@@ -23,7 +23,6 @@ RUN cd $GOPATH/src && mkdir -p webconsole
 COPY . $GOPATH/src/webconsole
 
 RUN cd $GOPATH/src/webconsole \
-    && make all \
     && CGO_ENABLED=0 go build -a -installsuffix nocgo -o webconsole -x server.go
 
 FROM alpine:3.8 as webui
@@ -43,4 +42,3 @@ RUN mkdir -p webconsole/
 
 # Copy executable and default certs
 COPY --from=builder /go/src/webconsole/webconsole ./webconsole
-COPY --from=builder /go/src/webconsole/public ./webconsole/public

@@ -63,7 +63,7 @@ func (webui *WEBUI) Initialize(c *cli.Context) {
 			panic(err)
 		}
 	} else {
-		DefaultWebUIConfigPath := path_util.Free5gcPath("free5gc/config/webuicfg.yaml")
+		DefaultWebUIConfigPath := path_util.Free5gcPath("webconsole/config/webuicfg.yaml")
 		if err := factory.InitConfigFactory(DefaultWebUIConfigPath); err != nil {
 			panic(err)
 		}

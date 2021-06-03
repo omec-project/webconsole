@@ -1,0 +1,261 @@
+# Copyright 2020-present Open Networking Foundation
+#
+# SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
+
+
+openapi: 3.0.0
+
+info:
+  title: Connectivity Service Configuration
+  description: APIs to configure connectivity service in Aether Network
+  contact:
+     name: ONF
+     url: http://opennetworking.org
+  version: 1.0.0
+servers:
+  - url: http://connectivity-config:8080
+paths:
+  /device-group/{group-name}:
+    description: Add IMSIs to the group
+    post:
+      parameters:
+      - in: path
+        name: group-name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/device-groups'
+      responses:
+        200:
+          description: IMSIs successfully added to group
+    patch:
+      parameters:
+      - in: path
+        name: group-name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/imsis'
+      responses:
+        200:
+          description: Additional IMSIs in the existing group  
+  /network-slice/{slice-name}:
+    description: create network slice
+    post:
+      description: Configure network slice
+      parameters: 
+        - in: path
+          name: slice-name
+          required: true
+          schema:
+            type: string
+            example: slice1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/slice'
+      responses:
+        201:
+          description: successfully created network slice
+    put:
+      description: Update network slice information
+      parameters: 
+        - in: path
+          name: slice-name
+          required: true
+          schema:
+            type: string
+            example: slice1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/slice'
+      responses:
+        201:
+          description: successfully created network slice
+    delete:
+      description: delete network slice information
+      parameters: 
+        - in: path
+          name: slice-name
+          required: true
+          schema:
+            type: string
+            example: slice1
+      responses:
+        200:
+          description: successfully created network slice
+components:
+  schemas:
+    imsis:
+      type: array
+      items:
+        type: string
+        example: 123456789123456
+    device-groups:
+      type: object
+      properties:
+        imsis:
+          type: array
+          items:
+            type: string
+            example: 123456789123456
+        site-info:
+          type: string
+          example: menlo..add site info
+        ip-domain-name:
+          type: string
+          example: pool1
+        ip-domain-expanded:
+          type: object
+          description: This is APN for device
+          properties:
+            dnn:
+              type: string
+              example: internet
+            ue-ip-pool:
+              type: string
+              example: 1.1.0.0/16
+            admin-status:
+              type: string
+              example: admin-up
+              enum: [admin-up, admin-down, admin-maintainance]
+            dns-primary:
+              type: string
+              example: 8.8.8.8
+            mtu:
+              type: integer 
+              example: 1460
+    slice:
+      type: object
+      properties:
+        slice-id:
+          type: object
+          properties:
+            sst:
+              description: Slice Service Type
+              type: integer
+              minimum: 1
+              maximum: 255
+            sd:
+              description: Slice differntiator. 
+              type: integer
+              minimum: 1
+              maximum: 65565
+        qos:
+          type: object
+          properties:
+            uplink:
+              type: integer
+              description: uplink data rate in mbps
+              example: 4 Mbps
+            downlink:
+              type: integer
+              description: downlink data rate in mbps
+              example: 20 Mbps
+            traffic-class:
+              type: string
+              description: QCI/QFI for the traffic
+        site-device-group:
+          type: array
+          items:
+            type: string
+            example: iot-camera
+            description: Name of the device group which is added in this slice
+        site-info:
+          type: object
+          description: give details of the site where this device group is activated
+          properties:
+            site-name:
+              type: string
+              example: "menlo"
+              description: Unique name per Site.
+            plmn:
+              type: object
+              description: Fixed supported plmn at the site.
+              properties:
+                mcc:
+                  type: string
+                  example: "315"
+                mnc:
+                  type: string
+                  example: "010"
+            gNodeBs:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    example: menlo-gnb1
+                    type: string
+                  tac:
+                    type: integer
+                    example: 1
+                    description: unique tac per gNB. This should match gNB configuration.
+            upf:
+              description: UPF which belong to this slice
+              properties:
+                upf-name:
+                  type: string
+                  example: upf.menlo.aetherproject.org
+                upf-port:
+                  type: integer
+                  example: 8805
+        deny-application:
+          type: array
+          items:
+            type: object
+            properties:
+              app-name:
+                type: string
+                example: iot-app2
+                description: Single App or group of application identification
+        permitted-applications:
+          type: array
+          items:
+            type: object
+            properties:
+              app-name:
+                type: string
+                example: iot-app
+                description: Single App or group of application identification
+        applications-information:
+          type: array
+          items:
+            type: object
+            properties:
+              app-name:
+                type: string
+                example: iot-app
+                description: Single App or group of application identification
+              endpoint:
+                type: string
+                example: 1.1.1.1/32
+                description: Single IP or network
+              start-port:
+                type: integer
+                example: 40000
+                description: port range start
+                minimum: 1
+                maximum: 65565
+              end-port:
+                type: integer
+                example: 40000
+                description: port range end
+                minimum: 1
+                maximum: 65565
+              protocol:
+                type: integer
+                example: 17
+                minimum: 1
+                maximum: 255

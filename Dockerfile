@@ -40,14 +40,11 @@ RUN chmod +x ${GRPC_WEB_PATH}
 
 RUN cd $GOPATH/src && mkdir -p webconsole
 COPY . $GOPATH/src/webconsole
-COPY ./netrc /root/.netrc
-RUN chmod 600 /root/.netrc
 RUN cd $GOPATH/src/webconsole/proto \
     && go get -u github.com/golang/protobuf/protoc-gen-go \
     && protoc --go_out=plugins=grpc:. config.proto
 
 RUN cd $GOPATH/src/webconsole \
-    && go mod vendor \
     && make all \
     && CGO_ENABLED=0 go build -a -installsuffix nocgo -o webconsole -x server.go
 

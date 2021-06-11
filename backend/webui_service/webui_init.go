@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	gClient "github.com/badhrinathpa/webconsole/proto/client"
 	"github.com/free5gc/MongoDBLibrary"
 	mongoDBLibLogger "github.com/free5gc/MongoDBLibrary/logger"
 	openApiLogger "github.com/free5gc/openapi/logger"
@@ -21,6 +20,7 @@ import (
 	"github.com/free5gc/webconsole/backend/factory"
 	"github.com/free5gc/webconsole/backend/logger"
 	"github.com/free5gc/webconsole/backend/webui_context"
+	gClient "github.com/omec-project/webconsole/proto/client"
 	"google.golang.org/grpc/connectivity"
 )
 
@@ -77,23 +77,25 @@ func startConfigClient() {
 		}
 	}()
 
-	select {
-	case ok := <-connReady:
-		if ok {
-			err = confClient.WriteConfig(&cReq)
-			if err != nil {
-				log.Println("write config to nssf failed : ", err)
-				return
-			}
+	go func() {
+		select {
+		case ok := <-connReady:
+			if ok {
+				err = confClient.WriteConfig(&cReq)
+				if err != nil {
+					log.Println("write config to nssf failed : ", err)
+					return
+				}
 
-			var cResp gClient.ConfigResp
-			err = confClient.ReadConfig(&cResp)
-			if err != nil {
-				log.Println("write config to nssf failed : ", err)
-				return
+				var cResp gClient.ConfigResp
+				err = confClient.ReadConfig(&cResp)
+				if err != nil {
+					log.Println("write config to nssf failed : ", err)
+					return
+				}
 			}
 		}
-	}
+	}()
 
 	return
 }

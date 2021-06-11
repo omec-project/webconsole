@@ -2,7 +2,7 @@ package client
 
 import (
 	context "context"
-	protos "github.com/badhrinathpa/webconsole/proto/omec5gconfig"
+	protos "github.com/omec-project/webconsole/proto/omec5gconfig"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"log"

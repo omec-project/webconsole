@@ -25,7 +25,7 @@ WEBCONSOLE_LDFLAGS = -X github.com/free5gc/version.VERSION=$(VERSION) \
 
 .DEFAULT_GOAL: nfs
 
- all: $(WEBCONSOLE)
+all: $(WEBCONSOLE)
 
 $(WEBCONSOLE): $(GO_BIN_PATH)/$(WEBCONSOLE)
 

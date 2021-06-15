@@ -1,0 +1,60 @@
+syntax = "proto3";
+package omec5gconfig;
+option go_package = "./omec5gconfig";
+
+service ConfigService {
+  // Update one or more entities on the target.
+  rpc Write(WriteRequest) returns (WriteResponse) {
+  }
+  // Read one or more P4 entities from the target.
+  rpc Read(ReadRequest) returns (ReadResponse) {
+  }
+}
+
+enum Status {
+  SUCCESS = 0;
+  FAILURE = 1;
+}
+
+message PlmnId {
+  string mcc = 1;
+  string mnc = 2;
+}
+
+message NSSAI {
+  string sst = 1;
+  string sd = 2;
+}
+
+message SupportedPlmnList {
+  repeated PlmnId plmnIds = 1; 
+}
+
+message SupportedNssaiList {
+  repeated NSSAI nssai = 1; 
+}
+
+message SupportedNssaiInPlmnList {
+    PlmnId plmn = 1;
+    SupportedNssaiList snssaiList = 2;
+}
+
+message Config {
+  SupportedPlmnList suppPlmnList = 1;
+  SupportedNssaiInPlmnList suppNssaiInPlmnList = 2;
+}
+
+message WriteRequest {
+    Config writeConfig = 1;
+}
+
+message WriteResponse {
+    Status writeStatus = 1;
+}
+
+message ReadRequest {
+}
+
+message ReadResponse {
+    Config readConfig = 1;
+}

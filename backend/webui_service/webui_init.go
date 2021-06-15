@@ -3,6 +3,7 @@ package webui_service
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os/exec"
 	"sync"
 
@@ -19,6 +20,8 @@ import (
 	"github.com/free5gc/webconsole/backend/factory"
 	"github.com/free5gc/webconsole/backend/logger"
 	"github.com/free5gc/webconsole/backend/webui_context"
+	gClient "github.com/omec-project/webconsole/proto/client"
+	"google.golang.org/grpc/connectivity"
 )
 
 type WEBUI struct{}
@@ -49,6 +52,54 @@ func init() {
 	initLog = logger.InitLog
 }
 
+func startConfigClient() {
+	var confClient *gClient.ConfigClient
+	confClient, err := gClient.CreateChannel("nssf:9876", 10000)
+	if err != nil {
+		log.Println("create grpc channel to nssf failed. : ", err)
+		return
+	}
+
+	var cReq gClient.ConfigReq
+	cReq.SuppPlmnList.PlmnIdList = make([]gClient.PlmnId, 2)
+	cReq.SuppPlmnList.PlmnIdList[0].MCC = "305"
+	cReq.SuppPlmnList.PlmnIdList[0].MNC = "11"
+	cReq.SuppPlmnList.PlmnIdList[1].MCC = "208"
+	cReq.SuppPlmnList.PlmnIdList[1].MNC = "93"
+
+	connReady := make(chan bool)
+	go func() {
+		for {
+			status := confClient.Conn.GetState()
+			if status == connectivity.Ready {
+				connReady <- true
+			}
+		}
+	}()
+
+	go func() {
+		select {
+		case ok := <-connReady:
+			if ok {
+				err = confClient.WriteConfig(&cReq)
+				if err != nil {
+					log.Println("write config to nssf failed : ", err)
+					return
+				}
+
+				var cResp gClient.ConfigResp
+				err = confClient.ReadConfig(&cResp)
+				if err != nil {
+					log.Println("write config to nssf failed : ", err)
+					return
+				}
+			}
+		}
+	}()
+
+	return
+}
+
 func (*WEBUI) GetCliCmd() (flags []cli.Flag) {
 	return webuiCLi
 }
@@ -70,6 +121,7 @@ func (webui *WEBUI) Initialize(c *cli.Context) {
 	}
 
 	webui.setLogLevel()
+	startConfigClient()
 }
 
 func (webui *WEBUI) setLogLevel() {

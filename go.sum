@@ -60,7 +60,10 @@ github.com/evanphx/json-patch v4.9.0+incompatible h1:kLcOMZeuLAJvL2BPWLMIj5oaZQo
 github.com/evanphx/json-patch v4.9.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/free5gc/MongoDBLibrary v1.0.0 h1:+CN5t3G9AvI4iv7azq46KUK4VWYsprbR7OHBqVM9XSo=
 github.com/free5gc/MongoDBLibrary v1.0.0/go.mod h1:0TSgWaO+5KyIrylML6jbHqtgoJJKpHGiXHPFdHXXPts=
+github.com/free5gc/http2_util v1.0.0 h1:0laMypHUNizAE5zsLoeJQq0R4XrfbvsLCW4NHCPpc44=
 github.com/free5gc/http2_util v1.0.0/go.mod h1:GN2BCD8IINjtnAKYGwe+dEeTBRFEv4lQnZblFIIhbdE=
+github.com/free5gc/http_wrapper v1.0.0 h1:NdnDHkItXxUzoxggiQsnR9SObBdi6KmwcN+QUJs4CoQ=
+github.com/free5gc/http_wrapper v1.0.0/go.mod h1:vVArDqfCo7fvmYGi9WRPj4yurSu86GxRh3iQ70aq+OE=
 github.com/free5gc/logger_conf v1.0.0 h1:cMqqB8L4HjE57tP36mBmiVUPIcHv8Ayr12jKfeiwqZU=
 github.com/free5gc/logger_conf v1.0.0/go.mod h1:DHecLXVV1qA5Z+lSoUvZdZ6tCtZidTNmtx99jsCfgLE=
 github.com/free5gc/logger_util v1.0.0 h1:hLTCTnKlEqJURrBwooNFQLavWPdJzS0o9KGIYUNKdJI=
@@ -78,6 +81,8 @@ github.com/gin-contrib/sse v0.1.0/go.mod h1:RHrZQHXnP2xjPF+u1gW/2HnVO7nvIa9PG3Gm
 github.com/gin-gonic/gin v1.5.0/go.mod h1:Nd6IXA8m5kNZdNEHMBd93KT+mdY3+bewLgRvmCsR2Do=
 github.com/gin-gonic/gin v1.6.3 h1:ahKqKTFpO5KTPHxWZjEdPScmYaGtLo8Y4DMHoEsnp14=
 github.com/gin-gonic/gin v1.6.3/go.mod h1:75u5sXoLsGZoRN5Sgbi1eraJ4GU3++wFwWzhwvtwp4M=
+github.com/gin-gonic/gin v1.7.2 h1:Tg03T9yM2xa8j6I3Z3oqLaQRSmKvxPd6g/2HJ6zICFA=
+github.com/gin-gonic/gin v1.7.2/go.mod h1:jD2toBW3GZUr5UMcdrwQA10I7RuaFOl/SGeDjXkfUtY=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20191125211704-12ad95a8df72/go.mod h1:tQ2UAYgL5IevRw8kRxooKSPJfGvJ9fJQFa0TUsXzTg8=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4/go.mod h1:tQ2UAYgL5IevRw8kRxooKSPJfGvJ9fJQFa0TUsXzTg8=
@@ -244,6 +249,8 @@ github.com/sirupsen/logrus v1.4.1/go.mod h1:ni0Sbl8bgC9z8RoU9G6nDWqqs/fq4eDPysMB
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/sirupsen/logrus v1.7.0 h1:ShrD1U9pZB12TX0cVy0DtePoCH97K8EtX+mg7ZARUtM=
 github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
+github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE=
+github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/spf13/cobra v0.0.3/go.mod h1:1l0Ry5zgKvJasoi3XT1TypsSe7PqH0Sj9dhYf7v3XqQ=
 github.com/spf13/pflag v1.0.3/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnInEg4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

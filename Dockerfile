@@ -26,23 +26,15 @@ ENV BASE=/usr
 RUN cp ./proto/bin/protoc ${BASE}/bin/
 RUN cp -R ./proto/include/* ${BASE}/include/
 
-# Download protoc-gen-grpc-web
-ENV GRPC_WEB=protoc-gen-grpc-web-1.2.1-linux-x86_64
-ENV GRPC_WEB_PATH=/usr/bin/protoc-gen-grpc-web
-ENV GRPC_TRACE=all
-ENV GRPC_VERBOSITY=debug
-ENV GRPC_GO_LOG_VERBOSITY_LEVEL=99
-ENV GRPC_GO_LOG_SEVERITY_LEVEL=info
-RUN curl -OL https://github.com/grpc/grpc-web/releases/download/1.2.1/${GRPC_WEB}
-# Copy into path
-RUN mv ${GRPC_WEB} ${GRPC_WEB_PATH}
-RUN chmod +x ${GRPC_WEB_PATH}
-
 RUN cd $GOPATH/src && mkdir -p webconsole
 COPY . $GOPATH/src/webconsole
 RUN cd $GOPATH/src/webconsole/proto \
-    && go get -u github.com/golang/protobuf/protoc-gen-go \
-    && protoc --go_out=plugins=grpc:. config.proto
+    && go get -u google.golang.org/protobuf/cmd/protoc-gen-go \
+    && go install google.golang.org/protobuf/cmd/protoc-gen-go \
+    && go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc \
+    && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc \
+    && protoc -I ./ --go_out=. config.proto \
+    && protoc -I ./ --go-grpc_out=. config.proto
 
 RUN cd $GOPATH/src/webconsole \
     && make all \
@@ -64,9 +56,5 @@ WORKDIR /free5gc
 RUN mkdir -p webconsole/
 
 # Copy executable and default certs
-ENV GRPC_TRACE=all
-ENV GRPC_VERBOSITY=debug
-ENV GRPC_GO_LOG_VERBOSITY_LEVEL=99
-ENV GRPC_GO_LOG_SEVERITY_LEVEL=info
 COPY --from=builder /go/src/webconsole/webconsole ./webconsole
 COPY --from=builder /go/src/webconsole/public ./webconsole/public

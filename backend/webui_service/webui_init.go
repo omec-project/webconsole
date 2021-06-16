@@ -13,6 +13,8 @@ import (
 
 	"github.com/free5gc/MongoDBLibrary"
 	mongoDBLibLogger "github.com/free5gc/MongoDBLibrary/logger"
+	"github.com/free5gc/http2_util"
+	"github.com/free5gc/logger_util"
 	openApiLogger "github.com/free5gc/openapi/logger"
 	"github.com/free5gc/path_util"
 	pathUtilLogger "github.com/free5gc/path_util/logger"
@@ -20,6 +22,7 @@ import (
 	"github.com/free5gc/webconsole/backend/factory"
 	"github.com/free5gc/webconsole/backend/logger"
 	"github.com/free5gc/webconsole/backend/webui_context"
+	"github.com/omec-project/webconsole/configapi"
 	gClient "github.com/omec-project/webconsole/proto/client"
 	"google.golang.org/grpc/connectivity"
 )
@@ -236,8 +239,31 @@ func (webui *WEBUI) Start() {
 	self.UpdateNfProfiles()
 
 	router.NoRoute(ReturnPublic())
+	go func() {
+		initLog.Infoln(router.Run(":5000"))
+		initLog.Infoln("Webserver stopped/terminated/not-started ")
+	}()
 
-	initLog.Infoln(router.Run(":5000"))
+	config_router := logger_util.NewGinWithLogrus(logger.GinLog)
+	configapi.AddService(config_router)
+	HTTPAddr := "0.0.0.0:9089"
+	initLog.Infoln("Http address ", HTTPAddr)
+	server, err := http2_util.NewServer(HTTPAddr, "", config_router)
+
+	if server == nil {
+		initLog.Error("Initialize HTTP server failed:", err)
+		return
+	}
+	if err != nil {
+		initLog.Warnln("Initialize HTTP server:", err)
+	}
+
+	initLog.Infoln("Start Http server at address ", HTTPAddr)
+	err = server.ListenAndServe()
+
+	if err != nil {
+		initLog.Fatalln("HTTP server setup failed:", err)
+	}
 }
 
 func (webui *WEBUI) Exec(c *cli.Context) error {

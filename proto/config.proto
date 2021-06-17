@@ -1,6 +1,6 @@
 syntax = "proto3";
-package omec5gconfig;
-option go_package = "./omec5gconfig";
+package sdcoreConfig;
+option go_package = "./sdcoreConfig";
 
 service ConfigService {
   // Update one or more entities on the target.

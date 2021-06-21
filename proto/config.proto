@@ -40,8 +40,9 @@ message SupportedNssaiInPlmnList {
 }
 
 message Config {
-  SupportedPlmnList suppPlmnList = 1;
-  SupportedNssaiInPlmnList suppNssaiInPlmnList = 2;
+  string version = 1;
+  SupportedPlmnList suppPlmnList = 2;
+  SupportedNssaiInPlmnList suppNssaiInPlmnList = 3;
 }
 
 message WriteRequest {
@@ -53,6 +54,7 @@ message WriteResponse {
 }
 
 message ReadRequest {
+    string version = 1;
 }
 
 message ReadResponse {

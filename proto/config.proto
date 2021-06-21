@@ -45,6 +45,48 @@ message Config {
   SupportedNssaiInPlmnList suppNssaiInPlmnList = 3;
 }
 
+message QoS {
+    uint32  uplink = 1;
+    uint32  downlink = 2;
+    string  trafficClass = 3;
+}
+
+message gNodeB {
+    string      name = 1;
+    uint32      tac  = 2;
+}
+
+message UpfInfo {
+    string      upfName = 1; 
+    uint32      upfPort = 2;
+}
+
+message SiteInfo {
+    string      siteName = 1;
+    gNodeB      gnb = 2;
+    PlmnId      plmn = 3;
+    UpfInfo     upf  = 4;
+}
+
+message AppInfo {
+    string appName = 1;
+    uint32 startport = 2;
+    uint32 endport = 3;
+    uint32 protocol = 4;
+    string endPoint = 5;
+}
+
+message NetworkSlice {
+    string name = 1;
+    NSSAI nssai = 2; 
+    QoS   qos   = 3;
+    repeated string deviceGroups = 4;
+    SiteInfo site = 5;
+    repeated string denyApps = 6;
+    repeated string permitApps = 7;
+    repeated AppInfo appInfo = 8;
+}
+
 message WriteRequest {
     Config writeConfig = 1;
 }

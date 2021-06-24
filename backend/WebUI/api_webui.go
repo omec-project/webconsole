@@ -282,7 +282,7 @@ func GetSubscribers(c *gin.Context) {
 	c.JSON(http.StatusOK, subsList)
 }
 
-// Get subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
+// Get subscriber by IMSI(ueId))
 func GetSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 
@@ -291,15 +291,13 @@ func GetSubscriberByID(c *gin.Context) {
 	var subsData SubsData
 
 	ueId := c.Param("ueId")
-	servingPlmnId := c.Param("servingPlmnId")
 
 	filterUeIdOnly := bson.M{"ueId": ueId}
-	filter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
 
 	authSubsDataInterface := MongoDBLibrary.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
-	amDataDataInterface := MongoDBLibrary.RestfulAPIGetOne(amDataColl, filter)
-	smDataDataInterface := MongoDBLibrary.RestfulAPIGetMany(smDataColl, filter)
-	smfSelDataInterface := MongoDBLibrary.RestfulAPIGetOne(smfSelDataColl, filter)
+	amDataDataInterface := MongoDBLibrary.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
+	smDataDataInterface := MongoDBLibrary.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
+	smfSelDataInterface := MongoDBLibrary.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
 	amPolicyDataInterface := MongoDBLibrary.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
 	smPolicyDataInterface := MongoDBLibrary.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
 
@@ -317,7 +315,6 @@ func GetSubscriberByID(c *gin.Context) {
 	json.Unmarshal(mapToByte(smPolicyDataInterface), &smPolicyData)
 
 	subsData = SubsData{
-		PlmnID:                            servingPlmnId,
 		UeId:                              ueId,
 		AuthenticationSubscription:        authSubsData,
 		AccessAndMobilitySubscriptionData: amDataData,
@@ -330,7 +327,7 @@ func GetSubscriberByID(c *gin.Context) {
 	c.JSON(http.StatusOK, subsData)
 }
 
-// Post subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
+// Post subscriber by IMSI(ueId)
 func PostSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Post One Subscriber Data")
@@ -341,28 +338,23 @@ func PostSubscriberByID(c *gin.Context) {
 	}
 
 	ueId := c.Param("ueId")
-	servingPlmnId := c.Param("servingPlmnId")
 
 	filterUeIdOnly := bson.M{"ueId": ueId}
-	filter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
 
 	authSubsBsonM := toBsonM(subsData.AuthenticationSubscription)
 	authSubsBsonM["ueId"] = ueId
 	amDataBsonM := toBsonM(subsData.AccessAndMobilitySubscriptionData)
 	amDataBsonM["ueId"] = ueId
-	amDataBsonM["servingPlmnId"] = servingPlmnId
 
 	smDatasBsonA := make([]interface{}, 0, len(subsData.SessionManagementSubscriptionData))
 	for _, smSubsData := range subsData.SessionManagementSubscriptionData {
 		smDataBsonM := toBsonM(smSubsData)
 		smDataBsonM["ueId"] = ueId
-		smDataBsonM["servingPlmnId"] = servingPlmnId
 		smDatasBsonA = append(smDatasBsonA, smDataBsonM)
 	}
 
 	smfSelSubsBsonM := toBsonM(subsData.SmfSelectionSubscriptionData)
 	smfSelSubsBsonM["ueId"] = ueId
-	smfSelSubsBsonM["servingPlmnId"] = servingPlmnId
 	amPolicyDataBsonM := toBsonM(subsData.AmPolicyData)
 	amPolicyDataBsonM["ueId"] = ueId
 	smPolicyDataBsonM := toBsonM(subsData.SmPolicyData)
@@ -372,17 +364,16 @@ func PostSubscriberByID(c *gin.Context) {
 	for _, flowRule := range subsData.FlowRules {
 		flowRuleBsonM := toBsonM(flowRule)
 		flowRuleBsonM["ueId"] = ueId
-		flowRuleBsonM["servingPlmnId"] = servingPlmnId
 		flowRulesBsonA = append(flowRulesBsonA, flowRuleBsonM)
 	}
 
 	MongoDBLibrary.RestfulAPIPost(authSubsDataColl, filterUeIdOnly, authSubsBsonM)
-	MongoDBLibrary.RestfulAPIPost(amDataColl, filter, amDataBsonM)
-	MongoDBLibrary.RestfulAPIPostMany(smDataColl, filter, smDatasBsonA)
-	MongoDBLibrary.RestfulAPIPost(smfSelDataColl, filter, smfSelSubsBsonM)
+	MongoDBLibrary.RestfulAPIPost(amDataColl, filterUeIdOnly, amDataBsonM)
+	MongoDBLibrary.RestfulAPIPostMany(smDataColl, filterUeIdOnly, smDatasBsonA)
+	MongoDBLibrary.RestfulAPIPost(smfSelDataColl, filterUeIdOnly, smfSelSubsBsonM)
 	MongoDBLibrary.RestfulAPIPost(amPolicyDataColl, filterUeIdOnly, amPolicyDataBsonM)
 	MongoDBLibrary.RestfulAPIPost(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
-	MongoDBLibrary.RestfulAPIPostMany(flowRuleDataColl, filter, flowRulesBsonA)
+	MongoDBLibrary.RestfulAPIPostMany(flowRuleDataColl, filterUeIdOnly, flowRulesBsonA)
 
 	c.JSON(http.StatusCreated, gin.H{})
 }
@@ -485,22 +476,20 @@ func PatchSubscriberByID(c *gin.Context) {
 	c.JSON(http.StatusNoContent, gin.H{})
 }
 
-// Delete subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
+// Delete subscriber by IMSI(ueId)
 func DeleteSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Delete One Subscriber Data")
 
 	ueId := c.Param("ueId")
-	servingPlmnId := c.Param("servingPlmnId")
 
 	filterUeIdOnly := bson.M{"ueId": ueId}
-	filter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
 
 	MongoDBLibrary.RestfulAPIDeleteOne(authSubsDataColl, filterUeIdOnly)
-	MongoDBLibrary.RestfulAPIDeleteOne(amDataColl, filter)
-	MongoDBLibrary.RestfulAPIDeleteMany(smDataColl, filter)
-	MongoDBLibrary.RestfulAPIDeleteMany(flowRuleDataColl, filter)
-	MongoDBLibrary.RestfulAPIDeleteOne(smfSelDataColl, filter)
+	MongoDBLibrary.RestfulAPIDeleteOne(amDataColl, filterUeIdOnly)
+	MongoDBLibrary.RestfulAPIDeleteMany(smDataColl, filterUeIdOnly)
+	MongoDBLibrary.RestfulAPIDeleteMany(flowRuleDataColl, filterUeIdOnly)
+	MongoDBLibrary.RestfulAPIDeleteOne(smfSelDataColl, filterUeIdOnly)
 	MongoDBLibrary.RestfulAPIDeleteOne(amPolicyDataColl, filterUeIdOnly)
 	MongoDBLibrary.RestfulAPIDeleteOne(smPolicyDataColl, filterUeIdOnly)
 

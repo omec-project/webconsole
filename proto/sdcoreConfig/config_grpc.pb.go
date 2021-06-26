@@ -22,10 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ConfigServiceClient interface {
-	// Update one or more entities on the target.
-	Write(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error)
-	// Read one or more P4 entities from the target.
-	Read(ctx context.Context, in *ReadRequest, opts ...grpc.CallOption) (*ReadResponse, error)
+	GetNetworkSlice(ctx context.Context, in *NetworkSliceRequest, opts ...grpc.CallOption) (*NetworkSliceResponse, error)
 }
 
 type configServiceClient struct {
@@ -36,18 +33,9 @@ func NewConfigServiceClient(cc grpc.ClientConnInterface) ConfigServiceClient {
 	return &configServiceClient{cc}
 }
 
-func (c *configServiceClient) Write(ctx context.Context, in *WriteRequest, opts ...grpc.CallOption) (*WriteResponse, error) {
-	out := new(WriteResponse)
-	err := c.cc.Invoke(ctx, "/sdcoreConfig.ConfigService/Write", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *configServiceClient) Read(ctx context.Context, in *ReadRequest, opts ...grpc.CallOption) (*ReadResponse, error) {
-	out := new(ReadResponse)
-	err := c.cc.Invoke(ctx, "/sdcoreConfig.ConfigService/Read", in, out, opts...)
+func (c *configServiceClient) GetNetworkSlice(ctx context.Context, in *NetworkSliceRequest, opts ...grpc.CallOption) (*NetworkSliceResponse, error) {
+	out := new(NetworkSliceResponse)
+	err := c.cc.Invoke(ctx, "/sdcoreConfig.ConfigService/GetNetworkSlice", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -58,10 +46,7 @@ func (c *configServiceClient) Read(ctx context.Context, in *ReadRequest, opts ..
 // All implementations must embed UnimplementedConfigServiceServer
 // for forward compatibility
 type ConfigServiceServer interface {
-	// Update one or more entities on the target.
-	Write(context.Context, *WriteRequest) (*WriteResponse, error)
-	// Read one or more P4 entities from the target.
-	Read(context.Context, *ReadRequest) (*ReadResponse, error)
+	GetNetworkSlice(context.Context, *NetworkSliceRequest) (*NetworkSliceResponse, error)
 	mustEmbedUnimplementedConfigServiceServer()
 }
 
@@ -69,11 +54,8 @@ type ConfigServiceServer interface {
 type UnimplementedConfigServiceServer struct {
 }
 
-func (UnimplementedConfigServiceServer) Write(context.Context, *WriteRequest) (*WriteResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")
-}
-func (UnimplementedConfigServiceServer) Read(context.Context, *ReadRequest) (*ReadResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Read not implemented")
+func (UnimplementedConfigServiceServer) GetNetworkSlice(context.Context, *NetworkSliceRequest) (*NetworkSliceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetNetworkSlice not implemented")
 }
 func (UnimplementedConfigServiceServer) mustEmbedUnimplementedConfigServiceServer() {}
 
@@ -88,38 +70,20 @@ func RegisterConfigServiceServer(s grpc.ServiceRegistrar, srv ConfigServiceServe
 	s.RegisterService(&ConfigService_ServiceDesc, srv)
 }
 
-func _ConfigService_Write_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(WriteRequest)
+func _ConfigService_GetNetworkSlice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NetworkSliceRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ConfigServiceServer).Write(ctx, in)
+		return srv.(ConfigServiceServer).GetNetworkSlice(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/sdcoreConfig.ConfigService/Write",
+		FullMethod: "/sdcoreConfig.ConfigService/GetNetworkSlice",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConfigServiceServer).Write(ctx, req.(*WriteRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ConfigService_Read_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReadRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ConfigServiceServer).Read(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/sdcoreConfig.ConfigService/Read",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConfigServiceServer).Read(ctx, req.(*ReadRequest))
+		return srv.(ConfigServiceServer).GetNetworkSlice(ctx, req.(*NetworkSliceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -132,12 +96,8 @@ var ConfigService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ConfigServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Write",
-			Handler:    _ConfigService_Write_Handler,
-		},
-		{
-			MethodName: "Read",
-			Handler:    _ConfigService_Read_Handler,
+			MethodName: "GetNetworkSlice",
+			Handler:    _ConfigService_GetNetworkSlice_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

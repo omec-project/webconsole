@@ -10,19 +10,10 @@
 package configapi
 
 import (
-	"github.com/free5gc/http_wrapper"
-	"github.com/free5gc/webconsole/backend/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
+	"github.com/omec-project/webconsole/backend/logger"
 	"net/http"
-	"strings"
 )
-
-var initLog *logrus.Entry
-
-func init() {
-	initLog = logger.InitLog
-}
 
 // DeviceGroupGroupNamePatch -
 func DeviceGroupGroupNamePatch(c *gin.Context) {
@@ -31,48 +22,12 @@ func DeviceGroupGroupNamePatch(c *gin.Context) {
 
 // DeviceGroupGroupNamePost -
 func DeviceGroupGroupNamePost(c *gin.Context) {
-	initLog.Infof("DeviceGroupGroupNamePost")
-
-	if group, exists := c.Params.Get("group-name"); exists {
-		initLog.Infof("Received group %v", group)
+	logger.ConfigLog.Infof("DeviceGroupGroupNamePost")
+	if ret := DeviceGroupPostHandler(c); ret == true {
+		c.JSON(http.StatusOK, gin.H{})
 	} else {
-		initLog.Infof("bad URI ")
+		c.JSON(http.StatusBadRequest, gin.H{})
 	}
-
-	var err error
-	var request DeviceGroups
-	s := strings.Split(c.GetHeader("Content-Type"), ";")
-	switch s[0] {
-	case "application/json":
-		err = c.ShouldBindJSON(&request)
-	}
-	if err != nil {
-		initLog.Infof(" err ", err)
-	}
-	initLog.Infof("Printing request full after binding : %v", request)
-	req := http_wrapper.NewRequest(c.Request, request)
-
-	initLog.Infof("Printing request full : %+v", req)
-	initLog.Infof("params : %v", req.Params)
-	initLog.Infof("Header : %v", req.Header)
-	initLog.Infof("Query  : %v", req.Query)
-	initLog.Infof("Printing request body : %v", req.Body)
-	initLog.Infof("URL : %v ", req.URL)
-
-	procReq := req.Body.(DeviceGroups)
-	initLog.Infof("Imsis.size : %v", len(procReq.Imsis))
-
-	for i := 0; i < len(procReq.Imsis); i++ {
-		initLog.Infof("Imsis : %v", procReq.Imsis[i])
-	}
-	initLog.Infof("IP Domain Name : %v", procReq.IpDomainName)
-	ipdomain := procReq.IpDomainExpanded
-	initLog.Infof("IP Domain details %v", ipdomain)
-	initLog.Infof("  dnn name : %v", ipdomain.Dnn)
-	initLog.Infof("  ue pool  : %v", ipdomain.UeIpPool)
-	initLog.Infof("  dns Primary : %v", ipdomain.DnsPrimary)
-	initLog.Infof("  ip mtu : %v", ipdomain.Mtu)
-	c.JSON(http.StatusOK, gin.H{})
 }
 
 // NetworkSliceSliceNameDelete -
@@ -82,89 +37,12 @@ func NetworkSliceSliceNameDelete(c *gin.Context) {
 
 // NetworkSliceSliceNamePost -
 func NetworkSliceSliceNamePost(c *gin.Context) {
-	initLog.Infof("Received NetworkSliceSliceNamePost ")
-	if slice, exists := c.Params.Get("slice-name"); exists {
-		initLog.Infof("Received slice : %v", slice)
+	logger.ConfigLog.Infof("Received NetworkSliceSliceNamePost ")
+	if ret := NetworkSlicePostHandler(c); ret == true {
+		c.JSON(http.StatusOK, gin.H{})
 	} else {
-		//TODO
+		c.JSON(http.StatusBadRequest, gin.H{})
 	}
-
-	var err error
-	var request Slice
-	s := strings.Split(c.GetHeader("Content-Type"), ";")
-	switch s[0] {
-	case "application/json":
-		err = c.ShouldBindJSON(&request)
-	}
-	if err != nil {
-		initLog.Infof(" err ", err)
-		//TOOD - ERROR
-	}
-	initLog.Infof("Printing request full after binding : %v ", request)
-
-	req := http_wrapper.NewRequest(c.Request, request)
-
-	initLog.Infof("Printing request full : %v", req)
-	initLog.Infof("params : %v ", req.Params)
-	initLog.Infof("Header : %v ", req.Header)
-	initLog.Infof("Query  : %v ", req.Query)
-	initLog.Infof("Printing request body : %v ", req.Body)
-	initLog.Infof("URL : %v ", req.URL)
-
-	procReq := req.Body.(Slice)
-
-	slice := procReq.SliceId
-	initLog.Infof("Network Slice : %v", slice)
-	initLog.Infof("  sst         : %v", slice.Sst)
-	initLog.Infof("  sd          : %v", slice.Sd)
-
-	qos := procReq.Qos
-	initLog.Infof("Slice QoS   : %v", qos)
-	initLog.Infof("  uplink    : %v", qos.Uplink)
-	initLog.Infof("  downlink  : %v", qos.Downlink)
-	initLog.Infof("  traffic   : %v", qos.TrafficClass)
-
-	group := procReq.SiteDeviceGroup
-	initLog.Infof("Number of device groups %v", len(group))
-	for i := 0; i < len(group); i++ {
-		initLog.Infof("  device groups(%v) - %v \n", i+1, group[i])
-	}
-	denylist := procReq.DenyApplications
-	initLog.Infof("Number of denied applications %v", len(denylist))
-	for d := 0; d < len(denylist); d++ {
-		initLog.Infof("    deny application %v", denylist[d])
-	}
-	permitlist := procReq.PermitApplications
-	initLog.Infof("Number of permit applications %v", len(permitlist))
-	for p := 0; p < len(permitlist); p++ {
-		initLog.Infof("    permit application %v", permitlist[p])
-	}
-
-	appinfo := procReq.ApplicationsInformation
-	initLog.Infof("Length Application information %v", len(appinfo))
-	for a := 0; a < len(appinfo); a++ {
-		app := appinfo[a]
-		initLog.Infof("    appname   : %v", app.AppName)
-		initLog.Infof("    endpoint  : %v ", app.Endpoint)
-		initLog.Infof("    startPort : %v", app.StartPort)
-		initLog.Infof("    endPort   : %v", app.EndPort)
-		initLog.Infof("    protocol  : %v", app.Protocol)
-	}
-
-	site := procReq.SiteInfo
-	initLog.Infof("Site name : %v", site.SiteName)
-	initLog.Infof("Site PLMN : %v", site.Plmn)
-	initLog.Infof("   mcc    : %v", site.Plmn.Mcc)
-	initLog.Infof("   mnc    : %v", site.Plmn.Mnc)
-	initLog.Infof("Site gNBs : %v", site.GNodeBs)
-	for e := 0; e < len(site.GNodeBs); e++ {
-		enb := site.GNodeBs[e]
-		initLog.Infof("    enb (%v) - name - %v , tac = %v \n", e+1, enb.Name, enb.Tac)
-	}
-	initLog.Infof("Site UPF : %v", site.Upf)
-	initLog.Infof("    upf-name : %v", site.Upf["upf-name"])
-	initLog.Infof("    upf-port : %v", site.Upf["upf-port"])
-	c.JSON(http.StatusOK, gin.H{})
 }
 
 // NetworkSliceSliceNamePut -

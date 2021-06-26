@@ -2,40 +2,23 @@ package server
 
 import (
 	context "context"
+	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/configmodels"
 	protos "github.com/omec-project/webconsole/proto/sdcoreConfig"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
-	"log"
 	"net"
 	"time"
 )
 
-type PlmnId struct {
-	MCC string
-	MNC string
-}
+var grpcLog *logrus.Entry
 
-type SupportedPlmnList struct {
-	PlmnIdList []PlmnId
-}
-
-type Nssai struct {
-	sst string
-	sd  string
-}
-
-type SupportedNssaiList struct {
-	NssaiList []Nssai
-}
-
-type SupportedNssaiInPlmnList struct {
-	Plmn       PlmnId
-	SnssaiList SupportedNssaiList
+func init() {
+	grpcLog = logger.GrpcLog
 }
 
 type ServerConfig struct {
-	suppNssaiPlmnList SupportedNssaiInPlmnList
-	SuppPlmnList      SupportedPlmnList
 }
 
 type ConfigServer struct {
@@ -54,55 +37,37 @@ var kasp = keepalive.ServerParameters{
 	Timeout: 5 * time.Second,  // Wait 1 second for the ping ack before assuming the connection is dead
 }
 
-func StartServer(host string, confServ *ConfigServer) {
-	log.Println("start config server")
+func StartServer(host string, confServ *ConfigServer, configMsgChan chan *configmodels.ConfigMessage) {
+
+	grpcLog.Println("Start grpc config server")
+
+	go configHandler(configMsgChan)
+
 	lis, err := net.Listen("tcp", host)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		grpcLog.Fatalf("failed to listen: %v", err)
 	}
 
 	grpcServer := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
 	protos.RegisterConfigServiceServer(grpcServer, confServ)
 	if err = grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		grpcLog.Fatalf("failed to serve: %v", err)
 	}
+	grpcLog.Infoln("Completed grpc server goroutine")
 }
 
-func (c *ConfigServer) Read(ctx context.Context, rReq *protos.ReadRequest) (*protos.ReadResponse, error) {
-	log.Println("Handle Read config request")
-	rResp := &protos.ReadResponse{}
-	rCfg := &protos.Config{}
-	rResp.ReadConfig = rCfg
-	suppPlmnList := &protos.SupportedPlmnList{}
-	plmnId1 := &protos.PlmnId{
-		Mcc: "305",
-		Mnc: "11",
+func (c *ConfigServer) GetNetworkSlice(ctx context.Context, rReq *protos.NetworkSliceRequest) (*protos.NetworkSliceResponse, error) {
+	grpcLog.Infof("Network Slice config req:Client %v, rst counter %v\n", rReq.ClientId, rReq.RestartCounter)
+	client, created := getClient(rReq.ClientId)
+	var reqMsg clientReqMsg
+	reqMsg.networkSliceReqMsg = rReq
+	reqMsg.grpcRspMsg = make(chan *clientRspMsg)
+	// Post the message on client handler & wait to get response
+	if created == true {
+		reqMsg.newClient = true
 	}
-	plmnId2 := &protos.PlmnId{
-		Mcc: "208",
-		Mnc: "93",
-	}
-	suppPlmnList.PlmnIds = append(suppPlmnList.PlmnIds, plmnId1)
-	suppPlmnList.PlmnIds = append(suppPlmnList.PlmnIds, plmnId2)
-	rCfg.SuppPlmnList = suppPlmnList
-	return rResp, nil
-}
-
-func (c *ConfigServer) Write(ctx context.Context, wReq *protos.WriteRequest) (*protos.WriteResponse, error) {
-	log.Println("Handle write request")
-	wResp := &protos.WriteResponse{}
-	wResp.WriteStatus = protos.Status_SUCCESS
-
-	wCfg := wReq.WriteConfig
-	suppPlmnList := wCfg.SuppPlmnList
-	for _, pl := range suppPlmnList.PlmnIds {
-		log.Println("mcc: ", pl.Mcc)
-		log.Println("mnc: ", pl.Mnc)
-		plmnId := PlmnId{
-			MCC: pl.GetMcc(),
-			MNC: pl.GetMnc(),
-		}
-		c.serverCfg.SuppPlmnList.PlmnIdList = append(c.serverCfg.SuppPlmnList.PlmnIdList, plmnId)
-	}
-	return wResp, nil
+	client.tempGrpcReq <- &reqMsg
+	rResp := <-reqMsg.grpcRspMsg
+	client.clientLog.Infoln("Received response message from client FSM")
+	return rResp.networkSliceRspMsg, nil
 }

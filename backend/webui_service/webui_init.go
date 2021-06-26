@@ -22,6 +22,7 @@ import (
 	"github.com/free5gc/webconsole/backend/logger"
 	"github.com/free5gc/webconsole/backend/webui_context"
 	"github.com/omec-project/webconsole/configapi"
+	"github.com/omec-project/webconsole/configmodels"
 	gServ "github.com/omec-project/webconsole/proto/server"
 )
 
@@ -74,9 +75,6 @@ func (webui *WEBUI) Initialize(c *cli.Context) {
 	}
 
 	webui.setLogLevel()
-	var host string = "0.0.0.0:9876"
-	confServ := &gServ.ConfigServer{}
-	go gServ.StartServer(host, confServ)
 }
 
 func (webui *WEBUI) setLogLevel() {
@@ -198,6 +196,13 @@ func (webui *WEBUI) Start() {
 
 	config_router := logger_util.NewGinWithLogrus(logger.GinLog)
 	configapi.AddService(config_router)
+	configMsgChan := make(chan *configmodels.ConfigMessage, 10)
+	configapi.SetChannel(configMsgChan)
+
+	var host string = "0.0.0.0:9876"
+	confServ := &gServ.ConfigServer{}
+	go gServ.StartServer(host, confServ, configMsgChan)
+
 	HTTPAddr := "0.0.0.0:9089"
 	initLog.Infoln("Http address ", HTTPAddr)
 	server, err := http2_util.NewServer(HTTPAddr, "", config_router)

@@ -3,11 +3,7 @@ package sdcoreConfig;
 option go_package = "./sdcoreConfig";
 
 service ConfigService {
-  // Update one or more entities on the target.
-  rpc Write(WriteRequest) returns (WriteResponse) {
-  }
-  // Read one or more P4 entities from the target.
-  rpc Read(ReadRequest) returns (ReadResponse) {
+  rpc GetNetworkSlice(NetworkSliceRequest) returns (NetworkSliceResponse) {
   }
 }
 
@@ -22,83 +18,73 @@ message PlmnId {
 }
 
 message NSSAI {
-  string sst = 1;
-  string sd = 2;
-}
-
-message SupportedPlmnList {
-  repeated PlmnId plmnIds = 1; 
-}
-
-message SupportedNssaiList {
-  repeated NSSAI nssai = 1; 
-}
-
-message SupportedNssaiInPlmnList {
-    PlmnId plmn = 1;
-    SupportedNssaiList snssaiList = 2;
-}
-
-message Config {
-  string version = 1;
-  SupportedPlmnList suppPlmnList = 2;
-  SupportedNssaiInPlmnList suppNssaiInPlmnList = 3;
+  int32 Sst = 1;
+  int32 Sd = 2;
 }
 
 message QoS {
-    uint32  uplink = 1;
-    uint32  downlink = 2;
-    string  trafficClass = 3;
+  int32  uplink = 1;
+  int32  downlink = 2;
+  string  trafficClass = 3;
 }
 
-message gNodeB {
-    string      name = 1;
-    uint32      tac  = 2;
+message GNodeB {
+  string      Name = 1;
+  int32      Tac  = 2;
 }
 
 message UpfInfo {
-    string      upfName = 1; 
-    uint32      upfPort = 2;
+  string      UpfName = 1; 
+  uint32      UpfPort = 2;
 }
 
 message SiteInfo {
-    string      siteName = 1;
-    gNodeB      gnb = 2;
-    PlmnId      plmn = 3;
-    UpfInfo     upf  = 4;
+  string      SiteName = 1;
+  repeated GNodeB      Gnb = 2;
+  PlmnId      Plmn = 3;
+  UpfInfo     Upf  = 4;
 }
 
 message AppInfo {
-    string appName = 1;
-    uint32 startport = 2;
-    uint32 endport = 3;
-    uint32 protocol = 4;
-    string endPoint = 5;
+  string AppName = 1;
+  uint32 Startport = 2;
+  uint32 Endport = 3;
+  uint32 Protocol = 4;
+  string EndPoint = 5;
 }
 
 message NetworkSlice {
-    string name = 1;
-    NSSAI nssai = 2; 
-    QoS   qos   = 3;
-    repeated string deviceGroups = 4;
-    SiteInfo site = 5;
-    repeated string denyApps = 6;
-    repeated string permitApps = 7;
-    repeated AppInfo appInfo = 8;
+  string Name = 1;
+  NSSAI Nssai = 2; 
+  QoS   Qos   = 3;
+  repeated DeviceGroup  DeviceGroup  = 4;
+  SiteInfo Site = 5;
+  repeated string DenyApps = 6;
+  repeated string PermitApps = 7;
+  repeated AppInfo AppInfo = 8;
 }
 
-message WriteRequest {
-    Config writeConfig = 1;
+message DeviceGroup {
+  string Name = 1;
+  IpDomain IpDomainDetails = 2;
+  repeated string Imsi = 3;
 }
 
-message WriteResponse {
-    Status writeStatus = 1;
+message IpDomain {
+  string Name = 1;
+  string DnnName = 2;
+  string UePool  = 3;
+  string DnsPrimary = 4;
+  int32 Mtu = 5;
 }
 
-message ReadRequest {
-    string version = 1;
+message NetworkSliceRequest {
+  uint32  RestartCounter = 1;
+  string  ClientId = 2;
+  bool    ImsiRequested = 3;
 }
 
-message ReadResponse {
-    Config readConfig = 1;
+message NetworkSliceResponse {
+  uint32  RestartCounter = 1;
+  repeated NetworkSlice NetworkSlice = 2;
 }

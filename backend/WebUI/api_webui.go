@@ -338,6 +338,7 @@ func PostSubscriberByID(c *gin.Context) {
 	}
 
 	ueId := c.Param("ueId")
+	servingPlmnId := subsData.PlmnID
 
 	filterUeIdOnly := bson.M{"ueId": ueId}
 
@@ -345,16 +346,19 @@ func PostSubscriberByID(c *gin.Context) {
 	authSubsBsonM["ueId"] = ueId
 	amDataBsonM := toBsonM(subsData.AccessAndMobilitySubscriptionData)
 	amDataBsonM["ueId"] = ueId
+	amDataBsonM["servingPlmnId"] = servingPlmnId
 
 	smDatasBsonA := make([]interface{}, 0, len(subsData.SessionManagementSubscriptionData))
 	for _, smSubsData := range subsData.SessionManagementSubscriptionData {
 		smDataBsonM := toBsonM(smSubsData)
 		smDataBsonM["ueId"] = ueId
+		smDataBsonM["servingPlmnId"] = servingPlmnId
 		smDatasBsonA = append(smDatasBsonA, smDataBsonM)
 	}
 
 	smfSelSubsBsonM := toBsonM(subsData.SmfSelectionSubscriptionData)
 	smfSelSubsBsonM["ueId"] = ueId
+	smfSelSubsBsonM["servingPlmnId"] = servingPlmnId
 	amPolicyDataBsonM := toBsonM(subsData.AmPolicyData)
 	amPolicyDataBsonM["ueId"] = ueId
 	smPolicyDataBsonM := toBsonM(subsData.SmPolicyData)
@@ -364,6 +368,7 @@ func PostSubscriberByID(c *gin.Context) {
 	for _, flowRule := range subsData.FlowRules {
 		flowRuleBsonM := toBsonM(flowRule)
 		flowRuleBsonM["ueId"] = ueId
+		flowRuleBsonM["servingPlmnId"] = servingPlmnId
 		flowRulesBsonA = append(flowRulesBsonA, flowRuleBsonM)
 	}
 

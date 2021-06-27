@@ -70,14 +70,14 @@ var routes = Routes{
 	{
 		"GetSubscriberByID",
 		http.MethodGet,
-		"/subscriber/:ueId/:servingPlmnId",
+		"/subscriber/:ueId",
 		GetSubscriberByID,
 	},
 
 	{
 		"PostSubscriberByID",
 		http.MethodPost,
-		"/subscriber/:ueId/:servingPlmnId",
+		"/subscriber/:ueId",
 		PostSubscriberByID,
 	},
 
@@ -91,7 +91,7 @@ var routes = Routes{
 	{
 		"DeleteSubscriberByID",
 		http.MethodDelete,
-		"/subscriber/:ueId/:servingPlmnId",
+		"/subscriber/:ueId",
 		DeleteSubscriberByID,
 	},
 

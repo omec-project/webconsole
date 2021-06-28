@@ -14,8 +14,8 @@ command :
 The Dockerfile contains the commands to generate the golang files from this config.proto. 
 The commands are as follows : 
 
-    protoc -I ./ --go_out=. config.proto // This generates the messages
-    protoc -I ./ --go-grpc_out=. config.proto // This generates the services
+    protoc -I ./ --go_out=. config.proto # This generates the messages
+    protoc -I ./ --go-grpc_out=. config.proto # This generates the services
 
 To run the above commands, we install the protoc compiler and the protobuf go
 based plugin. The commands for installing are as follows : 
@@ -23,8 +23,8 @@ based plugin. The commands for installing are as follows :
     curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protoc-3.14.0-linux-x86_64.zip
     unzip -o protoc-3.14.0-linux-x86_64.zip -d ./proto 
     chmod 755 -R ./proto/bin
-    cp ./proto/bin/protoc /usr/bin/
-    cp -R ./proto/include/* /usr/include/
+    sudo cp ./proto/bin/protoc /usr/bin/
+    sudo cp -R ./proto/include/* /usr/include/
     go get -u google.golang.org/protobuf/cmd/protoc-gen-go
     go install google.golang.org/protobuf/cmd/protoc-gen-go
     go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc

@@ -18,8 +18,8 @@ message PlmnId {
 }
 
 message NSSAI {
-  int32 Sst = 1;
-  int32 Sd = 2;
+  string Sst = 1;
+  string Sd = 2;
 }
 
 message QoS {

@@ -12,8 +12,8 @@ package configmodels
 type SliceSliceId struct {
 
 	// Slice Service Type
-	Sst int32 `json:"sst,omitempty"`
+	Sst string `json:"sst,omitempty"`
 
 	// Slice differntiator.
-	Sd int32 `json:"sd,omitempty"`
+	Sd string `json:"sd,omitempty"`
 }

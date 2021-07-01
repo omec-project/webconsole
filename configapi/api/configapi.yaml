@@ -173,14 +173,12 @@ components:
       properties:
         sst:
           description: Slice Service Type
-          maximum: 255
-          minimum: 1
-          type: integer
+          example: "1"
+          type: string
         sd:
           description: Slice differntiator.
-          maximum: 65565
-          minimum: 1
-          type: integer
+          example: "010203"
+          type: string
       type: object
     slice_qos:
       properties:

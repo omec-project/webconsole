@@ -1,12 +1,12 @@
 package server
 
 import (
+	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	protos "github.com/omec-project/webconsole/proto/sdcoreConfig"
 	"github.com/sirupsen/logrus"
-	"github.com/omec-project/webconsole/backend/logger"
-    "math/rand"
-    "time"
+	"math/rand"
+	"time"
 )
 
 type clientNF struct {
@@ -37,9 +37,9 @@ var restartCounter uint32
 
 func init() {
 	clientNFPool = make(map[string]*clientNF)
-    s1 := rand.NewSource(time.Now().UnixNano())
-    r1 := rand.New(s1)
-    restartCounter = r1.Uint32()
+	s1 := rand.NewSource(time.Now().UnixNano())
+	r1 := rand.New(s1)
+	restartCounter = r1.Uint32()
 }
 
 func getClient(id string) (*clientNF, bool) {
@@ -156,11 +156,17 @@ func clientEventMachine(client *clientNF) {
 			if configMsg.DevGroup != nil {
 				client.clientLog.Infof("Received new configuration for device Group  %v ", configMsg.DevGroupName)
 				client.devgroupsConfigClient[configMsg.DevGroupName] = configMsg.DevGroup
+			} else if configMsg.DevGroupName != "" && configMsg.MsgMethod == configmodels.Delete_op {
+				client.clientLog.Infof("Received delete configuration for device Group  %v ", configMsg.DevGroupName)
+				client.devgroupsConfigClient[configMsg.DevGroupName] = nil
 			}
 
 			if configMsg.Slice != nil {
 				client.clientLog.Infof("Received new configuration for slice %v ", configMsg.SliceName)
 				client.slicesConfigClient[configMsg.SliceName] = configMsg.Slice
+			} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
+				client.clientLog.Infof("Received delete configuration for slice %v ", configMsg.SliceName)
+				client.slicesConfigClient[configMsg.SliceName] = nil
 			}
 
 			client.configChanged = true
@@ -181,6 +187,9 @@ func clientEventMachine(client *clientNF) {
 			}
 			client.clientLog.Infof("Send complete snapshoot to client. Number of Network Slices %v ", len(client.slicesConfigClient))
 			for sliceName, sliceConfig := range client.slicesConfigClient {
+				if sliceConfig == nil {
+					continue
+				}
 				sliceProto := &protos.NetworkSlice{}
 				result := fillSlice(client, sliceName, sliceConfig, sliceProto)
 				if result == true {
@@ -189,6 +198,7 @@ func clientEventMachine(client *clientNF) {
 					client.clientLog.Infoln("Not sending slice config")
 				}
 			}
+			sliceDetails.ConfigUpdated = 1
 			cReqMsg.grpcRspMsg <- envMsg
 			client.configChanged = false // TODO RACE CONDITION
 		}

@@ -2,13 +2,12 @@ package configapi
 
 import (
 	"github.com/free5gc/http_wrapper"
-	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/configmodels"
 	"github.com/sirupsen/logrus"
-    "github.com/omec-project/webconsole/configmodels"
 	"strings"
 )
-
 
 const (
 	device_group = iota
@@ -18,18 +17,35 @@ const (
 var configChannel chan *configmodels.ConfigMessage
 
 var configLog *logrus.Entry
+
 func init() {
 	configLog = logger.ConfigLog
 }
 
 func SetChannel(cfgChannel chan *configmodels.ConfigMessage) {
-    configLog.Infof("Setting configChannel")
-    configChannel = cfgChannel
+	configLog.Infof("Setting configChannel")
+	configChannel = cfgChannel
 }
 
-func DeviceGroupPostHandler(c *gin.Context) bool {
-    var groupName string
-    var exists bool
+func DeviceGroupDeleteHandler(c *gin.Context) bool {
+	var groupName string
+	var exists bool
+	if groupName, exists = c.Params.Get("group-name"); exists {
+		configLog.Infof("Received group %v", groupName)
+	}
+	var msg configmodels.ConfigMessage
+	msg.MsgType = device_group
+	msg.MsgMethod = configmodels.Delete_op
+	msg.DevGroupName = groupName
+	configChannel <- &msg
+	configLog.Infof("Successfully posted message for device group %v to main config thread", groupName)
+	return true
+
+}
+
+func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
+	var groupName string
+	var exists bool
 	if groupName, exists = c.Params.Get("group-name"); exists {
 		configLog.Infof("Received group %v", groupName)
 	}
@@ -69,19 +85,35 @@ func DeviceGroupPostHandler(c *gin.Context) bool {
 	configLog.Infof("  dns Primary : %v", ipdomain.DnsPrimary)
 	configLog.Infof("  ip mtu : %v", ipdomain.Mtu)
 
-    var msg configmodels.ConfigMessage
-    msg.MsgType = device_group
-    msg.DevGroup = &request
-    configLog.Infof("Group %v ", groupName)
-    msg.DevGroupName = groupName
-    configChannel <- &msg
-    configLog.Infof("Successfully posted message for device group %v to main config thread", groupName)
+	var msg configmodels.ConfigMessage
+	msg.MsgType = device_group
+	msg.MsgMethod = msgOp
+	msg.DevGroup = &request
+	configLog.Infof("Group %v ", groupName)
+	msg.DevGroupName = groupName
+	configChannel <- &msg
+	configLog.Infof("Successfully posted message for device group %v to main config thread", groupName)
 	return true
 }
 
-func NetworkSlicePostHandler(c *gin.Context) bool {
-    var sliceName string
-    var exists bool
+func NetworkSliceDeleteHandler(c *gin.Context) bool {
+	var sliceName string
+	var exists bool
+	if sliceName, exists = c.Params.Get("slice-name"); exists {
+		configLog.Infof("Received slice : %v", sliceName)
+	}
+	var msg configmodels.ConfigMessage
+	msg.MsgMethod = configmodels.Delete_op
+	msg.MsgType = network_slice
+	msg.SliceName = sliceName
+	configChannel <- &msg
+	configLog.Infof("Slice Delete - Successfully posted message for slice %v to main config thread", sliceName)
+	return true
+}
+
+func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
+	var sliceName string
+	var exists bool
 	if sliceName, exists = c.Params.Get("slice-name"); exists {
 		configLog.Infof("Received slice : %v", sliceName)
 	}
@@ -162,11 +194,12 @@ func NetworkSlicePostHandler(c *gin.Context) bool {
 	configLog.Infof("    upf-name : %v", site.Upf["upf-name"])
 	configLog.Infof("    upf-port : %v", site.Upf["upf-port"])
 
-    var msg configmodels.ConfigMessage
-    msg.MsgType = network_slice
-    msg.Slice = &request
-    msg.SliceName = sliceName
-    configChannel <- &msg
-    configLog.Infof("Successfully posted message for slice %v to main config thread", sliceName)
+	var msg configmodels.ConfigMessage
+	msg.MsgMethod = msgOp
+	msg.MsgType = network_slice
+	msg.Slice = &request
+	msg.SliceName = sliceName
+	configChannel <- &msg
+	configLog.Infof("Successfully posted message for slice %v to main config thread", sliceName)
 	return true
 }

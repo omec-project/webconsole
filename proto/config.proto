@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+//
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
+
 syntax = "proto3";
 package sdcoreConfig;
 option go_package = "./sdcoreConfig";
@@ -87,4 +92,5 @@ message NetworkSliceRequest {
 message NetworkSliceResponse {
   uint32  RestartCounter = 1;
   repeated NetworkSlice NetworkSlice = 2;
+  uint32  ConfigUpdated = 3;
 }

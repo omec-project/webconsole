@@ -12,18 +12,40 @@ package configapi
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/configmodels"
 	"net/http"
 )
 
+// DeviceGroupGroupNameDelete -
+func DeviceGroupGroupNameDelete(c *gin.Context) {
+	logger.ConfigLog.Infof("DeviceGroupGroupNameDelete")
+	if ret := DeviceGroupDeleteHandler(c); ret == true {
+		c.JSON(http.StatusOK, gin.H{})
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{})
+	}
+}
+
+// DeviceGroupGroupNamePut -
+func DeviceGroupGroupNamePut(c *gin.Context) {
+	logger.ConfigLog.Infof("DeviceGroupGroupNamePut")
+	if ret := DeviceGroupPostHandler(c, configmodels.Put_op); ret == true {
+		c.JSON(http.StatusOK, gin.H{})
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{})
+	}
+}
+
 // DeviceGroupGroupNamePatch -
 func DeviceGroupGroupNamePatch(c *gin.Context) {
+	logger.ConfigLog.Infof("DeviceGroupGroupNamePatch")
 	c.JSON(http.StatusOK, gin.H{})
 }
 
 // DeviceGroupGroupNamePost -
 func DeviceGroupGroupNamePost(c *gin.Context) {
 	logger.ConfigLog.Infof("DeviceGroupGroupNamePost")
-	if ret := DeviceGroupPostHandler(c); ret == true {
+	if ret := DeviceGroupPostHandler(c, configmodels.Post_op); ret == true {
 		c.JSON(http.StatusOK, gin.H{})
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{})
@@ -32,13 +54,18 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 
 // NetworkSliceSliceNameDelete -
 func NetworkSliceSliceNameDelete(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	logger.ConfigLog.Infof("Received NetworkSliceSliceNameDelete ")
+	if ret := NetworkSliceDeleteHandler(c); ret == true {
+		c.JSON(http.StatusOK, gin.H{})
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{})
+	}
 }
 
 // NetworkSliceSliceNamePost -
 func NetworkSliceSliceNamePost(c *gin.Context) {
 	logger.ConfigLog.Infof("Received NetworkSliceSliceNamePost ")
-	if ret := NetworkSlicePostHandler(c); ret == true {
+	if ret := NetworkSlicePostHandler(c, configmodels.Post_op); ret == true {
 		c.JSON(http.StatusOK, gin.H{})
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{})
@@ -47,5 +74,10 @@ func NetworkSliceSliceNamePost(c *gin.Context) {
 
 // NetworkSliceSliceNamePut -
 func NetworkSliceSliceNamePut(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	logger.ConfigLog.Infof("Received NetworkSliceSliceNamePut ")
+	if ret := NetworkSlicePostHandler(c, configmodels.Put_op); ret == true {
+		c.JSON(http.StatusOK, gin.H{})
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{})
+	}
 }

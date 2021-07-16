@@ -1,7 +1,14 @@
 package configmodels
 
+const (
+	Post_op = iota
+	Put_op
+	Delete_op
+)
+
 type ConfigMessage struct {
 	MsgType      int
+	MsgMethod    int
 	DevGroup     *DeviceGroups
 	Slice        *Slice
 	DevGroupName string

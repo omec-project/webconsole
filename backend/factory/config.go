@@ -24,6 +24,7 @@ type Info struct {
 type Configuration struct {
 	WebServer *WebServer `yaml:"WebServer,omitempty"`
 	Mongodb   *Mongodb   `yaml:"mongodb"`
+	RocEnd    *RocEndpt  `yaml:"managedByConfigPod,omitempty"`
 }
 
 type WebServer struct {
@@ -35,4 +36,9 @@ type WebServer struct {
 type Mongodb struct {
 	Name string `yaml:"name"`
 	Url  string `yaml:"url"`
+}
+
+type RocEndpt struct {
+	Enabled bool   `yaml:"enabled"`
+	SyncUrl string `yaml:"syncUrl"`
 }

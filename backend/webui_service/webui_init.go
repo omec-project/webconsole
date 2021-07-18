@@ -3,8 +3,10 @@ package webui_service
 import (
 	"bufio"
 	"fmt"
+	"net/http"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/sirupsen/logrus"
@@ -203,6 +205,8 @@ func (webui *WEBUI) Start() {
 	confServ := &gServ.ConfigServer{}
 	go gServ.StartServer(host, confServ, configMsgChan)
 
+	go fetchConfigAdapater()
+
 	HTTPAddr := "0.0.0.0:9089"
 	initLog.Infoln("Http address ", HTTPAddr)
 	server, err := http2_util.NewServer(HTTPAddr, "", config_router)
@@ -269,4 +273,36 @@ func (webui *WEBUI) Exec(c *cli.Context) error {
 	wg.Wait()
 
 	return err
+}
+func fetchConfigAdapater() {
+	for {
+		if  (factory.WebUIConfig.Configuration == nil) ||
+			(factory.WebUIConfig.Configuration.RocEnd == nil) ||
+			(factory.WebUIConfig.Configuration.RocEnd.Enabled == false) ||
+			(factory.WebUIConfig.Configuration.RocEnd.SyncUrl == "") {
+			time.Sleep(1 * time.Second)
+			fmt.Printf("Continue polling config change %v ", factory.WebUIConfig.Configuration)
+			continue
+		}
+
+		client := &http.Client{}
+		httpend := factory.WebUIConfig.Configuration.RocEnd.SyncUrl
+		req, err := http.NewRequest(http.MethodPost, httpend, nil)
+		//Handle Error
+		if err != nil {
+			fmt.Printf("An Error Occured %v", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		// set the request header Content-Type for json
+		req.Header.Set("Content-Type", "application/json; charset=utf-8")
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("An Error Occured %v", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		fmt.Printf("Message POST %v Success\n", resp.StatusCode)
+		break
+	}
 }

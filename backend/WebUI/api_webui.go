@@ -282,7 +282,7 @@ func GetSubscribers(c *gin.Context) {
 	c.JSON(http.StatusOK, subsList)
 }
 
-// Get subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
+// Get subscriber by IMSI(ueId))
 func GetSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 
@@ -291,15 +291,13 @@ func GetSubscriberByID(c *gin.Context) {
 	var subsData SubsData
 
 	ueId := c.Param("ueId")
-	servingPlmnId := c.Param("servingPlmnId")
 
 	filterUeIdOnly := bson.M{"ueId": ueId}
-	filter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
 
 	authSubsDataInterface := MongoDBLibrary.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
-	amDataDataInterface := MongoDBLibrary.RestfulAPIGetOne(amDataColl, filter)
-	smDataDataInterface := MongoDBLibrary.RestfulAPIGetMany(smDataColl, filter)
-	smfSelDataInterface := MongoDBLibrary.RestfulAPIGetOne(smfSelDataColl, filter)
+	amDataDataInterface := MongoDBLibrary.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
+	smDataDataInterface := MongoDBLibrary.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
+	smfSelDataInterface := MongoDBLibrary.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
 	amPolicyDataInterface := MongoDBLibrary.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
 	smPolicyDataInterface := MongoDBLibrary.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
 
@@ -317,7 +315,6 @@ func GetSubscriberByID(c *gin.Context) {
 	json.Unmarshal(mapToByte(smPolicyDataInterface), &smPolicyData)
 
 	subsData = SubsData{
-		PlmnID:                            servingPlmnId,
 		UeId:                              ueId,
 		AuthenticationSubscription:        authSubsData,
 		AccessAndMobilitySubscriptionData: amDataData,
@@ -330,59 +327,305 @@ func GetSubscriberByID(c *gin.Context) {
 	c.JSON(http.StatusOK, subsData)
 }
 
-// Post subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
+// Post subscriber by IMSI(ueId)
 func PostSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Post One Subscriber Data")
 
-	var subsData SubsData
-	if err := c.ShouldBindJSON(&subsData); err != nil {
+	var subsOverrideData SubsOverrideData
+	if err := c.ShouldBindJSON(&subsOverrideData); err != nil {
 		logger.WebUILog.Panic(err.Error())
 	}
 
 	ueId := c.Param("ueId")
-	servingPlmnId := c.Param("servingPlmnId")
 
 	filterUeIdOnly := bson.M{"ueId": ueId}
-	filter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
 
-	authSubsBsonM := toBsonM(subsData.AuthenticationSubscription)
+	// start to compose a default UE info
+	var servingPlmnId string
+	servingPlmnId = "20893"
+	authSubsData := models.AuthenticationSubscription{
+		AuthenticationManagementField: "8000",
+		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
+		Milenage: &models.Milenage{
+			Op: &models.Op{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				OpValue:             "", // Required
+			},
+		},
+		Opc: &models.Opc{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			OpcValue:            "8e27b6af0e692e750f32667a3b14605d", // Required
+		},
+		PermanentKey: &models.PermanentKey{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862", // Required
+		},
+		SequenceNumber: "16f3b3f70fc2",
+	}
+
+	amDataData := models.AccessAndMobilitySubscriptionData{
+		Gpsis: []string{
+			"msisdn-0900000000",
+		},
+		Nssai: &models.Nssai{
+			DefaultSingleNssais: []models.Snssai{
+				{
+					Sd:  "010203",
+					Sst: 1,
+				},
+				{
+					Sd:  "112233",
+					Sst: 1,
+				},
+			},
+		},
+		SubscribedUeAmbr: &models.AmbrRm{
+			Downlink: "2 Gbps",
+			Uplink:   "1 Gbps",
+		},
+	}
+
+	smDataData := []models.SessionManagementSubscriptionData{
+		{
+			SingleNssai: &models.Snssai{
+				Sst: 1,
+				Sd:  "010203",
+			},
+			DnnConfigurations: map[string]models.DnnConfiguration{
+				"internet": {
+					PduSessionTypes: &models.PduSessionTypes{
+						DefaultSessionType:  models.PduSessionType_IPV4,
+						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
+					},
+					SscModes: &models.SscModes{
+						DefaultSscMode:  models.SscMode__1,
+						AllowedSscModes: []models.SscMode{
+							"SSC_MODE_2",
+							"SSC_MODE_3",
+						},
+					},
+					SessionAmbr: &models.Ambr{
+						Downlink: "100 Mbps",
+						Uplink:   "200 Mbps",
+					},
+					Var5gQosProfile: &models.SubscribedDefaultQos{
+						Var5qi: 9,
+						Arp: &models.Arp{
+							 PriorityLevel: 8,
+						},
+						PriorityLevel: 8,
+					},
+				},
+				"internet2": {
+					PduSessionTypes: &models.PduSessionTypes{
+						DefaultSessionType:  models.PduSessionType_IPV4,
+						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
+					},
+					SscModes: &models.SscModes{
+						DefaultSscMode:  models.SscMode__1,
+						AllowedSscModes: []models.SscMode{
+							"SSC_MODE_2",
+							"SSC_MODE_3",
+						},
+					},
+					SessionAmbr: &models.Ambr{
+						Downlink: "100 Mbps",
+						Uplink:   "200 Mbps",
+					},
+					Var5gQosProfile: &models.SubscribedDefaultQos{
+						Var5qi: 9,
+						Arp: &models.Arp{
+							 PriorityLevel: 8,
+						},
+						PriorityLevel: 8,
+					},
+				},
+			},
+		},
+		{
+			SingleNssai: &models.Snssai{
+				Sst: 1,
+				Sd:  "112233",
+			},
+			DnnConfigurations: map[string]models.DnnConfiguration{
+				"internet": {
+					PduSessionTypes: &models.PduSessionTypes{
+						DefaultSessionType:  models.PduSessionType_IPV4,
+						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
+					},
+					SscModes: &models.SscModes{
+						DefaultSscMode:  models.SscMode__1,
+						AllowedSscModes: []models.SscMode{
+							"SSC_MODE_2",
+							"SSC_MODE_3",
+						},
+					},
+					SessionAmbr: &models.Ambr{
+						Downlink: "100 Mbps",
+						Uplink:   "200 Mbps",
+					},
+					Var5gQosProfile: &models.SubscribedDefaultQos{
+						Var5qi: 9,
+						Arp: &models.Arp{
+							PriorityLevel: 8,
+						},
+						PriorityLevel: 8,
+					},
+				},
+				"internet2": {
+					PduSessionTypes: &models.PduSessionTypes{
+						DefaultSessionType:  models.PduSessionType_IPV4,
+						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
+					},
+					SscModes: &models.SscModes{
+						DefaultSscMode:  models.SscMode__1,
+						AllowedSscModes: []models.SscMode{
+							"SSC_MODE_2",
+							"SSC_MODE_3",
+						},
+					},
+					SessionAmbr: &models.Ambr{
+						Downlink: "100 Mbps",
+						Uplink:   "200 Mbps",
+					},
+					Var5gQosProfile: &models.SubscribedDefaultQos{
+						Var5qi: 9,
+						Arp: &models.Arp{
+							 PriorityLevel: 8,
+						},
+						PriorityLevel: 8,
+					},
+				},
+			},
+		},
+	}
+
+	smfSelData := models.SmfSelectionSubscriptionData{
+		SubscribedSnssaiInfos: map[string]models.SnssaiInfo{
+			"01010203": {
+				DnnInfos: []models.DnnInfo{
+					{
+						Dnn: "internet",
+					},
+					{
+						Dnn: "internet2",
+					},
+				},
+			},
+			"01112233": {
+				DnnInfos: []models.DnnInfo{
+					{
+						Dnn: "internet",
+					},
+					{
+						Dnn: "internet2",
+					},
+				},
+			},
+		},
+	}
+
+	amPolicyData := models.AmPolicyData{
+		SubscCats: []string{
+			"free5gc",
+		},
+	}
+
+	smPolicyData := models.SmPolicyData{
+		SmPolicySnssaiData: map[string]models.SmPolicySnssaiData{
+			"01010203": {
+				Snssai: &models.Snssai{
+					Sd:  "010203",
+					Sst: 1,
+				},
+				SmPolicyDnnData: map[string]models.SmPolicyDnnData{
+					"internet": {
+						Dnn: "internet",
+					},
+					"internet2" : {
+						Dnn: "internet2",
+					},
+				},
+			},
+			"01112233": {
+				Snssai: &models.Snssai{
+					Sd:  "112233",
+					Sst: 1,
+				},
+				SmPolicyDnnData: map[string]models.SmPolicyDnnData{
+					"internet": {
+						Dnn: "internet",
+					},
+					"internet2" : {
+						Dnn: "internet2",
+					},
+				},
+			},
+		},
+	}
+	// end to compose a default UE info
+
+	// override values
+	if subsOverrideData.PlmnID != "" {
+		servingPlmnId = subsOverrideData.PlmnID
+	}
+	if subsOverrideData.OPc != "" {
+		authSubsData.Opc.OpcValue = subsOverrideData.OPc
+	}
+	if subsOverrideData.Key != "" {
+		authSubsData.PermanentKey.PermanentKeyValue = subsOverrideData.Key
+	}
+	if subsOverrideData.SequenceNumber != "" {
+		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
+	}
+//	if subsOverrideData.DNN != nil {
+	// TODO
+//	}
+
+
+	authSubsBsonM := toBsonM(authSubsData)
 	authSubsBsonM["ueId"] = ueId
-	amDataBsonM := toBsonM(subsData.AccessAndMobilitySubscriptionData)
+
+	amDataBsonM := toBsonM(amDataData)
 	amDataBsonM["ueId"] = ueId
 	amDataBsonM["servingPlmnId"] = servingPlmnId
 
-	smDatasBsonA := make([]interface{}, 0, len(subsData.SessionManagementSubscriptionData))
-	for _, smSubsData := range subsData.SessionManagementSubscriptionData {
+	smDatasBsonA := make([]interface{}, 0, len(smDataData))
+	for _, smSubsData := range smDataData {
 		smDataBsonM := toBsonM(smSubsData)
 		smDataBsonM["ueId"] = ueId
 		smDataBsonM["servingPlmnId"] = servingPlmnId
 		smDatasBsonA = append(smDatasBsonA, smDataBsonM)
 	}
 
-	smfSelSubsBsonM := toBsonM(subsData.SmfSelectionSubscriptionData)
+	smfSelSubsBsonM := toBsonM(smfSelData)
 	smfSelSubsBsonM["ueId"] = ueId
 	smfSelSubsBsonM["servingPlmnId"] = servingPlmnId
-	amPolicyDataBsonM := toBsonM(subsData.AmPolicyData)
+	amPolicyDataBsonM := toBsonM(amPolicyData)
 	amPolicyDataBsonM["ueId"] = ueId
-	smPolicyDataBsonM := toBsonM(subsData.SmPolicyData)
+	smPolicyDataBsonM := toBsonM(smPolicyData)
 	smPolicyDataBsonM["ueId"] = ueId
 
-	flowRulesBsonA := make([]interface{}, 0, len(subsData.FlowRules))
+	// there is no flowRule table in DB, this part of code is not used, uncomment it when need.
+/*	flowRulesBsonA := make([]interface{}, 0, len(subsData.FlowRules))
 	for _, flowRule := range subsData.FlowRules {
 		flowRuleBsonM := toBsonM(flowRule)
 		flowRuleBsonM["ueId"] = ueId
 		flowRuleBsonM["servingPlmnId"] = servingPlmnId
 		flowRulesBsonA = append(flowRulesBsonA, flowRuleBsonM)
 	}
-
+*/
 	MongoDBLibrary.RestfulAPIPost(authSubsDataColl, filterUeIdOnly, authSubsBsonM)
-	MongoDBLibrary.RestfulAPIPost(amDataColl, filter, amDataBsonM)
-	MongoDBLibrary.RestfulAPIPostMany(smDataColl, filter, smDatasBsonA)
-	MongoDBLibrary.RestfulAPIPost(smfSelDataColl, filter, smfSelSubsBsonM)
+	MongoDBLibrary.RestfulAPIPost(amDataColl, filterUeIdOnly, amDataBsonM)
+	MongoDBLibrary.RestfulAPIPostMany(smDataColl, filterUeIdOnly, smDatasBsonA)
+	MongoDBLibrary.RestfulAPIPost(smfSelDataColl, filterUeIdOnly, smfSelSubsBsonM)
 	MongoDBLibrary.RestfulAPIPost(amPolicyDataColl, filterUeIdOnly, amPolicyDataBsonM)
 	MongoDBLibrary.RestfulAPIPost(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
-	MongoDBLibrary.RestfulAPIPostMany(flowRuleDataColl, filter, flowRulesBsonA)
+//	MongoDBLibrary.RestfulAPIPostMany(flowRuleDataColl, filterUeIdOnly, flowRulesBsonA)
 
 	c.JSON(http.StatusCreated, gin.H{})
 }
@@ -485,22 +728,20 @@ func PatchSubscriberByID(c *gin.Context) {
 	c.JSON(http.StatusNoContent, gin.H{})
 }
 
-// Delete subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
+// Delete subscriber by IMSI(ueId)
 func DeleteSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Delete One Subscriber Data")
 
 	ueId := c.Param("ueId")
-	servingPlmnId := c.Param("servingPlmnId")
 
 	filterUeIdOnly := bson.M{"ueId": ueId}
-	filter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
 
 	MongoDBLibrary.RestfulAPIDeleteOne(authSubsDataColl, filterUeIdOnly)
-	MongoDBLibrary.RestfulAPIDeleteOne(amDataColl, filter)
-	MongoDBLibrary.RestfulAPIDeleteMany(smDataColl, filter)
-	MongoDBLibrary.RestfulAPIDeleteMany(flowRuleDataColl, filter)
-	MongoDBLibrary.RestfulAPIDeleteOne(smfSelDataColl, filter)
+	MongoDBLibrary.RestfulAPIDeleteOne(amDataColl, filterUeIdOnly)
+	MongoDBLibrary.RestfulAPIDeleteMany(smDataColl, filterUeIdOnly)
+	MongoDBLibrary.RestfulAPIDeleteMany(flowRuleDataColl, filterUeIdOnly)
+	MongoDBLibrary.RestfulAPIDeleteOne(smfSelDataColl, filterUeIdOnly)
 	MongoDBLibrary.RestfulAPIDeleteOne(amPolicyDataColl, filterUeIdOnly)
 	MongoDBLibrary.RestfulAPIDeleteOne(smPolicyDataColl, filterUeIdOnly)
 
@@ -572,3 +813,4 @@ func GetUEPDUSessionInfo(c *gin.Context) {
 		})
 	}
 }
+

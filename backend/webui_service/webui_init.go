@@ -3,8 +3,10 @@ package webui_service
 import (
 	"bufio"
 	"fmt"
+	"net/http"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/sirupsen/logrus"
@@ -12,6 +14,8 @@ import (
 
 	"github.com/free5gc/MongoDBLibrary"
 	mongoDBLibLogger "github.com/free5gc/MongoDBLibrary/logger"
+	"github.com/free5gc/http2_util"
+	"github.com/free5gc/logger_util"
 	openApiLogger "github.com/free5gc/openapi/logger"
 	"github.com/free5gc/path_util"
 	pathUtilLogger "github.com/free5gc/path_util/logger"
@@ -19,6 +23,9 @@ import (
 	"github.com/free5gc/webconsole/backend/factory"
 	"github.com/free5gc/webconsole/backend/logger"
 	"github.com/free5gc/webconsole/backend/webui_context"
+	"github.com/omec-project/webconsole/configapi"
+	"github.com/omec-project/webconsole/configmodels"
+	gServ "github.com/omec-project/webconsole/proto/server"
 )
 
 type WEBUI struct{}
@@ -184,8 +191,40 @@ func (webui *WEBUI) Start() {
 	self.UpdateNfProfiles()
 
 	router.NoRoute(ReturnPublic())
+	go func() {
+		initLog.Infoln(router.Run(":5000"))
+		initLog.Infoln("Webserver stopped/terminated/not-started ")
+	}()
 
-	initLog.Infoln(router.Run(":5000"))
+	config_router := logger_util.NewGinWithLogrus(logger.GinLog)
+	configapi.AddService(config_router)
+	configMsgChan := make(chan *configmodels.ConfigMessage, 10)
+	configapi.SetChannel(configMsgChan)
+
+	var host string = "0.0.0.0:9876"
+	confServ := &gServ.ConfigServer{}
+	go gServ.StartServer(host, confServ, configMsgChan)
+
+	go fetchConfigAdapater()
+
+	HTTPAddr := "0.0.0.0:9089"
+	initLog.Infoln("Http address ", HTTPAddr)
+	server, err := http2_util.NewServer(HTTPAddr, "", config_router)
+
+	if server == nil {
+		initLog.Error("Initialize HTTP server failed:", err)
+		return
+	}
+	if err != nil {
+		initLog.Warnln("Initialize HTTP server:", err)
+	}
+
+	initLog.Infoln("Start Http server at address ", HTTPAddr)
+	err = server.ListenAndServe()
+
+	if err != nil {
+		initLog.Fatalln("HTTP server setup failed:", err)
+	}
 }
 
 func (webui *WEBUI) Exec(c *cli.Context) error {
@@ -234,4 +273,36 @@ func (webui *WEBUI) Exec(c *cli.Context) error {
 	wg.Wait()
 
 	return err
+}
+func fetchConfigAdapater() {
+	for {
+		if  (factory.WebUIConfig.Configuration == nil) ||
+			(factory.WebUIConfig.Configuration.RocEnd == nil) ||
+			(factory.WebUIConfig.Configuration.RocEnd.Enabled == false) ||
+			(factory.WebUIConfig.Configuration.RocEnd.SyncUrl == "") {
+			time.Sleep(1 * time.Second)
+			fmt.Printf("Continue polling config change %v ", factory.WebUIConfig.Configuration)
+			continue
+		}
+
+		client := &http.Client{}
+		httpend := factory.WebUIConfig.Configuration.RocEnd.SyncUrl
+		req, err := http.NewRequest(http.MethodPost, httpend, nil)
+		//Handle Error
+		if err != nil {
+			fmt.Printf("An Error Occured %v", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		// set the request header Content-Type for json
+		req.Header.Set("Content-Type", "application/json; charset=utf-8")
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("An Error Occured %v", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		fmt.Printf("Message POST %v Success\n", resp.StatusCode)
+		break
+	}
 }

@@ -1,0 +1,96 @@
+// SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+//
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
+
+syntax = "proto3";
+package sdcoreConfig;
+option go_package = "./sdcoreConfig";
+
+service ConfigService {
+  rpc GetNetworkSlice(NetworkSliceRequest) returns (NetworkSliceResponse) {
+  }
+}
+
+enum Status {
+  SUCCESS = 0;
+  FAILURE = 1;
+}
+
+message PlmnId {
+  string mcc = 1;
+  string mnc = 2;
+}
+
+message NSSAI {
+  string Sst = 1;
+  string Sd = 2;
+}
+
+message QoS {
+  int32  uplink = 1;
+  int32  downlink = 2;
+  string  trafficClass = 3;
+}
+
+message GNodeB {
+  string      Name = 1;
+  int32      Tac  = 2;
+}
+
+message UpfInfo {
+  string      UpfName = 1; 
+  uint32      UpfPort = 2;
+}
+
+message SiteInfo {
+  string      SiteName = 1;
+  repeated GNodeB      Gnb = 2;
+  PlmnId      Plmn = 3;
+  UpfInfo     Upf  = 4;
+}
+
+message AppInfo {
+  string AppName = 1;
+  uint32 Startport = 2;
+  uint32 Endport = 3;
+  uint32 Protocol = 4;
+  string EndPoint = 5;
+}
+
+message NetworkSlice {
+  string Name = 1;
+  NSSAI Nssai = 2; 
+  QoS   Qos   = 3;
+  repeated DeviceGroup  DeviceGroup  = 4;
+  SiteInfo Site = 5;
+  repeated string DenyApps = 6;
+  repeated string PermitApps = 7;
+  repeated AppInfo AppInfo = 8;
+}
+
+message DeviceGroup {
+  string Name = 1;
+  IpDomain IpDomainDetails = 2;
+  repeated string Imsi = 3;
+}
+
+message IpDomain {
+  string Name = 1;
+  string DnnName = 2;
+  string UePool  = 3;
+  string DnsPrimary = 4;
+  int32 Mtu = 5;
+}
+
+message NetworkSliceRequest {
+  uint32  RestartCounter = 1;
+  string  ClientId = 2;
+  bool    ImsiRequested = 3;
+}
+
+message NetworkSliceResponse {
+  uint32  RestartCounter = 1;
+  repeated NetworkSlice NetworkSlice = 2;
+  uint32  ConfigUpdated = 3;
+}

@@ -25,3 +25,4 @@ cscope.*
 # build
 bin/
 public/
+!/frontend/public/*.license

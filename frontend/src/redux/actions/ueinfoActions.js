@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+//
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
+
 export default class ueinfoActions {
   static SET_REG_UE = 'UEINFO/SET_REG_UE';
   static SET_UE_DETAIL = 'UEINFO/SET_UE_DETAIL';

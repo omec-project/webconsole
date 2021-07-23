@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -18,6 +20,7 @@ import (
 	"github.com/free5gc/openapi/models"
 	"github.com/free5gc/webconsole/backend/logger"
 	"github.com/free5gc/webconsole/backend/webui_context"
+	gServ "github.com/omec-project/webconsole/proto/server"
 )
 
 const (
@@ -407,63 +410,7 @@ func PostSubscriberByID(c *gin.Context) {
 						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
 					},
 					SscModes: &models.SscModes{
-						DefaultSscMode:  models.SscMode__1,
-						AllowedSscModes: []models.SscMode{
-							"SSC_MODE_2",
-							"SSC_MODE_3",
-						},
-					},
-					SessionAmbr: &models.Ambr{
-						Downlink: "100 Mbps",
-						Uplink:   "200 Mbps",
-					},
-					Var5gQosProfile: &models.SubscribedDefaultQos{
-						Var5qi: 9,
-						Arp: &models.Arp{
-							 PriorityLevel: 8,
-						},
-						PriorityLevel: 8,
-					},
-				},
-				"internet2": {
-					PduSessionTypes: &models.PduSessionTypes{
-						DefaultSessionType:  models.PduSessionType_IPV4,
-						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
-					},
-					SscModes: &models.SscModes{
-						DefaultSscMode:  models.SscMode__1,
-						AllowedSscModes: []models.SscMode{
-							"SSC_MODE_2",
-							"SSC_MODE_3",
-						},
-					},
-					SessionAmbr: &models.Ambr{
-						Downlink: "100 Mbps",
-						Uplink:   "200 Mbps",
-					},
-					Var5gQosProfile: &models.SubscribedDefaultQos{
-						Var5qi: 9,
-						Arp: &models.Arp{
-							 PriorityLevel: 8,
-						},
-						PriorityLevel: 8,
-					},
-				},
-			},
-		},
-		{
-			SingleNssai: &models.Snssai{
-				Sst: 1,
-				Sd:  "112233",
-			},
-			DnnConfigurations: map[string]models.DnnConfiguration{
-				"internet": {
-					PduSessionTypes: &models.PduSessionTypes{
-						DefaultSessionType:  models.PduSessionType_IPV4,
-						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
-					},
-					SscModes: &models.SscModes{
-						DefaultSscMode:  models.SscMode__1,
+						DefaultSscMode: models.SscMode__1,
 						AllowedSscModes: []models.SscMode{
 							"SSC_MODE_2",
 							"SSC_MODE_3",
@@ -487,7 +434,7 @@ func PostSubscriberByID(c *gin.Context) {
 						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
 					},
 					SscModes: &models.SscModes{
-						DefaultSscMode:  models.SscMode__1,
+						DefaultSscMode: models.SscMode__1,
 						AllowedSscModes: []models.SscMode{
 							"SSC_MODE_2",
 							"SSC_MODE_3",
@@ -500,7 +447,63 @@ func PostSubscriberByID(c *gin.Context) {
 					Var5gQosProfile: &models.SubscribedDefaultQos{
 						Var5qi: 9,
 						Arp: &models.Arp{
-							 PriorityLevel: 8,
+							PriorityLevel: 8,
+						},
+						PriorityLevel: 8,
+					},
+				},
+			},
+		},
+		{
+			SingleNssai: &models.Snssai{
+				Sst: 1,
+				Sd:  "112233",
+			},
+			DnnConfigurations: map[string]models.DnnConfiguration{
+				"internet": {
+					PduSessionTypes: &models.PduSessionTypes{
+						DefaultSessionType:  models.PduSessionType_IPV4,
+						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
+					},
+					SscModes: &models.SscModes{
+						DefaultSscMode: models.SscMode__1,
+						AllowedSscModes: []models.SscMode{
+							"SSC_MODE_2",
+							"SSC_MODE_3",
+						},
+					},
+					SessionAmbr: &models.Ambr{
+						Downlink: "100 Mbps",
+						Uplink:   "200 Mbps",
+					},
+					Var5gQosProfile: &models.SubscribedDefaultQos{
+						Var5qi: 9,
+						Arp: &models.Arp{
+							PriorityLevel: 8,
+						},
+						PriorityLevel: 8,
+					},
+				},
+				"internet2": {
+					PduSessionTypes: &models.PduSessionTypes{
+						DefaultSessionType:  models.PduSessionType_IPV4,
+						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
+					},
+					SscModes: &models.SscModes{
+						DefaultSscMode: models.SscMode__1,
+						AllowedSscModes: []models.SscMode{
+							"SSC_MODE_2",
+							"SSC_MODE_3",
+						},
+					},
+					SessionAmbr: &models.Ambr{
+						Downlink: "100 Mbps",
+						Uplink:   "200 Mbps",
+					},
+					Var5gQosProfile: &models.SubscribedDefaultQos{
+						Var5qi: 9,
+						Arp: &models.Arp{
+							PriorityLevel: 8,
 						},
 						PriorityLevel: 8,
 					},
@@ -551,7 +554,7 @@ func PostSubscriberByID(c *gin.Context) {
 					"internet": {
 						Dnn: "internet",
 					},
-					"internet2" : {
+					"internet2": {
 						Dnn: "internet2",
 					},
 				},
@@ -565,7 +568,7 @@ func PostSubscriberByID(c *gin.Context) {
 					"internet": {
 						Dnn: "internet",
 					},
-					"internet2" : {
+					"internet2": {
 						Dnn: "internet2",
 					},
 				},
@@ -587,10 +590,9 @@ func PostSubscriberByID(c *gin.Context) {
 	if subsOverrideData.SequenceNumber != "" {
 		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
 	}
-//	if subsOverrideData.DNN != nil {
+	//	if subsOverrideData.DNN != nil {
 	// TODO
-//	}
-
+	//	}
 
 	authSubsBsonM := toBsonM(authSubsData)
 	authSubsBsonM["ueId"] = ueId
@@ -616,23 +618,24 @@ func PostSubscriberByID(c *gin.Context) {
 	smPolicyDataBsonM["ueId"] = ueId
 
 	// there is no flowRule table in DB, this part of code is not used, uncomment it when need.
-/*	flowRulesBsonA := make([]interface{}, 0, len(subsData.FlowRules))
-	for _, flowRule := range subsData.FlowRules {
-		flowRuleBsonM := toBsonM(flowRule)
-		flowRuleBsonM["ueId"] = ueId
-		flowRuleBsonM["servingPlmnId"] = servingPlmnId
-		flowRulesBsonA = append(flowRulesBsonA, flowRuleBsonM)
-	}
-*/
+	/*	flowRulesBsonA := make([]interface{}, 0, len(subsData.FlowRules))
+		for _, flowRule := range subsData.FlowRules {
+			flowRuleBsonM := toBsonM(flowRule)
+			flowRuleBsonM["ueId"] = ueId
+			flowRuleBsonM["servingPlmnId"] = servingPlmnId
+			flowRulesBsonA = append(flowRulesBsonA, flowRuleBsonM)
+		}
+	*/
 	MongoDBLibrary.RestfulAPIPost(authSubsDataColl, filterUeIdOnly, authSubsBsonM)
 	MongoDBLibrary.RestfulAPIPost(amDataColl, filterUeIdOnly, amDataBsonM)
 	MongoDBLibrary.RestfulAPIPostMany(smDataColl, filterUeIdOnly, smDatasBsonA)
 	MongoDBLibrary.RestfulAPIPost(smfSelDataColl, filterUeIdOnly, smfSelSubsBsonM)
 	MongoDBLibrary.RestfulAPIPost(amPolicyDataColl, filterUeIdOnly, amPolicyDataBsonM)
 	MongoDBLibrary.RestfulAPIPost(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
-//	MongoDBLibrary.RestfulAPIPostMany(flowRuleDataColl, filterUeIdOnly, flowRulesBsonA)
+	//	MongoDBLibrary.RestfulAPIPostMany(flowRuleDataColl, filterUeIdOnly, flowRulesBsonA)
 
 	c.JSON(http.StatusCreated, gin.H{})
+	gServ.HandleSubscriberAdd(ueId)
 }
 
 // Put subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
@@ -682,6 +685,7 @@ func PutSubscriberByID(c *gin.Context) {
 	MongoDBLibrary.RestfulAPIPutOne(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
 
 	c.JSON(http.StatusNoContent, gin.H{})
+	gServ.HandleSubscriberAdd(ueId)
 }
 
 // Patch subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
@@ -819,3 +823,86 @@ func GetUEPDUSessionInfo(c *gin.Context) {
 	}
 }
 
+func compareNssai(sNssai *models.Snssai,
+	sliceId *models.Snssai) int {
+	if sNssai.Sst != sliceId.Sst {
+		return 1
+	}
+	return strings.Compare(sNssai.Sd, sliceId.Sd)
+}
+
+func convertToString(val uint32) string {
+	var mbVal, gbVal, kbVal uint32
+	kbVal = val / 1024
+	mbVal = val / 1048576
+	gbVal = val / 1073741824
+	var retStr string
+	if gbVal != 0 {
+		retStr = strconv.FormatUint(uint64(gbVal), 10) + " Gbps"
+	} else if mbVal != 0 {
+		retStr = strconv.FormatUint(uint64(mbVal), 10) + " Mbps"
+	} else if kbVal != 0 {
+		retStr = strconv.FormatUint(uint64(kbVal), 10) + " Kbps"
+	} else {
+		retStr = strconv.FormatUint(uint64(val), 10) + " bps"
+	}
+
+	return retStr
+}
+
+// SubscriptionUpdateHandle : Handle subscription update
+func SubscriptionUpdateHandle(subsUpdateChan chan *gServ.SubsUpdMsg) {
+	for subsData := range subsUpdateChan {
+		logger.WebUILog.Infoln("SubscriptionUpdateHandle")
+		var smDataData []models.SessionManagementSubscriptionData
+		var smDatasBsonA []interface{}
+		filterEmpty := bson.M{}
+		var ueID string
+		for _, ueID = range subsData.UeIds {
+			filter := bson.M{"ueId": ueID}
+			smDataDataInterface := MongoDBLibrary.RestfulAPIGetMany(smDataColl, filter)
+			var found bool = false
+			json.Unmarshal(sliceToByte(smDataDataInterface), &smDataData)
+			if len(smDataData) != 0 {
+				smDatasBsonA = make([]interface{}, 0, len(smDataData))
+				for _, data := range smDataData {
+					if compareNssai(data.SingleNssai, &subsData.Nssai) == 0 {
+						logger.WebUILog.Infoln("entry exists for Imsi :  with SST:  and SD: ",
+							ueID, subsData.Nssai.Sst, subsData.Nssai.Sd)
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					logger.WebUILog.Infoln("entry doesnt exist for Imsi : %v with SST: %v and SD: %v",
+						ueID, subsData.Nssai.Sst, subsData.Nssai.Sd)
+					data := smDataData[0]
+					data.SingleNssai.Sst = subsData.Nssai.Sst
+					data.SingleNssai.Sd = subsData.Nssai.Sd
+					data.SingleNssai.Sd = subsData.Nssai.Sd
+					for idx, dnnCfg := range data.DnnConfigurations {
+						var sessAmbr models.Ambr
+						sessAmbr.Uplink = convertToString(uint32(subsData.Qos.Uplink))
+						sessAmbr.Downlink = convertToString(uint32(subsData.Qos.Downlink))
+						dnnCfg.SessionAmbr = &sessAmbr
+						data.DnnConfigurations[idx] = dnnCfg
+						logger.WebUILog.Infoln("uplink mbr ", data.DnnConfigurations[idx].SessionAmbr.Uplink)
+						logger.WebUILog.Infoln("downlink mbr ", data.DnnConfigurations[idx].SessionAmbr.Downlink)
+					}
+					smDataBsonM := toBsonM(data)
+					smDataBsonM["ueId"] = ueID
+					smDataBsonM["servingPlmnId"] = subsData.ServingPlmnId
+					logger.WebUILog.Infoln("servingplmnid ", subsData.ServingPlmnId)
+					smDatasBsonA = append(smDatasBsonA, smDataBsonM)
+				}
+			} else {
+				logger.WebUILog.Infoln("No imsi entry in db for imsi ", ueID)
+			}
+		}
+
+		if len(smDatasBsonA) != 0 {
+			MongoDBLibrary.RestfulAPIPostMany(smDataColl, filterEmpty, smDatasBsonA)
+		}
+	}
+}

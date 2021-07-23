@@ -205,12 +205,15 @@ func (webui *WEBUI) Start() {
 	configapi.AddService(config_router)
 	configMsgChan := make(chan *configmodels.ConfigMessage, 10)
 	configapi.SetChannel(configMsgChan)
+	subsUpdateChan := make(chan *gServ.SubsUpdMsg, 10)
 
 	var host string = "0.0.0.0:9876"
 	confServ := &gServ.ConfigServer{}
-	go gServ.StartServer(host, confServ, configMsgChan)
+	go gServ.StartServer(host, confServ,
+		configMsgChan, subsUpdateChan)
 
 	go fetchConfigAdapater()
+	go WebUI.SubscriptionUpdateHandle(subsUpdateChan)
 
 	HTTPAddr := "0.0.0.0:9089"
 	initLog.Infoln("Http address ", HTTPAddr)
@@ -279,14 +282,15 @@ func (webui *WEBUI) Exec(c *cli.Context) error {
 
 	return err
 }
+
 func fetchConfigAdapater() {
 	for {
-		if  (factory.WebUIConfig.Configuration == nil) ||
+		if (factory.WebUIConfig.Configuration == nil) ||
 			(factory.WebUIConfig.Configuration.RocEnd == nil) ||
 			(factory.WebUIConfig.Configuration.RocEnd.Enabled == false) ||
 			(factory.WebUIConfig.Configuration.RocEnd.SyncUrl == "") {
 			time.Sleep(1 * time.Second)
-			fmt.Printf("Continue polling config change %v ", factory.WebUIConfig.Configuration)
+			//fmt.Printf("Continue polling config change %v ", factory.WebUIConfig.Configuration)
 			continue
 		}
 

@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+//
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
+
 package server
 
 import (
@@ -37,11 +42,11 @@ var kasp = keepalive.ServerParameters{
 	Timeout: 5 * time.Second,  // Wait 1 second for the ping ack before assuming the connection is dead
 }
 
-func StartServer(host string, confServ *ConfigServer, configMsgChan chan *configmodels.ConfigMessage) {
-
+func StartServer(host string, confServ *ConfigServer,
+	configMsgChan chan *configmodels.ConfigMessage, subsChannel chan *SubsUpdMsg) {
 	grpcLog.Println("Start grpc config server")
 
-	go configHandler(configMsgChan)
+	go configHandler(configMsgChan, subsChannel)
 
 	lis, err := net.Listen("tcp", host)
 	if err != nil {

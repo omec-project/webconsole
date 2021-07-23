@@ -21,8 +21,8 @@ type SubsData struct {
 	FlowRules                         []FlowRule                                 `json:"FlowRules"`
 }
 type SubsOverrideData struct {
-	PlmnID                            string                                     `json:"plmnID"`
-	OPc                               string                                     `json:"opc"`
-	Key                               string                                     `json:"key"`
-	SequenceNumber                    string                                     `json:"sequenceNumber"`
+	PlmnID         string `json:"plmnID"`
+	OPc            string `json:"opc"`
+	Key            string `json:"key"`
+	SequenceNumber string `json:"sequenceNumber"`
 }

@@ -27,9 +27,11 @@ type Info struct {
 }
 
 type Configuration struct {
-	WebServer *WebServer `yaml:"WebServer,omitempty"`
-	Mongodb   *Mongodb   `yaml:"mongodb"`
-	RocEnd    *RocEndpt  `yaml:"managedByConfigPod,omitempty"`
+	Mode5G    bool        `yaml:"mode5G,omitempty"`
+	WebServer *WebServer  `yaml:"WebServer,omitempty"`
+	Mongodb   *Mongodb    `yaml:"mongodb"`
+	RocEnd    *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
+	LteEnd    []*LteEndpt `yaml:"endpoints,omitempty"`          //LTE endpoints are configured and not auto-detected
 }
 
 type WebServer struct {
@@ -39,11 +41,17 @@ type WebServer struct {
 }
 
 type Mongodb struct {
-	Name string `yaml:"name"`
-	Url  string `yaml:"url"`
+	Name string `yaml:"name,omitempty"`
+	Url  string `yaml:"url,omitempty"`
 }
 
 type RocEndpt struct {
-	Enabled bool   `yaml:"enabled"`
-	SyncUrl string `yaml:"syncUrl"`
+	Enabled bool   `yaml:"enabled,omitempty"`
+	SyncUrl string `yaml:"syncUrl,omitempty"`
+}
+
+type LteEndpt struct {
+	NodeType string `yaml:"type,omitempty"`
+	ConfigPushUrl   string `yaml:"configPushUrl,omitempty"`
+	ConfigCheckUrl string `yaml:"configCheckUrl,omitempty"`  // only for 4G components 
 }

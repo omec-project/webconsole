@@ -6,17 +6,24 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	protos "github.com/omec-project/webconsole/proto/sdcoreConfig"
 	"github.com/sirupsen/logrus"
 	"math/rand"
+	"net/http"
+	"strconv"
 	"time"
 )
 
 type clientNF struct {
 	id                    string
 	rc                    int
+	ConfigPushUrl         string
+	ConfigCheckUrl        string
 	configChanged         bool
 	slicesConfigClient    map[string]*configmodels.Slice
 	devgroupsConfigClient map[string]*configmodels.DeviceGroups
@@ -40,11 +47,147 @@ type clientRspMsg struct {
 var clientNFPool map[string]*clientNF
 var restartCounter uint32
 
+type ServingPlmn struct {
+	Mcc int32 `json:"mcc,omitempty"`
+	Mnc int32 `json:"mnc,omitempty"`
+	Tac int32 `json:"tac,omitempty"`
+}
+
+type ImsiRange struct {
+	From uint64 `json:"from,omitempty"`
+	To   uint64 `json:"to,omitempty"`
+}
+
+type selectionKeys struct {
+	ServingPlmn  ServingPlmn `json:"serving-plmn,omitempty"`
+	RequestedApn string      `json:"requested-apn,omitempty"`
+	ImsiRange    *ImsiRange  `json:"imsi-range,omitempty"`
+}
+
+type subSelectionRule struct {
+	Keys                     selectionKeys `json:"keys,omitempty"`
+	Priority                 int           `json:"priority,omitempty"`
+	SelectedQoSProfile       string        `json:"selected-qos-profile,omitempty"`
+	SelectedUserPlaneProfile string        `json:"selected-user-plane-profile,omitempty"`
+	SelectedApnProfile       string        `json:"selected-apn-profile,omitempty"`
+}
+
+type securityProfile struct {
+	Opc string `json:key",omitempty"`
+	Key string `json:opc",omitempty"`
+	Sqn uint64 `json:sqn",omitempty"`
+}
+
+type apnProfile struct {
+	DnsPrimary   string `json:"dns_primary,omitempty"`
+	DnsSecondary string `json:"dns_secondary,omitempty"`
+	ApnName      string `json:"apn-name,omitempty"`
+	Mtu          int32  `json:"mtu,omitempty"`
+	GxEnabled    bool   `json:"gx_enabled,omitempty"`
+}
+
+type userPlaneProfile struct {
+	UserPlane     string `json:"user-plane,omitempty"`
+	GlobalAddress bool   `json:"global-address,omitempty"`
+}
+
+type qosProfile struct {
+	Qci  int     `json:"qci,omitempty"`
+	Arp  int     `json:"arp,omitempty"`
+	Ambr []int32 `json:"apn-ambr,omitempty"`
+}
+
+type configSpgw struct {
+	SubSelectRules    []*subSelectionRule          `json:"subscriber-selection-rules,omitempty"`
+	ApnProfiles       map[string]*apnProfile       `json:"apn-profiles,omitempty"`
+	UserPlaneProfiles map[string]*userPlaneProfile `json:"user-plane-profiles,omitempty"`
+	QosProfiles       map[string]*qosProfile       `json:"qos-profiles,omitempty"`
+}
+
+type configHss struct {
+	StartImsi   uint64                 `json:"start-imsi,omitempty"`
+	EndImsi     uint64                 `json:"end-imsi,omitempty"`
+	Opc         string                 `json:"Opc,omitempty"`
+	Key         string                 `json:"Key,omitempty"`
+	Sqn         uint64                 `json:"sqn,omitempty"`
+	Rand        string                 `json:"rand,omitempty"`
+	Msisdn      int64                  `json:"msisdn,omitempty"`
+	AmbrUl      int32                  `json:"ambr-up,omitempty"`
+	AmbrDl      int32                  `json:"ambr-dl,omitempty"`
+	ApnProfiles map[string]*apnProfile `json:"apn-profiles,omitempty"`
+	Qci         int32                  `json:"qci,omitempty"`
+	Arp         int32                  `json:"arp,omitempty"`
+}
+
+type ruleFlowInfo struct {
+	FlowDesc string `json:"Flow-Description,omitempty"`
+}
+
+type arpInfo struct {
+	Priority     int `json:"Priority-Level,omitempty"`
+	PreEmptCap   int `json:"Pre-Emption-Capability,omitempty"`
+	PreEmpVulner int `json:"Pre-Emption-Vulnerability,omitempty"`
+}
+
+type ruleQosInfo struct {
+	Qci       int      `json:"QoS-Class-Identifier,omitempty"`
+	Mbr_ul    int      `json:"Max-Requested-Bandwidth-UL,omitempty"`
+	Mbr_dl    int      `json:"Max-Requested-Bandwidth-DL,omitempty"`
+	Gbr_ul    int      `json:"Guaranteed-Bitrate-UL,omitempty"`
+	Gbr_dl    int      `json:"Guaranteed-Bitrate-DL,omitempty"`
+	Arp       *arpInfo `json:"Allocation-Retention-Priority,omitempty"`
+	ApnAmbrUl int      `json:"APN-Aggregate-Max-Bitrate-UL,omitempty"`
+	ApnAmbrDl int      `json:"APN-Aggregate-Max-Bitrate-DL,omitempty"`
+}
+
+type pcrfRuledef struct {
+	RuleName string        `json:"Charging-Rule-Name,omitempty"`
+	QosInfo  *ruleQosInfo  `json:"QoS-Information,omitempty"`
+	FlowInfo *ruleFlowInfo `json:"Flow-Information,omitempty"`
+}
+
+type pcrfRules struct {
+	Definitions *pcrfRuledef `json:"definition,omitempty"`
+}
+
+type pcrfServices struct {
+	Qci                   int      `json:"qci,omitempty"`
+	Arp                   int      `json:"arp,omitempty"`
+	Ambr_ul               int32    `json:"AMBR_UL,omitempty"`
+	Ambr_dl               int32    `json:"AMBR_DL,omitempty"`
+	Rules                 []string `json:"service-activation-rules,omitempty"`
+	Activate_conditions   []string `json:"activate-confitions,omitempty"`
+	Deactivate_conditions []string `json:"deactivate-conditions-rules,omitempty"`
+	Deactivate_actions    []string `json:"deactivate-actions,omitempty"`
+}
+
+type pcrfServiceGroup struct {
+	Def_service       string   `json:"default-activate-service,omitempty"`
+	OnDemand_services []string `json:"on-demant-service,omitempty"`
+}
+
+type PcrfPolicies struct {
+	ServiceGroups map[string]*pcrfServiceGroup `json:"service-groups,omitempty"`
+	Services      map[string]*pcrfServices     `json:"services,omitempty"`
+	Rules         map[string]*pcrfRules        `json:"rules,omitempty"`
+}
+type configPcrf struct {
+	Policies *PcrfPolicies `json:"Policies,omitempty"`
+}
+
 func init() {
 	clientNFPool = make(map[string]*clientNF)
 	s1 := rand.NewSource(time.Now().UnixNano())
 	r1 := rand.New(s1)
 	restartCounter = r1.Uint32()
+}
+
+func setClientConfigPushUrl(client *clientNF, url string) {
+	client.ConfigPushUrl = url
+}
+
+func setClientConfigCheckUrl(client *clientNF, url string) {
+	client.ConfigCheckUrl = url
 }
 
 func getClient(id string) (*clientNF, bool) {
@@ -153,8 +296,39 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 }
 
 func clientEventMachine(client *clientNF) {
+	ticker := time.NewTicker(10 * time.Second)
+
 	for {
 		select {
+		case t := <-ticker.C:
+			if client.ConfigCheckUrl != "" {
+				go func() {
+					c := &http.Client{}
+					httpend := client.ConfigCheckUrl
+					req, err := http.NewRequest(http.MethodPost, httpend, nil)
+					if err != nil {
+						client.clientLog.Infof("An Error Occured %v for channel %v \n", err, t)
+					}
+					resp, err := c.Do(req)
+					if err != nil {
+						client.clientLog.Infof("An Error Occured %v\n", err)
+					} else {
+						client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
+						if factory.WebUIConfig.Configuration.Mode5G == false  && resp.StatusCode == http.StatusNotFound {
+							if client.id == "hss" {
+								postConfigHss(client)
+							} else if client.id == "mme-app" || client.id == "mme-s1ap" {
+								postConfigMme(client)
+							} else if client.id == "pcrf" {
+								postConfigPcrf(client)
+							} else if client.id == "spgw" {
+								postConfigSpgw(client)
+							}
+						}
+					}
+				}()
+			}
+
 		case configMsg := <-client.outStandingPushConfig:
 			client.clientLog.Infof("Received new configuration for Client %v ", client.id)
 			// update config snapshot
@@ -175,6 +349,17 @@ func clientEventMachine(client *clientNF) {
 			}
 
 			client.configChanged = true
+			if factory.WebUIConfig.Configuration.Mode5G == false {
+				if client.id == "hss" {
+					postConfigHss(client)
+				} else if client.id == "mme-app" || client.id == "mme-s1ap" {
+					postConfigMme(client)
+				} else if client.id == "pcrf" {
+					postConfigPcrf(client)
+				} else if client.id == "spgw" {
+					postConfigSpgw(client)
+				}
+			}
 
 		case cReqMsg := <-client.tempGrpcReq:
 			client.clientLog.Infof("Config changed %t and NewClient %t\n", client.configChanged, cReqMsg.newClient)
@@ -207,5 +392,234 @@ func clientEventMachine(client *clientNF) {
 			cReqMsg.grpcRspMsg <- envMsg
 			client.configChanged = false // TODO RACE CONDITION
 		}
+	}
+}
+
+func postConfigMme(client *clientNF) {
+}
+
+func postConfigHss(client *clientNF) {
+	client.clientLog.Infoln("Post configuration to Hss")
+	config := configHss{
+		ApnProfiles: make(map[string]*apnProfile),
+	}
+
+	for sliceName, sliceConfig := range client.slicesConfigClient {
+		if sliceConfig == nil {
+			continue
+		}
+		client.clientLog.Infoln("SliceName ", sliceName)
+		// qos profile
+		sqos := sliceConfig.Qos
+		config.Qci = 9
+		config.Arp = 1
+		config.AmbrUl = sqos.Uplink
+		config.AmbrDl = sqos.Downlink
+
+		for _, d := range sliceConfig.SiteDeviceGroup {
+			devGroup := devgroupsConfigSnapshot[d]
+			client.clientLog.Infoln("DeviceGroup ", devGroup)
+			var apnProf apnProfile
+			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
+			apnProfName := sliceName + "-apn"
+			config.ApnProfiles[apnProfName] = &apnProf
+
+			for _, imsi := range devGroup.Imsis {
+				num, _ := strconv.ParseInt(imsi, 10, 64)
+				config.StartImsi = uint64(num)
+				config.EndImsi = uint64(num)
+				authSubsData := imsiData[imsi]
+				client.clientLog.Infoln("imsiData ", imsiData)
+				if authSubsData == nil {
+					client.clientLog.Infoln("SIM card details not found for IMSI ", imsi)
+					continue
+				}
+				config.Opc = authSubsData.Opc.OpcValue
+				config.Key = authSubsData.PermanentKey.PermanentKeyValue
+				num, _ = strconv.ParseInt(authSubsData.SequenceNumber, 10, 64)
+				config.Sqn = uint64(num)
+				client.clientLog.Infoln("HSS config ", config)
+				b, err := json.Marshal(config)
+				if err != nil {
+					client.clientLog.Infoln("error in marshalling json -", err)
+				} else {
+					client.clientLog.Infoln("marshalling json -", b)
+				}
+				reqMsgBody := bytes.NewBuffer(b)
+				client.clientLog.Infoln("reqMsgBody -", reqMsgBody)
+				c := &http.Client{}
+				httpend := client.ConfigPushUrl
+				req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)
+				if err != nil {
+					client.clientLog.Infof("An Error Occured %v", err)
+				}
+				req.Header.Set("Content-Type", "application/json; charset=utf-8")
+				resp, err := c.Do(req)
+				if err != nil {
+					client.clientLog.Infof("An Error Occured %v", err)
+				} else {
+					client.clientLog.Infof("Message POST to HSS %v %v Success\n", reqMsgBody, resp.StatusCode)
+				}
+
+			}
+			// multiple groups handling?
+		}
+	}
+}
+
+func postConfigPcrf(client *clientNF) {
+	client.clientLog.Infoln("Post configuration to Pcrf")
+	config := configPcrf{}
+	config.Policies = &PcrfPolicies{
+		ServiceGroups: make(map[string]*pcrfServiceGroup),
+		Services:      make(map[string]*pcrfServices),
+		Rules:         make(map[string]*pcrfRules),
+	}
+	for sliceName, sliceConfig := range client.slicesConfigClient {
+		if sliceConfig == nil {
+			continue
+		}
+		client.clientLog.Infoln("Slice ", sliceName)
+		siteInfo := sliceConfig.SiteInfo
+		client.clientLog.Infoln("siteInfo ", siteInfo)
+		//subscriber selection rules
+		rule := subSelectionRule{}
+		rule.Priority = 1
+		//apn profile
+		sqos := sliceConfig.Qos
+		for _, d := range sliceConfig.SiteDeviceGroup {
+			client.clientLog.Infoln("PCRF devgroup ", d)
+			devGroup := devgroupsConfigSnapshot[d]
+			sgroup := &pcrfServiceGroup{}
+			sgroup.Def_service = d
+			config.Policies.ServiceGroups[devGroup.IpDomainExpanded.Dnn] = sgroup
+			pcrfService := &pcrfServices{}
+			pcrfService.Qci = 9
+			pcrfService.Arp = 1
+			pcrfService.Ambr_ul = sqos.Uplink
+			pcrfService.Ambr_dl = sqos.Downlink
+			pcrfService.Rules = append(pcrfService.Rules, d)
+			client.clientLog.Infoln("pcrf Service ", pcrfService.Rules)
+			config.Policies.Services[d] = pcrfService
+		}
+	}
+	client.clientLog.Infoln("PCRF Config after filling details ", config)
+	client.clientLog.Infoln("PCRF Config after filling details ", config.Policies)
+	b, err := json.Marshal(config)
+	if err != nil {
+		client.clientLog.Infoln("PCRF error in marshalling json -", err)
+	} else {
+		client.clientLog.Infoln("PCRF marshalling json -", b)
+	}
+	reqMsgBody := bytes.NewBuffer(b)
+	client.clientLog.Infoln("PCRF reqMsgBody -", reqMsgBody)
+	c := &http.Client{}
+	httpend := client.ConfigPushUrl
+	req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)
+	if err != nil {
+		client.clientLog.Infof("An Error Occured %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	resp, err := c.Do(req)
+	if err != nil {
+		client.clientLog.Infof("An Error Occured %v", err)
+	} else {
+		client.clientLog.Infof("PCRF Message POST %v %v Success\n", reqMsgBody, resp.StatusCode)
+	}
+}
+
+func postConfigSpgw(client *clientNF) {
+	client.clientLog.Infoln("Post configuration to spgw ", client.slicesConfigClient)
+	config := configSpgw{
+		ApnProfiles:       make(map[string]*apnProfile),
+		UserPlaneProfiles: make(map[string]*userPlaneProfile),
+		QosProfiles:       make(map[string]*qosProfile),
+	}
+
+	for sliceName, sliceConfig := range client.slicesConfigClient {
+		if sliceConfig == nil {
+			continue
+		}
+		siteInfo := sliceConfig.SiteInfo
+		client.clientLog.Infoln("siteInfo.GNodeBs ", siteInfo.GNodeBs)
+		for _, gnb := range siteInfo.GNodeBs {
+			//subscriber selection rules
+			var rule subSelectionRule
+			rule.Priority = 1
+			//apn profile
+			for _, d := range sliceConfig.SiteDeviceGroup {
+				devGroup := devgroupsConfigSnapshot[d]
+				var apnProf apnProfile
+				apnProf.DnsPrimary = devGroup.IpDomainExpanded.DnsPrimary
+				apnProf.DnsSecondary = devGroup.IpDomainExpanded.DnsPrimary
+				apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
+				apnProf.Mtu = devGroup.IpDomainExpanded.Mtu
+				apnProf.GxEnabled = false
+				apnProfName := sliceName + "-apn"
+				config.ApnProfiles[apnProfName] = &apnProf
+				rule.SelectedApnProfile = apnProfName
+			}
+
+			// user plane profile
+			var upProf userPlaneProfile
+			userProfName := sliceName + "_up"
+			upProf.UserPlane = siteInfo.Upf["upf-name"].(string)
+			upProf.GlobalAddress = true
+			config.UserPlaneProfiles[userProfName] = &upProf
+			rule.SelectedUserPlaneProfile = userProfName
+
+			// qos profile
+			sqos := sliceConfig.Qos
+			qosProfName := sliceName + "_qos"
+			var qosProf qosProfile
+			qosProf.Qci = 9
+			qosProf.Arp = 1
+			qosProf.Ambr = append(qosProf.Ambr, sqos.Uplink)
+			qosProf.Ambr = append(qosProf.Ambr, sqos.Downlink)
+			config.QosProfiles[qosProfName] = &qosProf
+			rule.SelectedQoSProfile = qosProfName
+
+			var keys selectionKeys
+			num, err := strconv.ParseInt(siteInfo.Plmn.Mcc, 10, 32)
+			if err != nil {
+				client.clientLog.Infof("format error. Mcc = %v, err = %v\n ", siteInfo.Plmn.Mcc, err)
+				continue
+			}
+			keys.ServingPlmn.Mcc = int32(num)
+			num, err = strconv.ParseInt(siteInfo.Plmn.Mnc, 10, 32)
+			if err != nil {
+				client.clientLog.Infof("format error. Mnc = %v, err = %v\n ", siteInfo.Plmn.Mnc, err)
+				continue
+			}
+
+			keys.ServingPlmn.Mnc = int32(num)
+
+			keys.ServingPlmn.Tac = gnb.Tac
+
+			rule.Keys = keys
+			config.SubSelectRules = append(config.SubSelectRules, &rule)
+		}
+	}
+	client.clientLog.Infoln("spgw Config after filling details ", config)
+	b, err := json.Marshal(config)
+	if err != nil {
+		client.clientLog.Infoln("error in marshalling json -", err)
+	} else {
+		client.clientLog.Infoln("spgw marshalling json -", b)
+	}
+	reqMsgBody := bytes.NewBuffer(b)
+	client.clientLog.Infoln("spgw reqMsgBody -", reqMsgBody)
+	c := &http.Client{}
+	httpend := client.ConfigPushUrl
+	req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)
+	if err != nil {
+		client.clientLog.Infof("An Error Occured %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	resp, err := c.Do(req)
+	if err != nil {
+		client.clientLog.Infof("An Error Occured %v", err)
+	} else {
+		client.clientLog.Infof("spgw Message POST %v %v Success\n", reqMsgBody, resp.StatusCode)
 	}
 }

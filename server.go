@@ -12,8 +12,8 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/free5gc/version"
-	"github.com/free5gc/webconsole/backend/logger"
-	"github.com/free5gc/webconsole/backend/webui_service"
+	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/backend/webui_service"
 )
 
 var WEBUI = &webui_service.WEBUI{}

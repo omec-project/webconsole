@@ -14,7 +14,7 @@ import (
 
 	"github.com/free5gc/MongoDBLibrary"
 	"github.com/free5gc/openapi/models"
-	"github.com/free5gc/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/backend/logger"
 )
 
 var webuiContext = WEBUIContext{}

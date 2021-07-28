@@ -24,10 +24,9 @@ import (
 	openApiLogger "github.com/free5gc/openapi/logger"
 	"github.com/free5gc/path_util"
 	pathUtilLogger "github.com/free5gc/path_util/logger"
-	"github.com/free5gc/webconsole/backend/WebUI"
-	"github.com/free5gc/webconsole/backend/factory"
-	"github.com/free5gc/webconsole/backend/logger"
-	"github.com/free5gc/webconsole/backend/webui_context"
+	"github.com/omec-project/webconsole/backend/factory"
+	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/backend/webui_context"
 	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
 	gServ "github.com/omec-project/webconsole/proto/server"
@@ -170,17 +169,21 @@ func (webui *WEBUI) FilterCli(c *cli.Context) (args []string) {
 }
 
 func (webui *WEBUI) Start() {
-	// get config file info from WebUIConfig
-	mongodb := factory.WebUIConfig.Configuration.Mongodb
+	if factory.WebUIConfig.Configuration.Mode5G == true {
+		// get config file info from WebUIConfig
+		mongodb := factory.WebUIConfig.Configuration.Mongodb
 
-	// Connect to MongoDB
-	MongoDBLibrary.SetMongoDB(mongodb.Name, mongodb.Url)
+		// Connect to MongoDB
+		MongoDBLibrary.SetMongoDB(mongodb.Name, mongodb.Url)
+	}
 
-	initLog.Infoln("Server started")
+	initLog.Infoln("WebUI Server started")
 
-	router := WebUI.NewRouter()
+	/* First HTTP Server running at port to receive Config from ROC */
+	subconfig_router := logger_util.NewGinWithLogrus(logger.GinLog)
+	configapi.AddServiceSub(subconfig_router)
 
-	router.Use(cors.New(cors.Config{
+	subconfig_router.Use(cors.New(cors.Config{
 		AllowMethods: []string{"GET", "POST", "OPTIONS", "PUT", "PATCH", "DELETE"},
 		AllowHeaders: []string{
 			"Origin", "Content-Length", "Content-Type", "User-Agent",
@@ -192,39 +195,42 @@ func (webui *WEBUI) Start() {
 		MaxAge:           86400,
 	}))
 
-	self := webui_context.WEBUI_Self()
-	self.UpdateNfProfiles()
-
-	router.NoRoute(ReturnPublic())
+	subconfig_router.NoRoute(ReturnPublic())
 	go func() {
-		initLog.Infoln(router.Run(":5000"))
+		initLog.Infoln(subconfig_router.Run(":5000"))
 		initLog.Infoln("Webserver stopped/terminated/not-started ")
 	}()
+	/* First HTTP server end */
 
-	config_router := logger_util.NewGinWithLogrus(logger.GinLog)
-	configapi.AddService(config_router)
+	if factory.WebUIConfig.Configuration.Mode5G == true {
+		self := webui_context.WEBUI_Self()
+		self.UpdateNfProfiles()
+	}
+
 	configMsgChan := make(chan *configmodels.ConfigMessage, 10)
 	configapi.SetChannel(configMsgChan)
-	subsUpdateChan := make(chan *gServ.SubsUpdMsg, 10)
 
+	// Start grpc Server. This has embedded functionality of sending
+	// 4G config over REST Api as well.
 	var host string = "0.0.0.0:9876"
 	confServ := &gServ.ConfigServer{}
-	go gServ.StartServer(host, confServ,
-		configMsgChan, subsUpdateChan)
+	go gServ.StartServer(host, confServ, configMsgChan)
 
+	// fetch one time configuration from the simapp/roc on startup
+	// this is to fetch existing config
 	go fetchConfigAdapater()
-	go WebUI.SubscriptionUpdateHandle(subsUpdateChan)
+
+	// Second HTTP Server running at port to receive Config from ROC
+	config_router := logger_util.NewGinWithLogrus(logger.GinLog)
+	configapi.AddService(config_router)
 
 	HTTPAddr := "0.0.0.0:9089"
 	initLog.Infoln("Http address ", HTTPAddr)
 	server, err := http2_util.NewServer(HTTPAddr, "", config_router)
 
-	if server == nil {
+	if server == nil || err != nil {
 		initLog.Error("Initialize HTTP server failed:", err)
 		return
-	}
-	if err != nil {
-		initLog.Warnln("Initialize HTTP server:", err)
 	}
 
 	initLog.Infoln("Start Http server at address ", HTTPAddr)
@@ -299,7 +305,7 @@ func fetchConfigAdapater() {
 		req, err := http.NewRequest(http.MethodPost, httpend, nil)
 		//Handle Error
 		if err != nil {
-			fmt.Printf("An Error Occured %v", err)
+			fmt.Printf("An Error Occured %v\n", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
@@ -307,7 +313,7 @@ func fetchConfigAdapater() {
 		req.Header.Set("Content-Type", "application/json; charset=utf-8")
 		resp, err := client.Do(req)
 		if err != nil {
-			fmt.Printf("An Error Occured %v", err)
+			fmt.Printf("An Error Occured %v\n", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}

@@ -23,6 +23,7 @@ type SubsData struct {
 type SubsOverrideData struct {
 	PlmnID         string `json:"plmnID"`
 	OPc            string `json:"opc"`
+	OP             string `json:"op"`
 	Key            string `json:"key"`
 	SequenceNumber string `json:"sequenceNumber"`
 }

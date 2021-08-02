@@ -581,6 +581,9 @@ func PostSubscriberByID(c *gin.Context) {
 	if subsOverrideData.PlmnID != "" {
 		servingPlmnId = subsOverrideData.PlmnID
 	}
+	if subsOverrideData.OP != "" {
+		authSubsData.Milenage.Op.OpValue = subsOverrideData.OP
+	}
 	if subsOverrideData.OPc != "" {
 		authSubsData.Opc.OpcValue = subsOverrideData.OPc
 	}

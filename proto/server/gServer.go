@@ -7,6 +7,7 @@ package server
 
 import (
 	context "context"
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	protos "github.com/omec-project/webconsole/proto/sdcoreConfig"
@@ -42,12 +43,29 @@ var kasp = keepalive.ServerParameters{
 	Timeout: 5 * time.Second,  // Wait 1 second for the ping ack before assuming the connection is dead
 }
 
-func StartServer(host string, confServ *ConfigServer,
-	configMsgChan chan *configmodels.ConfigMessage, subsChannel chan *SubsUpdMsg) {
-	grpcLog.Println("Start grpc config server")
+func StartServer(host string, confServ *ConfigServer, configMsgChan chan *configmodels.ConfigMessage) {
 
-	go configHandler(configMsgChan, subsChannel)
+	// add 4G endpoints in the client list. 4G endpoints are configured in the
+	// yaml file
+	if factory.WebUIConfig.Configuration.Mode5G == false {
+		var config *factory.Config
+		config = factory.GetConfig()
+		if config != nil && config.Configuration != nil && config.Configuration.LteEnd != nil {
+			for _, end := range config.Configuration.LteEnd {
+				grpcLog.Infoln("Adding Client endpoint ", end.NodeType, end.ConfigPushUrl)
+				c, _ := getClient(end.NodeType)
+				setClientConfigPushUrl(c, end.ConfigPushUrl)
+				setClientConfigCheckUrl(c, end.ConfigCheckUrl)
+			}
+		}
+	}
+	// we wish to start grpc server only if we received at least one config
+	// from the simapp/ROC
+	configReady := make(chan bool)
+	go configHandler(configMsgChan, configReady)
+	ready := <-configReady
 
+	grpcLog.Println("Start grpc config server ", ready)
 	lis, err := net.Listen("tcp", host)
 	if err != nil {
 		grpcLog.Fatalf("failed to listen: %v", err)

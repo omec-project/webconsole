@@ -3,43 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
 
-package WebUI
+package configapi
 
 import (
 	"net/http"
-
 	"github.com/gin-gonic/gin"
-
-	"github.com/free5gc/logger_util"
-	"github.com/free5gc/webconsole/backend/logger"
 )
 
-// Route is the information for every URI.
-type Route struct {
-	// Name is the name of this Route.
-	Name string
-	// Method is the string for the HTTP method. ex) GET, POST etc..
-	Method string
-	// Pattern is the pattern of the URI.
-	Pattern string
-	// HandlerFunc is the handler function of this route.
-	HandlerFunc gin.HandlerFunc
-}
-
-// Routes is the list of the generated Route.
-type Routes []Route
-
-// NewRouter returns a new router.
-func NewRouter() *gin.Engine {
-	router := logger_util.NewGinWithLogrus(logger.GinLog)
-	AddService(router)
-	return router
-}
-
-func AddService(engine *gin.Engine) *gin.RouterGroup {
+func AddServiceSub(engine *gin.Engine) *gin.RouterGroup {
 	group := engine.Group("/api")
 
-	for _, route := range routes {
+	for _, route := range routesL {
 		switch route.Method {
 		case http.MethodGet:
 			group.GET(route.Pattern, route.HandlerFunc)
@@ -57,7 +31,7 @@ func AddService(engine *gin.Engine) *gin.RouterGroup {
 	return group
 }
 
-var routes = Routes{
+var routesL = Routes{
 	{
 		"GetExample",
 		http.MethodGet,

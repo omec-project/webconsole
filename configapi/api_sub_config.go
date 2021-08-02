@@ -3,24 +3,24 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
 
-package WebUI
+package configapi
 
 import (
 	"crypto/tls"
 	"encoding/json"
+    "os"
 	"fmt"
 	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/free5gc/MongoDBLibrary"
 	"github.com/free5gc/openapi/models"
-	"github.com/free5gc/webconsole/backend/logger"
-	"github.com/free5gc/webconsole/backend/webui_context"
+	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/backend/webui_context"
 	gServ "github.com/omec-project/webconsole/proto/server"
+    "github.com/omec-project/webconsole/configmodels"
 )
 
 const (
@@ -53,6 +53,7 @@ func sliceToByte(data []map[string]interface{}) (ret []byte) {
 	return
 }
 
+// seems something which we should move to mongolib
 func toBsonM(data interface{}) (ret bson.M) {
 	tmp, _ := json.Marshal(data)
 	json.Unmarshal(tmp, &ret)
@@ -83,7 +84,7 @@ func GetSampleJSON(c *gin.Context) {
 
 	logger.WebUILog.Infoln("Get a JSON Example")
 
-	var subsData SubsData
+	var subsData configmodels.SubsData
 
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
@@ -256,7 +257,7 @@ func GetSampleJSON(c *gin.Context) {
 	servingPlmnId := "20893"
 	ueId := "imsi-2089300007487"
 
-	subsData = SubsData{
+	subsData = configmodels.SubsData{
 		PlmnID:                            servingPlmnId,
 		UeId:                              ueId,
 		AuthenticationSubscription:        authSubsData,
@@ -275,12 +276,12 @@ func GetSubscribers(c *gin.Context) {
 
 	logger.WebUILog.Infoln("Get All Subscribers List")
 
-	var subsList []SubsListIE = make([]SubsListIE, 0)
+	var subsList []configmodels.SubsListIE = make([]configmodels.SubsListIE, 0)
 	amDataList := MongoDBLibrary.RestfulAPIGetMany(amDataColl, bson.M{})
 	for _, amData := range amDataList {
 		ueId := amData["ueId"]
 		servingPlmnId := amData["servingPlmnId"]
-		tmp := SubsListIE{
+		tmp := configmodels.SubsListIE{
 			PlmnID: servingPlmnId.(string),
 			UeId:   ueId.(string),
 		}
@@ -296,7 +297,7 @@ func GetSubscriberByID(c *gin.Context) {
 
 	logger.WebUILog.Infoln("Get One Subscriber Data")
 
-	var subsData SubsData
+	var subsData configmodels.SubsData
 
 	ueId := c.Param("ueId")
 
@@ -322,7 +323,7 @@ func GetSubscriberByID(c *gin.Context) {
 	var smPolicyData models.SmPolicyData
 	json.Unmarshal(mapToByte(smPolicyDataInterface), &smPolicyData)
 
-	subsData = SubsData{
+	subsData = configmodels.SubsData{
 		UeId:                              ueId,
 		AuthenticationSubscription:        authSubsData,
 		AccessAndMobilitySubscriptionData: amDataData,
@@ -337,10 +338,11 @@ func GetSubscriberByID(c *gin.Context) {
 
 // Post subscriber by IMSI(ueId)
 func PostSubscriberByID(c *gin.Context) {
+
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Post One Subscriber Data")
 
-	var subsOverrideData SubsOverrideData
+	var subsOverrideData configmodels.SubsOverrideData
 	if err := c.ShouldBindJSON(&subsOverrideData); err != nil {
 		logger.WebUILog.Panic(err.Error())
 	}
@@ -626,6 +628,7 @@ func PostSubscriberByID(c *gin.Context) {
 			flowRulesBsonA = append(flowRulesBsonA, flowRuleBsonM)
 		}
 	*/
+	if os.Getenv("CONFIGPOD_DEPLOYMENT") != "4G" {
 	MongoDBLibrary.RestfulAPIPost(authSubsDataColl, filterUeIdOnly, authSubsBsonM)
 	MongoDBLibrary.RestfulAPIPost(amDataColl, filterUeIdOnly, amDataBsonM)
 	MongoDBLibrary.RestfulAPIPostMany(smDataColl, filterUeIdOnly, smDatasBsonA)
@@ -633,9 +636,10 @@ func PostSubscriberByID(c *gin.Context) {
 	MongoDBLibrary.RestfulAPIPost(amPolicyDataColl, filterUeIdOnly, amPolicyDataBsonM)
 	MongoDBLibrary.RestfulAPIPost(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
 	//	MongoDBLibrary.RestfulAPIPostMany(flowRuleDataColl, filterUeIdOnly, flowRulesBsonA)
+    }
 
 	c.JSON(http.StatusCreated, gin.H{})
-	gServ.HandleSubscriberAdd(ueId)
+	gServ.HandleSubscriberAdd(ueId, &authSubsData)
 }
 
 // Put subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
@@ -643,7 +647,7 @@ func PutSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Put One Subscriber Data")
 
-	var subsData SubsData
+	var subsData configmodels.SubsData
 	if err := c.ShouldBindJSON(&subsData); err != nil {
 		logger.WebUILog.Panic(err.Error())
 	}
@@ -685,7 +689,7 @@ func PutSubscriberByID(c *gin.Context) {
 	MongoDBLibrary.RestfulAPIPutOne(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
 
 	c.JSON(http.StatusNoContent, gin.H{})
-	gServ.HandleSubscriberAdd(ueId)
+	gServ.HandleSubscriberAdd(ueId, &subsData.AuthenticationSubscription)
 }
 
 // Patch subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
@@ -693,7 +697,7 @@ func PatchSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Patch One Subscriber Data")
 
-	var subsData SubsData
+	var subsData configmodels.SubsData
 	if err := c.ShouldBindJSON(&subsData); err != nil {
 		logger.WebUILog.Panic(err.Error())
 	}
@@ -823,86 +827,6 @@ func GetUEPDUSessionInfo(c *gin.Context) {
 	}
 }
 
-func compareNssai(sNssai *models.Snssai,
-	sliceId *models.Snssai) int {
-	if sNssai.Sst != sliceId.Sst {
-		return 1
-	}
-	return strings.Compare(sNssai.Sd, sliceId.Sd)
-}
 
-func convertToString(val uint32) string {
-	var mbVal, gbVal, kbVal uint32
-	kbVal = val / 1024
-	mbVal = val / 1048576
-	gbVal = val / 1073741824
-	var retStr string
-	if gbVal != 0 {
-		retStr = strconv.FormatUint(uint64(gbVal), 10) + " Gbps"
-	} else if mbVal != 0 {
-		retStr = strconv.FormatUint(uint64(mbVal), 10) + " Mbps"
-	} else if kbVal != 0 {
-		retStr = strconv.FormatUint(uint64(kbVal), 10) + " Kbps"
-	} else {
-		retStr = strconv.FormatUint(uint64(val), 10) + " bps"
-	}
 
-	return retStr
-}
 
-// SubscriptionUpdateHandle : Handle subscription update
-func SubscriptionUpdateHandle(subsUpdateChan chan *gServ.SubsUpdMsg) {
-	for subsData := range subsUpdateChan {
-		logger.WebUILog.Infoln("SubscriptionUpdateHandle")
-		var smDataData []models.SessionManagementSubscriptionData
-		var smDatasBsonA []interface{}
-		filterEmpty := bson.M{}
-		var ueID string
-		for _, ueID = range subsData.UeIds {
-			filter := bson.M{"ueId": ueID}
-			smDataDataInterface := MongoDBLibrary.RestfulAPIGetMany(smDataColl, filter)
-			var found bool = false
-			json.Unmarshal(sliceToByte(smDataDataInterface), &smDataData)
-			if len(smDataData) != 0 {
-				smDatasBsonA = make([]interface{}, 0, len(smDataData))
-				for _, data := range smDataData {
-					if compareNssai(data.SingleNssai, &subsData.Nssai) == 0 {
-						logger.WebUILog.Infoln("entry exists for Imsi :  with SST:  and SD: ",
-							ueID, subsData.Nssai.Sst, subsData.Nssai.Sd)
-						found = true
-						break
-					}
-				}
-
-				if !found {
-					logger.WebUILog.Infoln("entry doesnt exist for Imsi : %v with SST: %v and SD: %v",
-						ueID, subsData.Nssai.Sst, subsData.Nssai.Sd)
-					data := smDataData[0]
-					data.SingleNssai.Sst = subsData.Nssai.Sst
-					data.SingleNssai.Sd = subsData.Nssai.Sd
-					data.SingleNssai.Sd = subsData.Nssai.Sd
-					for idx, dnnCfg := range data.DnnConfigurations {
-						var sessAmbr models.Ambr
-						sessAmbr.Uplink = convertToString(uint32(subsData.Qos.Uplink))
-						sessAmbr.Downlink = convertToString(uint32(subsData.Qos.Downlink))
-						dnnCfg.SessionAmbr = &sessAmbr
-						data.DnnConfigurations[idx] = dnnCfg
-						logger.WebUILog.Infoln("uplink mbr ", data.DnnConfigurations[idx].SessionAmbr.Uplink)
-						logger.WebUILog.Infoln("downlink mbr ", data.DnnConfigurations[idx].SessionAmbr.Downlink)
-					}
-					smDataBsonM := toBsonM(data)
-					smDataBsonM["ueId"] = ueID
-					smDataBsonM["servingPlmnId"] = subsData.ServingPlmnId
-					logger.WebUILog.Infoln("servingplmnid ", subsData.ServingPlmnId)
-					smDatasBsonA = append(smDatasBsonA, smDataBsonM)
-				}
-			} else {
-				logger.WebUILog.Infoln("No imsi entry in db for imsi ", ueID)
-			}
-		}
-
-		if len(smDatasBsonA) != 0 {
-			MongoDBLibrary.RestfulAPIPostMany(smDataColl, filterEmpty, smDatasBsonA)
-		}
-	}
-}

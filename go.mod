@@ -1,4 +1,4 @@
-module github.com/free5gc/webconsole
+module github.com/omec-project/webconsole
 
 go 1.14
 
@@ -14,7 +14,6 @@ require (
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.2
 	github.com/mitchellh/mapstructure v1.4.0
-	github.com/omec-project/webconsole v0.0.0-00010101000000-000000000000
 	github.com/omec-project/webconsole/configapi v0.0.0-00010101000000-000000000000
 	github.com/omec-project/webconsole/configmodels v0.0.0-00010101000000-000000000000
 	github.com/sirupsen/logrus v1.8.1
@@ -30,3 +29,5 @@ replace github.com/omec-project/webconsole => ../webconsole
 replace github.com/omec-project/webconsole/configapi => ../webconsole/configapi
 
 replace github.com/omec-project/webconsole/configmodels => ../webconsole/configmodels
+
+replace github.com/omec-project/webconsole/factory => ../webconsole/factory

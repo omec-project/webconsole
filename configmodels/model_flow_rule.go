@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
 
-package WebUI
+package configmodels
 
 type FlowRule struct {
 	Filter string `json:"filter,omitempty" yaml:"filter" bson:"filter" mapstructure:"filter"`

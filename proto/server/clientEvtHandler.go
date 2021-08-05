@@ -125,19 +125,19 @@ type ruleFlowInfo struct {
 
 type arpInfo struct {
 	Priority     int `json:"Priority-Level,omitempty"`
-	PreEmptCap   int `json:"Pre-Emption-Capability,omitempty"`
-	PreEmpVulner int `json:"Pre-Emption-Vulnerability,omitempty"`
+	PreEmptCap   int `json:"Pre-emption-Capability,omitempty"`
+	PreEmpVulner int `json:"Pre-emption-Vulnerability,omitempty"`
 }
 
 type ruleQosInfo struct {
 	Qci       int      `json:"QoS-Class-Identifier,omitempty"`
-	Mbr_ul    int      `json:"Max-Requested-Bandwidth-UL,omitempty"`
-	Mbr_dl    int      `json:"Max-Requested-Bandwidth-DL,omitempty"`
-	Gbr_ul    int      `json:"Guaranteed-Bitrate-UL,omitempty"`
-	Gbr_dl    int      `json:"Guaranteed-Bitrate-DL,omitempty"`
+	Mbr_ul    int32    `json:"Max-Requested-Bandwidth-UL,omitempty"`
+	Mbr_dl    int32    `json:"Max-Requested-Bandwidth-DL,omitempty"`
+	Gbr_ul    int32    `json:"Guaranteed-Bitrate-UL,omitempty"`
+	Gbr_dl    int32    `json:"Guaranteed-Bitrate-DL,omitempty"`
 	Arp       *arpInfo `json:"Allocation-Retention-Priority,omitempty"`
-	ApnAmbrUl int      `json:"APN-Aggregate-Max-Bitrate-UL,omitempty"`
-	ApnAmbrDl int      `json:"APN-Aggregate-Max-Bitrate-DL,omitempty"`
+	ApnAmbrUl int32    `json:"APN-Aggregate-Max-Bitrate-UL,omitempty"`
+	ApnAmbrDl int32    `json:"APN-Aggregate-Max-Bitrate-DL,omitempty"`
 }
 
 type pcrfRuledef struct {
@@ -162,8 +162,8 @@ type pcrfServices struct {
 }
 
 type pcrfServiceGroup struct {
-	Def_service       string   `json:"default-activate-service,omitempty"`
-	OnDemand_services []string `json:"on-demant-service,omitempty"`
+	Def_service       []string `json:"default-activate-service,omitempty"`
+	OnDemand_services []string `json:"on-demand-service,omitempty"`
 }
 
 type PcrfPolicies struct {
@@ -313,8 +313,8 @@ func clientEventMachine(client *clientNF) {
 					if err != nil {
 						client.clientLog.Infof("An Error Occured %v\n", err)
 					} else {
-						client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
-						if factory.WebUIConfig.Configuration.Mode5G == false  && resp.StatusCode == http.StatusNotFound {
+						if factory.WebUIConfig.Configuration.Mode5G == false && resp.StatusCode == http.StatusNotFound {
+							client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
 							if client.id == "hss" {
 								postConfigHss(client)
 							} else if client.id == "mme-app" || client.id == "mme-s1ap" {
@@ -475,6 +475,7 @@ func postConfigPcrf(client *clientNF) {
 		Services:      make(map[string]*pcrfServices),
 		Rules:         make(map[string]*pcrfRules),
 	}
+
 	for sliceName, sliceConfig := range client.slicesConfigClient {
 		if sliceConfig == nil {
 			continue
@@ -491,18 +492,43 @@ func postConfigPcrf(client *clientNF) {
 			client.clientLog.Infoln("PCRF devgroup ", d)
 			devGroup := devgroupsConfigSnapshot[d]
 			sgroup := &pcrfServiceGroup{}
-			sgroup.Def_service = d
+			sgroup.Def_service = append(sgroup.Def_service, d)
 			config.Policies.ServiceGroups[devGroup.IpDomainExpanded.Dnn] = sgroup
 			pcrfService := &pcrfServices{}
-			pcrfService.Qci = 9
+			pcrfService.Qci = 9 /* map traffic class to QCI, ARP */
 			pcrfService.Arp = 1
 			pcrfService.Ambr_ul = sqos.Uplink
 			pcrfService.Ambr_dl = sqos.Downlink
 			pcrfService.Rules = append(pcrfService.Rules, d)
 			client.clientLog.Infoln("pcrf Service ", pcrfService.Rules)
-			config.Policies.Services[d] = pcrfService
+			pcrfServiceName := d + "-service"
+			config.Policies.Services[pcrfServiceName] = pcrfService
+			pcrfRule := &pcrfRules{}
+			ruledef := &pcrfRuledef{}
+			pcrfRule.Definitions = ruledef
+			ruleName := d + "-rule"
+			ruledef.RuleName = ruleName
+			ruleQInfo := &ruleQosInfo{}
+			ruledef.QosInfo = ruleQInfo
+			ruleQInfo.Qci = 9
+			ruleQInfo.Mbr_ul = sqos.Uplink
+			ruleQInfo.Mbr_dl = sqos.Downlink
+			ruleQInfo.Gbr_ul = 0
+			ruleQInfo.Gbr_dl = 0
+			ruleQInfo.ApnAmbrUl = sqos.Uplink
+			ruleQInfo.ApnAmbrDl = sqos.Downlink
+			arp := &arpInfo{}
+			arp.Priority = 1
+			arp.PreEmptCap = 1
+			arp.PreEmpVulner = 1
+			ruleQInfo.Arp = arp
+			ruleFInfo := &ruleFlowInfo{}
+			ruleFInfo.FlowDesc = "permit out ip 0.0.0.0/0 to assigned"
+			ruledef.FlowInfo = ruleFInfo
+			config.Policies.Rules[ruleName] = pcrfRule
 		}
 	}
+
 	client.clientLog.Infoln("PCRF Config after filling details ", config)
 	client.clientLog.Infoln("PCRF Config after filling details ", config.Policies)
 	b, err := json.Marshal(config)

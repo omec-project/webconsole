@@ -94,3 +94,34 @@ func (c *ConfigServer) GetNetworkSlice(ctx context.Context, rReq *protos.Network
 	client.clientLog.Infoln("Received response message from client FSM")
 	return rResp.networkSliceRspMsg, nil
 }
+
+func (c *ConfigServer) NetworkSliceSubscribe(req *protos.NetworkSliceRequest, stream protos.ConfigService_NetworkSliceSubscribeServer) error {
+	grpcLog.Infoln("NetworkSliceSubscribe call from client ID ", req.ClientId)
+	fin := make(chan bool)
+	// Save the subscriber stream according to the given client ID
+	client, created := getClient(req.ClientId)
+	client.resStream = stream
+	client.resChannel = fin
+
+	var reqMsg clientReqMsg
+	reqMsg.networkSliceReqMsg = req
+	// Post the message on client handler & wait to get response
+	if created == true {
+		reqMsg.newClient = true
+	}
+	client.tempGrpcReq <- &reqMsg
+	ctx := stream.Context()
+	// Keep this scope alive because once this scope exits - the stream is closed
+	for {
+		select {
+		case <-fin:
+			client.clientLog.Infoln("Closing stream for client ID: ", req.ClientId)
+			delete(clientNFPool, req.ClientId)
+			return nil
+		case <-ctx.Done():
+			client.clientLog.Infof("Client ID %d has disconnected", req.ClientId)
+			delete(clientNFPool, req.ClientId)
+			return nil
+		}
+	}
+}

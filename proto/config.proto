@@ -8,8 +8,8 @@ package sdcoreConfig;
 option go_package = "./sdcoreConfig";
 
 service ConfigService {
-  rpc GetNetworkSlice(NetworkSliceRequest) returns (NetworkSliceResponse) {
-  }
+  rpc GetNetworkSlice(NetworkSliceRequest) returns (NetworkSliceResponse) {}
+  rpc NetworkSliceSubscribe(NetworkSliceRequest) returns (stream NetworkSliceResponse) {}
 }
 
 enum Status {

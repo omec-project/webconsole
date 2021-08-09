@@ -29,6 +29,8 @@ type clientNF struct {
 	devgroupsConfigClient map[string]*configmodels.DeviceGroups
 	outStandingPushConfig chan *configmodels.ConfigMessage
 	tempGrpcReq           chan *clientReqMsg
+	resStream             protos.ConfigService_NetworkSliceSubscribeServer
+	resChannel            chan bool
 	clientLog             *logrus.Entry
 }
 
@@ -202,7 +204,7 @@ func getClient(id string) (*clientNF, bool) {
 	client.clientLog = grpcLog.WithFields(subField)
 	client.id = id
 	client.outStandingPushConfig = make(chan *configmodels.ConfigMessage, 10)
-	client.tempGrpcReq = make(chan *clientReqMsg)
+	client.tempGrpcReq = make(chan *clientReqMsg, 10)
 	clientNFPool[id] = client
 	client.slicesConfigClient = make(map[string]*configmodels.Slice)
 	client.devgroupsConfigClient = make(map[string]*configmodels.DeviceGroups)
@@ -349,6 +351,18 @@ func clientEventMachine(client *clientNF) {
 			}
 
 			client.configChanged = true
+			/*If client is attached through stream, then
+			  send update to client */
+			if client.resStream != nil {
+				client.clientLog.Infoln("resStream available")
+				var reqMsg clientReqMsg
+				var nReq protos.NetworkSliceRequest
+				reqMsg.networkSliceReqMsg = &nReq
+				reqMsg.grpcRspMsg = make(chan *clientRspMsg)
+				reqMsg.newClient = false
+				client.tempGrpcReq <- &reqMsg
+				client.clientLog.Infoln("sent data to client from push config ")
+			}
 			if factory.WebUIConfig.Configuration.Mode5G == false {
 				if client.id == "hss" {
 					postConfigHss(client)
@@ -372,7 +386,21 @@ func clientEventMachine(client *clientNF) {
 
 			if client.configChanged == false && cReqMsg.newClient == false {
 				client.clientLog.Infoln("No new update to be sent")
-				cReqMsg.grpcRspMsg <- envMsg
+				if client.resStream == nil {
+					cReqMsg.grpcRspMsg <- envMsg
+				} else {
+					if err := client.resStream.Send(
+						envMsg.networkSliceRspMsg); err != nil {
+						client.clientLog.Infoln("Failed to send data to client: ", err)
+						select {
+						case client.resChannel <- true:
+							client.clientLog.Infoln("Unsubscribed client: ", client.id)
+						default:
+							// Default case is to avoid blocking in case client has already unsubscribed
+						}
+					}
+				}
+				client.clientLog.Infoln("sent data to client: ")
 				continue
 			}
 			client.clientLog.Infof("Send complete snapshoot to client. Number of Network Slices %v ", len(client.slicesConfigClient))
@@ -389,7 +417,21 @@ func clientEventMachine(client *clientNF) {
 				}
 			}
 			sliceDetails.ConfigUpdated = 1
-			cReqMsg.grpcRspMsg <- envMsg
+			if client.resStream == nil {
+				cReqMsg.grpcRspMsg <- envMsg
+			} else {
+				if err := client.resStream.Send(
+					envMsg.networkSliceRspMsg); err != nil {
+					client.clientLog.Infoln("Failed to send data to client: ", err)
+					select {
+					case client.resChannel <- true:
+						client.clientLog.Infoln("Unsubscribed client: ", client.id)
+					default:
+						// Default case is to avoid blocking in case client has already unsubscribed
+					}
+				}
+			}
+			client.clientLog.Infoln("send slice success")
 			client.configChanged = false // TODO RACE CONDITION
 		}
 	}

@@ -177,6 +177,10 @@ type configPcrf struct {
 	Policies *PcrfPolicies `json:"Policies,omitempty"`
 }
 
+type configMme struct {
+	PlmnList []string `json:"plmnlist,omitempty"`
+}
+
 func init() {
 	clientNFPool = make(map[string]*clientNF)
 	s1 := rand.NewSource(time.Now().UnixNano())
@@ -438,27 +442,65 @@ func clientEventMachine(client *clientNF) {
 }
 
 func postConfigMme(client *clientNF) {
+	client.clientLog.Infoln("Post configuration to MME")
+	config := configMme{}
+
+	for sliceName, sliceConfig := range client.slicesConfigClient {
+		if sliceConfig == nil {
+			continue
+		}
+		siteInfo := sliceConfig.SiteInfo
+		client.clientLog.Infof("Slice %v, siteInfo.GNodeBs %v", sliceName, siteInfo.GNodeBs)
+
+		//keys.ServingPlmn.Tac = gnb.Tac
+		plmn := "mcc=" + siteInfo.Plmn.Mcc + ", mnc=" + siteInfo.Plmn.Mnc
+
+		client.clientLog.Infof("plmn for mme %v", plmn)
+		config.PlmnList = append(config.PlmnList, plmn)
+	}
+	client.clientLog.Infoln("mme Config after filling details ", config)
+	b, err := json.Marshal(config)
+	if err != nil {
+		client.clientLog.Infoln("error in marshalling json -", err)
+	} else {
+		client.clientLog.Infoln("mme marshalling json -", b)
+	}
+	reqMsgBody := bytes.NewBuffer(b)
+	client.clientLog.Infoln("mme reqMsgBody -", reqMsgBody)
+	c := &http.Client{}
+	httpend := client.ConfigPushUrl
+	req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)
+	if err != nil {
+		client.clientLog.Infof("An Error Occured %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	resp, err := c.Do(req)
+	if err != nil {
+		client.clientLog.Infof("An Error Occured %v", err)
+	} else {
+		client.clientLog.Infof("mme Message POST %v %v \n", reqMsgBody, resp.StatusCode)
+	}
 }
 
 func postConfigHss(client *clientNF) {
 	client.clientLog.Infoln("Post configuration to Hss")
-	config := configHss{
-		ApnProfiles: make(map[string]*apnProfile),
-	}
 
 	for sliceName, sliceConfig := range client.slicesConfigClient {
 		if sliceConfig == nil {
 			continue
 		}
 		client.clientLog.Infoln("SliceName ", sliceName)
-		// qos profile
-		sqos := sliceConfig.Qos
-		config.Qci = 9
-		config.Arp = 1
-		config.AmbrUl = sqos.Uplink
-		config.AmbrDl = sqos.Downlink
 
 		for _, d := range sliceConfig.SiteDeviceGroup {
+			config := configHss{
+				ApnProfiles: make(map[string]*apnProfile),
+			}
+			// qos profile
+			sqos := sliceConfig.Qos
+			config.Qci = 9
+			config.Arp = 1
+			config.AmbrUl = sqos.Uplink
+			config.AmbrDl = sqos.Downlink
 			devGroup := devgroupsConfigSnapshot[d]
 			client.clientLog.Infoln("DeviceGroup ", devGroup)
 			var apnProf apnProfile
@@ -534,21 +576,21 @@ func postConfigPcrf(client *clientNF) {
 			client.clientLog.Infoln("PCRF devgroup ", d)
 			devGroup := devgroupsConfigSnapshot[d]
 			sgroup := &pcrfServiceGroup{}
-			sgroup.Def_service = append(sgroup.Def_service, d)
+			pcrfServiceName := d + "-service"
+			sgroup.Def_service = append(sgroup.Def_service, pcrfServiceName)
 			config.Policies.ServiceGroups[devGroup.IpDomainExpanded.Dnn] = sgroup
 			pcrfService := &pcrfServices{}
 			pcrfService.Qci = 9 /* map traffic class to QCI, ARP */
 			pcrfService.Arp = 1
 			pcrfService.Ambr_ul = sqos.Uplink
 			pcrfService.Ambr_dl = sqos.Downlink
-			pcrfService.Rules = append(pcrfService.Rules, d)
+			ruleName := d + "-rule"
+			pcrfService.Rules = append(pcrfService.Rules, ruleName)
 			client.clientLog.Infoln("pcrf Service ", pcrfService.Rules)
-			pcrfServiceName := d + "-service"
 			config.Policies.Services[pcrfServiceName] = pcrfService
 			pcrfRule := &pcrfRules{}
 			ruledef := &pcrfRuledef{}
 			pcrfRule.Definitions = ruledef
-			ruleName := d + "-rule"
 			ruledef.RuleName = ruleName
 			ruleQInfo := &ruleQosInfo{}
 			ruledef.QosInfo = ruleQInfo

@@ -52,11 +52,17 @@ var routesL = Routes{
 		"/subscriber/:ueId",
 		GetSubscriberByID,
 	},
-
 	{
 		"PostSubscriberByID",
 		http.MethodPost,
 		"/subscriber/:ueId",
+		PostSubscriberByID,
+	},
+
+	{
+		"PostSubscriberByID",
+		http.MethodPost,
+		"/subscriber/:ueId/:servingPlmnId",
 		PostSubscriberByID,
 	},
 

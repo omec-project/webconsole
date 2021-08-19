@@ -8,9 +8,9 @@ package configapi
 import (
 	"crypto/tls"
 	"encoding/json"
-    "os"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,8 +19,8 @@ import (
 	"github.com/free5gc/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
+	"github.com/omec-project/webconsole/configmodels"
 	gServ "github.com/omec-project/webconsole/proto/server"
-    "github.com/omec-project/webconsole/configmodels"
 )
 
 const (
@@ -348,12 +348,15 @@ func PostSubscriberByID(c *gin.Context) {
 	}
 
 	ueId := c.Param("ueId")
+	var servingPlmnId string
+	servingPlmnId = c.Param("servingPlmnId")
+	if servingPlmnId == "" {
+		servingPlmnId = "20893"
+	}
 
 	filterUeIdOnly := bson.M{"ueId": ueId}
 
 	// start to compose a default UE info
-	var servingPlmnId string
-	servingPlmnId = "20893"
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
@@ -629,14 +632,14 @@ func PostSubscriberByID(c *gin.Context) {
 		}
 	*/
 	if os.Getenv("CONFIGPOD_DEPLOYMENT") != "4G" {
-	MongoDBLibrary.RestfulAPIPost(authSubsDataColl, filterUeIdOnly, authSubsBsonM)
-	MongoDBLibrary.RestfulAPIPost(amDataColl, filterUeIdOnly, amDataBsonM)
-	MongoDBLibrary.RestfulAPIPostMany(smDataColl, filterUeIdOnly, smDatasBsonA)
-	MongoDBLibrary.RestfulAPIPost(smfSelDataColl, filterUeIdOnly, smfSelSubsBsonM)
-	MongoDBLibrary.RestfulAPIPost(amPolicyDataColl, filterUeIdOnly, amPolicyDataBsonM)
-	MongoDBLibrary.RestfulAPIPost(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
-	//	MongoDBLibrary.RestfulAPIPostMany(flowRuleDataColl, filterUeIdOnly, flowRulesBsonA)
-    }
+		MongoDBLibrary.RestfulAPIPost(authSubsDataColl, filterUeIdOnly, authSubsBsonM)
+		MongoDBLibrary.RestfulAPIPost(amDataColl, filterUeIdOnly, amDataBsonM)
+		MongoDBLibrary.RestfulAPIPostMany(smDataColl, filterUeIdOnly, smDatasBsonA)
+		MongoDBLibrary.RestfulAPIPost(smfSelDataColl, filterUeIdOnly, smfSelSubsBsonM)
+		MongoDBLibrary.RestfulAPIPost(amPolicyDataColl, filterUeIdOnly, amPolicyDataBsonM)
+		MongoDBLibrary.RestfulAPIPost(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
+		//	MongoDBLibrary.RestfulAPIPostMany(flowRuleDataColl, filterUeIdOnly, flowRulesBsonA)
+	}
 
 	c.JSON(http.StatusCreated, gin.H{})
 	gServ.HandleSubscriberAdd(ueId, &authSubsData)
@@ -826,7 +829,3 @@ func GetUEPDUSessionInfo(c *gin.Context) {
 		})
 	}
 }
-
-
-
-

@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"net"
+	"os"
 	"time"
 )
 
@@ -47,7 +48,7 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 
 	// add 4G endpoints in the client list. 4G endpoints are configured in the
 	// yaml file
-	if factory.WebUIConfig.Configuration.Mode5G == false {
+	if os.Getenv("MANAGED_BY_CONFIG_POD") == "true" && factory.WebUIConfig.Configuration.Mode5G == false {
 		var config *factory.Config
 		config = factory.GetConfig()
 		if config != nil && config.Configuration != nil && config.Configuration.LteEnd != nil {

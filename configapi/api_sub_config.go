@@ -603,10 +603,6 @@ func PostSubscriberByID(c *gin.Context) {
 	amDataBsonM["ueId"] = ueId
 	amDataBsonM["servingPlmnId"] = servingPlmnId
 
-    delFilter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
-	// Replace all data with new one
-	MongoDBLibrary.RestfulAPIDeleteMany(smDataColl, delFilter)
-    MongoDBLibrary.RestfulAPIDeleteMany(smfSelDataColl, delFilter)
 	smDatasBsonA := make([]interface{}, 0, len(smDataData))
 	for _, smSubsData := range smDataData {
 		smDataBsonM := toBsonM(smSubsData)

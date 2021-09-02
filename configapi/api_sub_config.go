@@ -8,9 +8,9 @@ package configapi
 import (
 	"crypto/tls"
 	"encoding/json"
-    "os"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,8 +19,8 @@ import (
 	"github.com/free5gc/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
+	"github.com/omec-project/webconsole/configmodels"
 	gServ "github.com/omec-project/webconsole/proto/server"
-    "github.com/omec-project/webconsole/configmodels"
 )
 
 const (
@@ -592,54 +592,54 @@ func PostSubscriberByID(c *gin.Context) {
 	if subsOverrideData.SequenceNumber != "" {
 		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
 	}
-	//	if subsOverrideData.DNN != nil {
-	// TODO
-	//	}
-
-	authSubsBsonM := toBsonM(authSubsData)
-	authSubsBsonM["ueId"] = ueId
-
-	amDataBsonM := toBsonM(amDataData)
-	amDataBsonM["ueId"] = ueId
-	amDataBsonM["servingPlmnId"] = servingPlmnId
-
-	delFilter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
-	// Replace all data with new one
-	MongoDBLibrary.RestfulAPIDeleteMany(smDataColl, delFilter)
-	smDatasBsonA := make([]interface{}, 0, len(smDataData))
-	for _, smSubsData := range smDataData {
-		smDataBsonM := toBsonM(smSubsData)
-		smDataBsonM["ueId"] = ueId
-		smDataBsonM["servingPlmnId"] = servingPlmnId
-		smDatasBsonA = append(smDatasBsonA, smDataBsonM)
-	}
-
-	smfSelSubsBsonM := toBsonM(smfSelData)
-	smfSelSubsBsonM["ueId"] = ueId
-	smfSelSubsBsonM["servingPlmnId"] = servingPlmnId
-	amPolicyDataBsonM := toBsonM(amPolicyData)
-	amPolicyDataBsonM["ueId"] = ueId
-	smPolicyDataBsonM := toBsonM(smPolicyData)
-	smPolicyDataBsonM["ueId"] = ueId
-
-	// there is no flowRule table in DB, this part of code is not used, uncomment it when need.
-	/*	flowRulesBsonA := make([]interface{}, 0, len(subsData.FlowRules))
-		for _, flowRule := range subsData.FlowRules {
-			flowRuleBsonM := toBsonM(flowRule)
-			flowRuleBsonM["ueId"] = ueId
-			flowRuleBsonM["servingPlmnId"] = servingPlmnId
-			flowRulesBsonA = append(flowRulesBsonA, flowRuleBsonM)
-		}
-	*/
 	if os.Getenv("CONFIGPOD_DEPLOYMENT") != "4G" {
-	MongoDBLibrary.RestfulAPIPost(authSubsDataColl, filterUeIdOnly, authSubsBsonM)
-	MongoDBLibrary.RestfulAPIPost(amDataColl, filterUeIdOnly, amDataBsonM)
-	MongoDBLibrary.RestfulAPIPostMany(smDataColl, filterUeIdOnly, smDatasBsonA)
-	MongoDBLibrary.RestfulAPIPost(smfSelDataColl, filterUeIdOnly, smfSelSubsBsonM)
-	MongoDBLibrary.RestfulAPIPost(amPolicyDataColl, filterUeIdOnly, amPolicyDataBsonM)
-	MongoDBLibrary.RestfulAPIPost(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
-	//	MongoDBLibrary.RestfulAPIPostMany(flowRuleDataColl, filterUeIdOnly, flowRulesBsonA)
-    }
+		//	if subsOverrideData.DNN != nil {
+		// TODO
+		//	}
+
+		authSubsBsonM := toBsonM(authSubsData)
+		authSubsBsonM["ueId"] = ueId
+
+		amDataBsonM := toBsonM(amDataData)
+		amDataBsonM["ueId"] = ueId
+		amDataBsonM["servingPlmnId"] = servingPlmnId
+
+		delFilter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
+		// Replace all data with new one
+		MongoDBLibrary.RestfulAPIDeleteMany(smDataColl, delFilter)
+		smDatasBsonA := make([]interface{}, 0, len(smDataData))
+		for _, smSubsData := range smDataData {
+			smDataBsonM := toBsonM(smSubsData)
+			smDataBsonM["ueId"] = ueId
+			smDataBsonM["servingPlmnId"] = servingPlmnId
+			smDatasBsonA = append(smDatasBsonA, smDataBsonM)
+		}
+
+		smfSelSubsBsonM := toBsonM(smfSelData)
+		smfSelSubsBsonM["ueId"] = ueId
+		smfSelSubsBsonM["servingPlmnId"] = servingPlmnId
+		amPolicyDataBsonM := toBsonM(amPolicyData)
+		amPolicyDataBsonM["ueId"] = ueId
+		smPolicyDataBsonM := toBsonM(smPolicyData)
+		smPolicyDataBsonM["ueId"] = ueId
+
+		// there is no flowRule table in DB, this part of code is not used, uncomment it when need.
+		/*	flowRulesBsonA := make([]interface{}, 0, len(subsData.FlowRules))
+			for _, flowRule := range subsData.FlowRules {
+				flowRuleBsonM := toBsonM(flowRule)
+				flowRuleBsonM["ueId"] = ueId
+				flowRuleBsonM["servingPlmnId"] = servingPlmnId
+				flowRulesBsonA = append(flowRulesBsonA, flowRuleBsonM)
+			}
+		*/
+		MongoDBLibrary.RestfulAPIPost(authSubsDataColl, filterUeIdOnly, authSubsBsonM)
+		MongoDBLibrary.RestfulAPIPost(amDataColl, filterUeIdOnly, amDataBsonM)
+		MongoDBLibrary.RestfulAPIPostMany(smDataColl, filterUeIdOnly, smDatasBsonA)
+		MongoDBLibrary.RestfulAPIPost(smfSelDataColl, filterUeIdOnly, smfSelSubsBsonM)
+		MongoDBLibrary.RestfulAPIPost(amPolicyDataColl, filterUeIdOnly, amPolicyDataBsonM)
+		MongoDBLibrary.RestfulAPIPost(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
+		//	MongoDBLibrary.RestfulAPIPostMany(flowRuleDataColl, filterUeIdOnly, flowRulesBsonA)
+	}
 
 	c.JSON(http.StatusCreated, gin.H{})
 	gServ.HandleSubscriberAdd(ueId, &authSubsData)
@@ -829,7 +829,3 @@ func GetUEPDUSessionInfo(c *gin.Context) {
 		})
 	}
 }
-
-
-
-

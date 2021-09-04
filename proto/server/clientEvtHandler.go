@@ -61,9 +61,9 @@ type ImsiRange struct {
 }
 
 type selectionKeys struct {
-	ServingPlmn  ServingPlmn `json:"serving-plmn,omitempty"`
-	RequestedApn string      `json:"requested-apn,omitempty"`
-	ImsiRange    *ImsiRange  `json:"imsi-range,omitempty"`
+	ServingPlmn  *ServingPlmn `json:"serving-plmn,omitempty"`
+	RequestedApn string       `json:"requested-apn,omitempty"`
+	ImsiRange    *ImsiRange   `json:"imsi-range,omitempty"`
 }
 
 type subSelectionRule struct {
@@ -652,23 +652,19 @@ func postConfigSpgw(client *clientNF) {
 		}
 		siteInfo := sliceConfig.SiteInfo
 		client.clientLog.Infoln("siteInfo.GNodeBs ", siteInfo.GNodeBs)
-		for _, gnb := range siteInfo.GNodeBs {
-			//subscriber selection rules
+		for _, d := range sliceConfig.SiteDeviceGroup {
 			var rule subSelectionRule
 			rule.Priority = 1
-			//apn profile
-			for _, d := range sliceConfig.SiteDeviceGroup {
-				devGroup := devgroupsConfigSnapshot[d]
-				var apnProf apnProfile
-				apnProf.DnsPrimary = devGroup.IpDomainExpanded.DnsPrimary
-				apnProf.DnsSecondary = devGroup.IpDomainExpanded.DnsPrimary
-				apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
-				apnProf.Mtu = devGroup.IpDomainExpanded.Mtu
-				apnProf.GxEnabled = false
-				apnProfName := sliceName + "-apn"
-				config.ApnProfiles[apnProfName] = &apnProf
-				rule.SelectedApnProfile = apnProfName
-			}
+			devGroup := devgroupsConfigSnapshot[d]
+			var apnProf apnProfile
+			apnProf.DnsPrimary = devGroup.IpDomainExpanded.DnsPrimary
+			apnProf.DnsSecondary = devGroup.IpDomainExpanded.DnsPrimary
+			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
+			apnProf.Mtu = devGroup.IpDomainExpanded.Mtu
+			apnProf.GxEnabled = false
+			apnProfName := sliceName + "-apn"
+			config.ApnProfiles[apnProfName] = &apnProf
+			rule.SelectedApnProfile = apnProfName
 
 			// user plane profile
 			var upProf userPlaneProfile
@@ -689,24 +685,9 @@ func postConfigSpgw(client *clientNF) {
 			config.QosProfiles[qosProfName] = &qosProf
 			rule.SelectedQoSProfile = qosProfName
 
-			var keys selectionKeys
-			num, err := strconv.ParseInt(siteInfo.Plmn.Mcc, 10, 32)
-			if err != nil {
-				client.clientLog.Infof("format error. Mcc = %v, err = %v\n ", siteInfo.Plmn.Mcc, err)
-				continue
-			}
-			keys.ServingPlmn.Mcc = int32(num)
-			num, err = strconv.ParseInt(siteInfo.Plmn.Mnc, 10, 32)
-			if err != nil {
-				client.clientLog.Infof("format error. Mnc = %v, err = %v\n ", siteInfo.Plmn.Mnc, err)
-				continue
-			}
-
-			keys.ServingPlmn.Mnc = int32(num)
-
-			keys.ServingPlmn.Tac = gnb.Tac
-
-			rule.Keys = keys
+			var key selectionKeys
+			key.RequestedApn = devGroup.IpDomainExpanded.Dnn
+			rule.Keys = key
 			config.SubSelectRules = append(config.SubSelectRules, &rule)
 		}
 	}

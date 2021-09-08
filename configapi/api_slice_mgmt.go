@@ -14,11 +14,6 @@ import (
 	"strings"
 )
 
-const (
-	device_group = iota
-	network_slice
-)
-
 var configChannel chan *configmodels.ConfigMessage
 
 var configLog *logrus.Entry
@@ -39,7 +34,7 @@ func DeviceGroupDeleteHandler(c *gin.Context) bool {
 		configLog.Infof("Received group %v", groupName)
 	}
 	var msg configmodels.ConfigMessage
-	msg.MsgType = device_group
+	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = configmodels.Delete_op
 	msg.DevGroupName = groupName
 	configChannel <- &msg
@@ -91,7 +86,7 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  ip mtu : %v", ipdomain.Mtu)
 
 	var msg configmodels.ConfigMessage
-	msg.MsgType = device_group
+	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = msgOp
 	msg.DevGroup = &request
 	configLog.Infof("Group %v ", groupName)
@@ -109,7 +104,7 @@ func NetworkSliceDeleteHandler(c *gin.Context) bool {
 	}
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = configmodels.Delete_op
-	msg.MsgType = network_slice
+	msg.MsgType = configmodels.Network_slice
 	msg.SliceName = sliceName
 	configChannel <- &msg
 	configLog.Infof("Slice Delete - Successfully posted message for slice %v to main config thread", sliceName)
@@ -201,7 +196,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = msgOp
-	msg.MsgType = network_slice
+	msg.MsgType = configmodels.Network_slice
 	msg.Slice = &request
 	msg.SliceName = sliceName
 	configChannel <- &msg

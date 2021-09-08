@@ -56,58 +56,12 @@ func init() {
 	imsiData = make(map[string]*models.AuthenticationSubscription)
 }
 
-// HandleSubscriberAdd : Update Info of subscriber
-func HandleSubscriberAdd(imsiVal string, authSubsData *models.AuthenticationSubscription) {
-	var dgNameVal string
-	imsiVal = strings.ReplaceAll(imsiVal, "imsi-", "")
-	configLog.Infoln("UpdateInfo for UE : ", imsiVal)
-	configLog.Infoln("Device Group snapshot ", devgroupsConfigSnapshot)
-	imsiData[imsiVal] = authSubsData
-	for key, dvcGrp := range devgroupsConfigSnapshot {
-		for _, imsi := range dvcGrp.Imsis {
-			if strings.Compare(imsi, imsiVal) == 0 {
-				dgNameVal = key
-				break
-			}
-		}
-		if dgNameVal == "" {
-			continue
-		}
-
-		configLog.Infoln("added imsi in map ", imsiData)
-		for _, slice := range slicesConfigSnapshot {
-			var subsMsgData SubsUpdMsg
-			subsMsgData.UeIds = nil
-			for _, dgName := range slice.SiteDeviceGroup {
-				configLog.Infoln("dgName : ", dgName)
-				if strings.Compare(dgName, dgNameVal) == 0 {
-					sVal, err :=
-						strconv.ParseUint(slice.SliceId.Sst,
-							10, 32)
-					if err != nil {
-						sVal = 0
-					}
-					subsMsgData.Nssai.Sst = int32(sVal)
-					subsMsgData.Nssai.Sd = slice.SliceId.Sd
-					subsMsgData.ServingPlmnId = slice.SiteInfo.Plmn.Mcc + slice.SiteInfo.Plmn.Mnc
-					subsMsgData.Qos = slice.Qos
-					var ueID string = "imsi-" + imsiVal
-					configLog.Infoln("ueID : ", ueID)
-					subsMsgData.UeIds = append(subsMsgData.UeIds, ueID)
-					configLog.Infoln("len of UeIds : ", len(subsMsgData.UeIds))
-					subsChannel <- &subsMsgData
-					break
-				}
-			}
-		}
-	}
-}
-
 func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceived chan bool) {
 
 	// Start Goroutine which will listens for subscriber config updates
 	// and update the mongoDB. Only for 5G
 	subsUpdateChan := make(chan *SubsUpdMsg, 10)
+	subsChannel = subsUpdateChan
 	if factory.WebUIConfig.Configuration.Mode5G == true {
 		go SubscriptionUpdateHandle(subsUpdateChan)
 	}
@@ -120,6 +74,11 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			if firstConfigRcvd == false {
 				firstConfigRcvd = true
 				configReceived <- true
+			}
+
+			if configMsg.MsgType == configmodels.Sub_data {
+				imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
+				imsiData[imsiVal] = configMsg.AuthSubData
 			}
 
 			if configMsg.MsgMethod == configmodels.Post_op || configMsg.MsgMethod == configmodels.Put_op {
@@ -138,15 +97,12 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				if factory.WebUIConfig.Configuration.Mode5G == true {
 					for _, slice := range slicesConfigSnapshot {
 						var subsMsgData SubsUpdMsg
-						sVal, err :=
-							strconv.ParseUint(slice.SliceId.Sst,
-								10, 32)
+						sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 						if err != nil {
 							sVal = 0
 						}
 						subsMsgData.Nssai.Sst = int32(sVal)
-						subsMsgData.Nssai.Sd =
-							slice.SliceId.Sd
+						subsMsgData.Nssai.Sd = slice.SliceId.Sd
 						subsMsgData.ServingPlmnId = slice.SiteInfo.Plmn.Mcc + slice.SiteInfo.Plmn.Mnc
 						subsMsgData.Qos = slice.Qos
 						subsMsgData.UeIds = nil
@@ -156,8 +112,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 							for _, imsi := range devGroupConfig.Imsis {
 								var ueID string = "imsi-" + imsi
 								configLog.Infoln("ueID : ", ueID)
-								subsMsgData.UeIds =
-									append(subsMsgData.UeIds, ueID)
+								subsMsgData.UeIds = append(subsMsgData.UeIds, ueID)
 							}
 						}
 

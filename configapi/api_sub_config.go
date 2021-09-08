@@ -20,7 +20,6 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
 	"github.com/omec-project/webconsole/configmodels"
-	gServ "github.com/omec-project/webconsole/proto/server"
 )
 
 const (
@@ -642,7 +641,12 @@ func PostSubscriberByID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{})
-	gServ.HandleSubscriberAdd(ueId, &authSubsData)
+
+	msg := configmodels.ConfigMessage{MsgType: configmodels.Sub_data,
+		MsgMethod:   configmodels.Post_op,
+		AuthSubData: &authSubsData,
+		Imsi:        ueId}
+	configChannel <- &msg
 }
 
 // Put subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
@@ -692,7 +696,12 @@ func PutSubscriberByID(c *gin.Context) {
 	MongoDBLibrary.RestfulAPIPutOne(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
 
 	c.JSON(http.StatusNoContent, gin.H{})
-	gServ.HandleSubscriberAdd(ueId, &subsData.AuthenticationSubscription)
+
+	msg := configmodels.ConfigMessage{MsgType: configmodels.Sub_data,
+		MsgMethod:   configmodels.Post_op,
+		AuthSubData: &subsData.AuthenticationSubscription,
+		Imsi:        ueId}
+	configChannel <- &msg
 }
 
 // Patch subscriber by IMSI(ueId) and PlmnID(servingPlmnId)

@@ -368,6 +368,7 @@ func clientEventMachine(client *clientNF) {
 				client.clientLog.Infoln("sent data to client from push config ")
 			}
 			if factory.WebUIConfig.Configuration.Mode5G == false {
+                //push config to 4G network functions 
 				if client.id == "hss" {
 					postConfigHss(client)
 				} else if client.id == "mme-app" || client.id == "mme-s1ap" {

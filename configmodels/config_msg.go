@@ -5,10 +5,20 @@
 
 package configmodels
 
+import (
+	"github.com/free5gc/openapi/models"
+)
+
 const (
 	Post_op = iota
 	Put_op
 	Delete_op
+)
+
+const (
+	Device_group = iota
+	Network_slice
+	Sub_data
 )
 
 type ConfigMessage struct {
@@ -18,6 +28,8 @@ type ConfigMessage struct {
 	Slice        *Slice
 	DevGroupName string
 	SliceName    string
+	AuthSubData  *models.AuthenticationSubscription
+	Imsi         string
 }
 
 // Slice + attached device group

@@ -20,6 +20,7 @@ type SubsData struct {
 	SmPolicyData                      models.SmPolicyData                        `json:"SmPolicyData"`
 	FlowRules                         []FlowRule                                 `json:"FlowRules"`
 }
+
 type SubsOverrideData struct {
 	PlmnID         string `json:"plmnID"`
 	OPc            string `json:"opc"`

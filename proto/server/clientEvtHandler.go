@@ -123,6 +123,7 @@ type configHss struct {
 
 type ruleFlowInfo struct {
 	FlowDesc string `json:"Flow-Description,omitempty"`
+	FlowDir  int    `json:"Flow-Direction,omitempty"`
 }
 
 type arpInfo struct {
@@ -143,9 +144,10 @@ type ruleQosInfo struct {
 }
 
 type pcrfRuledef struct {
-	RuleName string        `json:"Charging-Rule-Name,omitempty"`
-	QosInfo  *ruleQosInfo  `json:"QoS-Information,omitempty"`
-	FlowInfo *ruleFlowInfo `json:"Flow-Information,omitempty"`
+	RuleName   string        `json:"Charging-Rule-Name,omitempty"`
+	FlowStatus uint32        `json:"Flow-Status,omitempty"`
+	QosInfo    *ruleQosInfo  `json:"QoS-Information,omitempty"`
+	FlowInfo   *ruleFlowInfo `json:"Flow-Information,omitempty"`
 }
 
 type pcrfRules struct {
@@ -593,6 +595,7 @@ func postConfigPcrf(client *clientNF) {
 			ruledef := &pcrfRuledef{}
 			pcrfRule.Definitions = ruledef
 			ruledef.RuleName = ruleName
+			ruledef.FlowStatus = 2
 			ruleQInfo := &ruleQosInfo{}
 			ruledef.QosInfo = ruleQInfo
 			ruleQInfo.Qci = 9
@@ -608,7 +611,8 @@ func postConfigPcrf(client *clientNF) {
 			arp.PreEmpVulner = 1
 			ruleQInfo.Arp = arp
 			ruleFInfo := &ruleFlowInfo{}
-			ruleFInfo.FlowDesc = "permit out ip 0.0.0.0/0 to assigned"
+			ruleFInfo.FlowDesc = "permit out ip from 0.0.0.0/0 to assigned"
+			ruleFInfo.FlowDir = 3
 			ruledef.FlowInfo = ruleFInfo
 			config.Policies.Rules[ruleName] = pcrfRule
 		}

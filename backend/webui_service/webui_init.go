@@ -19,7 +19,6 @@ import (
 
 	"github.com/free5gc/MongoDBLibrary"
 	mongoDBLibLogger "github.com/free5gc/MongoDBLibrary/logger"
-
 	"github.com/free5gc/logger_util"
 	openApiLogger "github.com/free5gc/openapi/logger"
 	"github.com/free5gc/path_util"
@@ -221,27 +220,6 @@ func (webui *WEBUI) Start() {
 	// this is to fetch existing config
 	go fetchConfigAdapater()
 
-	/*
-		// Second HTTP Server running at port to receive Config from ROC
-		config_router := logger_util.NewGinWithLogrus(logger.GinLog)
-		configapi.AddService(config_router)
-
-		HTTPAddr := "0.0.0.0:9089"
-		initLog.Infoln("Http address ", HTTPAddr)
-		server, err := http2_util.NewServer(HTTPAddr, "", config_router)
-
-		if server == nil || err != nil {
-			initLog.Error("Initialize HTTP server failed:", err)
-			return
-		}
-
-		initLog.Infoln("Start Http server at address ", HTTPAddr)
-		err = server.ListenAndServe()
-
-		if err != nil {
-			initLog.Fatalln("HTTP server setup failed:", err)
-		}
-	*/
 	select {}
 }
 

@@ -63,9 +63,9 @@ type ImsiRange struct {
 }
 
 type selectionKeys struct {
-	ServingPlmn  ServingPlmn `json:"serving-plmn,omitempty"`
-	RequestedApn string      `json:"requested-apn,omitempty"`
-	ImsiRange    *ImsiRange  `json:"imsi-range,omitempty"`
+	ServingPlmn  *ServingPlmn `json:"serving-plmn,omitempty"`
+	RequestedApn string       `json:"requested-apn,omitempty"`
+	ImsiRange    *ImsiRange   `json:"imsi-range,omitempty"`
 }
 
 type subSelectionRule struct {
@@ -125,6 +125,7 @@ type configHss struct {
 
 type ruleFlowInfo struct {
 	FlowDesc string `json:"Flow-Description,omitempty"`
+	FlowDir  int    `json:"Flow-Direction,omitempty"`
 }
 
 type arpInfo struct {
@@ -145,9 +146,10 @@ type ruleQosInfo struct {
 }
 
 type pcrfRuledef struct {
-	RuleName string        `json:"Charging-Rule-Name,omitempty"`
-	QosInfo  *ruleQosInfo  `json:"QoS-Information,omitempty"`
-	FlowInfo *ruleFlowInfo `json:"Flow-Information,omitempty"`
+	RuleName   string        `json:"Charging-Rule-Name,omitempty"`
+	FlowStatus uint32        `json:"Flow-Status,omitempty"`
+	QosInfo    *ruleQosInfo  `json:"QoS-Information,omitempty"`
+	FlowInfo   *ruleFlowInfo `json:"Flow-Information,omitempty"`
 }
 
 type pcrfRules struct {
@@ -374,7 +376,7 @@ func clientEventMachine(client *clientNF) {
 				client.clientLog.Infoln("sent data to client from push config ")
 			}
 			if factory.WebUIConfig.Configuration.Mode5G == false {
-				//push config to 4G network functions,
+				//push config to 4G network functions
 				if client.id == "hss" {
 					if configMsg.MsgType == configmodels.Sub_data && configMsg.MsgMethod == configmodels.Delete_op {
 						imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
@@ -546,6 +548,32 @@ func getDeletedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) 
 	return
 }
 
+func getAddedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
+	if curr == nil {
+		return
+	}
+	if prev == nil {
+		return curr.Imsis
+	}
+
+	for _, cval1 := range curr.Imsis {
+
+		var found bool
+		for _, pval2 := range prev.Imsis {
+			if cval1 == pval2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			imsis = append(imsis, cval1)
+		}
+
+	}
+
+	return
+}
+
 func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 	client.clientLog.Infoln("Post configuration to Hss")
 
@@ -577,12 +605,13 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 				imsis := getDeletedImsiList(lastDevGroup, devGroup)
 				client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", imsis)
 				for _, val := range imsis {
-					// TODO: delete config from HSS
 					deleteConfigHss(client, val)
 				}
 			}
 
-			for _, imsi := range devGroup.Imsis {
+			newImsis := getAddedImsiList(lastDevGroup, devGroup)
+
+			for _, imsi := range newImsis {
 				num, _ := strconv.ParseInt(imsi, 10, 64)
 				config.StartImsi = uint64(num)
 				config.EndImsi = uint64(num)
@@ -666,6 +695,7 @@ func postConfigPcrf(client *clientNF) {
 			ruledef := &pcrfRuledef{}
 			pcrfRule.Definitions = ruledef
 			ruledef.RuleName = ruleName
+			ruledef.FlowStatus = 2
 			ruleQInfo := &ruleQosInfo{}
 			ruledef.QosInfo = ruleQInfo
 			ruleQInfo.Qci = 9
@@ -681,7 +711,8 @@ func postConfigPcrf(client *clientNF) {
 			arp.PreEmpVulner = 1
 			ruleQInfo.Arp = arp
 			ruleFInfo := &ruleFlowInfo{}
-			ruleFInfo.FlowDesc = "permit out ip 0.0.0.0/0 to assigned"
+			ruleFInfo.FlowDesc = "permit out ip from 0.0.0.0/0 to assigned"
+			ruleFInfo.FlowDir = 3
 			ruledef.FlowInfo = ruleFInfo
 			config.Policies.Rules[ruleName] = pcrfRule
 		}
@@ -726,23 +757,19 @@ func postConfigSpgw(client *clientNF) {
 		}
 		siteInfo := sliceConfig.SiteInfo
 		client.clientLog.Infoln("siteInfo.GNodeBs ", siteInfo.GNodeBs)
-		for _, gnb := range siteInfo.GNodeBs {
-			//subscriber selection rules
+		for _, d := range sliceConfig.SiteDeviceGroup {
 			var rule subSelectionRule
 			rule.Priority = 1
-			//apn profile
-			for _, d := range sliceConfig.SiteDeviceGroup {
-				devGroup := devgroupsConfigSnapshot[d]
-				var apnProf apnProfile
-				apnProf.DnsPrimary = devGroup.IpDomainExpanded.DnsPrimary
-				apnProf.DnsSecondary = devGroup.IpDomainExpanded.DnsPrimary
-				apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
-				apnProf.Mtu = devGroup.IpDomainExpanded.Mtu
-				apnProf.GxEnabled = false
-				apnProfName := sliceName + "-apn"
-				config.ApnProfiles[apnProfName] = &apnProf
-				rule.SelectedApnProfile = apnProfName
-			}
+			devGroup := devgroupsConfigSnapshot[d]
+			var apnProf apnProfile
+			apnProf.DnsPrimary = devGroup.IpDomainExpanded.DnsPrimary
+			apnProf.DnsSecondary = devGroup.IpDomainExpanded.DnsPrimary
+			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
+			apnProf.Mtu = devGroup.IpDomainExpanded.Mtu
+			apnProf.GxEnabled = false
+			apnProfName := sliceName + "-apn"
+			config.ApnProfiles[apnProfName] = &apnProf
+			rule.SelectedApnProfile = apnProfName
 
 			// user plane profile
 			var upProf userPlaneProfile
@@ -763,24 +790,9 @@ func postConfigSpgw(client *clientNF) {
 			config.QosProfiles[qosProfName] = &qosProf
 			rule.SelectedQoSProfile = qosProfName
 
-			var keys selectionKeys
-			num, err := strconv.ParseInt(siteInfo.Plmn.Mcc, 10, 32)
-			if err != nil {
-				client.clientLog.Infof("format error. Mcc = %v, err = %v\n ", siteInfo.Plmn.Mcc, err)
-				continue
-			}
-			keys.ServingPlmn.Mcc = int32(num)
-			num, err = strconv.ParseInt(siteInfo.Plmn.Mnc, 10, 32)
-			if err != nil {
-				client.clientLog.Infof("format error. Mnc = %v, err = %v\n ", siteInfo.Plmn.Mnc, err)
-				continue
-			}
-
-			keys.ServingPlmn.Mnc = int32(num)
-
-			keys.ServingPlmn.Tac = gnb.Tac
-
-			rule.Keys = keys
+			var key selectionKeys
+			key.RequestedApn = devGroup.IpDomainExpanded.Dnn
+			rule.Keys = key
 			config.SubSelectRules = append(config.SubSelectRules, &rule)
 		}
 	}

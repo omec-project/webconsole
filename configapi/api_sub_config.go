@@ -760,17 +760,24 @@ func DeleteSubscriberByID(c *gin.Context) {
 
 	ueId := c.Param("ueId")
 
-	filterUeIdOnly := bson.M{"ueId": ueId}
+	if os.Getenv("CONFIGPOD_DEPLOYMENT") != "4G" {
 
-	MongoDBLibrary.RestfulAPIDeleteOne(authSubsDataColl, filterUeIdOnly)
-	MongoDBLibrary.RestfulAPIDeleteOne(amDataColl, filterUeIdOnly)
-	MongoDBLibrary.RestfulAPIDeleteMany(smDataColl, filterUeIdOnly)
-	MongoDBLibrary.RestfulAPIDeleteMany(flowRuleDataColl, filterUeIdOnly)
-	MongoDBLibrary.RestfulAPIDeleteOne(smfSelDataColl, filterUeIdOnly)
-	MongoDBLibrary.RestfulAPIDeleteOne(amPolicyDataColl, filterUeIdOnly)
-	MongoDBLibrary.RestfulAPIDeleteOne(smPolicyDataColl, filterUeIdOnly)
+		filterUeIdOnly := bson.M{"ueId": ueId}
 
+		MongoDBLibrary.RestfulAPIDeleteOne(authSubsDataColl, filterUeIdOnly)
+		MongoDBLibrary.RestfulAPIDeleteOne(amDataColl, filterUeIdOnly)
+		MongoDBLibrary.RestfulAPIDeleteMany(smDataColl, filterUeIdOnly)
+		MongoDBLibrary.RestfulAPIDeleteMany(flowRuleDataColl, filterUeIdOnly)
+		MongoDBLibrary.RestfulAPIDeleteOne(smfSelDataColl, filterUeIdOnly)
+		MongoDBLibrary.RestfulAPIDeleteOne(amPolicyDataColl, filterUeIdOnly)
+		MongoDBLibrary.RestfulAPIDeleteOne(smPolicyDataColl, filterUeIdOnly)
+	}
 	c.JSON(http.StatusNoContent, gin.H{})
+
+	msg := configmodels.ConfigMessage{MsgType: configmodels.Sub_data,
+		MsgMethod: configmodels.Delete_op,
+		Imsi:      ueId}
+	configChannel <- &msg
 }
 
 func GetRegisteredUEContext(c *gin.Context) {

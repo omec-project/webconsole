@@ -8,15 +8,17 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"math/rand"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	protos "github.com/omec-project/webconsole/proto/sdcoreConfig"
 	"github.com/sirupsen/logrus"
-	"math/rand"
-	"net/http"
-	"strconv"
-	"time"
 )
 
 type clientNF struct {
@@ -322,7 +324,7 @@ func clientEventMachine(client *clientNF) {
 						if factory.WebUIConfig.Configuration.Mode5G == false && resp.StatusCode == http.StatusNotFound {
 							client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
 							if client.id == "hss" {
-								postConfigHss(client)
+								postConfigHss(client, nil)
 							} else if client.id == "mme-app" || client.id == "mme-s1ap" {
 								postConfigMme(client)
 							} else if client.id == "pcrf" {
@@ -337,11 +339,15 @@ func clientEventMachine(client *clientNF) {
 
 		case configMsg := <-client.outStandingPushConfig:
 			client.clientLog.Infof("Received new configuration for Client %v ", client.id)
+			var lastDevGroup *configmodels.DeviceGroups
+
 			// update config snapshot
 			if configMsg.DevGroup != nil {
+				lastDevGroup = client.devgroupsConfigClient[configMsg.DevGroupName]
 				client.clientLog.Infof("Received new configuration for device Group  %v ", configMsg.DevGroupName)
 				client.devgroupsConfigClient[configMsg.DevGroupName] = configMsg.DevGroup
 			} else if configMsg.DevGroupName != "" && configMsg.MsgMethod == configmodels.Delete_op {
+				lastDevGroup = client.devgroupsConfigClient[configMsg.DevGroupName]
 				client.clientLog.Infof("Received delete configuration for device Group  %v ", configMsg.DevGroupName)
 				client.devgroupsConfigClient[configMsg.DevGroupName] = nil
 			}
@@ -368,9 +374,14 @@ func clientEventMachine(client *clientNF) {
 				client.clientLog.Infoln("sent data to client from push config ")
 			}
 			if factory.WebUIConfig.Configuration.Mode5G == false {
-                //push config to 4G network functions 
+				//push config to 4G network functions,
 				if client.id == "hss" {
-					postConfigHss(client)
+					if configMsg.MsgType == configmodels.Sub_data && configMsg.MsgMethod == configmodels.Delete_op {
+						imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
+						deleteConfigHss(client, imsiVal)
+					} else {
+						postConfigHss(client, lastDevGroup)
+					}
 				} else if client.id == "mme-app" || client.id == "mme-s1ap" {
 					postConfigMme(client)
 				} else if client.id == "pcrf" {
@@ -483,7 +494,59 @@ func postConfigMme(client *clientNF) {
 	}
 }
 
-func postConfigHss(client *clientNF) {
+func deleteConfigHss(client *clientNF, imsi string) {
+	config := configHss{}
+	num, _ := strconv.ParseInt(imsi, 10, 64)
+	config.StartImsi = uint64(num)
+	config.EndImsi = uint64(num)
+	client.clientLog.Infoln("HSS config ", config)
+	b, err := json.Marshal(config)
+	if err != nil {
+		client.clientLog.Infoln("error in marshalling json -", err)
+	} else {
+		client.clientLog.Infoln("marshalling json -", b)
+	}
+	reqMsgBody := bytes.NewBuffer(b)
+	client.clientLog.Infoln("reqMsgBody -", reqMsgBody)
+	c := &http.Client{}
+	httpend := client.ConfigPushUrl
+	req, err := http.NewRequest(http.MethodDelete, httpend, reqMsgBody)
+	if err != nil {
+		client.clientLog.Infof("An Error Occured %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	resp, err := c.Do(req)
+	if err != nil {
+		client.clientLog.Infof("An Error Occured %v", err)
+	} else {
+		client.clientLog.Infof("Message DELETE to HSS %v %v Success\n", reqMsgBody, resp.StatusCode)
+	}
+}
+
+func getDeletedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
+	if curr == nil {
+		return prev.Imsis
+	}
+
+	for _, pval1 := range prev.Imsis {
+
+		var found bool
+		for _, cval2 := range curr.Imsis {
+			if pval1 == cval2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			imsis = append(imsis, pval1)
+		}
+
+	}
+
+	return
+}
+
+func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 	client.clientLog.Infoln("Post configuration to Hss")
 
 	for sliceName, sliceConfig := range client.slicesConfigClient {
@@ -508,6 +571,16 @@ func postConfigHss(client *clientNF) {
 			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
 			apnProfName := sliceName + "-apn"
 			config.ApnProfiles[apnProfName] = &apnProf
+
+			if lastDevGroup != nil {
+				// imsi is not present in latest device Group
+				imsis := getDeletedImsiList(lastDevGroup, devGroup)
+				client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", imsis)
+				for _, val := range imsis {
+					// TODO: delete config from HSS
+					deleteConfigHss(client, val)
+				}
+			}
 
 			for _, imsi := range devGroup.Imsis {
 				num, _ := strconv.ParseInt(imsi, 10, 64)

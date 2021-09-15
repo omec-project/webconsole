@@ -71,6 +71,8 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		configLog.Infoln("Waiting for configuration event ")
 		select {
 		case configMsg := <-configMsgChan:
+			//var lastImsiData map[string]*models.AuthenticationSubscription
+			//var devgroupsConfigSnapshot map[string]*configmodels.DeviceGroups
 
 			if firstConfigRcvd == false {
 				firstConfigRcvd = true
@@ -78,6 +80,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			}
 
 			if configMsg.MsgType == configmodels.Sub_data {
+				//lastImsiData = imsiData
 				imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
 				imsiData[imsiVal] = configMsg.AuthSubData
 			}
@@ -87,6 +90,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				configLog.Infoln("Received msg from configApi package ", configMsg)
 				// update config snapshot
 				if configMsg.DevGroup != nil {
+					//lastDevGroupsConfigSnapshot = devgroupsConfigSnapshot
 					configLog.Infoln("Received msg from configApi package for Device Group ", configMsg.DevGroupName)
 					devgroupsConfigSnapshot[configMsg.DevGroupName] = configMsg.DevGroup
 				}

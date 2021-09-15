@@ -181,9 +181,7 @@ func (webui *WEBUI) Start() {
 
 	/* First HTTP Server running at port to receive Config from ROC */
 	subconfig_router := logger_util.NewGinWithLogrus(logger.GinLog)
-	if factory.WebUIConfig.Configuration.Mode5G == true {
-		configapi.AddServiceSub(subconfig_router)
-	}
+	configapi.AddServiceSub(subconfig_router)
 	configapi.AddService(subconfig_router)
 
 	subconfig_router.Use(cors.New(cors.Config{

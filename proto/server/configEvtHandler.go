@@ -6,6 +6,9 @@ package server
 
 import (
 	"encoding/json"
+	"strconv"
+	"strings"
+
 	"github.com/free5gc/MongoDBLibrary"
 	"github.com/free5gc/openapi/models"
 	"github.com/omec-project/webconsole/backend/factory"
@@ -13,8 +16,6 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
-	"strconv"
-	"strings"
 )
 
 const (

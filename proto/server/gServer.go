@@ -7,6 +7,10 @@ package server
 
 import (
 	context "context"
+	"net"
+	"os"
+	"time"
+
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -14,9 +18,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
-	"net"
-	"os"
-	"time"
 )
 
 var grpcLog *logrus.Entry
@@ -65,6 +66,8 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 	configReady := make(chan bool)
 	go configHandler(configMsgChan, configReady)
 	ready := <-configReady
+
+	time.Sleep(2 * time.Second)
 
 	grpcLog.Println("Start grpc config server ", ready)
 	lis, err := net.Listen("tcp", host)

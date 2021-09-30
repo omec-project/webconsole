@@ -6,6 +6,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -34,14 +35,20 @@ func init() {
 	configLog = logger.ConfigLog
 }
 
-type SubsUpdMsg struct {
+/*type SubsUpdMsg struct {
 	UeIds         []string
 	Nssai         models.Snssai
 	ServingPlmnId string
 	Qos           configmodels.SliceQos
+}*/
+
+type Update5GSubscriberMsg struct {
+	Msg          *configmodels.ConfigMessage
+	PrevDevGroup *configmodels.DeviceGroups
+	PrevSlice    *configmodels.Slice
 }
 
-var subsChannel chan *SubsUpdMsg
+var subsChannel chan *Update5GSubscriberMsg
 var slicesConfigSnapshot map[string]*configmodels.Slice
 var devgroupsConfigSnapshot map[string]*configmodels.DeviceGroups
 
@@ -61,10 +68,10 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 
 	// Start Goroutine which will listens for subscriber config updates
 	// and update the mongoDB. Only for 5G
-	subsUpdateChan := make(chan *SubsUpdMsg, 10)
+	subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
 	subsChannel = subsUpdateChan
 	if factory.WebUIConfig.Configuration.Mode5G == true {
-		go SubscriptionUpdateHandle(subsUpdateChan)
+		go Config5GUpdateHandle(subsUpdateChan)
 	}
 	firstConfigRcvd := false
 	for {
@@ -72,55 +79,47 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		select {
 		case configMsg := <-configMsgChan:
 
-			if firstConfigRcvd == false {
-				firstConfigRcvd = true
-				configReceived <- true
-			}
-
 			if configMsg.MsgType == configmodels.Sub_data {
 				imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
 				imsiData[imsiVal] = configMsg.AuthSubData
+				var configUMsg Update5GSubscriberMsg
+				configUMsg.Msg = configMsg
+				subsUpdateChan <- &configUMsg
 			}
 
 			if configMsg.MsgMethod == configmodels.Post_op || configMsg.MsgMethod == configmodels.Put_op {
+
+				if firstConfigRcvd == false && (configMsg.MsgType == configmodels.Device_group || configMsg.MsgType == configmodels.Network_slice) {
+					configLog.Debugln("First config received from ROC")
+					firstConfigRcvd = true
+					configReceived <- true
+				}
+
 				configLog.Infoln("Received msg from configApi package ", configMsg)
 				// update config snapshot
 				if configMsg.DevGroup != nil {
 					configLog.Infoln("Received msg from configApi package for Device Group ", configMsg.DevGroupName)
+
+					if factory.WebUIConfig.Configuration.Mode5G == true {
+						var config5gMsg Update5GSubscriberMsg
+						config5gMsg.Msg = configMsg
+						config5gMsg.PrevDevGroup = devgroupsConfigSnapshot[configMsg.DevGroupName]
+						subsUpdateChan <- &config5gMsg
+					}
 					devgroupsConfigSnapshot[configMsg.DevGroupName] = configMsg.DevGroup
 				}
 
 				if configMsg.Slice != nil {
 					configLog.Infoln("Received msg from configApi package for Slice ", configMsg.SliceName)
-					slicesConfigSnapshot[configMsg.SliceName] = configMsg.Slice
-				}
 
-				if factory.WebUIConfig.Configuration.Mode5G == true {
-					for _, slice := range slicesConfigSnapshot {
-						var subsMsgData SubsUpdMsg
-						sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
-						if err != nil {
-							sVal = 0
-						}
-						subsMsgData.Nssai.Sst = int32(sVal)
-						subsMsgData.Nssai.Sd = slice.SliceId.Sd
-						subsMsgData.ServingPlmnId = slice.SiteInfo.Plmn.Mcc + slice.SiteInfo.Plmn.Mnc
-						subsMsgData.Qos = slice.Qos
-						subsMsgData.UeIds = nil
-						for _, dgName := range slice.SiteDeviceGroup {
-							configLog.Infoln("dgName : ", dgName)
-							devGroupConfig := devgroupsConfigSnapshot[dgName]
-							for _, imsi := range devGroupConfig.Imsis {
-								var ueID string = "imsi-" + imsi
-								configLog.Infoln("ueID : ", ueID)
-								subsMsgData.UeIds = append(subsMsgData.UeIds, ueID)
-							}
-						}
-
-						configLog.Infoln("len of UeIds : ", len(subsMsgData.UeIds))
-						configLog.Infoln("slice sst : ", sVal, " sd: ", slice.SliceId.Sd)
-						subsUpdateChan <- &subsMsgData
+					if factory.WebUIConfig.Configuration.Mode5G == true {
+						var config5gMsg Update5GSubscriberMsg
+						config5gMsg.Msg = configMsg
+						config5gMsg.PrevSlice = slicesConfigSnapshot[configMsg.SliceName]
+						subsUpdateChan <- &config5gMsg
 					}
+					slicesConfigSnapshot[configMsg.SliceName] = configMsg.Slice
+
 				}
 
 				// loop through all clients and send this message to all clients
@@ -133,17 +132,26 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				}
 			} else {
 				configLog.Infoln("Received delete msg from configApi package ", configMsg)
-				// update config snapshot
-				if configMsg.DevGroup == nil {
-					configLog.Infoln("Received msg from configApi package to delete Device Group ", configMsg.DevGroupName)
-					devgroupsConfigSnapshot[configMsg.DevGroupName] = nil
-				}
+				var config5gMsg Update5GSubscriberMsg
+				if configMsg.MsgType != configmodels.Sub_data {
+					// update config snapshot
+					if configMsg.DevGroup == nil {
+						configLog.Infoln("Received msg from configApi package to delete Device Group ", configMsg.DevGroupName)
+						config5gMsg.PrevDevGroup = devgroupsConfigSnapshot[configMsg.DevGroupName]
+						delete(devgroupsConfigSnapshot, configMsg.DevGroupName)
+					}
 
-				if configMsg.Slice == nil {
-					configLog.Infoln("Received msg from configApi package to delete Slice ", configMsg.SliceName)
-					slicesConfigSnapshot[configMsg.SliceName] = nil
-				}
+					if configMsg.Slice == nil {
+						configLog.Infoln("Received msg from configApi package to delete Slice ", configMsg.SliceName)
+						config5gMsg.PrevSlice = slicesConfigSnapshot[configMsg.SliceName]
+						delete(slicesConfigSnapshot, configMsg.SliceName)
+					}
 
+				}
+				if factory.WebUIConfig.Configuration.Mode5G == true {
+					config5gMsg.Msg = configMsg
+					subsUpdateChan <- &config5gMsg
+				}
 				// loop through all clients and send this message to all clients
 				if len(clientNFPool) == 0 {
 					configLog.Infoln("No client available. No need to send config")
@@ -151,66 +159,321 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				for _, client := range clientNFPool {
 					client.outStandingPushConfig <- configMsg
 				}
+
 			}
 		}
 	}
 }
 
-// SubscriptionUpdateHandle : Handle subscription update
-func SubscriptionUpdateHandle(subsUpdateChan chan *SubsUpdMsg) {
-	for subsData := range subsUpdateChan {
-		logger.WebUILog.Infoln("SubscriptionUpdateHandle")
-		var smDataData []models.SessionManagementSubscriptionData
-		var smDatasBsonA []interface{}
-		filterEmpty := bson.M{}
-		var ueID string
-		for _, ueID = range subsData.UeIds {
-			filter := bson.M{"ueId": ueID}
-			smDataDataInterface := MongoDBLibrary.RestfulAPIGetMany(smDataColl, filter)
-			var found bool = false
-			json.Unmarshal(sliceToByte(smDataDataInterface), &smDataData)
-			if len(smDataData) != 0 {
-				smDatasBsonA = make([]interface{}, 0, len(smDataData))
-				for _, data := range smDataData {
-					if compareNssai(data.SingleNssai, &subsData.Nssai) == 0 {
-						logger.WebUILog.Infoln("entry exists for Imsi :  with SST:  and SD: ",
-							ueID, subsData.Nssai.Sst, subsData.Nssai.Sd)
-						found = true
-						break
-					}
-				}
+func isImsiPartofDeviceGroup(imsi string) bool {
+	for _, devgroup := range devgroupsConfigSnapshot {
+		for _, val := range devgroup.Imsis {
+			if val == imsi {
+				return true
+			}
+		}
+	}
+	return false
+}
 
-				if !found {
-					logger.WebUILog.Infoln("entry doesnt exist for Imsi : %v with SST: %v and SD: %v",
-						ueID, subsData.Nssai.Sst, subsData.Nssai.Sd)
-					data := smDataData[0]
-					data.SingleNssai.Sst = subsData.Nssai.Sst
-					data.SingleNssai.Sd = subsData.Nssai.Sd
-					data.SingleNssai.Sd = subsData.Nssai.Sd
-					for idx, dnnCfg := range data.DnnConfigurations {
-						var sessAmbr models.Ambr
-						sessAmbr.Uplink = convertToString(uint32(subsData.Qos.Uplink))
-						sessAmbr.Downlink = convertToString(uint32(subsData.Qos.Downlink))
-						dnnCfg.SessionAmbr = &sessAmbr
-						data.DnnConfigurations[idx] = dnnCfg
-						logger.WebUILog.Infoln("uplink mbr ", data.DnnConfigurations[idx].SessionAmbr.Uplink)
-						logger.WebUILog.Infoln("downlink mbr ", data.DnnConfigurations[idx].SessionAmbr.Downlink)
-					}
-					smDataBsonM := toBsonM(data)
-					smDataBsonM["ueId"] = ueID
-					smDataBsonM["servingPlmnId"] = subsData.ServingPlmnId
-					logger.WebUILog.Infoln("servingplmnid ", subsData.ServingPlmnId)
-					smDatasBsonA = append(smDatasBsonA, smDataBsonM)
+func getAddedImsisList(group, prevGroup *configmodels.DeviceGroups) (aimsis []string) {
+	if group == nil {
+		return
+	}
+	for _, imsi := range group.Imsis {
+		if prevGroup == nil {
+			if imsiData[imsi] != nil {
+				aimsis = append(aimsis, imsi)
+			}
+		} else {
+			var found bool
+			for _, pimsi := range prevGroup.Imsis {
+				if pimsi == imsi {
+					found = true
 				}
-			} else {
-				logger.WebUILog.Infoln("No imsi entry in db for imsi ", ueID)
+			}
+
+			if !found {
+				aimsis = append(aimsis, imsi)
+			}
+		}
+	}
+
+	return
+}
+
+func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []string) {
+	if prevGroup == nil {
+		return
+	}
+
+	if group == nil {
+		return prevGroup.Imsis
+	}
+
+	for _, pimsi := range prevGroup.Imsis {
+		var found bool
+		for _, imsi := range group.Imsis {
+			if pimsi == imsi {
+				found = true
 			}
 		}
 
-		if len(smDatasBsonA) != 0 {
-			MongoDBLibrary.RestfulAPIPostMany(smDataColl, filterEmpty, smDatasBsonA)
+		if !found {
+			dimsis = append(dimsis, pimsi)
 		}
 	}
+
+	return
+}
+
+func updateAmPolicyData(imsi string) {
+	//ampolicydata
+	var amPolicy models.AmPolicyData
+	amPolicy.SubscCats = append(amPolicy.SubscCats, "free5gc")
+	amPolicyDatBsonA := toBsonM(amPolicy)
+	amPolicyDatBsonA["ueId"] = "imsi-" + imsi
+	filter := bson.M{"ueId": "imsi-" + imsi}
+	MongoDBLibrary.RestfulAPIPost(amPolicyDataColl, filter, amPolicyDatBsonA)
+}
+
+func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
+
+	var smPolicyData models.SmPolicyData
+	var smPolicySnssaiData models.SmPolicySnssaiData
+	dnnData := map[string]models.SmPolicyDnnData{
+		dnn: {
+			Dnn: dnn,
+		},
+	}
+	//smpolicydata
+	smPolicySnssaiData.Snssai = snssai
+	smPolicySnssaiData.SmPolicyDnnData = dnnData
+	smPolicyData.SmPolicySnssaiData = make(map[string]models.SmPolicySnssaiData)
+	smPolicyData.SmPolicySnssaiData[SnssaiModelsToHex(*snssai)] = smPolicySnssaiData
+	smPolicyDatBsonA := toBsonM(smPolicyData)
+	smPolicyDatBsonA["ueId"] = "imsi-" + imsi
+	filter := bson.M{"ueId": "imsi-" + imsi}
+	MongoDBLibrary.RestfulAPIPost(smPolicyDataColl, filter, smPolicyDatBsonA)
+}
+
+func updateAmProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string) {
+	amData := models.AccessAndMobilitySubscriptionData{
+		Gpsis: []string{
+			"msisdn-0900000000",
+		},
+		Nssai: &models.Nssai{
+			DefaultSingleNssais: []models.Snssai{*snssai},
+			SingleNssais:        []models.Snssai{*snssai},
+		},
+		SubscribedUeAmbr: &models.AmbrRm{
+			Downlink: "2 Gbps",
+			Uplink:   "1 Gbps",
+		},
+	}
+	amDataBsonA := toBsonM(amData)
+	amDataBsonA["ueId"] = "imsi-" + imsi
+	amDataBsonA["servingPlmnId"] = mcc + mnc
+	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
+	MongoDBLibrary.RestfulAPIPost(amDataColl, filter, amDataBsonA)
+}
+
+func updateSmProviosionedData(snssai *models.Snssai, qos configmodels.SliceQos, mcc, mnc, dnn, imsi string) {
+	//TODO smData
+	smData := models.SessionManagementSubscriptionData{
+		SingleNssai: snssai,
+		DnnConfigurations: map[string]models.DnnConfiguration{
+			dnn: {
+				PduSessionTypes: &models.PduSessionTypes{
+					DefaultSessionType:  models.PduSessionType_IPV4,
+					AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
+				},
+				SscModes: &models.SscModes{
+					DefaultSscMode: models.SscMode__1,
+					AllowedSscModes: []models.SscMode{
+						"SSC_MODE_2",
+						"SSC_MODE_3",
+					},
+				},
+				SessionAmbr: &models.Ambr{
+					Downlink: convertToString(uint64(qos.Downlink)),
+					Uplink:   convertToString(uint64(qos.Uplink)),
+				},
+				Var5gQosProfile: &models.SubscribedDefaultQos{
+					Var5qi: 9,
+					Arp: &models.Arp{
+						PriorityLevel: 8,
+					},
+					PriorityLevel: 8,
+				},
+			},
+		},
+	}
+	smDataBsonA := toBsonM(smData)
+	smDataBsonA["ueId"] = "imsi-" + imsi
+	smDataBsonA["servingPlmnId"] = mcc + mnc
+	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
+	MongoDBLibrary.RestfulAPIPost(smDataColl, filter, smDataBsonA)
+}
+
+func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string) {
+	smfSelData := models.SmfSelectionSubscriptionData{
+		SubscribedSnssaiInfos: map[string]models.SnssaiInfo{
+			SnssaiModelsToHex(*snssai): {
+				DnnInfos: []models.DnnInfo{
+					{
+						Dnn: dnn,
+					},
+				},
+			},
+		}}
+	smfSelecDataBsonA := toBsonM(smfSelData)
+	smfSelecDataBsonA["ueId"] = "imsi-" + imsi
+	smfSelecDataBsonA["servingPlmnId"] = mcc + mnc
+	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
+	MongoDBLibrary.RestfulAPIPost(smfSelDataColl, filter, smfSelecDataBsonA)
+}
+
+func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg) *configmodels.Slice {
+	for name, slice := range slicesConfigSnapshot {
+		for _, dgName := range slice.SiteDeviceGroup {
+			if dgName == msg.Msg.DevGroupName {
+				logger.WebUILog.Infof("Device Group [%v] is part of slice: %v", dgName, name)
+				return slice
+			}
+		}
+	}
+
+	return nil
+}
+
+func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) {
+	for prevSlice == nil {
+		return
+	}
+
+	if slice != nil {
+		for _, pdgName := range prevSlice.SiteDeviceGroup {
+			var found bool
+			for _, dgName := range slice.SiteDeviceGroup {
+				if dgName == pdgName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				names = append(names, pdgName)
+			}
+		}
+	} else {
+		for _, pdgName := range prevSlice.SiteDeviceGroup {
+			names = append(names, pdgName)
+		}
+	}
+
+	return
+}
+func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
+	for confData := range confChan {
+		switch confData.Msg.MsgType {
+		case configmodels.Sub_data:
+			logger.WebUILog.Debugln("Insert/Update AuthenticationSubscription")
+			//check this Imsi is part of any of the devicegroup
+			imsi := strings.ReplaceAll(confData.Msg.Imsi, "imsi-", "")
+			if confData.Msg.MsgMethod != configmodels.Delete_op {
+				filter := bson.M{"ueId": confData.Msg.Imsi}
+				authDataBsonA := toBsonM(confData.Msg.AuthSubData)
+				authDataBsonA["ueId"] = confData.Msg.Imsi
+				MongoDBLibrary.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
+			} else {
+				filter := bson.M{"ueId": "imsi-" + imsi}
+				MongoDBLibrary.RestfulAPIDeleteOne(authSubsDataColl, filter)
+			}
+		case configmodels.Device_group:
+			/* is this devicegroup part of any existing slice */
+			slice := isDeviceGroupExistInSlice(confData)
+			if slice != nil {
+				sVal, _ := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
+				snssai := &models.Snssai{
+					Sd:  slice.SliceId.Sd,
+					Sst: int32(sVal),
+				}
+
+				aimsis := getAddedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)
+				for _, imsi := range aimsis {
+					dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
+					updateAmPolicyData(imsi)
+					updateSmPolicyData(snssai, dnn, imsi)
+					updateAmProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+					updateSmProviosionedData(snssai, slice.Qos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+					updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+				}
+
+				dimsis := getDeletedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)
+				for _, imsi := range dimsis {
+					mcc := slice.SiteInfo.Plmn.Mcc
+					mnc := slice.SiteInfo.Plmn.Mnc
+					filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
+					filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
+					MongoDBLibrary.RestfulAPIDeleteOne(amPolicyDataColl, filterImsiOnly)
+					MongoDBLibrary.RestfulAPIDeleteOne(smPolicyDataColl, filterImsiOnly)
+					MongoDBLibrary.RestfulAPIDeleteOne(amDataColl, filter)
+					MongoDBLibrary.RestfulAPIDeleteOne(smDataColl, filter)
+					MongoDBLibrary.RestfulAPIDeleteOne(smfSelDataColl, filter)
+				}
+			}
+
+		case configmodels.Network_slice:
+			logger.WebUILog.Debugln("Insert/Update Network Slice")
+			slice := confData.Msg.Slice
+			if slice == nil && confData.PrevSlice != nil {
+				logger.WebUILog.Debugln("Deleted Slice: ", confData.PrevSlice)
+			}
+			if slice != nil {
+				sVal, _ := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
+				snssai := &models.Snssai{
+					Sd:  slice.SliceId.Sd,
+					Sst: int32(sVal),
+				}
+				for _, dgName := range slice.SiteDeviceGroup {
+					configLog.Infoln("dgName : ", dgName)
+					devGroupConfig := devgroupsConfigSnapshot[dgName]
+					if devgroupsConfigSnapshot[dgName] != nil {
+						for _, imsi := range devGroupConfig.Imsis {
+							dnn := devGroupConfig.IpDomainExpanded.Dnn
+							mcc := slice.SiteInfo.Plmn.Mcc
+							mnc := slice.SiteInfo.Plmn.Mnc
+							updateAmPolicyData(imsi)
+							updateSmPolicyData(snssai, dnn, imsi)
+							updateAmProviosionedData(snssai, mcc, mnc, dnn, imsi)
+							updateSmProviosionedData(snssai, slice.Qos, mcc, mnc, dnn, imsi)
+							updateSmfSelectionProviosionedData(snssai, mcc, mnc, dnn, imsi)
+						}
+					}
+				}
+			}
+
+			dgnames := getDeleteGroupsList(slice, confData.PrevSlice)
+			for _, dgname := range dgnames {
+				if devgroupsConfigSnapshot[dgname] != nil {
+					for _, imsi := range devgroupsConfigSnapshot[dgname].Imsis {
+						mcc := confData.PrevSlice.SiteInfo.Plmn.Mcc
+						mnc := confData.PrevSlice.SiteInfo.Plmn.Mnc
+						filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
+						filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
+						MongoDBLibrary.RestfulAPIDeleteOne(amPolicyDataColl, filterImsiOnly)
+						MongoDBLibrary.RestfulAPIDeleteOne(smPolicyDataColl, filterImsiOnly)
+						MongoDBLibrary.RestfulAPIDeleteOne(amDataColl, filter)
+						MongoDBLibrary.RestfulAPIDeleteOne(smDataColl, filter)
+						MongoDBLibrary.RestfulAPIDeleteOne(smfSelDataColl, filter)
+					}
+
+				}
+			}
+
+		}
+	} //end of for loop
+
 }
 
 func sliceToByte(data []map[string]interface{}) (ret []byte) {
@@ -226,8 +489,8 @@ func compareNssai(sNssai *models.Snssai,
 	return strings.Compare(sNssai.Sd, sliceId.Sd)
 }
 
-func convertToString(val uint32) string {
-	var mbVal, gbVal, kbVal uint32
+func convertToString(val uint64) string {
+	var mbVal, gbVal, kbVal uint64
 	kbVal = val / 1024
 	mbVal = val / 1048576
 	gbVal = val / 1073741824
@@ -250,4 +513,9 @@ func toBsonM(data interface{}) (ret bson.M) {
 	tmp, _ := json.Marshal(data)
 	json.Unmarshal(tmp, &ret)
 	return
+}
+
+func SnssaiModelsToHex(snssai models.Snssai) string {
+	sst := fmt.Sprintf("%02x", snssai.Sst)
+	return sst + snssai.Sd
 }

@@ -527,6 +527,9 @@ func deleteConfigHss(client *clientNF, imsi string) {
 
 func getDeletedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	if curr == nil {
+		if prev == nil {
+			return
+		}
 		return prev.Imsis
 	}
 
@@ -584,6 +587,14 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 		client.clientLog.Infoln("SliceName ", sliceName)
 
 		for _, d := range sliceConfig.SiteDeviceGroup {
+			if devgroupsConfigSnapshot[d] == nil {
+				client.clientLog.Errorln("Device Group is deleted: ", d)
+				imsis := getDeletedImsiList(lastDevGroup, nil)
+				for _, val := range imsis {
+					deleteConfigHss(client, val)
+				}
+				continue
+			}
 			config := configHss{
 				ApnProfiles: make(map[string]*apnProfile),
 			}
@@ -676,8 +687,12 @@ func postConfigPcrf(client *clientNF) {
 		//apn profile
 		sqos := sliceConfig.Qos
 		for _, d := range sliceConfig.SiteDeviceGroup {
-			client.clientLog.Infoln("PCRF devgroup ", d)
 			devGroup := devgroupsConfigSnapshot[d]
+			if devGroup == nil {
+				client.clientLog.Errorln("Device Group doesn't exist: ", d)
+				continue
+			}
+			client.clientLog.Infoln("PCRF devgroup ", d)
 			sgroup := &pcrfServiceGroup{}
 			pcrfServiceName := d + "-service"
 			sgroup.Def_service = append(sgroup.Def_service, pcrfServiceName)
@@ -758,9 +773,13 @@ func postConfigSpgw(client *clientNF) {
 		siteInfo := sliceConfig.SiteInfo
 		client.clientLog.Infoln("siteInfo.GNodeBs ", siteInfo.GNodeBs)
 		for _, d := range sliceConfig.SiteDeviceGroup {
+			devGroup := devgroupsConfigSnapshot[d]
+			if devGroup == nil {
+				client.clientLog.Errorln("Device Group is not exist: ", d)
+				continue
+			}
 			var rule subSelectionRule
 			rule.Priority = 1
-			devGroup := devgroupsConfigSnapshot[d]
 			var apnProf apnProfile
 			apnProf.DnsPrimary = devGroup.IpDomainExpanded.DnsPrimary
 			apnProf.DnsSecondary = devGroup.IpDomainExpanded.DnsPrimary

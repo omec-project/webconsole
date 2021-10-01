@@ -794,7 +794,7 @@ func postConfigSpgw(client *clientNF) {
 			var upProf userPlaneProfile
 			userProfName := sliceName + "_up"
 			upProf.UserPlane = siteInfo.Upf["upf-name"].(string)
-			upProf.GlobalAddress = true
+			upProf.GlobalAddress = false
 			config.UserPlaneProfiles[userProfName] = &upProf
 			rule.SelectedUserPlaneProfile = userProfName
 

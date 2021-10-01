@@ -217,6 +217,8 @@ func getClient(id string) (*clientNF, bool) {
 	client.slicesConfigClient = make(map[string]*configmodels.Slice)
 	client.devgroupsConfigClient = make(map[string]*configmodels.DeviceGroups)
 	// TODO : should we lock global tables before copying them ?
+	rwLock.RLock()
+	defer rwLock.RUnlock()
 	for key, value := range slicesConfigSnapshot {
 		client.slicesConfigClient[key] = value
 	}
@@ -351,7 +353,7 @@ func clientEventMachine(client *clientNF) {
 			} else if configMsg.DevGroupName != "" && configMsg.MsgMethod == configmodels.Delete_op {
 				lastDevGroup = client.devgroupsConfigClient[configMsg.DevGroupName]
 				client.clientLog.Infof("Received delete configuration for device Group  %v ", configMsg.DevGroupName)
-				client.devgroupsConfigClient[configMsg.DevGroupName] = nil
+				delete(client.devgroupsConfigClient, configMsg.DevGroupName)
 			}
 
 			if configMsg.Slice != nil {
@@ -359,7 +361,7 @@ func clientEventMachine(client *clientNF) {
 				client.slicesConfigClient[configMsg.SliceName] = configMsg.Slice
 			} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
 				client.clientLog.Infof("Received delete configuration for slice %v ", configMsg.SliceName)
-				client.slicesConfigClient[configMsg.SliceName] = nil
+				delete(client.slicesConfigClient, configMsg.SliceName)
 			}
 
 			client.configChanged = true
@@ -587,7 +589,8 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 		client.clientLog.Infoln("SliceName ", sliceName)
 
 		for _, d := range sliceConfig.SiteDeviceGroup {
-			if devgroupsConfigSnapshot[d] == nil {
+			devGroup := client.devgroupsConfigClient[d]
+			if devGroup == nil {
 				client.clientLog.Errorln("Device Group is deleted: ", d)
 				imsis := getDeletedImsiList(lastDevGroup, nil)
 				for _, val := range imsis {
@@ -604,7 +607,6 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 			config.Arp = 1
 			config.AmbrUl = sqos.Uplink
 			config.AmbrDl = sqos.Downlink
-			devGroup := devgroupsConfigSnapshot[d]
 			client.clientLog.Infoln("DeviceGroup ", devGroup)
 			var apnProf apnProfile
 			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
@@ -687,7 +689,7 @@ func postConfigPcrf(client *clientNF) {
 		//apn profile
 		sqos := sliceConfig.Qos
 		for _, d := range sliceConfig.SiteDeviceGroup {
-			devGroup := devgroupsConfigSnapshot[d]
+			devGroup := client.devgroupsConfigClient[d]
 			if devGroup == nil {
 				client.clientLog.Errorln("Device Group doesn't exist: ", d)
 				continue
@@ -773,7 +775,7 @@ func postConfigSpgw(client *clientNF) {
 		siteInfo := sliceConfig.SiteInfo
 		client.clientLog.Infoln("siteInfo.GNodeBs ", siteInfo.GNodeBs)
 		for _, d := range sliceConfig.SiteDeviceGroup {
-			devGroup := devgroupsConfigSnapshot[d]
+			devGroup := client.devgroupsConfigClient[d]
 			if devGroup == nil {
 				client.clientLog.Errorln("Device Group is not exist: ", d)
 				continue

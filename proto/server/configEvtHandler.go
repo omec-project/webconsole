@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/free5gc/MongoDBLibrary"
 	"github.com/free5gc/openapi/models"
@@ -51,6 +52,7 @@ type Update5GSubscriberMsg struct {
 var subsChannel chan *Update5GSubscriberMsg
 var slicesConfigSnapshot map[string]*configmodels.Slice
 var devgroupsConfigSnapshot map[string]*configmodels.DeviceGroups
+var rwLock sync.RWMutex
 
 func init() {
 	slicesConfigSnapshot = make(map[string]*configmodels.Slice)
@@ -78,13 +80,17 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		configLog.Infoln("Waiting for configuration event ")
 		select {
 		case configMsg := <-configMsgChan:
+			rwLock.Lock()
+			defer rwLock.Unlock()
 
 			if configMsg.MsgType == configmodels.Sub_data {
 				imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
 				imsiData[imsiVal] = configMsg.AuthSubData
-				var configUMsg Update5GSubscriberMsg
-				configUMsg.Msg = configMsg
-				subsUpdateChan <- &configUMsg
+				if factory.WebUIConfig.Configuration.Mode5G == true {
+					var configUMsg Update5GSubscriberMsg
+					configUMsg.Msg = configMsg
+					subsUpdateChan <- &configUMsg
+				}
 			}
 
 			if configMsg.MsgMethod == configmodels.Post_op || configMsg.MsgMethod == configmodels.Put_op {
@@ -119,7 +125,6 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 						subsUpdateChan <- &config5gMsg
 					}
 					slicesConfigSnapshot[configMsg.SliceName] = configMsg.Slice
-
 				}
 
 				// loop through all clients and send this message to all clients
@@ -375,6 +380,8 @@ func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) 
 }
 func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 	for confData := range confChan {
+		rwLock.RLock()
+		rwLock.RUnlock()
 		switch confData.Msg.MsgType {
 		case configmodels.Sub_data:
 			logger.WebUILog.Debugln("Insert/Update AuthenticationSubscription")

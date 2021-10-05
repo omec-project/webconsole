@@ -70,7 +70,7 @@ type selectionKeys struct {
 
 type subSelectionRule struct {
 	Keys                     selectionKeys `json:"keys,omitempty"`
-	Priority                 int           `json:"priority,omitempty"`
+	Priority                 int32           `json:"priority,omitempty"`
 	SelectedQoSProfile       string        `json:"selected-qos-profile,omitempty"`
 	SelectedUserPlaneProfile string        `json:"selected-user-plane-profile,omitempty"`
 	SelectedApnProfile       string        `json:"selected-apn-profile,omitempty"`
@@ -96,8 +96,8 @@ type userPlaneProfile struct {
 }
 
 type qosProfile struct {
-	Qci  int     `json:"qci,omitempty"`
-	Arp  int     `json:"arp,omitempty"`
+	Qci  int32     `json:"qci,omitempty"`
+	Arp  int32     `json:"arp,omitempty"`
 	Ambr []int32 `json:"apn-ambr,omitempty"`
 }
 
@@ -129,13 +129,13 @@ type ruleFlowInfo struct {
 }
 
 type arpInfo struct {
-	Priority     int `json:"Priority-Level,omitempty"`
-	PreEmptCap   int `json:"Pre-emption-Capability,omitempty"`
-	PreEmpVulner int `json:"Pre-emption-Vulnerability,omitempty"`
+	Priority     int32 `json:"Priority-Level,omitempty"`
+	PreEmptCap   int32 `json:"Pre-emption-Capability,omitempty"`
+	PreEmpVulner int32 `json:"Pre-emption-Vulnerability,omitempty"`
 }
 
 type ruleQosInfo struct {
-	Qci       int      `json:"QoS-Class-Identifier,omitempty"`
+	Qci       int32    `json:"QoS-Class-Identifier,omitempty"`
 	Mbr_ul    int32    `json:"Max-Requested-Bandwidth-UL,omitempty"`
 	Mbr_dl    int32    `json:"Max-Requested-Bandwidth-DL,omitempty"`
 	Gbr_ul    int32    `json:"Guaranteed-Bitrate-UL,omitempty"`
@@ -157,8 +157,8 @@ type pcrfRules struct {
 }
 
 type pcrfServices struct {
-	Qci                   int      `json:"qci,omitempty"`
-	Arp                   int      `json:"arp,omitempty"`
+	Qci                   int32    `json:"qci,omitempty"`
+	Arp                   int32    `json:"arp,omitempty"`
 	Ambr_ul               int32    `json:"AMBR_UL,omitempty"`
 	Ambr_dl               int32    `json:"AMBR_DL,omitempty"`
 	Rules                 []string `json:"service-activation-rules,omitempty"`
@@ -598,13 +598,12 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 			config := configHss{
 				ApnProfiles: make(map[string]*apnProfile),
 			}
+			devGroup := devgroupsConfigSnapshot[d]
 			// qos profile
 			sqos := sliceConfig.Qos
-			config.Qci = 9
-			config.Arp = 1
+			config.Qci, config.Arp = parseTrafficClass(devGroup.IpDomainExpanded.ApnQos.TrafficClass)
 			config.AmbrUl = sqos.Uplink
 			config.AmbrDl = sqos.Downlink
-			devGroup := devgroupsConfigSnapshot[d]
 			client.clientLog.Infoln("DeviceGroup ", devGroup)
 			var apnProf apnProfile
 			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
@@ -665,6 +664,21 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 	}
 }
 
+func parseTrafficClass(traffic string) (int32, int32) {
+    switch traffic {
+        case "silver":
+            return 9, 0x7D
+        case "platinum":
+            return 8, 0x7D
+        case "gold":
+            return 7, 0x7D
+        case "diamond":
+            return 6, 0x7D
+        default:
+            return 9, 0x7D
+    }
+}
+
 func postConfigPcrf(client *clientNF) {
 	client.clientLog.Infoln("Post configuration to Pcrf")
 	config := configPcrf{}
@@ -685,7 +699,6 @@ func postConfigPcrf(client *clientNF) {
 		rule := subSelectionRule{}
 		rule.Priority = 1
 		//apn profile
-		sqos := sliceConfig.Qos
 		for _, d := range sliceConfig.SiteDeviceGroup {
 			devGroup := devgroupsConfigSnapshot[d]
 			if devGroup == nil {
@@ -698,38 +711,57 @@ func postConfigPcrf(client *clientNF) {
 			sgroup.Def_service = append(sgroup.Def_service, pcrfServiceName)
 			config.Policies.ServiceGroups[devGroup.IpDomainExpanded.Dnn] = sgroup
 			pcrfService := &pcrfServices{}
-			pcrfService.Qci = 9 /* map traffic class to QCI, ARP */
-			pcrfService.Arp = 1
-			pcrfService.Ambr_ul = sqos.Uplink
-			pcrfService.Ambr_dl = sqos.Downlink
-			ruleName := d + "-rule"
-			pcrfService.Rules = append(pcrfService.Rules, ruleName)
-			client.clientLog.Infoln("pcrf Service ", pcrfService.Rules)
-			config.Policies.Services[pcrfServiceName] = pcrfService
-			pcrfRule := &pcrfRules{}
-			ruledef := &pcrfRuledef{}
-			pcrfRule.Definitions = ruledef
-			ruledef.RuleName = ruleName
-			ruledef.FlowStatus = 2
-			ruleQInfo := &ruleQosInfo{}
-			ruledef.QosInfo = ruleQInfo
-			ruleQInfo.Qci = 9
-			ruleQInfo.Mbr_ul = sqos.Uplink
-			ruleQInfo.Mbr_dl = sqos.Downlink
-			ruleQInfo.Gbr_ul = 0
-			ruleQInfo.Gbr_dl = 0
-			ruleQInfo.ApnAmbrUl = sqos.Uplink
-			ruleQInfo.ApnAmbrDl = sqos.Downlink
-			arp := &arpInfo{}
-			arp.Priority = 1
-			arp.PreEmptCap = 1
-			arp.PreEmpVulner = 1
-			ruleQInfo.Arp = arp
-			ruleFInfo := &ruleFlowInfo{}
-			ruleFInfo.FlowDesc = "permit out ip from 0.0.0.0/0 to assigned"
-			ruleFInfo.FlowDir = 3
-			ruledef.FlowInfo = ruleFInfo
-			config.Policies.Rules[ruleName] = pcrfRule
+			pcrfService.Qci, pcrfService.Arp = parseTrafficClass(devGroup.IpDomainExpanded.ApnQos.TrafficClass) /* map traffic class to QCI, ARP */
+			pcrfService.Ambr_ul = devGroup.IpDomainExpanded.ApnQos.Uplink
+			pcrfService.Ambr_dl = devGroup.IpDomainExpanded.ApnQos.Downlink
+			if len(sliceConfig.ApplicationFilteringRules) == 0 {
+				app := configmodels.SliceApplicationFilteringRules{RuleName: "rule1", Priority: 1, Action: "permit", Endpoint: "0.0.0.0/0"}
+				sliceConfig.ApplicationFilteringRules = append(sliceConfig.ApplicationFilteringRules, app)
+			}
+			for _, app := range sliceConfig.ApplicationFilteringRules {
+				ruleName := d + app.RuleName
+				client.clientLog.Infoln("rulename ", ruleName)
+				pcrfService.Rules = append(pcrfService.Rules, ruleName)
+				client.clientLog.Infoln("pcrf Service ", pcrfService.Rules)
+				config.Policies.Services[pcrfServiceName] = pcrfService
+				pcrfRule := &pcrfRules{}
+				ruledef := &pcrfRuledef{}
+				pcrfRule.Definitions = ruledef
+				ruledef.RuleName = ruleName
+				ruledef.FlowStatus = 3 // disabled by default
+                if app.Action == "permit" {
+				  ruledef.FlowStatus = 2
+                }
+				ruleQInfo := &ruleQosInfo{}
+				ruledef.QosInfo = ruleQInfo
+                var arpi int32
+				ruleQInfo.Qci, arpi = parseTrafficClass(app.TrafficClass)
+				ruleQInfo.Mbr_ul = app.AppMbrUplink
+				ruleQInfo.Mbr_dl = app.AppMbrDownlink
+				ruleQInfo.Gbr_ul = 0
+				ruleQInfo.Gbr_dl = 0
+				ruleQInfo.ApnAmbrUl = devGroup.IpDomainExpanded.ApnQos.Uplink
+				ruleQInfo.ApnAmbrDl = devGroup.IpDomainExpanded.ApnQos.Downlink
+				arp := &arpInfo{}
+				arp.Priority = (arpi & 0x3c) >> 2
+				arp.PreEmptCap = (arpi & 0x40) >> 6
+				arp.PreEmpVulner = arpi & 0x1
+				ruleQInfo.Arp = arp
+				ruleFInfo := &ruleFlowInfo{}
+				// permit out udp from 8.8.8.8/32 to assigned sport-dport
+				var desc string
+				if app.Protocol == 6 {
+					desc = "permit out tcp from " + app.Endpoint + " to assigned " + strconv.FormatInt(int64(app.StartPort), 10) + "-" + strconv.FormatInt(int64(app.EndPort), 10)
+				} else if app.Protocol == 17 {
+					desc = "permit out udp from " + app.Endpoint + " to assigned " + strconv.FormatInt(int64(app.StartPort), 10) + "-" + strconv.FormatInt(int64(app.EndPort), 10)
+				} else {
+					desc = "permit out ip from " + app.Endpoint + " to assigned"
+				}
+				ruleFInfo.FlowDesc = desc
+				ruleFInfo.FlowDir = 3
+				ruledef.FlowInfo = ruleFInfo
+				config.Policies.Rules[ruleName] = pcrfRule
+			}
 		}
 	}
 

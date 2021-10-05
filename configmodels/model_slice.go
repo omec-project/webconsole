@@ -15,14 +15,17 @@
 package configmodels
 
 type Slice struct {
-
 	SliceId SliceSliceId `json:"slice-id,omitempty"`
 
 	Qos SliceQos `json:"qos,omitempty"`
 
+	ApnQos ApnAmbrQosInfo `json:"apn-ambr-qos,omitempty"`
+
 	SiteDeviceGroup []string `json:"site-device-group,omitempty"`
 
 	SiteInfo SliceSiteInfo `json:"site-info,omitempty"`
+
+	ApplicationFilteringRules []SliceApplicationFilteringRules `json:"application-filtering-rules,omitempty"`
 
 	DenyApplications []string `json:"deny-applications,omitempty"`
 

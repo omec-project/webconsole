@@ -340,7 +340,7 @@ func clientEventMachine(client *clientNF) {
 			}
 
 		case configMsg := <-client.outStandingPushConfig:
-			client.clientLog.Infof("Received new configuration for Client %v ", client.id)
+			client.clientLog.Infof("Received new configuration for Client %v ", configMsg)
 			var lastDevGroup *configmodels.DeviceGroups
 
 			// update config snapshot
@@ -385,11 +385,17 @@ func clientEventMachine(client *clientNF) {
 						postConfigHss(client, lastDevGroup)
 					}
 				} else if client.id == "mme-app" || client.id == "mme-s1ap" {
-					postConfigMme(client)
+					if configMsg.Slice != nil || configMsg.DevGroup != nil {
+						postConfigMme(client)
+					}
 				} else if client.id == "pcrf" {
-					postConfigPcrf(client)
+					if configMsg.Slice != nil || configMsg.DevGroup != nil {
+						postConfigPcrf(client)
+					}
 				} else if client.id == "spgw" {
-					postConfigSpgw(client)
+					if configMsg.Slice != nil || configMsg.DevGroup != nil {
+						postConfigSpgw(client)
+					}
 				}
 			}
 

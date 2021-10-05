@@ -390,6 +390,7 @@ func PostSubscriberByID(c *gin.Context) {
 		AuthSubData: &authSubsData,
 		Imsi:        ueId}
 	configChannel <- &msg
+	logger.WebUILog.Infoln("Post Subscriber Data complete")
 }
 
 // Put subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
@@ -410,6 +411,7 @@ func PutSubscriberByID(c *gin.Context) {
 		AuthSubData: &subsData.AuthenticationSubscription,
 		Imsi:        ueId}
 	configChannel <- &msg
+	logger.WebUILog.Infoln("Put Subscriber Data complete")
 }
 
 // Patch subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
@@ -475,6 +477,7 @@ func DeleteSubscriberByID(c *gin.Context) {
 		MsgMethod: configmodels.Delete_op,
 		Imsi:      ueId}
 	configChannel <- &msg
+	logger.WebUILog.Infoln("Delete Subscriber Data complete")
 }
 
 func GetRegisteredUEContext(c *gin.Context) {

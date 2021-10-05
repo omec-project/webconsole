@@ -38,7 +38,7 @@ func DeviceGroupDeleteHandler(c *gin.Context) bool {
 	msg.MsgMethod = configmodels.Delete_op
 	msg.DevGroupName = groupName
 	configChannel <- &msg
-	configLog.Infof("Successfully posted message for device group %v to main config thread", groupName)
+	configLog.Infof("Delete message for device group %v to main config thread, message %v ", groupName, msg)
 	return true
 
 }
@@ -92,7 +92,7 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("Group %v ", groupName)
 	msg.DevGroupName = groupName
 	configChannel <- &msg
-	configLog.Infof("Successfully posted message for device group %v to main config thread", groupName)
+	configLog.Infof("Post message for device group %v to main config thread, message %v ", groupName, msg)
 	return true
 }
 
@@ -107,7 +107,7 @@ func NetworkSliceDeleteHandler(c *gin.Context) bool {
 	msg.MsgType = configmodels.Network_slice
 	msg.SliceName = sliceName
 	configChannel <- &msg
-	configLog.Infof("Slice Delete - Successfully posted message for slice %v to main config thread", sliceName)
+	configLog.Infof("Delete message for Slice %v to main config thread, message %v ", sliceName, msg)
 	return true
 }
 
@@ -200,6 +200,6 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	msg.Slice = &request
 	msg.SliceName = sliceName
 	configChannel <- &msg
-	configLog.Infof("Successfully posted message for slice %v to main config thread", sliceName)
+	configLog.Infof("Post message for Slice %v to main config thread, message %v ", sliceName, msg)
 	return true
 }

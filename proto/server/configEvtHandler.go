@@ -80,10 +80,10 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		configLog.Infoln("Waiting for configuration event ")
 		select {
 		case configMsg := <-configMsgChan:
-
+			configLog.Infof("Received configuration event %v ", configMsg)
 			if configMsg.MsgType == configmodels.Sub_data {
-				rwLock.Lock()
 				imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
+				rwLock.Lock()
 				imsiData[imsiVal] = configMsg.AuthSubData
 				rwLock.Unlock()
 				if factory.WebUIConfig.Configuration.Mode5G == true {
@@ -169,7 +169,6 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				for _, client := range clientNFPool {
 					client.outStandingPushConfig <- configMsg
 				}
-
 			}
 		}
 	}
@@ -486,7 +485,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 
 				}
 			}
-			rwLock.RLock()
+			rwLock.RUnlock()
 		}
 	} //end of for loop
 

@@ -29,6 +29,8 @@ import (
 	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
 	gServ "github.com/omec-project/webconsole/proto/server"
+    _ "net/http/pprof"
+    _ "net/http"
 )
 
 type WEBUI struct{}
@@ -219,6 +221,8 @@ func (webui *WEBUI) Start() {
 	// fetch one time configuration from the simapp/roc on startup
 	// this is to fetch existing config
 	go fetchConfigAdapater()
+
+	http.ListenAndServe("0.0.0.0:5001", nil)
 
 	select {}
 }

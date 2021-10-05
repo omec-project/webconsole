@@ -218,13 +218,13 @@ func getClient(id string) (*clientNF, bool) {
 	client.devgroupsConfigClient = make(map[string]*configmodels.DeviceGroups)
 	// TODO : should we lock global tables before copying them ?
 	rwLock.RLock()
-	defer rwLock.RUnlock()
 	for key, value := range slicesConfigSnapshot {
 		client.slicesConfigClient[key] = value
 	}
 	for key, value := range devgroupsConfigSnapshot {
 		client.devgroupsConfigClient[key] = value
 	}
+	rwLock.RUnlock()
 	go clientEventMachine(client)
 	return client, true
 }
@@ -328,7 +328,9 @@ func clientEventMachine(client *clientNF) {
 						if factory.WebUIConfig.Configuration.Mode5G == false && resp.StatusCode == http.StatusNotFound {
 							client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
 							if client.id == "hss" {
+								rwLock.RLock()
 								postConfigHss(client, nil)
+								rwLock.RUnlock()
 							} else if client.id == "mme-app" || client.id == "mme-s1ap" {
 								postConfigMme(client)
 							} else if client.id == "pcrf" {

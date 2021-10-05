@@ -10,6 +10,7 @@ LABEL maintainer="ONF <omec-dev@opennetworking.org>"
 #RUN apt remove cmdtest yarn
 RUN apt-get update
 RUN apt-get -y install apt-transport-https ca-certificates
+RUN apt-get -y upgrade
 RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg > pubkey.gpg
 RUN apt-key add pubkey.gpg
 RUN curl -sL https://deb.nodesource.com/setup_10.x | bash -

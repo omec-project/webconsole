@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/free5gc/MongoDBLibrary"
 	"github.com/free5gc/openapi/models"
@@ -51,6 +52,7 @@ type Update5GSubscriberMsg struct {
 var subsChannel chan *Update5GSubscriberMsg
 var slicesConfigSnapshot map[string]*configmodels.Slice
 var devgroupsConfigSnapshot map[string]*configmodels.DeviceGroups
+var rwLock sync.RWMutex
 
 func init() {
 	slicesConfigSnapshot = make(map[string]*configmodels.Slice)
@@ -81,10 +83,12 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			configLog.Infof("Received configuration event %v ", configMsg)
 			if configMsg.MsgType == configmodels.Sub_data {
 				imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
+				rwLock.Lock()
 				imsiData[imsiVal] = configMsg.AuthSubData
-				var configUMsg Update5GSubscriberMsg
-				configUMsg.Msg = configMsg
+				rwLock.Unlock()
 				if factory.WebUIConfig.Configuration.Mode5G == true {
+					var configUMsg Update5GSubscriberMsg
+					configUMsg.Msg = configMsg
 					subsUpdateChan <- &configUMsg
 				}
 			}
@@ -108,7 +112,9 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 						config5gMsg.PrevDevGroup = devgroupsConfigSnapshot[configMsg.DevGroupName]
 						subsUpdateChan <- &config5gMsg
 					}
+					rwLock.Lock()
 					devgroupsConfigSnapshot[configMsg.DevGroupName] = configMsg.DevGroup
+					rwLock.Unlock()
 				}
 
 				if configMsg.Slice != nil {
@@ -120,8 +126,9 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 						config5gMsg.PrevSlice = slicesConfigSnapshot[configMsg.SliceName]
 						subsUpdateChan <- &config5gMsg
 					}
+					rwLock.Lock()
 					slicesConfigSnapshot[configMsg.SliceName] = configMsg.Slice
-
+					rwLock.Unlock()
 				}
 
 				// loop through all clients and send this message to all clients
@@ -136,6 +143,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				configLog.Infoln("Received delete msg from configApi package ", configMsg)
 				var config5gMsg Update5GSubscriberMsg
 				if configMsg.MsgType != configmodels.Sub_data {
+					rwLock.Lock()
 					// update config snapshot
 					if configMsg.DevGroup == nil {
 						configLog.Infoln("Received msg from configApi package to delete Device Group ", configMsg.DevGroupName)
@@ -148,7 +156,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 						config5gMsg.PrevSlice = slicesConfigSnapshot[configMsg.SliceName]
 						delete(slicesConfigSnapshot, configMsg.SliceName)
 					}
-
+					rwLock.Unlock()
 				}
 				if factory.WebUIConfig.Configuration.Mode5G == true {
 					config5gMsg.Msg = configMsg
@@ -378,6 +386,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 	for confData := range confChan {
 		switch confData.Msg.MsgType {
 		case configmodels.Sub_data:
+			rwLock.RLock()
 			logger.WebUILog.Debugln("Insert/Update AuthenticationSubscription")
 			//check this Imsi is part of any of the devicegroup
 			imsi := strings.ReplaceAll(confData.Msg.Imsi, "imsi-", "")
@@ -390,7 +399,10 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				filter := bson.M{"ueId": "imsi-" + imsi}
 				MongoDBLibrary.RestfulAPIDeleteOne(authSubsDataColl, filter)
 			}
+			rwLock.RUnlock()
+
 		case configmodels.Device_group:
+			rwLock.RLock()
 			/* is this devicegroup part of any existing slice */
 			slice := isDeviceGroupExistInSlice(confData)
 			if slice != nil {
@@ -423,8 +435,10 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					MongoDBLibrary.RestfulAPIDeleteOne(smfSelDataColl, filter)
 				}
 			}
+			rwLock.RUnlock()
 
 		case configmodels.Network_slice:
+			rwLock.RLock()
 			logger.WebUILog.Debugln("Insert/Update Network Slice")
 			slice := confData.Msg.Slice
 			if slice == nil && confData.PrevSlice != nil {
@@ -471,7 +485,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 
 				}
 			}
-
+			rwLock.RUnlock()
 		}
 	} //end of for loop
 

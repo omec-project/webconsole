@@ -70,7 +70,7 @@ type selectionKeys struct {
 
 type subSelectionRule struct {
 	Keys                     selectionKeys `json:"keys,omitempty"`
-	Priority                 int32           `json:"priority,omitempty"`
+	Priority                 int32         `json:"priority,omitempty"`
 	SelectedQoSProfile       string        `json:"selected-qos-profile,omitempty"`
 	SelectedUserPlaneProfile string        `json:"selected-user-plane-profile,omitempty"`
 	SelectedApnProfile       string        `json:"selected-apn-profile,omitempty"`
@@ -96,8 +96,8 @@ type userPlaneProfile struct {
 }
 
 type qosProfile struct {
-	Qci  int32     `json:"qci,omitempty"`
-	Arp  int32     `json:"arp,omitempty"`
+	Qci  int32   `json:"qci,omitempty"`
+	Arp  int32   `json:"arp,omitempty"`
 	Ambr []int32 `json:"apn-ambr,omitempty"`
 }
 
@@ -217,12 +217,14 @@ func getClient(id string) (*clientNF, bool) {
 	client.slicesConfigClient = make(map[string]*configmodels.Slice)
 	client.devgroupsConfigClient = make(map[string]*configmodels.DeviceGroups)
 	// TODO : should we lock global tables before copying them ?
+	rwLock.RLock()
 	for key, value := range slicesConfigSnapshot {
 		client.slicesConfigClient[key] = value
 	}
 	for key, value := range devgroupsConfigSnapshot {
 		client.devgroupsConfigClient[key] = value
 	}
+	rwLock.RUnlock()
 	go clientEventMachine(client)
 	return client, true
 }
@@ -326,7 +328,9 @@ func clientEventMachine(client *clientNF) {
 						if factory.WebUIConfig.Configuration.Mode5G == false && resp.StatusCode == http.StatusNotFound {
 							client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
 							if client.id == "hss" {
+								rwLock.RLock()
 								postConfigHss(client, nil)
+								rwLock.RUnlock()
 							} else if client.id == "mme-app" || client.id == "mme-s1ap" {
 								postConfigMme(client)
 							} else if client.id == "pcrf" {
@@ -351,7 +355,7 @@ func clientEventMachine(client *clientNF) {
 			} else if configMsg.DevGroupName != "" && configMsg.MsgMethod == configmodels.Delete_op {
 				lastDevGroup = client.devgroupsConfigClient[configMsg.DevGroupName]
 				client.clientLog.Infof("Received delete configuration for device Group  %v ", configMsg.DevGroupName)
-				client.devgroupsConfigClient[configMsg.DevGroupName] = nil
+				delete(client.devgroupsConfigClient, configMsg.DevGroupName)
 			}
 
 			if configMsg.Slice != nil {
@@ -359,7 +363,7 @@ func clientEventMachine(client *clientNF) {
 				client.slicesConfigClient[configMsg.SliceName] = configMsg.Slice
 			} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
 				client.clientLog.Infof("Received delete configuration for slice %v ", configMsg.SliceName)
-				client.slicesConfigClient[configMsg.SliceName] = nil
+				delete(client.slicesConfigClient, configMsg.SliceName)
 			}
 
 			client.configChanged = true
@@ -593,7 +597,8 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 		client.clientLog.Infoln("SliceName ", sliceName)
 
 		for _, d := range sliceConfig.SiteDeviceGroup {
-			if devgroupsConfigSnapshot[d] == nil {
+			devGroup := client.devgroupsConfigClient[d]
+			if devGroup == nil {
 				client.clientLog.Errorln("Device Group is deleted: ", d)
 				imsis := getDeletedImsiList(lastDevGroup, nil)
 				for _, val := range imsis {
@@ -604,7 +609,6 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 			config := configHss{
 				ApnProfiles: make(map[string]*apnProfile),
 			}
-			devGroup := devgroupsConfigSnapshot[d]
 			// qos profile
 			sqos := sliceConfig.Qos
 			config.Qci, config.Arp = parseTrafficClass(devGroup.IpDomainExpanded.ApnQos.TrafficClass)
@@ -671,18 +675,18 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 }
 
 func parseTrafficClass(traffic string) (int32, int32) {
-    switch traffic {
-        case "silver":
-            return 9, 0x7D
-        case "platinum":
-            return 8, 0x7D
-        case "gold":
-            return 7, 0x7D
-        case "diamond":
-            return 6, 0x7D
-        default:
-            return 9, 0x7D
-    }
+	switch traffic {
+	case "silver":
+		return 9, 0x7D
+	case "platinum":
+		return 8, 0x7D
+	case "gold":
+		return 7, 0x7D
+	case "diamond":
+		return 6, 0x7D
+	default:
+		return 9, 0x7D
+	}
 }
 
 func postConfigPcrf(client *clientNF) {
@@ -706,7 +710,7 @@ func postConfigPcrf(client *clientNF) {
 		rule.Priority = 1
 		//apn profile
 		for _, d := range sliceConfig.SiteDeviceGroup {
-			devGroup := devgroupsConfigSnapshot[d]
+			devGroup := client.devgroupsConfigClient[d]
 			if devGroup == nil {
 				client.clientLog.Errorln("Device Group doesn't exist: ", d)
 				continue
@@ -735,12 +739,12 @@ func postConfigPcrf(client *clientNF) {
 				pcrfRule.Definitions = ruledef
 				ruledef.RuleName = ruleName
 				ruledef.FlowStatus = 3 // disabled by default
-                if app.Action == "permit" {
-				  ruledef.FlowStatus = 2
-                }
+				if app.Action == "permit" {
+					ruledef.FlowStatus = 2
+				}
 				ruleQInfo := &ruleQosInfo{}
 				ruledef.QosInfo = ruleQInfo
-                var arpi int32
+				var arpi int32
 				ruleQInfo.Qci, arpi = parseTrafficClass(app.TrafficClass)
 				ruleQInfo.Mbr_ul = app.AppMbrUplink
 				ruleQInfo.Mbr_dl = app.AppMbrDownlink
@@ -811,7 +815,7 @@ func postConfigSpgw(client *clientNF) {
 		siteInfo := sliceConfig.SiteInfo
 		client.clientLog.Infoln("siteInfo.GNodeBs ", siteInfo.GNodeBs)
 		for _, d := range sliceConfig.SiteDeviceGroup {
-			devGroup := devgroupsConfigSnapshot[d]
+			devGroup := client.devgroupsConfigClient[d]
 			if devGroup == nil {
 				client.clientLog.Errorln("Device Group is not exist: ", d)
 				continue

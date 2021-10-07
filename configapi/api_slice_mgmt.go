@@ -6,12 +6,13 @@
 package configapi
 
 import (
+	"strings"
+
 	"github.com/free5gc/http_wrapper"
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/sirupsen/logrus"
-	"strings"
 )
 
 var configChannel chan *configmodels.ConfigMessage
@@ -83,6 +84,7 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  dnn name : %v", ipdomain.Dnn)
 	configLog.Infof("  ue pool  : %v", ipdomain.UeIpPool)
 	configLog.Infof("  dns Primary : %v", ipdomain.DnsPrimary)
+	configLog.Infof("  dns Secondary : %v", ipdomain.DnsSecondary)
 	configLog.Infof("  ip mtu : %v", ipdomain.Mtu)
 
 	var msg configmodels.ConfigMessage

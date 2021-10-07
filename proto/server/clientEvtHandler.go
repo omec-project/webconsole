@@ -271,11 +271,7 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 	nssai.Sst = sliceConf.SliceId.Sst
 	nssai.Sd = sliceConf.SliceId.Sd
 	sliceProto.Nssai = nssai
-	qos := &protos.QoS{}
-	qos.Uplink = sliceConf.Qos.Uplink
-	qos.Downlink = sliceConf.Qos.Downlink
-	qos.TrafficClass = sliceConf.Qos.TrafficClass
-	sliceProto.Qos = qos
+
 	for d := 0; d < len(sliceConf.SiteDeviceGroup); d++ {
 		group := sliceConf.SiteDeviceGroup[d]
 		client.clientLog.Debugf("group %v, len of devgroupsConfigClient %v ", group, len(client.devgroupsConfigClient))
@@ -284,6 +280,31 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 			client.clientLog.Infoln("Did not find group %v ", group)
 			return false
 		}
+
+		//QoS
+		qos := &protos.QoS{}
+		//UL
+		if devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
+			qos.Uplink = devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrUplink
+		} else {
+			qos.Uplink = sliceConf.Qos.Uplink
+		}
+
+		//DL
+		if devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
+			qos.Downlink = devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
+		} else {
+			qos.Downlink = sliceConf.Qos.Downlink
+		}
+
+		//Traffic Class
+		if devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
+			qos.TrafficClass = devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass
+		} else {
+			qos.TrafficClass = sliceConf.Qos.TrafficClass
+		}
+		sliceProto.Qos = qos
+
 		devGroupProto := &protos.DeviceGroup{}
 		fillDeviceGroup(group, devGroupConfig, devGroupProto)
 		sliceProto.DeviceGroup = append(sliceProto.DeviceGroup, devGroupProto)
@@ -300,6 +321,62 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 		name := sliceConf.PermitApplications[a]
 		sliceProto.PermitApps = append(sliceProto.PermitApps, name)
 	}
+
+	//Add Filtering rules
+	appFilters := protos.AppFilterRules{
+		PccRuleBase: make([]*protos.PccRule, 0),
+	}
+
+	for _, ruleConfig := range sliceConf.ApplicationFilteringRules {
+		client.clientLog.Debugf("Received Rule config = %v ", ruleConfig)
+		pccRule := protos.PccRule{}
+
+		//RuleName
+		pccRule.RuleId = ruleConfig.RuleName
+
+		//Qos Info
+		ruleQos := protos.PccRuleQos{}
+		ruleQos.MaxbrUl = ruleConfig.AppMbrUplink
+		ruleQos.MaxbrDl = ruleConfig.AppMbrDownlink
+		ruleQos.GbrUl = 0
+		ruleQos.GbrUl = 0
+		var arpi, var5qi int32
+		var5qi, arpi = parseTrafficClass(ruleConfig.TrafficClass)
+		ruleQos.Var5Qi = int32(var5qi)
+		arp := &protos.PccArp{}
+		arp.PL = int32((arpi & 0x3c) >> 2)
+		arp.PC = protos.PccArpPc((arpi & 0x40) >> 6)
+		arp.PV = protos.PccArpPv(arpi & 0x1)
+		ruleQos.Arp = arp
+		pccRule.Qos = &ruleQos
+
+		//Flow Info
+		//As of now config provides us only single flow
+		pccRule.FlowInfos = make([]*protos.PccFlowInfo, 0)
+		var desc string
+		if ruleConfig.Protocol == int32(protos.PccFlowTos_TCP.Number()) {
+			desc = "permit out tcp from " + ruleConfig.Endpoint + " to assigned " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10)
+		} else if ruleConfig.Protocol == int32(protos.PccFlowTos_UDP.Number()) {
+			desc = "permit out udp from " + ruleConfig.Endpoint + " to assigned " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10)
+		} else {
+			desc = "permit out ip from " + ruleConfig.Endpoint + " to assigned"
+		}
+
+		flowInfo := protos.PccFlowInfo{}
+		flowInfo.FlowDesc = desc
+		flowInfo.TosTrafficClass = ruleConfig.TrafficClass
+		flowInfo.FlowDir = protos.PccFlowDirection_BIDIRECTIONAL
+		pccRule.FlowInfos = append(pccRule.FlowInfos, &flowInfo)
+
+		//Add PCC rule to Rulebase
+		appFilters.PccRuleBase = append(appFilters.PccRuleBase, &pccRule)
+	}
+
+	//Add to Config to be pushed to client
+	if len(appFilters.PccRuleBase) > 0 {
+		sliceProto.AppFilters = &appFilters
+	}
+
 	//
 	//   for a:= 0; a < len(sliceConf.ApplicationsInformation); a++  {
 	//
@@ -611,9 +688,31 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 			}
 			// qos profile
 			sqos := sliceConfig.Qos
-			config.Qci, config.Arp = parseTrafficClass(devGroup.IpDomainExpanded.ApnQos.TrafficClass)
-			config.AmbrUl = sqos.Uplink
-			config.AmbrDl = sqos.Downlink
+
+			//Traffic Class
+			//override with device-group specific if available
+			if devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
+				config.Qci, config.Arp = parseTrafficClass(devGroup.IpDomainExpanded.UeDnnQos.TrafficClass)
+			} else {
+				config.Qci, config.Arp = parseTrafficClass(sqos.TrafficClass)
+			}
+
+			//UL AMBR
+			//override with device-group specific if available
+			if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
+				config.AmbrUl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink
+			} else {
+				config.AmbrUl = sqos.Uplink
+			}
+
+			//DL AMBR
+			//override with device-group specific if available
+			if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
+				config.AmbrDl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
+			} else {
+				config.AmbrDl = sqos.Downlink
+			}
+
 			client.clientLog.Infoln("DeviceGroup ", devGroup)
 			var apnProf apnProfile
 			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
@@ -721,9 +820,26 @@ func postConfigPcrf(client *clientNF) {
 			sgroup.Def_service = append(sgroup.Def_service, pcrfServiceName)
 			config.Policies.ServiceGroups[devGroup.IpDomainExpanded.Dnn] = sgroup
 			pcrfService := &pcrfServices{}
-			pcrfService.Qci, pcrfService.Arp = parseTrafficClass(devGroup.IpDomainExpanded.ApnQos.TrafficClass) /* map traffic class to QCI, ARP */
-			pcrfService.Ambr_ul = devGroup.IpDomainExpanded.ApnQos.Uplink
-			pcrfService.Ambr_dl = devGroup.IpDomainExpanded.ApnQos.Downlink
+			//Traffic Class
+			if devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
+				pcrfService.Qci, pcrfService.Arp = parseTrafficClass(devGroup.IpDomainExpanded.UeDnnQos.TrafficClass) /* map traffic class to QCI, ARP */
+			} else {
+				pcrfService.Qci, pcrfService.Arp = parseTrafficClass(sliceConfig.Qos.TrafficClass)
+			}
+
+			//AMBR UL
+			if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
+				pcrfService.Ambr_ul = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink
+			} else {
+				pcrfService.Ambr_ul = sliceConfig.Qos.Uplink
+			}
+			//AMBR DL
+			if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
+				pcrfService.Ambr_dl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
+			} else {
+				pcrfService.Ambr_dl = sliceConfig.Qos.Downlink
+			}
+
 			if len(sliceConfig.ApplicationFilteringRules) == 0 {
 				app := configmodels.SliceApplicationFilteringRules{RuleName: "rule1", Priority: 1, Action: "permit", Endpoint: "0.0.0.0/0"}
 				sliceConfig.ApplicationFilteringRules = append(sliceConfig.ApplicationFilteringRules, app)
@@ -750,8 +866,20 @@ func postConfigPcrf(client *clientNF) {
 				ruleQInfo.Mbr_dl = app.AppMbrDownlink
 				ruleQInfo.Gbr_ul = 0
 				ruleQInfo.Gbr_dl = 0
-				ruleQInfo.ApnAmbrUl = devGroup.IpDomainExpanded.ApnQos.Uplink
-				ruleQInfo.ApnAmbrDl = devGroup.IpDomainExpanded.ApnQos.Downlink
+
+				//override with device-group specific if available
+				if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
+					ruleQInfo.ApnAmbrUl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink
+				} else {
+					ruleQInfo.ApnAmbrUl = sliceConfig.Qos.Uplink
+				}
+
+				//override with device-group specific if available
+				if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
+					ruleQInfo.ApnAmbrDl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
+				} else {
+					ruleQInfo.ApnAmbrDl = sliceConfig.Qos.Downlink
+				}
 				arp := &arpInfo{}
 				arp.Priority = (arpi & 0x3c) >> 2
 				arp.PreEmptCap = (arpi & 0x40) >> 6
@@ -824,7 +952,7 @@ func postConfigSpgw(client *clientNF) {
 			rule.Priority = 1
 			var apnProf apnProfile
 			apnProf.DnsPrimary = devGroup.IpDomainExpanded.DnsPrimary
-			apnProf.DnsSecondary = devGroup.IpDomainExpanded.DnsPrimary
+			apnProf.DnsSecondary = devGroup.IpDomainExpanded.DnsSecondary
 			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
 			apnProf.Mtu = devGroup.IpDomainExpanded.Mtu
 			apnProf.GxEnabled = false

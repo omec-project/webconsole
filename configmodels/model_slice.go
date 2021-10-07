@@ -19,8 +19,6 @@ type Slice struct {
 
 	Qos SliceQos `json:"qos,omitempty"`
 
-	ApnQos ApnAmbrQosInfo `json:"apn-ambr-qos,omitempty"`
-
 	SiteDeviceGroup []string `json:"site-device-group,omitempty"`
 
 	SiteInfo SliceSiteInfo `json:"site-info,omitempty"`

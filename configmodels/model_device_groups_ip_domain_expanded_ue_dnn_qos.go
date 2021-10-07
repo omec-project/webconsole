@@ -14,17 +14,12 @@
 
 package configmodels
 
-// DeviceGroupsIpDomainExpanded - This is APN for device
-type DeviceGroupsIpDomainExpanded struct {
-	Dnn string `json:"dnn,omitempty"`
-
-	UeIpPool string `json:"ue-ip-pool,omitempty"`
-
-	DnsPrimary string `json:"dns-primary,omitempty"`
-
-	DnsSecondary string `json:"dns-secondary,omitempty"`
-
-	Mtu int32 `json:"mtu,omitempty"`
-
-	UeDnnQos *DeviceGroupsIpDomainExpandedUeDnnQos `json:"ue-dnn-qos,omitempty"`
+// DeviceGroupsIpDomainExpandedUeDnnQos struct for DeviceGroupsIpDomainExpandedUeDnnQos
+type DeviceGroupsIpDomainExpandedUeDnnQos struct {
+	// uplink data rate in bps
+	DnnMbrUplink int32 `json:"dnn-mbr-uplink,omitempty"`
+	// downlink data rate in bps
+	DnnMbrDownlink int32 `json:"dnn-mbr-downlink,omitempty"`
+	// QCI/QFI for the traffic
+	TrafficClass string `json:"traffic-class,omitempty"`
 }

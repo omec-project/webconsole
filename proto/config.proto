@@ -67,6 +67,7 @@ message NetworkSlice {
   repeated string DenyApps = 6;
   repeated string PermitApps = 7;
   repeated AppInfo AppInfo = 8;
+  AppFilterRules AppFilters = 9;
 }
 
 message DeviceGroup {
@@ -81,6 +82,72 @@ message IpDomain {
   string UePool  = 3;
   string DnsPrimary = 4;
   int32 Mtu = 5;
+}
+
+enum PccFlowDirection {
+  DOWNLINK = 0;
+  UPLINK = 1;
+  BIDIRECTIONAL = 2;
+  UNSPECIFIED = 3;
+}
+
+enum PccArpPc {
+  NOT_PREEMPT = 0;
+  MAY_PREEMPT = 1;
+}
+
+enum PccArpPv {
+  NOT_PREEMPTABLE = 0;
+  PREEMPTABLE = 1;
+}
+
+enum PccFlowTos {
+  HOPOPT = 0;
+  ICMP = 1;
+  TCP = 6;
+  UDP = 17;
+}
+
+enum PccFlowStatus {
+  ENABLED_UPLINK = 0; 
+  ENABLED_DOWNLINK = 1;
+  ENABLED = 2;
+  DISABLED = 3;
+  REMOVED = 4;
+}
+
+message PccFlowInfo {
+  string FlowDesc = 1;    //packet filters of the IP flow
+  string TosTrafficClass = 2;
+  PccFlowDirection FlowDir = 3;
+  PccFlowStatus FlowStatus = 4;
+}
+
+message PccArp {
+  int32 PL = 1;
+  PccArpPc PC = 2;
+  PccArpPv PV = 3;
+}
+
+message PccRuleQos {
+  int32 Var5qi = 1;
+  int32 MaxbrUl = 2;
+  int32 MaxbrDl = 3;
+  int32 GbrUl = 4;
+  int32 GbrDl = 5;
+  PccArp Arp = 6;
+}
+
+
+
+message PccRule {
+  repeated PccFlowInfo FlowInfos = 1;  
+  string RuleId = 2;                 //Name of Rule
+  PccRuleQos Qos =3;
+}
+
+message AppFilterRules {
+  repeated PccRule PccRuleBase = 1;
 }
 
 message NetworkSliceRequest {

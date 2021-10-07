@@ -170,9 +170,31 @@ components:
         dns-primary:
           example: 8.8.8.8
           type: string
+        dns-secondary:
+          nullable: false
+          example: 8.8.4.4
+          type: string
         mtu:
           example: 1460
           type: integer
+        ue-dnn-qos:
+          properties:
+            dnn-mbr-uplink:
+              description: uplink data rate in bps
+              example: 4000000
+              type: integer
+            dnn-mbr-downlink:
+              description: downlink data rate in bps
+              example: 20000000
+              type: integer
+            traffic-class:
+              description: QCI/QFI for the traffic
+              enum:
+              - platinum
+              - gold
+              - silver
+              type: string
+          type: object
       type: object
     slice_slice_id:
       properties:

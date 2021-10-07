@@ -147,6 +147,7 @@ type ruleQosInfo struct {
 
 type pcrfRuledef struct {
 	RuleName   string        `json:"Charging-Rule-Name,omitempty"`
+	Precedence int32         `json:"Precedence,omitempty"`
 	FlowStatus uint32        `json:"Flow-Status,omitempty"`
 	QosInfo    *ruleQosInfo  `json:"QoS-Information,omitempty"`
 	FlowInfo   *ruleFlowInfo `json:"Flow-Information,omitempty"`
@@ -284,21 +285,21 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 		//QoS
 		qos := &protos.QoS{}
 		//UL
-		if devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
+		if devGroupConfig.IpDomainExpanded.UeDnnQos != nil && devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
 			qos.Uplink = devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrUplink
 		} else {
 			qos.Uplink = sliceConf.Qos.Uplink
 		}
 
 		//DL
-		if devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
+		if devGroupConfig.IpDomainExpanded.UeDnnQos != nil && devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
 			qos.Downlink = devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
 		} else {
 			qos.Downlink = sliceConf.Qos.Downlink
 		}
 
 		//Traffic Class
-		if devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
+		if devGroupConfig.IpDomainExpanded.UeDnnQos != nil && devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
 			qos.TrafficClass = devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass
 		} else {
 			qos.TrafficClass = sliceConf.Qos.TrafficClass
@@ -691,7 +692,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 
 			//Traffic Class
 			//override with device-group specific if available
-			if devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
+			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
 				config.Qci, config.Arp = parseTrafficClass(devGroup.IpDomainExpanded.UeDnnQos.TrafficClass)
 			} else {
 				config.Qci, config.Arp = parseTrafficClass(sqos.TrafficClass)
@@ -699,7 +700,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 
 			//UL AMBR
 			//override with device-group specific if available
-			if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
+			if devGroup.IpDomainExpanded.UeDnnQos != nil &&  devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
 				config.AmbrUl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink
 			} else {
 				config.AmbrUl = sqos.Uplink
@@ -707,7 +708,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 
 			//DL AMBR
 			//override with device-group specific if available
-			if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
+			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
 				config.AmbrDl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
 			} else {
 				config.AmbrDl = sqos.Downlink
@@ -804,9 +805,6 @@ func postConfigPcrf(client *clientNF) {
 		client.clientLog.Infoln("Slice ", sliceName)
 		siteInfo := sliceConfig.SiteInfo
 		client.clientLog.Infoln("siteInfo ", siteInfo)
-		//subscriber selection rules
-		rule := subSelectionRule{}
-		rule.Priority = 1
 		//apn profile
 		for _, d := range sliceConfig.SiteDeviceGroup {
 			devGroup := client.devgroupsConfigClient[d]
@@ -821,20 +819,20 @@ func postConfigPcrf(client *clientNF) {
 			config.Policies.ServiceGroups[devGroup.IpDomainExpanded.Dnn] = sgroup
 			pcrfService := &pcrfServices{}
 			//Traffic Class
-			if devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
+			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
 				pcrfService.Qci, pcrfService.Arp = parseTrafficClass(devGroup.IpDomainExpanded.UeDnnQos.TrafficClass) /* map traffic class to QCI, ARP */
 			} else {
 				pcrfService.Qci, pcrfService.Arp = parseTrafficClass(sliceConfig.Qos.TrafficClass)
 			}
 
 			//AMBR UL
-			if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
+			if devGroup.IpDomainExpanded.UeDnnQos != nil &&  devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
 				pcrfService.Ambr_ul = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink
 			} else {
 				pcrfService.Ambr_ul = sliceConfig.Qos.Uplink
 			}
 			//AMBR DL
-			if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
+			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
 				pcrfService.Ambr_dl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
 			} else {
 				pcrfService.Ambr_dl = sliceConfig.Qos.Downlink
@@ -854,6 +852,7 @@ func postConfigPcrf(client *clientNF) {
 				ruledef := &pcrfRuledef{}
 				pcrfRule.Definitions = ruledef
 				ruledef.RuleName = ruleName
+				ruledef.Precedence = app.Priority
 				ruledef.FlowStatus = 3 // disabled by default
 				if app.Action == "permit" {
 					ruledef.FlowStatus = 2
@@ -868,14 +867,14 @@ func postConfigPcrf(client *clientNF) {
 				ruleQInfo.Gbr_dl = 0
 
 				//override with device-group specific if available
-				if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
+				if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
 					ruleQInfo.ApnAmbrUl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink
 				} else {
 					ruleQInfo.ApnAmbrUl = sliceConfig.Qos.Uplink
 				}
 
 				//override with device-group specific if available
-				if devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
+				if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
 					ruleQInfo.ApnAmbrDl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
 				} else {
 					ruleQInfo.ApnAmbrDl = sliceConfig.Qos.Downlink

@@ -342,6 +342,7 @@ func PostSubscriberByID(c *gin.Context) {
 
 	var subsOverrideData configmodels.SubsOverrideData
 	if err := c.ShouldBindJSON(&subsOverrideData); err != nil {
+	    logger.WebUILog.Infoln("Post One Subscriber Data - panic")
 		logger.WebUILog.Panic(err.Error())
 	}
 

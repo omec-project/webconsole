@@ -185,6 +185,9 @@ func (webui *WEBUI) Start() {
 	configapi.AddServiceSub(subconfig_router)
 	configapi.AddService(subconfig_router)
 
+	configMsgChan := make(chan *configmodels.ConfigMessage, 10)
+	configapi.SetChannel(configMsgChan)
+
 	subconfig_router.Use(cors.New(cors.Config{
 		AllowMethods: []string{"GET", "POST", "OPTIONS", "PUT", "PATCH", "DELETE"},
 		AllowHeaders: []string{
@@ -209,8 +212,6 @@ func (webui *WEBUI) Start() {
 		self.UpdateNfProfiles()
 	}
 
-	configMsgChan := make(chan *configmodels.ConfigMessage, 10)
-	configapi.SetChannel(configMsgChan)
 
 	// Start grpc Server. This has embedded functionality of sending
 	// 4G config over REST Api as well.

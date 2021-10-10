@@ -82,6 +82,21 @@ message IpDomain {
   string UePool  = 3;
   string DnsPrimary = 4;
   int32 Mtu = 5;
+  UeDnnQosInfo UeDnnQos = 6;
+}
+
+message UeDnnQosInfo {
+  int64  DnnMbrUplink = 1;
+  int64  DnnMbrDownlink  = 2;
+  TrafficClassInfo TrafficClass  = 3;
+}
+
+message TrafficClassInfo {
+  string Name = 1;
+  int32  Qci  = 2;
+  int32  Arp  = 3;
+  int32  Pdb  = 4;
+  int32  Pelr  = 5;
 }
 
 enum PccFlowDirection {

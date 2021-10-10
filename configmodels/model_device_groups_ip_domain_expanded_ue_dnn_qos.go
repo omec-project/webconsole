@@ -17,9 +17,9 @@ package configmodels
 // DeviceGroupsIpDomainExpandedUeDnnQos struct for DeviceGroupsIpDomainExpandedUeDnnQos
 type DeviceGroupsIpDomainExpandedUeDnnQos struct {
 	// uplink data rate in bps
-	DnnMbrUplink int32 `json:"dnn-mbr-uplink,omitempty"`
+	DnnMbrUplink int64 `json:"dnn-mbr-uplink,omitempty"`
 	// downlink data rate in bps
-	DnnMbrDownlink int32 `json:"dnn-mbr-downlink,omitempty"`
+	DnnMbrDownlink int64 `json:"dnn-mbr-downlink,omitempty"`
 	// QCI/QFI for the traffic
-	TrafficClass string `json:"traffic-class,omitempty"`
+	TrafficClass *TrafficClassInfo `json:"traffic-class,omitempty"`
 }

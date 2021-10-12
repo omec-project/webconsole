@@ -259,6 +259,20 @@ func fillDeviceGroup(groupName string, devGroupConfig *configmodels.DeviceGroups
 	ipdomain.UePool = devGroupConfig.IpDomainExpanded.UeIpPool
 	ipdomain.DnsPrimary = devGroupConfig.IpDomainExpanded.DnsPrimary
 	ipdomain.Mtu = devGroupConfig.IpDomainExpanded.Mtu
+	if devGroupConfig.IpDomainExpanded.UeDnnQos != nil {
+		ipdomain.UeDnnQos = &protos.UeDnnQosInfo{}
+		ipdomain.UeDnnQos.DnnMbrUplink = devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrUplink
+		ipdomain.UeDnnQos.DnnMbrDownlink = devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
+		if devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass != nil {
+			ipdomain.UeDnnQos.TrafficClass = &protos.TrafficClassInfo{}
+			ipdomain.UeDnnQos.TrafficClass.Name = devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass.Name
+			ipdomain.UeDnnQos.TrafficClass.Qci = devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass.Qci
+			ipdomain.UeDnnQos.TrafficClass.Arp = devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass.Arp
+			ipdomain.UeDnnQos.TrafficClass.Pdb = devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass.Pdb
+			ipdomain.UeDnnQos.TrafficClass.Pelr = devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass.Pelr
+		}
+	}
+
 	devGroupProto.IpDomainDetails = ipdomain
 
 	for i := 0; i < len(devGroupConfig.Imsis); i++ {
@@ -273,6 +287,7 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 	nssai.Sd = sliceConf.SliceId.Sd
 	sliceProto.Nssai = nssai
 
+	var defaultQos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos
 	for d := 0; d < len(sliceConf.SiteDeviceGroup); d++ {
 		group := sliceConf.SiteDeviceGroup[d]
 		client.clientLog.Debugf("group %v, len of devgroupsConfigClient %v ", group, len(client.devgroupsConfigClient))
@@ -282,28 +297,37 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 			return false
 		}
 
+		if (defaultQos == nil) && (devGroupConfig.IpDomainExpanded.UeDnnQos != nil) &&
+			(devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass != nil) {
+			defaultQos = &configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{}
+			defaultQos.TrafficClass = &configmodels.TrafficClassInfo{}
+			defaultQos.TrafficClass.Qci = devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass.Qci
+			defaultQos.TrafficClass.Arp = devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass.Arp
+		}
+
 		//QoS
 		qos := &protos.QoS{}
 		//UL
 		if devGroupConfig.IpDomainExpanded.UeDnnQos != nil && devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
-			qos.Uplink = devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrUplink
+			qos.Uplink = int32(devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrUplink)
 		} else {
 			qos.Uplink = sliceConf.Qos.Uplink
 		}
 
 		//DL
 		if devGroupConfig.IpDomainExpanded.UeDnnQos != nil && devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
-			qos.Downlink = devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
+			qos.Downlink = int32(devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)
 		} else {
 			qos.Downlink = sliceConf.Qos.Downlink
 		}
 
 		//Traffic Class
-		if devGroupConfig.IpDomainExpanded.UeDnnQos != nil && devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
-			qos.TrafficClass = devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass
+		if devGroupConfig.IpDomainExpanded.UeDnnQos != nil && devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass != nil {
+			qos.TrafficClass = devGroupConfig.IpDomainExpanded.UeDnnQos.TrafficClass.Name
 		} else {
 			qos.TrafficClass = sliceConf.Qos.TrafficClass
 		}
+
 		sliceProto.Qos = qos
 
 		devGroupProto := &protos.DeviceGroup{}
@@ -341,8 +365,20 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 		ruleQos.MaxbrDl = ruleConfig.AppMbrDownlink
 		ruleQos.GbrUl = 0
 		ruleQos.GbrUl = 0
+
 		var arpi, var5qi int32
-		var5qi, arpi = parseTrafficClass(ruleConfig.TrafficClass)
+
+		if ruleConfig.TrafficClass != nil {
+			var5qi = ruleConfig.TrafficClass.Qci
+			arpi = ruleConfig.TrafficClass.Arp
+		} else if defaultQos != nil {
+			var5qi = defaultQos.TrafficClass.Qci
+			arpi = defaultQos.TrafficClass.Arp
+		} else {
+			var5qi = 9
+			arpi = 1
+		}
+
 		ruleQos.Var5Qi = int32(var5qi)
 		arp := &protos.PccArp{}
 		arp.PL = int32((arpi & 0x3c) >> 2)
@@ -365,7 +401,7 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 
 		flowInfo := protos.PccFlowInfo{}
 		flowInfo.FlowDesc = desc
-		flowInfo.TosTrafficClass = ruleConfig.TrafficClass
+		flowInfo.TosTrafficClass = "IPV4"
 		flowInfo.FlowDir = protos.PccFlowDirection_BIDIRECTIONAL
 		pccRule.FlowInfos = append(pccRule.FlowInfos, &flowInfo)
 
@@ -692,16 +728,17 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 
 			//Traffic Class
 			//override with device-group specific if available
-			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
-				config.Qci, config.Arp = parseTrafficClass(devGroup.IpDomainExpanded.UeDnnQos.TrafficClass)
+			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != nil {
+				config.Qci = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Qci
+				config.Arp = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Arp
 			} else {
 				config.Qci, config.Arp = parseTrafficClass(sqos.TrafficClass)
 			}
 
 			//UL AMBR
 			//override with device-group specific if available
-			if devGroup.IpDomainExpanded.UeDnnQos != nil &&  devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
-				config.AmbrUl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink
+			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
+				config.AmbrUl = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink)
 			} else {
 				config.AmbrUl = sqos.Uplink
 			}
@@ -709,7 +746,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 			//DL AMBR
 			//override with device-group specific if available
 			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
-				config.AmbrDl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
+				config.AmbrDl = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)
 			} else {
 				config.AmbrDl = sqos.Downlink
 			}
@@ -819,21 +856,22 @@ func postConfigPcrf(client *clientNF) {
 			config.Policies.ServiceGroups[devGroup.IpDomainExpanded.Dnn] = sgroup
 			pcrfService := &pcrfServices{}
 			//Traffic Class
-			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != "" {
-				pcrfService.Qci, pcrfService.Arp = parseTrafficClass(devGroup.IpDomainExpanded.UeDnnQos.TrafficClass) /* map traffic class to QCI, ARP */
+			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != nil {
+				pcrfService.Qci = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Qci
+				pcrfService.Arp = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Arp
 			} else {
 				pcrfService.Qci, pcrfService.Arp = parseTrafficClass(sliceConfig.Qos.TrafficClass)
 			}
 
 			//AMBR UL
-			if devGroup.IpDomainExpanded.UeDnnQos != nil &&  devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
-				pcrfService.Ambr_ul = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink
+			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
+				pcrfService.Ambr_ul = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink)
 			} else {
 				pcrfService.Ambr_ul = sliceConfig.Qos.Uplink
 			}
 			//AMBR DL
 			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
-				pcrfService.Ambr_dl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
+				pcrfService.Ambr_dl = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)
 			} else {
 				pcrfService.Ambr_dl = sliceConfig.Qos.Downlink
 			}
@@ -860,7 +898,18 @@ func postConfigPcrf(client *clientNF) {
 				ruleQInfo := &ruleQosInfo{}
 				ruledef.QosInfo = ruleQInfo
 				var arpi int32
-				ruleQInfo.Qci, arpi = parseTrafficClass(app.TrafficClass)
+				if app.TrafficClass != nil {
+					ruleQInfo.Qci = app.TrafficClass.Qci
+					arpi = app.TrafficClass.Arp
+				} else if devGroup.IpDomainExpanded.UeDnnQos != nil &&
+					devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != nil {
+					ruleQInfo.Qci = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Qci
+					arpi = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Arp
+				} else {
+					ruleQInfo.Qci = 9
+					arpi = 1
+				}
+
 				ruleQInfo.Mbr_ul = app.AppMbrUplink
 				ruleQInfo.Mbr_dl = app.AppMbrDownlink
 				ruleQInfo.Gbr_ul = 0
@@ -868,14 +917,14 @@ func postConfigPcrf(client *clientNF) {
 
 				//override with device-group specific if available
 				if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
-					ruleQInfo.ApnAmbrUl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink
+					ruleQInfo.ApnAmbrUl = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink)
 				} else {
 					ruleQInfo.ApnAmbrUl = sliceConfig.Qos.Uplink
 				}
 
 				//override with device-group specific if available
 				if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
-					ruleQInfo.ApnAmbrDl = devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink
+					ruleQInfo.ApnAmbrDl = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)
 				} else {
 					ruleQInfo.ApnAmbrDl = sliceConfig.Qos.Downlink
 				}
@@ -971,10 +1020,19 @@ func postConfigSpgw(client *clientNF) {
 			sqos := sliceConfig.Qos
 			qosProfName := sliceName + "_qos"
 			var qosProf qosProfile
-			qosProf.Qci = 9
-			qosProf.Arp = 1
-			qosProf.Ambr = append(qosProf.Ambr, sqos.Uplink)
-			qosProf.Ambr = append(qosProf.Ambr, sqos.Downlink)
+			if (devGroup.IpDomainExpanded.UeDnnQos != nil) &&
+				(devGroup.IpDomainExpanded.UeDnnQos.TrafficClass != nil) {
+				qosProf.Qci = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Qci
+				qosProf.Arp = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Arp
+				qosProf.Ambr = append(qosProf.Ambr, int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink))
+				qosProf.Ambr = append(qosProf.Ambr, int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink))
+			} else {
+				qosProf.Qci = 9
+				qosProf.Arp = 1
+				qosProf.Ambr = append(qosProf.Ambr, sqos.Uplink)
+				qosProf.Ambr = append(qosProf.Ambr, sqos.Downlink)
+			}
+
 			config.QosProfiles[qosProfName] = &qosProf
 			rule.SelectedQoSProfile = qosProfName
 

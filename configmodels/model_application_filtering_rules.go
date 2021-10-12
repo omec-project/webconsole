@@ -41,7 +41,7 @@ type SliceApplicationFilteringRules struct {
 
 	AppMbrDownlink int32 `json:"app-mbr-downlink,omitempty"`
 
-	TrafficClass string `json:"traffic-class,omitempty"`
+	TrafficClass *TrafficClassInfo `json:"traffic-class,omitempty"`
 
 	RuleTrigger string `json:"rule-trigger,omitempty"`
 }

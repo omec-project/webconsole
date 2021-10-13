@@ -338,15 +338,16 @@ func GetSubscriberByID(c *gin.Context) {
 func PostSubscriberByID(c *gin.Context) {
 
 	setCorsHeader(c)
-	logger.WebUILog.Infoln("Post One Subscriber Data")
 
 	var subsOverrideData configmodels.SubsOverrideData
 	if err := c.ShouldBindJSON(&subsOverrideData); err != nil {
-	    logger.WebUILog.Infoln("Post One Subscriber Data - panic")
+		logger.WebUILog.Infoln("Post One Subscriber Data - panic")
 		logger.WebUILog.Panic(err.Error())
 	}
 
 	ueId := c.Param("ueId")
+
+	logger.WebUILog.Infoln("Received Post Subscriber Data from Roc/Simapp: ", ueId)
 
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
@@ -391,7 +392,7 @@ func PostSubscriberByID(c *gin.Context) {
 		AuthSubData: &authSubsData,
 		Imsi:        ueId}
 	configChannel <- &msg
-	logger.WebUILog.Infoln("Post Subscriber Data complete")
+	logger.WebUILog.Infoln("Sucessfully Added Subscriber Data to ConfigChannel: ", ueId)
 }
 
 // Put subscriber by IMSI(ueId) and PlmnID(servingPlmnId)

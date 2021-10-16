@@ -6,9 +6,9 @@
 package configapi
 
 import (
+	"encoding/json"
 	"strings"
 
-	"github.com/free5gc/http_wrapper"
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -32,14 +32,14 @@ func DeviceGroupDeleteHandler(c *gin.Context) bool {
 	var groupName string
 	var exists bool
 	if groupName, exists = c.Params.Get("group-name"); exists {
-		configLog.Infof("Received group %v", groupName)
+		configLog.Infof("Received Delete Group %v from Roc/simapp", groupName)
 	}
 	var msg configmodels.ConfigMessage
 	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = configmodels.Delete_op
 	msg.DevGroupName = groupName
 	configChannel <- &msg
-	configLog.Infof("Delete message for device group %v to main config thread, message %v ", groupName, msg)
+	configLog.Infof("Suuccessfully Added Device Group [%v] with delete_op to config channel.", groupName)
 	return true
 
 }
@@ -62,10 +62,10 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 		configLog.Infof(" err ", err)
 		return false
 	}
-	configLog.Infof("Printing request full after binding : %v", request)
-	req := http_wrapper.NewRequest(c.Request, request)
+	//configLog.Infof("Printing request full after binding : %v", request)
+	//req := http_wrapper.NewRequest(c.Request, request)
 
-	configLog.Infof("Printing request full : %+v", req)
+	/*configLog.Infof("Printing request full : %+v", req)
 	configLog.Infof("params : %v", req.Params)
 	configLog.Infof("Header : %v", req.Header)
 	configLog.Infof("Query  : %v", req.Query)
@@ -73,28 +73,32 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("URL : %v ", req.URL)
 
 	procReq := req.Body.(configmodels.DeviceGroups)
+	ipdomain := procReq.IpDomainExpanded
 	configLog.Infof("Imsis.size : %v", len(procReq.Imsis))
 
 	for i := 0; i < len(procReq.Imsis); i++ {
 		configLog.Infof("Imsis : %v", procReq.Imsis[i])
 	}
 	configLog.Infof("IP Domain Name : %v", procReq.IpDomainName)
-	ipdomain := procReq.IpDomainExpanded
 	configLog.Infof("IP Domain details %v", ipdomain)
 	configLog.Infof("  dnn name : %v", ipdomain.Dnn)
 	configLog.Infof("  ue pool  : %v", ipdomain.UeIpPool)
 	configLog.Infof("  dns Primary : %v", ipdomain.DnsPrimary)
 	configLog.Infof("  dns Secondary : %v", ipdomain.DnsSecondary)
 	configLog.Infof("  ip mtu : %v", ipdomain.Mtu)
-
+	configLog.Infof("Group %v ", groupName)
+	*/
 	var msg configmodels.ConfigMessage
 	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = msgOp
 	msg.DevGroup = &request
-	configLog.Infof("Group %v ", groupName)
 	msg.DevGroupName = groupName
+	b, err := json.MarshalIndent(msg, "", "  ")
+	configLog.Infof("======== Device Group Msg Start========")
+	configLog.Infof(string(b))
+	configLog.Infof("======== Device Group Msg End========")
 	configChannel <- &msg
-	configLog.Infof("Post message for device group %v to main config thread, message %v ", groupName, msg)
+	configLog.Infof("Suuccessfully Added Device Group [%v] to config channel.", groupName)
 	return true
 }
 
@@ -102,14 +106,14 @@ func NetworkSliceDeleteHandler(c *gin.Context) bool {
 	var sliceName string
 	var exists bool
 	if sliceName, exists = c.Params.Get("slice-name"); exists {
-		configLog.Infof("Received slice : %v", sliceName)
+		configLog.Infof("Received Deleted slice : %v from Roc/simapp", sliceName)
 	}
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = configmodels.Delete_op
 	msg.MsgType = configmodels.Network_slice
 	msg.SliceName = sliceName
 	configChannel <- &msg
-	configLog.Infof("Delete message for Slice %v to main config thread, message %v ", sliceName, msg)
+	configLog.Infof("Suuccessfully Added Device Group [%v] with delete_op to config channel.", sliceName)
 	return true
 }
 
@@ -131,17 +135,16 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		configLog.Infof(" err ", err)
 		return false
 	}
-	configLog.Infof("Printing request full after binding : %v ", request)
+	//configLog.Infof("Printing request full after binding : %v ", request)
 
-	req := http_wrapper.NewRequest(c.Request, request)
+	//req := http_wrapper.NewRequest(c.Request, request)
 
-	configLog.Infof("Printing request full : %v", req)
+	/*configLog.Infof("Printing request full : %v", req)
 	configLog.Infof("params : %v ", req.Params)
 	configLog.Infof("Header : %v ", req.Header)
 	configLog.Infof("Query  : %v ", req.Query)
 	configLog.Infof("Printing request body : %v ", req.Body)
 	configLog.Infof("URL : %v ", req.URL)
-
 	procReq := req.Body.(configmodels.Slice)
 
 	slice := procReq.SliceId
@@ -195,13 +198,18 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("Site UPF : %v", site.Upf)
 	configLog.Infof("    upf-name : %v", site.Upf["upf-name"])
 	configLog.Infof("    upf-port : %v", site.Upf["upf-port"])
+	*/
 
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = msgOp
 	msg.MsgType = configmodels.Network_slice
 	msg.Slice = &request
 	msg.SliceName = sliceName
+	b, err := json.MarshalIndent(msg, "", "  ")
+	configLog.Infof("======== Slice Info Start========")
+	configLog.Infof(string(b))
+	configLog.Infof("======== Slice Info End========")
 	configChannel <- &msg
-	configLog.Infof("Post message for Slice %v to main config thread, message %v ", sliceName, msg)
+	configLog.Infof("Suuccessfully Added Slice [%v] to config channel.", sliceName)
 	return true
 }

@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/antonfisher/nested-logrus-formatter v1.3.0
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/free5gc/MongoDBLibrary v1.0.0
 	github.com/free5gc/http2_util v1.0.0
 	github.com/free5gc/logger_conf v1.0.0

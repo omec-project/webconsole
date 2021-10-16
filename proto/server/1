@@ -600,15 +600,14 @@ func postConfigMme(client *clientNF) {
 		client.clientLog.Infof("plmn for mme %v", plmn)
 		config.PlmnList = append(config.PlmnList, plmn)
 	}
-	client.clientLog.Infoln("Config sending to mme:")
+	client.clientLog.Infoln("mme Config after filling details ", config)
 	b, err := json.Marshal(config)
 	if err != nil {
 		client.clientLog.Infoln("error in marshalling json -", err)
 	}
-	client.clientLog.Infoln(string(b))
 
 	reqMsgBody := bytes.NewBuffer(b)
-	client.clientLog.Debugln("mme reqMsgBody -", reqMsgBody)
+	client.clientLog.Infoln("mme reqMsgBody -", reqMsgBody)
 	c := &http.Client{}
 	httpend := client.ConfigPushUrl
 	req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)
@@ -636,7 +635,7 @@ func deleteConfigHss(client *clientNF, imsi string) {
 	}
 
 	reqMsgBody := bytes.NewBuffer(b)
-	client.clientLog.Debugln("reqMsgBody -", reqMsgBody)
+	client.clientLog.Infoln("reqMsgBody -", reqMsgBody)
 	c := &http.Client{}
 	httpend := client.ConfigPushUrl
 	req, err := http.NewRequest(http.MethodDelete, httpend, reqMsgBody)
@@ -710,7 +709,7 @@ func getAddedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 
 func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 	if len(client.slicesConfigClient) == 0 {
-		client.clientLog.Infoln("slice config not received yet, not pushing subscriber configuration to HSS.")
+		client.clientLog.Infoln("slice config not received yet")
 		return
 	}
 	client.clientLog.Infoln("postConfigHss API Enter")
@@ -837,10 +836,6 @@ func parseTrafficClass(traffic string) (int32, int32) {
 }
 
 func postConfigPcrf(client *clientNF) {
-	if len(client.slicesConfigClient) == 0 {
-		client.clientLog.Infoln("DeviceGroup config received, waiting for first slice config.")
-		return
-	}
 	client.clientLog.Infoln("postConfigPcrf API Enter")
 	config := configPcrf{}
 	config.Policies = &PcrfPolicies{
@@ -854,7 +849,7 @@ func postConfigPcrf(client *clientNF) {
 			continue
 		}
 		siteInfo := sliceConfig.SiteInfo
-		client.clientLog.Infof("Received Slice: %v, siteInfo: %v", sliceName, spew.Sdump(siteInfo))
+		client.clientLog.Infof("Slice: %v, siteInfo: %v", sliceName, spew.Sdump(siteInfo))
 		//apn profile
 		for _, d := range sliceConfig.SiteDeviceGroup {
 			devGroup := client.devgroupsConfigClient[d]
@@ -972,7 +967,7 @@ func postConfigPcrf(client *clientNF) {
 	}
 
 	reqMsgBody := bytes.NewBuffer(b)
-	client.clientLog.Debugln("PCRF reqMsgBody -", reqMsgBody)
+	//client.clientLog.Infoln("PCRF reqMsgBody -", reqMsgBody)
 	c := &http.Client{}
 	httpend := client.ConfigPushUrl
 	req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)
@@ -989,11 +984,7 @@ func postConfigPcrf(client *clientNF) {
 }
 
 func postConfigSpgw(client *clientNF) {
-	if len(client.slicesConfigClient) == 0 {
-		client.clientLog.Infoln("DeviceGroup config received, waiting for first slice config.")
-		return
-	}
-	client.clientLog.Infoln("postConfigSpgw API Enter")
+	client.clientLog.Infoln("Post configuration to spgw ", client.slicesConfigClient)
 	config := configSpgw{
 		ApnProfiles:       make(map[string]*apnProfile),
 		UserPlaneProfiles: make(map[string]*userPlaneProfile),
@@ -1005,7 +996,7 @@ func postConfigSpgw(client *clientNF) {
 			continue
 		}
 		siteInfo := sliceConfig.SiteInfo
-		client.clientLog.Infof("slice: %v, siteInfo.GNodeBs %v", sliceName, siteInfo.GNodeBs)
+		client.clientLog.Infoln("siteInfo.GNodeBs ", siteInfo.GNodeBs)
 		for _, d := range sliceConfig.SiteDeviceGroup {
 			devGroup := client.devgroupsConfigClient[d]
 			if devGroup == nil {
@@ -1065,7 +1056,7 @@ func postConfigSpgw(client *clientNF) {
 	}
 
 	reqMsgBody := bytes.NewBuffer(b)
-	client.clientLog.Debugln("spgw reqMsgBody -", reqMsgBody)
+	//client.clientLog.Infoln("spgw reqMsgBody -", reqMsgBody)
 	c := &http.Client{}
 	httpend := client.ConfigPushUrl
 	req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)

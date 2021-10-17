@@ -342,8 +342,9 @@ func PostSubscriberByID(c *gin.Context) {
 
 	var subsOverrideData configmodels.SubsOverrideData
 	if err := c.ShouldBindJSON(&subsOverrideData); err != nil {
-	    logger.WebUILog.Infoln("Post One Subscriber Data - panic")
-		logger.WebUILog.Panic(err.Error())
+		logger.WebUILog.Errorln("Post One Subscriber Data - ShouldBindJSON failed ", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	ueId := c.Param("ueId")

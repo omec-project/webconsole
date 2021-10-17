@@ -303,7 +303,7 @@ func fetchConfigAdapater() {
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		fmt.Printf("Message POST %v Success\n", resp.StatusCode)
+		fmt.Printf("Fetching config from simapp/roc. Response code = %d \n", resp.StatusCode)
 		break
 	}
 }

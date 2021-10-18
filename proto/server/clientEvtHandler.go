@@ -376,7 +376,7 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 			arpi = defaultQos.TrafficClass.Arp
 		} else {
 			var5qi = 9
-			arpi = 1
+			arpi = 0x7D
 		}
 
 		ruleQos.Var5Qi = int32(var5qi)
@@ -505,7 +505,7 @@ func clientEventMachine(client *clientNF) {
 					} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
 						for _, name := range lastSlice.SiteDeviceGroup {
 							if client.devgroupsConfigClient[name] != nil && !isDeviceGroupInExistingSlices(client, name) {
-								imsis := getDeletedImsiList(client.devgroupsConfigClient[name], nil)
+								imsis := deletedImsis(client.devgroupsConfigClient[name], nil)
 								for _, val := range imsis {
 									deleteConfigHss(client, val)
 								}
@@ -607,7 +607,6 @@ func postConfigMme(client *clientNF) {
 
 		//keys.ServingPlmn.Tac = gnb.Tac
 		plmn := "mcc=" + siteInfo.Plmn.Mcc + ", mnc=" + siteInfo.Plmn.Mnc
-
 		client.clientLog.Infof("plmn for mme %v", plmn)
 		config.PlmnList = append(config.PlmnList, plmn)
 	}
@@ -647,7 +646,7 @@ func deleteConfigHss(client *clientNF, imsi string) {
 
 	client.clientLog.Infof("Deleting SubscriptionData for imsi: %v from HSS", imsi)
 	reqMsgBody := bytes.NewBuffer(b)
-	//client.clientLog.Infoln("reqMsgBody -", reqMsgBody)
+	client.clientLog.Debugln("reqMsgBody -", reqMsgBody)
 	c := &http.Client{}
 	httpend := client.ConfigPushUrl
 	req, err := http.NewRequest(http.MethodDelete, httpend, reqMsgBody)
@@ -663,7 +662,7 @@ func deleteConfigHss(client *clientNF, imsi string) {
 	}
 }
 
-func getDeletedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
+func deletedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	if curr == nil {
 		if prev == nil {
 			return
@@ -689,7 +688,7 @@ func getDeletedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) 
 	return
 }
 
-func getAddedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
+func addedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	if curr == nil {
 		return
 	}
@@ -750,7 +749,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				//devGroup not exist in current but exist in lastSlice
 				devGroup := client.devgroupsConfigClient[oldG]
 				if !found && devGroup != nil && !isDeviceGroupInExistingSlices(client, oldG) {
-					imsis := getDeletedImsiList(devGroup, nil)
+					imsis := deletedImsis(devGroup, nil)
 					client.clientLog.Infoln("DeviceGroup Deleted from Slice: ", oldG)
 					for _, val := range imsis {
 						deleteConfigHss(client, val)
@@ -762,11 +761,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 		for _, d := range sliceConfig.SiteDeviceGroup {
 			devGroup := client.devgroupsConfigClient[d]
 			if devGroup == nil {
-				client.clientLog.Errorln("Device Group is deleted: ", d)
-				imsis := getDeletedImsiList(lastDevGroup, nil)
-				for _, val := range imsis {
-					deleteConfigHss(client, val)
-				}
+				client.clientLog.Errorf("Device Group [%v] is deleted but bound to slice [%v]: ", d, sliceName)
 				continue
 			}
 			config := configHss{
@@ -809,14 +804,16 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 			var newImsis []string
 			if lastDevGroup != nil && lastDevGroup == devGroup {
 				// imsi is not present in latest device Group
-				imsis := getDeletedImsiList(lastDevGroup, devGroup)
-				client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", imsis)
-				for _, val := range imsis {
+				delImsis := deletedImsis(lastDevGroup, devGroup)
+				client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", dImsis)
+				for _, val := range delImsis {
 					deleteConfigHss(client, val)
 				}
-				newImsis = getAddedImsiList(lastDevGroup, devGroup)
+				newImsis = addedImsis(lastDevGroup, devGroup)
 			} else {
-				newImsis = getAddedImsiList(nil, devGroup)
+				/* TODO: DG1 exist in slice. now DG2 added to the same slice, below code should hit only for DG2 but
+				it hits for DG1 also which lead to adding imsis exist in DG1 to Hss again */
+				newImsis = addedImsis(nil, devGroup)
 			}
 
 			for _, imsi := range newImsis {
@@ -956,7 +953,7 @@ func postConfigPcrf(client *clientNF) {
 					arpi = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Arp
 				} else {
 					ruleQInfo.Qci = 9
-					arpi = 1
+					arpi = 0x7D
 				}
 
 				ruleQInfo.Mbr_ul = app.AppMbrUplink

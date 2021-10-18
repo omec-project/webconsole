@@ -376,7 +376,7 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 			arpi = defaultQos.TrafficClass.Arp
 		} else {
 			var5qi = 9
-			arpi = 1
+			arpi = 0x7D
 		}
 
 		ruleQos.Var5Qi = int32(var5qi)
@@ -592,7 +592,6 @@ func postConfigMme(client *clientNF) {
 
 		//keys.ServingPlmn.Tac = gnb.Tac
 		plmn := "mcc=" + siteInfo.Plmn.Mcc + ", mnc=" + siteInfo.Plmn.Mnc
-
 		client.clientLog.Infof("plmn for mme %v", plmn)
 		config.PlmnList = append(config.PlmnList, plmn)
 	}
@@ -907,7 +906,7 @@ func postConfigPcrf(client *clientNF) {
 					arpi = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Arp
 				} else {
 					ruleQInfo.Qci = 9
-					arpi = 1
+					arpi = 0x7D
 				}
 
 				ruleQInfo.Mbr_ul = app.AppMbrUplink

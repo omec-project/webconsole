@@ -805,7 +805,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 			if lastDevGroup != nil && lastDevGroup == devGroup {
 				// imsi is not present in latest device Group
 				delImsis := deletedImsis(lastDevGroup, devGroup)
-				client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", dImsis)
+				client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", delImsis)
 				for _, val := range delImsis {
 					deleteConfigHss(client, val)
 				}

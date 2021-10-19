@@ -764,6 +764,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				client.clientLog.Errorf("Device Group [%v] is deleted but bound to slice [%v]: ", d, sliceName)
 				continue
 			}
+			client.clientLog.Infof("Processing DeviceGroup: %v in slice: [%v] ", devGroup, sliceName)
 			config := configHss{
 				ApnProfiles: make(map[string]*apnProfile),
 			}
@@ -795,7 +796,6 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				config.AmbrDl = sqos.Downlink
 			}
 
-			client.clientLog.Infoln("DeviceGroup ", devGroup)
 			var apnProf apnProfile
 			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
 			apnProfName := sliceName + "-apn"

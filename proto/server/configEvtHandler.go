@@ -80,9 +80,10 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		configLog.Infoln("Waiting for configuration event ")
 		select {
 		case configMsg := <-configMsgChan:
-			configLog.Debugf("Received configuration event %v ", configMsg)
+			//configLog.Infof("Received configuration event %v ", configMsg)
 			if configMsg.MsgType == configmodels.Sub_data {
 				imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
+				configLog.Infoln("Received imsi from config channel: ", imsiVal)
 				rwLock.Lock()
 				imsiData[imsiVal] = configMsg.AuthSubData
 				rwLock.Unlock()
@@ -102,6 +103,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 					configReceived <- true
 				}
 
+				//configLog.Infoln("Received msg from configApi package ", configMsg)
 				// update config snapshot
 				if configMsg.DevGroup != nil {
 					configLog.Infof("Received Device Group [%v] configuration from config channel", configMsg.DevGroupName)

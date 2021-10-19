@@ -6,9 +6,9 @@
 package configapi
 
 import (
-	"encoding/json"
 	"strings"
 
+	"github.com/free5gc/http_wrapper"
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -39,7 +39,7 @@ func DeviceGroupDeleteHandler(c *gin.Context) bool {
 	msg.MsgMethod = configmodels.Delete_op
 	msg.DevGroupName = groupName
 	configChannel <- &msg
-	configLog.Infof("Suuccessfully Added Device Group [%v] with delete_op to config channel.", groupName)
+	configLog.Infof("Successfully Added Device Group [%v] with delete_op to config channel.", groupName)
 	return true
 
 }
@@ -62,10 +62,9 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 		configLog.Infof(" err ", err)
 		return false
 	}
-	//configLog.Infof("Printing request full after binding : %v", request)
-	//req := http_wrapper.NewRequest(c.Request, request)
+	req := http_wrapper.NewRequest(c.Request, request)
 
-	/*configLog.Infof("Printing request full : %+v", req)
+	configLog.Infof("Printing Device Group [%v] : %+v", groupName, req)
 	configLog.Infof("params : %v", req.Params)
 	configLog.Infof("Header : %v", req.Header)
 	configLog.Infof("Query  : %v", req.Query)
@@ -74,31 +73,24 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 
 	procReq := req.Body.(configmodels.DeviceGroups)
 	ipdomain := procReq.IpDomainExpanded
-	configLog.Infof("Imsis.size : %v", len(procReq.Imsis))
+	configLog.Infof("Imsis.size : %v, Imsis: %v", len(procReq.Imsis), procReq.Imsis)
 
-	for i := 0; i < len(procReq.Imsis); i++ {
-		configLog.Infof("Imsis : %v", procReq.Imsis[i])
-	}
 	configLog.Infof("IP Domain Name : %v", procReq.IpDomainName)
-	configLog.Infof("IP Domain details %v", ipdomain)
+	configLog.Infof("IP Domain details : %v", ipdomain)
 	configLog.Infof("  dnn name : %v", ipdomain.Dnn)
 	configLog.Infof("  ue pool  : %v", ipdomain.UeIpPool)
 	configLog.Infof("  dns Primary : %v", ipdomain.DnsPrimary)
 	configLog.Infof("  dns Secondary : %v", ipdomain.DnsSecondary)
 	configLog.Infof("  ip mtu : %v", ipdomain.Mtu)
-	configLog.Infof("Group %v ", groupName)
-	*/
+	configLog.Infof("Device Group Name :  %v ", groupName)
+
 	var msg configmodels.ConfigMessage
 	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = msgOp
 	msg.DevGroup = &request
 	msg.DevGroupName = groupName
-	b, err := json.MarshalIndent(msg, "", "  ")
-	configLog.Infof("======== Device Group Msg Start========")
-	configLog.Infof(string(b))
-	configLog.Infof("======== Device Group Msg End========")
 	configChannel <- &msg
-	configLog.Infof("Suuccessfully Added Device Group [%v] to config channel.", groupName)
+	configLog.Infof("Successfully Added Device Group [%v] to config channel.", groupName)
 	return true
 }
 
@@ -113,7 +105,7 @@ func NetworkSliceDeleteHandler(c *gin.Context) bool {
 	msg.MsgType = configmodels.Network_slice
 	msg.SliceName = sliceName
 	configChannel <- &msg
-	configLog.Infof("Suuccessfully Added Device Group [%v] with delete_op to config channel.", sliceName)
+	configLog.Infof("Successfully Added Device Group [%v] with delete_op to config channel.", sliceName)
 	return true
 }
 
@@ -137,9 +129,9 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	}
 	//configLog.Infof("Printing request full after binding : %v ", request)
 
-	//req := http_wrapper.NewRequest(c.Request, request)
+	req := http_wrapper.NewRequest(c.Request, request)
 
-	/*configLog.Infof("Printing request full : %v", req)
+	configLog.Infof("Printing Slice: [%v] received from Roc/Simapp : %v", sliceName, request)
 	configLog.Infof("params : %v ", req.Params)
 	configLog.Infof("Header : %v ", req.Header)
 	configLog.Infof("Query  : %v ", req.Query)
@@ -198,18 +190,13 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("Site UPF : %v", site.Upf)
 	configLog.Infof("    upf-name : %v", site.Upf["upf-name"])
 	configLog.Infof("    upf-port : %v", site.Upf["upf-port"])
-	*/
 
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = msgOp
 	msg.MsgType = configmodels.Network_slice
 	msg.Slice = &request
 	msg.SliceName = sliceName
-	b, err := json.MarshalIndent(msg, "", "  ")
-	configLog.Infof("======== Slice Info Start========")
-	configLog.Infof(string(b))
-	configLog.Infof("======== Slice Info End========")
 	configChannel <- &msg
-	configLog.Infof("Suuccessfully Added Slice [%v] to config channel.", sliceName)
+	configLog.Infof("Successfully Added Slice [%v] to config channel.", sliceName)
 	return true
 }

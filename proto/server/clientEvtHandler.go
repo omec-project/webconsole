@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -377,7 +376,7 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 			arpi = defaultQos.TrafficClass.Arp
 		} else {
 			var5qi = 9
-			arpi = 1
+			arpi = 0x7D
 		}
 
 		ruleQos.Var5Qi = int32(var5qi)
@@ -444,7 +443,7 @@ func clientEventMachine(client *clientNF) {
 							client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
 							if client.id == "hss" {
 								rwLock.RLock()
-								postConfigHss(client, nil)
+								postConfigHss(client, nil, nil)
 								rwLock.RUnlock()
 							} else if client.id == "mme-app" || client.id == "mme-s1ap" {
 								postConfigMme(client)
@@ -460,6 +459,7 @@ func clientEventMachine(client *clientNF) {
 
 		case configMsg := <-client.outStandingPushConfig:
 			var lastDevGroup *configmodels.DeviceGroups
+			var lastSlice *configmodels.Slice
 
 			// update config snapshot
 			if configMsg.DevGroup != nil {
@@ -468,15 +468,17 @@ func clientEventMachine(client *clientNF) {
 				client.devgroupsConfigClient[configMsg.DevGroupName] = configMsg.DevGroup
 			} else if configMsg.DevGroupName != "" && configMsg.MsgMethod == configmodels.Delete_op {
 				lastDevGroup = client.devgroupsConfigClient[configMsg.DevGroupName]
-				client.clientLog.Debugf("Deleted device Group  %v ", configMsg.DevGroupName)
+				client.clientLog.Debugf("Received delete configuration for  Device Group: %v ", configMsg.DevGroupName)
 				delete(client.devgroupsConfigClient, configMsg.DevGroupName)
 			}
 
 			if configMsg.Slice != nil {
-				client.clientLog.Debugf("Received configuration for slice %v ", configMsg.SliceName)
+				lastSlice = client.slicesConfigClient[configMsg.SliceName]
+				client.clientLog.Infof("Received new configuration for slice %v ", configMsg.SliceName)
 				client.slicesConfigClient[configMsg.SliceName] = configMsg.Slice
 			} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
-				client.clientLog.Debugf("Deleted slice %v ", configMsg.SliceName)
+				lastSlice = client.slicesConfigClient[configMsg.SliceName]
+				client.clientLog.Debugf("Received delete configuration for Slice: %v ", configMsg.SliceName)
 				delete(client.slicesConfigClient, configMsg.SliceName)
 			}
 
@@ -496,26 +498,35 @@ func clientEventMachine(client *clientNF) {
 			if factory.WebUIConfig.Configuration.Mode5G == false {
 				//push config to 4G network functions
 				if client.id == "hss" {
-					client.clientLog.Debugf("Received configuration: %v", spew.Sdump(configMsg))
+					//client.clientLog.Debugf("Received configuration: %v", spew.Sdump(configMsg))
 					if configMsg.MsgType == configmodels.Sub_data && configMsg.MsgMethod == configmodels.Delete_op {
 						imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
 						deleteConfigHss(client, imsiVal)
+					} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
+						for _, name := range lastSlice.SiteDeviceGroup {
+							if client.devgroupsConfigClient[name] != nil && !isDeviceGroupInExistingSlices(client, name) {
+								imsis := deletedImsis(client.devgroupsConfigClient[name], nil)
+								for _, val := range imsis {
+									deleteConfigHss(client, val)
+								}
+							}
+						}
 					} else {
-						postConfigHss(client, lastDevGroup)
+						rwLock.RLock()
+						postConfigHss(client, lastDevGroup, lastSlice)
+						rwLock.RUnlock()
+
 					}
 				} else if client.id == "mme-app" || client.id == "mme-s1ap" {
 					if configMsg.Slice != nil || configMsg.DevGroup != nil {
-						client.clientLog.Debugf("Received configuration: %v", spew.Sdump(configMsg))
 						postConfigMme(client)
 					}
 				} else if client.id == "pcrf" {
 					if configMsg.Slice != nil || configMsg.DevGroup != nil {
-						client.clientLog.Debugf("Received configuration: %v", spew.Sdump(configMsg))
 						postConfigPcrf(client)
 					}
 				} else if client.id == "spgw" {
 					if configMsg.Slice != nil || configMsg.DevGroup != nil {
-						client.clientLog.Debugf("Received configuration: %v", spew.Sdump(configMsg))
 						postConfigSpgw(client)
 					}
 				}
@@ -584,6 +595,11 @@ func clientEventMachine(client *clientNF) {
 }
 
 func postConfigMme(client *clientNF) {
+	if len(client.slicesConfigClient) == 0 {
+		client.clientLog.Infoln("Not posting config to MME since number of slices: 0")
+		return
+	}
+
 	client.clientLog.Infoln("Post configuration to MME")
 	config := configMme{}
 
@@ -596,7 +612,6 @@ func postConfigMme(client *clientNF) {
 
 		//keys.ServingPlmn.Tac = gnb.Tac
 		plmn := "mcc=" + siteInfo.Plmn.Mcc + ", mnc=" + siteInfo.Plmn.Mnc
-
 		client.clientLog.Infof("plmn for mme %v", plmn)
 		config.PlmnList = append(config.PlmnList, plmn)
 	}
@@ -605,7 +620,6 @@ func postConfigMme(client *clientNF) {
 	if err != nil {
 		client.clientLog.Infoln("error in marshalling json -", err)
 	}
-	client.clientLog.Infoln(string(b))
 
 	reqMsgBody := bytes.NewBuffer(b)
 	client.clientLog.Debugln("mme reqMsgBody -", reqMsgBody)
@@ -632,9 +646,11 @@ func deleteConfigHss(client *clientNF, imsi string) {
 	client.clientLog.Infoln("HSS config ", config)
 	b, err := json.Marshal(config)
 	if err != nil {
-		client.clientLog.Infoln("error in marshalling json -", err)
+		client.clientLog.Errorln("error in marshalling json -", err)
+		return
 	}
 
+	client.clientLog.Infof("Deleting SubscriptionData for imsi: %v from HSS", imsi)
 	reqMsgBody := bytes.NewBuffer(b)
 	client.clientLog.Debugln("reqMsgBody -", reqMsgBody)
 	c := &http.Client{}
@@ -652,7 +668,7 @@ func deleteConfigHss(client *clientNF, imsi string) {
 	}
 }
 
-func getDeletedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
+func deletedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	if curr == nil {
 		if prev == nil {
 			return
@@ -682,7 +698,7 @@ func getDeletedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) 
 	return
 }
 
-func getAddedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
+func addedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	if curr == nil {
 		return
 	}
@@ -708,7 +724,19 @@ func getAddedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	return
 }
 
-func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
+func isDeviceGroupInExistingSlices(client *clientNF, name string) bool {
+	for _, sliceConfig := range client.slicesConfigClient {
+		for _, dg := range sliceConfig.SiteDeviceGroup {
+			if dg == name {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, lastSlice *configmodels.Slice) {
 	if len(client.slicesConfigClient) == 0 {
 		client.clientLog.Infoln("slice config not received yet, not pushing subscriber configuration to HSS.")
 		return
@@ -716,22 +744,34 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 	client.clientLog.Infoln("postConfigHss API Enter")
 
 	for sliceName, sliceConfig := range client.slicesConfigClient {
-		if sliceConfig == nil {
-			continue
+
+		/* handling of disable devicegroup in slice */
+		if lastSlice != nil && lastSlice.SliceId == sliceConfig.SliceId {
+			for _, oldG := range lastSlice.SiteDeviceGroup {
+				var found bool
+				// checking lastSlice.DevGroup is exist in current slice or not
+				for _, newG := range sliceConfig.SiteDeviceGroup {
+					if oldG == newG {
+						found = true
+					}
+				}
+
+				//devGroup not exist in current but exist in lastSlice
+				devGroup := client.devgroupsConfigClient[oldG]
+				if !found && devGroup != nil && !isDeviceGroupInExistingSlices(client, oldG) {
+					imsis := deletedImsis(devGroup, nil)
+					client.clientLog.Infoln("DeviceGroup Deleted from Slice: ", oldG)
+					for _, val := range imsis {
+						deleteConfigHss(client, val)
+					}
+				}
+			}
 		}
 
-		if len(sliceConfig.SiteDeviceGroup) == 0 {
-			client.clientLog.Infoln("DeviceGroup list is nil in slice: %v", sliceName)
-			continue
-		}
 		for _, d := range sliceConfig.SiteDeviceGroup {
 			devGroup := client.devgroupsConfigClient[d]
 			if devGroup == nil {
-				client.clientLog.Infoln("Device Group [%v] deleted from slice configuration: %v", d, sliceName)
-				imsis := getDeletedImsiList(lastDevGroup, nil)
-				for _, val := range imsis {
-					deleteConfigHss(client, val)
-				}
+				client.clientLog.Errorf("Device Group [%v] is deleted but bound to slice [%v]: ", d, sliceName)
 				continue
 			}
 			config := configHss{
@@ -771,15 +811,21 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 			apnProfName := sliceName + "-apn"
 			config.ApnProfiles[apnProfName] = &apnProf
 
-			dimsis := getDeletedImsiList(lastDevGroup, devGroup)
-			// imsi is not present in latest device Group
-			client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", dimsis)
-			for _, val := range dimsis {
-				deleteConfigHss(client, val)
+			var newImsis []string
+			if lastDevGroup != nil && lastDevGroup == devGroup {
+				// imsi is not present in latest device Group
+				delImsis := deletedImsis(lastDevGroup, devGroup)
+				client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", delImsis)
+				for _, val := range delImsis {
+					deleteConfigHss(client, val)
+				}
+				newImsis = addedImsis(lastDevGroup, devGroup)
+			} else {
+				/* TODO: DG1 exist in slice. now DG2 added to the same slice, below code should hit only for DG2 but
+				it hits for DG1 also which lead to adding imsis exist in DG1 to Hss again */
+				newImsis = addedImsis(nil, devGroup)
 			}
 
-			newImsis := getAddedImsiList(lastDevGroup, devGroup)
-			client.clientLog.Infoln("Added Imsi list in DeviceGroup: ", newImsis)
 			for _, imsi := range newImsis {
 				num, _ := strconv.ParseInt(imsi, 10, 64)
 				config.StartImsi = uint64(num)
@@ -793,10 +839,10 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 				config.Key = authSubsData.PermanentKey.PermanentKeyValue
 				num, _ = strconv.ParseInt(authSubsData.SequenceNumber, 10, 64)
 				config.Sqn = uint64(num)
-				client.clientLog.Infof("Imsi-%v config, Opc: %v, Key: %v, Sqn: %vto Hss", imsi, config.Opc, config.Key, config.Sqn)
+				client.clientLog.Infof("Adding SubscritionData for IMSI: %v in HSS ", imsi)
 				b, err := json.Marshal(config)
 				if err != nil {
-					client.clientLog.Infoln("error in marshalling json -", err)
+					client.clientLog.Errorln("error in marshalling json -", err)
 				}
 
 				reqMsgBody := bytes.NewBuffer(b)
@@ -853,13 +899,12 @@ func postConfigPcrf(client *clientNF) {
 		if sliceConfig == nil {
 			continue
 		}
-		siteInfo := sliceConfig.SiteInfo
-		client.clientLog.Infof("Received Slice: %v, siteInfo: %v", sliceName, spew.Sdump(siteInfo))
+		//siteInfo := sliceConfig.SiteInfo
 		//apn profile
 		for _, d := range sliceConfig.SiteDeviceGroup {
 			devGroup := client.devgroupsConfigClient[d]
 			if devGroup == nil {
-				client.clientLog.Errorln("Device Group doesn't exist: ", d)
+				client.clientLog.Errorf("Device Group : [%v] doesn't exist in slice [%v]: ", d, sliceName)
 				continue
 			}
 			//client.clientLog.Infoln("PCRF devgroup ", d)
@@ -920,7 +965,7 @@ func postConfigPcrf(client *clientNF) {
 					arpi = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Arp
 				} else {
 					ruleQInfo.Qci = 9
-					arpi = 1
+					arpi = 0x7D
 				}
 
 				ruleQInfo.Mbr_ul = app.AppMbrUplink
@@ -942,7 +987,6 @@ func postConfigPcrf(client *clientNF) {
 					ruleQInfo.ApnAmbrDl = sliceConfig.Qos.Downlink
 				}
 				arp := &arpInfo{}
-				arp.Priority = (arpi & 0x3c) >> 2
 				arp.PreEmptCap = (arpi & 0x40) >> 6
 				arp.PreEmpVulner = arpi & 0x1
 				ruleQInfo.Arp = arp

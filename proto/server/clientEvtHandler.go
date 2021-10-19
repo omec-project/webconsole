@@ -443,7 +443,7 @@ func clientEventMachine(client *clientNF) {
 							client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
 							if client.id == "hss" {
 								rwLock.RLock()
-								postConfigHss(client, nil)
+								postConfigHss(client, nil, nil)
 								rwLock.RUnlock()
 							} else if client.id == "mme-app" || client.id == "mme-s1ap" {
 								postConfigMme(client)
@@ -460,6 +460,7 @@ func clientEventMachine(client *clientNF) {
 		case configMsg := <-client.outStandingPushConfig:
 			client.clientLog.Infof("Received new configuration for Client %v ", configMsg)
 			var lastDevGroup *configmodels.DeviceGroups
+			var lastSlice *configmodels.Slice
 
 			// update config snapshot
 			if configMsg.DevGroup != nil {
@@ -473,9 +474,11 @@ func clientEventMachine(client *clientNF) {
 			}
 
 			if configMsg.Slice != nil {
+				lastSlice = client.slicesConfigClient[configMsg.SliceName]
 				client.clientLog.Infof("Received new configuration for slice %v ", configMsg.SliceName)
 				client.slicesConfigClient[configMsg.SliceName] = configMsg.Slice
 			} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
+				lastSlice = client.slicesConfigClient[configMsg.SliceName]
 				client.clientLog.Infof("Received delete configuration for slice %v ", configMsg.SliceName)
 				delete(client.slicesConfigClient, configMsg.SliceName)
 			}
@@ -499,8 +502,20 @@ func clientEventMachine(client *clientNF) {
 					if configMsg.MsgType == configmodels.Sub_data && configMsg.MsgMethod == configmodels.Delete_op {
 						imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
 						deleteConfigHss(client, imsiVal)
+					} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
+						for _, name := range lastSlice.SiteDeviceGroup {
+							if client.devgroupsConfigClient[name] != nil && !isDeviceGroupInExistingSlices(client, name) {
+								imsis := deletedImsis(client.devgroupsConfigClient[name], nil)
+								for _, val := range imsis {
+									deleteConfigHss(client, val)
+								}
+							}
+						}
 					} else {
-						postConfigHss(client, lastDevGroup)
+						rwLock.RLock()
+						postConfigHss(client, lastDevGroup, lastSlice)
+						rwLock.RUnlock()
+
 					}
 				} else if client.id == "mme-app" || client.id == "mme-s1ap" {
 					if configMsg.Slice != nil || configMsg.DevGroup != nil {
@@ -599,8 +614,6 @@ func postConfigMme(client *clientNF) {
 	b, err := json.Marshal(config)
 	if err != nil {
 		client.clientLog.Infoln("error in marshalling json -", err)
-	} else {
-		client.clientLog.Infoln("mme marshalling json -", b)
 	}
 	reqMsgBody := bytes.NewBuffer(b)
 	client.clientLog.Infoln("mme reqMsgBody -", reqMsgBody)
@@ -627,12 +640,13 @@ func deleteConfigHss(client *clientNF, imsi string) {
 	client.clientLog.Infoln("HSS config ", config)
 	b, err := json.Marshal(config)
 	if err != nil {
-		client.clientLog.Infoln("error in marshalling json -", err)
-	} else {
-		client.clientLog.Infoln("marshalling json -", b)
+		client.clientLog.Errorln("error in marshalling json -", err)
+		return
 	}
+
+	client.clientLog.Infof("Deleting SubscriptionData for imsi: %v from HSS", imsi)
 	reqMsgBody := bytes.NewBuffer(b)
-	client.clientLog.Infoln("reqMsgBody -", reqMsgBody)
+	client.clientLog.Debugln("reqMsgBody -", reqMsgBody)
 	c := &http.Client{}
 	httpend := client.ConfigPushUrl
 	req, err := http.NewRequest(http.MethodDelete, httpend, reqMsgBody)
@@ -648,7 +662,7 @@ func deleteConfigHss(client *clientNF, imsi string) {
 	}
 }
 
-func getDeletedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
+func deletedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	if curr == nil {
 		if prev == nil {
 			return
@@ -674,7 +688,7 @@ func getDeletedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) 
 	return
 }
 
-func getAddedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
+func addedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	if curr == nil {
 		return
 	}
@@ -700,7 +714,19 @@ func getAddedImsiList(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	return
 }
 
-func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
+func isDeviceGroupInExistingSlices(client *clientNF, name string) bool {
+	for _, sliceConfig := range client.slicesConfigClient {
+		for _, dg := range sliceConfig.SiteDeviceGroup {
+			if dg == name {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, lastSlice *configmodels.Slice) {
 	client.clientLog.Infoln("Post configuration to Hss")
 
 	for sliceName, sliceConfig := range client.slicesConfigClient {
@@ -709,14 +735,33 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 		}
 		client.clientLog.Infoln("SliceName ", sliceName)
 
+		/* handling of disable devicegroup in slice */
+		if lastSlice != nil && lastSlice.SliceId == sliceConfig.SliceId {
+			for _, oldG := range lastSlice.SiteDeviceGroup {
+				var found bool
+				// checking lastSlice.DevGroup is exist in current slice or not
+				for _, newG := range sliceConfig.SiteDeviceGroup {
+					if oldG == newG {
+						found = true
+					}
+				}
+
+				//devGroup not exist in current but exist in lastSlice
+				devGroup := client.devgroupsConfigClient[oldG]
+				if !found && devGroup != nil && !isDeviceGroupInExistingSlices(client, oldG) {
+					imsis := deletedImsis(devGroup, nil)
+					client.clientLog.Infoln("DeviceGroup Deleted from Slice: ", oldG)
+					for _, val := range imsis {
+						deleteConfigHss(client, val)
+					}
+				}
+			}
+		}
+
 		for _, d := range sliceConfig.SiteDeviceGroup {
 			devGroup := client.devgroupsConfigClient[d]
 			if devGroup == nil {
-				client.clientLog.Errorln("Device Group is deleted: ", d)
-				imsis := getDeletedImsiList(lastDevGroup, nil)
-				for _, val := range imsis {
-					deleteConfigHss(client, val)
-				}
+				client.clientLog.Errorf("Device Group [%v] is deleted but bound to slice [%v]: ", d, sliceName)
 				continue
 			}
 			config := configHss{
@@ -756,23 +801,26 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 			apnProfName := sliceName + "-apn"
 			config.ApnProfiles[apnProfName] = &apnProf
 
-			if lastDevGroup != nil {
+			var newImsis []string
+			if lastDevGroup != nil && lastDevGroup == devGroup {
 				// imsi is not present in latest device Group
-				imsis := getDeletedImsiList(lastDevGroup, devGroup)
-				client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", imsis)
-				for _, val := range imsis {
+				delImsis := deletedImsis(lastDevGroup, devGroup)
+				client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", dImsis)
+				for _, val := range delImsis {
 					deleteConfigHss(client, val)
 				}
+				newImsis = addedImsis(lastDevGroup, devGroup)
+			} else {
+				/* TODO: DG1 exist in slice. now DG2 added to the same slice, below code should hit only for DG2 but
+				it hits for DG1 also which lead to adding imsis exist in DG1 to Hss again */
+				newImsis = addedImsis(nil, devGroup)
 			}
-
-			newImsis := getAddedImsiList(lastDevGroup, devGroup)
 
 			for _, imsi := range newImsis {
 				num, _ := strconv.ParseInt(imsi, 10, 64)
 				config.StartImsi = uint64(num)
 				config.EndImsi = uint64(num)
 				authSubsData := imsiData[imsi]
-				client.clientLog.Infoln("imsiData ", imsiData)
 				if authSubsData == nil {
 					client.clientLog.Infoln("SIM card details not found for IMSI ", imsi)
 					continue
@@ -781,15 +829,14 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups) {
 				config.Key = authSubsData.PermanentKey.PermanentKeyValue
 				num, _ = strconv.ParseInt(authSubsData.SequenceNumber, 10, 64)
 				config.Sqn = uint64(num)
-				client.clientLog.Infoln("HSS config ", config)
+				client.clientLog.Infof("Adding SubscritionData for IMSI: %v in HSS ", imsi)
 				b, err := json.Marshal(config)
 				if err != nil {
-					client.clientLog.Infoln("error in marshalling json -", err)
-				} else {
-					client.clientLog.Infoln("marshalling json -", b)
+					client.clientLog.Errorln("error in marshalling json -", err)
 				}
+
 				reqMsgBody := bytes.NewBuffer(b)
-				client.clientLog.Infoln("reqMsgBody -", reqMsgBody)
+				//client.clientLog.Infoln("reqMsgBody -", reqMsgBody)
 				c := &http.Client{}
 				httpend := client.ConfigPushUrl
 				req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)
@@ -955,9 +1002,8 @@ func postConfigPcrf(client *clientNF) {
 	b, err := json.Marshal(config)
 	if err != nil {
 		client.clientLog.Infoln("PCRF error in marshalling json -", err)
-	} else {
-		client.clientLog.Infoln("PCRF marshalling json -", b)
 	}
+
 	reqMsgBody := bytes.NewBuffer(b)
 	client.clientLog.Infoln("PCRF reqMsgBody -", reqMsgBody)
 	c := &http.Client{}
@@ -1045,8 +1091,6 @@ func postConfigSpgw(client *clientNF) {
 	b, err := json.Marshal(config)
 	if err != nil {
 		client.clientLog.Infoln("error in marshalling json -", err)
-	} else {
-		client.clientLog.Infoln("spgw marshalling json -", b)
 	}
 	reqMsgBody := bytes.NewBuffer(b)
 	client.clientLog.Infoln("spgw reqMsgBody -", reqMsgBody)

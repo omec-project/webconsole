@@ -6,13 +6,13 @@
 package configapi
 
 import (
-	"strings"
-
 	"github.com/free5gc/http_wrapper"
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/sirupsen/logrus"
+	"math"
+	"strings"
 )
 
 var configChannel chan *configmodels.ConfigMessage
@@ -83,6 +83,16 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  dns Secondary : %v", ipdomain.DnsSecondary)
 	configLog.Infof("  ip mtu : %v", ipdomain.Mtu)
 	configLog.Infof("Device Group Name :  %v ", groupName)
+	if ipdomain.UeDnnQos != nil {
+		ipdomain.UeDnnQos.DnnMbrDownlink = ipdomain.UeDnnQos.DnnMbrDownlink * 1000000
+		if ipdomain.UeDnnQos.DnnMbrDownlink < 0 {
+			ipdomain.UeDnnQos.DnnMbrDownlink = math.MaxInt64
+		}
+		ipdomain.UeDnnQos.DnnMbrUplink = ipdomain.UeDnnQos.DnnMbrUplink * 1000000
+		if ipdomain.UeDnnQos.DnnMbrUplink < 0 {
+			ipdomain.UeDnnQos.DnnMbrUplink = math.MaxInt64
+		}
+	}
 
 	var msg configmodels.ConfigMessage
 	msg.MsgType = configmodels.Device_group
@@ -144,11 +154,19 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  sst         : %v", slice.Sst)
 	configLog.Infof("  sd          : %v", slice.Sd)
 
-	qos := procReq.Qos
-	configLog.Infof("Slice QoS   : %v", qos)
-	configLog.Infof("  uplink    : %v", qos.Uplink)
-	configLog.Infof("  downlink  : %v", qos.Downlink)
-	configLog.Infof("  traffic   : %v", qos.TrafficClass)
+	qos := &procReq.Qos
+	qos.Uplink = qos.Uplink * 1000000
+	if qos.Uplink < 0 {
+		qos.Uplink = math.MaxInt32
+	}
+	qos.Downlink = qos.Downlink * 1000000
+	if qos.Downlink < 0 {
+		qos.Downlink = math.MaxInt32
+	}
+	configLog.Infof("Slice QoS ")
+	configLog.Infof("  uplink bps    : %v", qos.Uplink)
+	configLog.Infof("  downlink bps  : %v", qos.Downlink)
+	configLog.Infof("  traffic       : %v", qos.TrafficClass)
 
 	group := procReq.SiteDeviceGroup
 	configLog.Infof("Number of device groups %v", len(group))
@@ -156,27 +174,57 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		configLog.Infof("  device groups(%v) - %v \n", i+1, group[i])
 	}
 	denylist := procReq.DenyApplications
-	configLog.Infof("Number of denied applications %v", len(denylist))
-	for d := 0; d < len(denylist); d++ {
-		configLog.Infof("    deny application %v", denylist[d])
+	if len(denylist) > 0 {
+		configLog.Infof("Number of denied applications %v", len(denylist))
+		for _, d := range(denylist) {
+			configLog.Infof("    deny application %v", d)
+		}
 	}
 	permitlist := procReq.PermitApplications
-	configLog.Infof("Number of permit applications %v", len(permitlist))
-	for p := 0; p < len(permitlist); p++ {
-		configLog.Infof("    permit application %v", permitlist[p])
+	if len(permitlist) > 0 {
+		configLog.Infof("Number of permit applications %v", len(permitlist))
+		for _, p := range(permitlist) {
+			configLog.Infof("    permit application %v", p)
+		}
 	}
 
 	appinfo := procReq.ApplicationsInformation
-	configLog.Infof("Length Application information %v", len(appinfo))
-	for a := 0; a < len(appinfo); a++ {
-		app := appinfo[a]
-		configLog.Infof("    appname   : %v", app.AppName)
-		configLog.Infof("    endpoint  : %v ", app.Endpoint)
-		configLog.Infof("    startPort : %v", app.StartPort)
-		configLog.Infof("    endPort   : %v", app.EndPort)
-		configLog.Infof("    protocol  : %v", app.Protocol)
+	if len(appinfo) > 0 {
+		configLog.Infof("Length Application information %v", len(appinfo))
+		for a := 0; a < len(appinfo); a++ {
+			app := appinfo[a]
+			configLog.Infof("    appname   : %v", app.AppName)
+			configLog.Infof("    endpoint  : %v ", app.Endpoint)
+			configLog.Infof("    startPort : %v", app.StartPort)
+			configLog.Infof("    endPort   : %v", app.EndPort)
+			configLog.Infof("    protocol  : %v", app.Protocol)
+		}
 	}
 
+	appFilterInfo := procReq.ApplicationFilteringRules
+	for _, filter := range appFilterInfo {
+		configLog.Infof("\tRule Name        : %v", filter.RuleName)
+		configLog.Infof("\tRule Priority    : %v", filter.Priority)
+		configLog.Infof("\tRule Action      : %v", filter.Action)
+		configLog.Infof("\tEndpoint         : %v", filter.Endpoint)
+		configLog.Infof("\tProtocol         : %v", filter.Protocol)
+		configLog.Infof("\tStart Port       : %v", filter.StartPort)
+		configLog.Infof("\tEnd   Port       : %v", filter.EndPort)
+		filter.AppMbrUplink = filter.AppMbrUplink * 1000000
+		if filter.AppMbrUplink < 0 {
+			filter.AppMbrUplink = math.MaxInt32
+		}
+		filter.AppMbrDownlink = filter.AppMbrDownlink * 1000000
+		if filter.AppMbrDownlink < 0 {
+			filter.AppMbrDownlink = math.MaxInt32
+		}
+
+		configLog.Infof("\tApp MBR Uplink   : %v", filter.AppMbrUplink)
+		configLog.Infof("\tApp MBR Downlink : %v", filter.AppMbrDownlink)
+		if filter.TrafficClass != nil {
+			configLog.Infof("\t\tTraffic Class : %v", filter.TrafficClass)
+		}
+	}
 	site := procReq.SiteInfo
 	configLog.Infof("Site name : %v", site.SiteName)
 	configLog.Infof("Site PLMN : %v", site.Plmn)

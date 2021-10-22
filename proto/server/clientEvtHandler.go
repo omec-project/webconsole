@@ -987,6 +987,7 @@ func postConfigPcrf(client *clientNF) {
 					ruleQInfo.ApnAmbrDl = sliceConfig.Qos.Downlink
 				}
 				arp := &arpInfo{}
+				arp.Priority = int32((arpi & 0x3c) >> 2)
 				arp.PreEmptCap = (arpi & 0x40) >> 6
 				arp.PreEmpVulner = arpi & 0x1
 				ruleQInfo.Arp = arp

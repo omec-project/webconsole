@@ -72,7 +72,7 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("URL : %v ", req.URL)
 
 	procReq := req.Body.(configmodels.DeviceGroups)
-	ipdomain := procReq.IpDomainExpanded
+	ipdomain := &procReq.IpDomainExpanded
 	configLog.Infof("Imsis.size : %v, Imsis: %v", len(procReq.Imsis), procReq.Imsis)
 
 	configLog.Infof("IP Domain Name : %v", procReq.IpDomainName)
@@ -97,7 +97,7 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	var msg configmodels.ConfigMessage
 	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = msgOp
-	msg.DevGroup = &request
+	msg.DevGroup = &procReq
 	msg.DevGroupName = groupName
 	configChannel <- &msg
 	configLog.Infof("Successfully Added Device Group [%v] to config channel.", groupName)
@@ -201,8 +201,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		}
 	}
 
-	appFilterInfo := procReq.ApplicationFilteringRules
-	for _, filter := range appFilterInfo {
+	for index, filter := range procReq.ApplicationFilteringRules {
 		configLog.Infof("\tRule Name        : %v", filter.RuleName)
 		configLog.Infof("\tRule Priority    : %v", filter.Priority)
 		configLog.Infof("\tRule Action      : %v", filter.Action)
@@ -210,17 +209,17 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		configLog.Infof("\tProtocol         : %v", filter.Protocol)
 		configLog.Infof("\tStart Port       : %v", filter.StartPort)
 		configLog.Infof("\tEnd   Port       : %v", filter.EndPort)
-		filter.AppMbrUplink = filter.AppMbrUplink * 1000000
-		if filter.AppMbrUplink < 0 {
-			filter.AppMbrUplink = math.MaxInt32
+		procReq.ApplicationFilteringRules[index].AppMbrUplink = procReq.ApplicationFilteringRules[index].AppMbrUplink * 1000000
+		if procReq.ApplicationFilteringRules[index].AppMbrUplink < 0 {
+			procReq.ApplicationFilteringRules[index].AppMbrUplink = math.MaxInt32
 		}
-		filter.AppMbrDownlink = filter.AppMbrDownlink * 1000000
-		if filter.AppMbrDownlink < 0 {
-			filter.AppMbrDownlink = math.MaxInt32
+		procReq.ApplicationFilteringRules[index].AppMbrDownlink = procReq.ApplicationFilteringRules[index].AppMbrDownlink * 1000000
+		if procReq.ApplicationFilteringRules[index].AppMbrDownlink < 0 {
+			procReq.ApplicationFilteringRules[index].AppMbrDownlink = math.MaxInt32
 		}
 
-		configLog.Infof("\tApp MBR Uplink   : %v", filter.AppMbrUplink)
-		configLog.Infof("\tApp MBR Downlink : %v", filter.AppMbrDownlink)
+		configLog.Infof("\tApp MBR Uplink   : %v", procReq.ApplicationFilteringRules[index].AppMbrUplink)
+		configLog.Infof("\tApp MBR Downlink : %v", procReq.ApplicationFilteringRules[index].AppMbrDownlink)
 		if filter.TrafficClass != nil {
 			configLog.Infof("\t\tTraffic Class : %v", filter.TrafficClass)
 		}
@@ -242,7 +241,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = msgOp
 	msg.MsgType = configmodels.Network_slice
-	msg.Slice = &request
+	msg.Slice = &procReq
 	msg.SliceName = sliceName
 	configChannel <- &msg
 	configLog.Infof("Successfully Added Slice [%v] to config channel.", sliceName)

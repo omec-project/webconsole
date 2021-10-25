@@ -812,7 +812,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 			config.ApnProfiles[apnProfName] = &apnProf
 
 			var newImsis []string
-			if lastDevGroup != nil && lastDevGroup == devGroup {
+			if lastDevGroup != nil && lastDevGroup.DeviceGroupName == devGroup.DeviceGroupName {
 				// imsi is not present in latest device Group
 				delImsis := deletedImsis(lastDevGroup, devGroup)
 				client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", delImsis)

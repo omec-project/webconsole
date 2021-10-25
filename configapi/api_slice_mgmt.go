@@ -95,6 +95,7 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	}
 
 	var msg configmodels.ConfigMessage
+	msg.DevGroupName = groupName
 	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = msgOp
 	msg.DevGroup = &procReq
@@ -240,6 +241,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = msgOp
+	msg.SliceName = sliceName
 	msg.MsgType = configmodels.Network_slice
 	msg.Slice = &procReq
 	msg.SliceName = sliceName

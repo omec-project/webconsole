@@ -478,7 +478,7 @@ func clientEventMachine(client *clientNF) {
 				client.slicesConfigClient[configMsg.SliceName] = configMsg.Slice
 			} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
 				lastSlice = client.slicesConfigClient[configMsg.SliceName]
-				client.clientLog.Debugf("Received delete configuration for Slice: %v ", configMsg.SliceName)
+				client.clientLog.Infof("Received delete configuration for Slice: %v ", configMsg.SliceName)
 				delete(client.slicesConfigClient, configMsg.SliceName)
 			}
 
@@ -518,15 +518,15 @@ func clientEventMachine(client *clientNF) {
 
 					}
 				} else if client.id == "mme-app" || client.id == "mme-s1ap" {
-					if configMsg.Slice != nil || configMsg.DevGroup != nil {
+					if (configMsg.SliceName != "") || (configMsg.DevGroupName != "") {
 						postConfigMme(client)
 					}
 				} else if client.id == "pcrf" {
-					if configMsg.Slice != nil || configMsg.DevGroup != nil {
+					if (configMsg.SliceName != "") || (configMsg.DevGroupName != "") {
 						postConfigPcrf(client)
 					}
 				} else if client.id == "spgw" {
-					if configMsg.Slice != nil || configMsg.DevGroup != nil {
+					if (configMsg.SliceName != "") || (configMsg.DevGroupName != "") {
 						postConfigSpgw(client)
 					}
 				}

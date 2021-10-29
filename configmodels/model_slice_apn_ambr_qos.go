@@ -15,7 +15,7 @@
 package configmodels
 
 type ApnAmbrQosInfo struct {
-	Uplink       int32    `json:"uplink-mbr,omitempty"`
-	Downlink     int32    `json:"downlink-mbr,omitempty"`
+	Uplink       int32  `json:"uplink-mbr,omitempty"`
+	Downlink     int32  `json:"downlink-mbr,omitempty"`
 	TrafficClass string `json:"traffic-class,omitempty"`
 }

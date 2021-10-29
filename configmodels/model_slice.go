@@ -15,6 +15,8 @@
 package configmodels
 
 type Slice struct {
+	SliceName string `json:slice-name,omitempty"`
+
 	SliceId SliceSliceId `json:"slice-id,omitempty"`
 
 	Qos SliceQos `json:"qos,omitempty"`

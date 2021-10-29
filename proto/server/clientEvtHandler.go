@@ -782,6 +782,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				client.clientLog.Errorf("Device Group [%v] is deleted but bound to slice [%v]: ", d, sliceName)
 				continue
 			}
+			client.clientLog.Infof("Processing DeviceGroup: %v in slice: [%v] ", devGroup, sliceName)
 			config := configHss{
 				ApnProfiles: make(map[string]*apnProfile),
 			}
@@ -813,14 +814,13 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				config.AmbrDl = sqos.Downlink
 			}
 
-			client.clientLog.Infoln("DeviceGroup ", devGroup)
 			var apnProf apnProfile
 			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
 			apnProfName := sliceName + "-apn"
 			config.ApnProfiles[apnProfName] = &apnProf
 
 			var newImsis []string
-			if lastDevGroup != nil && lastDevGroup == devGroup {
+			if lastDevGroup != nil && lastDevGroup.DeviceGroupName == devGroup.DeviceGroupName {
 				// imsi is not present in latest device Group
 				delImsis := deletedImsis(lastDevGroup, devGroup)
 				client.clientLog.Infoln("Deleted Imsi list from DeviceGroup: ", delImsis)
@@ -995,6 +995,7 @@ func postConfigPcrf(client *clientNF) {
 					ruleQInfo.ApnAmbrDl = sliceConfig.Qos.Downlink
 				}
 				arp := &arpInfo{}
+				arp.Priority = int32((arpi & 0x3c) >> 2)
 				arp.PreEmptCap = (arpi & 0x40) >> 6
 				arp.PreEmpVulner = arpi & 0x1
 				ruleQInfo.Arp = arp

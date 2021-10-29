@@ -6,13 +6,13 @@
 package configapi
 
 import (
-	"strings"
-
 	"github.com/free5gc/http_wrapper"
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/sirupsen/logrus"
+	"math"
+	"strings"
 )
 
 var configChannel chan *configmodels.ConfigMessage
@@ -72,7 +72,7 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("URL : %v ", req.URL)
 
 	procReq := req.Body.(configmodels.DeviceGroups)
-	ipdomain := procReq.IpDomainExpanded
+	ipdomain := &procReq.IpDomainExpanded
 	configLog.Infof("Imsis.size : %v, Imsis: %v", len(procReq.Imsis), procReq.Imsis)
 
 	configLog.Infof("IP Domain Name : %v", procReq.IpDomainName)
@@ -83,11 +83,22 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  dns Secondary : %v", ipdomain.DnsSecondary)
 	configLog.Infof("  ip mtu : %v", ipdomain.Mtu)
 	configLog.Infof("Device Group Name :  %v ", groupName)
+	if ipdomain.UeDnnQos != nil {
+		ipdomain.UeDnnQos.DnnMbrDownlink = ipdomain.UeDnnQos.DnnMbrDownlink * 1000000
+		if ipdomain.UeDnnQos.DnnMbrDownlink < 0 {
+			ipdomain.UeDnnQos.DnnMbrDownlink = math.MaxInt64
+		}
+		ipdomain.UeDnnQos.DnnMbrUplink = ipdomain.UeDnnQos.DnnMbrUplink * 1000000
+		if ipdomain.UeDnnQos.DnnMbrUplink < 0 {
+			ipdomain.UeDnnQos.DnnMbrUplink = math.MaxInt64
+		}
+	}
 
 	var msg configmodels.ConfigMessage
+	msg.DevGroupName = groupName
 	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = msgOp
-	msg.DevGroup = &request
+	msg.DevGroup = &procReq
 	msg.DevGroupName = groupName
 	configChannel <- &msg
 	configLog.Infof("Successfully Added Device Group [%v] to config channel.", groupName)
@@ -144,11 +155,19 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  sst         : %v", slice.Sst)
 	configLog.Infof("  sd          : %v", slice.Sd)
 
-	qos := procReq.Qos
-	configLog.Infof("Slice QoS   : %v", qos)
-	configLog.Infof("  uplink    : %v", qos.Uplink)
-	configLog.Infof("  downlink  : %v", qos.Downlink)
-	configLog.Infof("  traffic   : %v", qos.TrafficClass)
+	qos := &procReq.Qos
+	qos.Uplink = qos.Uplink * 1000000
+	if qos.Uplink < 0 {
+		qos.Uplink = math.MaxInt32
+	}
+	qos.Downlink = qos.Downlink * 1000000
+	if qos.Downlink < 0 {
+		qos.Downlink = math.MaxInt32
+	}
+	configLog.Infof("Slice QoS ")
+	configLog.Infof("  uplink bps    : %v", qos.Uplink)
+	configLog.Infof("  downlink bps  : %v", qos.Downlink)
+	configLog.Infof("  traffic       : %v", qos.TrafficClass)
 
 	group := procReq.SiteDeviceGroup
 	configLog.Infof("Number of device groups %v", len(group))
@@ -156,27 +175,56 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		configLog.Infof("  device groups(%v) - %v \n", i+1, group[i])
 	}
 	denylist := procReq.DenyApplications
-	configLog.Infof("Number of denied applications %v", len(denylist))
-	for d := 0; d < len(denylist); d++ {
-		configLog.Infof("    deny application %v", denylist[d])
+	if len(denylist) > 0 {
+		configLog.Infof("Number of denied applications %v", len(denylist))
+		for _, d := range(denylist) {
+			configLog.Infof("    deny application %v", d)
+		}
 	}
 	permitlist := procReq.PermitApplications
-	configLog.Infof("Number of permit applications %v", len(permitlist))
-	for p := 0; p < len(permitlist); p++ {
-		configLog.Infof("    permit application %v", permitlist[p])
+	if len(permitlist) > 0 {
+		configLog.Infof("Number of permit applications %v", len(permitlist))
+		for _, p := range(permitlist) {
+			configLog.Infof("    permit application %v", p)
+		}
 	}
 
 	appinfo := procReq.ApplicationsInformation
-	configLog.Infof("Length Application information %v", len(appinfo))
-	for a := 0; a < len(appinfo); a++ {
-		app := appinfo[a]
-		configLog.Infof("    appname   : %v", app.AppName)
-		configLog.Infof("    endpoint  : %v ", app.Endpoint)
-		configLog.Infof("    startPort : %v", app.StartPort)
-		configLog.Infof("    endPort   : %v", app.EndPort)
-		configLog.Infof("    protocol  : %v", app.Protocol)
+	if len(appinfo) > 0 {
+		configLog.Infof("Length Application information %v", len(appinfo))
+		for a := 0; a < len(appinfo); a++ {
+			app := appinfo[a]
+			configLog.Infof("    appname   : %v", app.AppName)
+			configLog.Infof("    endpoint  : %v ", app.Endpoint)
+			configLog.Infof("    startPort : %v", app.StartPort)
+			configLog.Infof("    endPort   : %v", app.EndPort)
+			configLog.Infof("    protocol  : %v", app.Protocol)
+		}
 	}
 
+	for index, filter := range procReq.ApplicationFilteringRules {
+		configLog.Infof("\tRule Name        : %v", filter.RuleName)
+		configLog.Infof("\tRule Priority    : %v", filter.Priority)
+		configLog.Infof("\tRule Action      : %v", filter.Action)
+		configLog.Infof("\tEndpoint         : %v", filter.Endpoint)
+		configLog.Infof("\tProtocol         : %v", filter.Protocol)
+		configLog.Infof("\tStart Port       : %v", filter.StartPort)
+		configLog.Infof("\tEnd   Port       : %v", filter.EndPort)
+		procReq.ApplicationFilteringRules[index].AppMbrUplink = procReq.ApplicationFilteringRules[index].AppMbrUplink * 1000000
+		if procReq.ApplicationFilteringRules[index].AppMbrUplink < 0 {
+			procReq.ApplicationFilteringRules[index].AppMbrUplink = math.MaxInt32
+		}
+		procReq.ApplicationFilteringRules[index].AppMbrDownlink = procReq.ApplicationFilteringRules[index].AppMbrDownlink * 1000000
+		if procReq.ApplicationFilteringRules[index].AppMbrDownlink < 0 {
+			procReq.ApplicationFilteringRules[index].AppMbrDownlink = math.MaxInt32
+		}
+
+		configLog.Infof("\tApp MBR Uplink   : %v", procReq.ApplicationFilteringRules[index].AppMbrUplink)
+		configLog.Infof("\tApp MBR Downlink : %v", procReq.ApplicationFilteringRules[index].AppMbrDownlink)
+		if filter.TrafficClass != nil {
+			configLog.Infof("\t\tTraffic Class : %v", filter.TrafficClass)
+		}
+	}
 	site := procReq.SiteInfo
 	configLog.Infof("Site name : %v", site.SiteName)
 	configLog.Infof("Site PLMN : %v", site.Plmn)
@@ -193,8 +241,9 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = msgOp
+	msg.SliceName = sliceName
 	msg.MsgType = configmodels.Network_slice
-	msg.Slice = &request
+	msg.Slice = &procReq
 	msg.SliceName = sliceName
 	configChannel <- &msg
 	configLog.Infof("Successfully Added Slice [%v] to config channel.", sliceName)

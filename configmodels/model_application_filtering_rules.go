@@ -37,9 +37,12 @@ type SliceApplicationFilteringRules struct {
 	// port range end
 	EndPort int32 `json:"end-port,omitempty"`
 
-	AppMbrUplink int32 `json:"app-mbr-uplink,omitempty"`
+	AppMbrUplink int64 `json:"app-mbr-uplink,omitempty"`
 
-	AppMbrDownlink int32 `json:"app-mbr-downlink,omitempty"`
+	AppMbrDownlink int64 `json:"app-mbr-downlink,omitempty"`
+
+	// data rate unit for uplink and downlink
+	BitrateUnit string `json:"bitrate-unit,omitempty"`
 
 	TrafficClass *TrafficClassInfo `json:"traffic-class,omitempty"`
 

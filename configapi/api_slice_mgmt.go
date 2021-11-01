@@ -6,13 +6,14 @@
 package configapi
 
 import (
+	"math"
+	"strings"
+
 	"github.com/free5gc/http_wrapper"
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/sirupsen/logrus"
-	"math"
-	"strings"
 )
 
 var configChannel chan *configmodels.ConfigMessage
@@ -84,11 +85,23 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  ip mtu : %v", ipdomain.Mtu)
 	configLog.Infof("Device Group Name :  %v ", groupName)
 	if ipdomain.UeDnnQos != nil {
-		ipdomain.UeDnnQos.DnnMbrDownlink = ipdomain.UeDnnQos.DnnMbrDownlink * 1000000
+		var bitrate int64
+		if strings.EqualFold(ipdomain.UeDnnQos.BitrateUnit, "kbps") {
+			bitrate = 1000
+		} else if strings.EqualFold(ipdomain.UeDnnQos.BitrateUnit, "mbps") {
+			bitrate = 1000 * 1000
+		} else if strings.EqualFold(ipdomain.UeDnnQos.BitrateUnit, "gbps") {
+			bitrate = 1000 * 1000 * 1000
+		} else {
+			// default consider it as mbps
+			bitrate = 1000 * 1000
+		}
+
+		ipdomain.UeDnnQos.DnnMbrDownlink = ipdomain.UeDnnQos.DnnMbrDownlink * bitrate
 		if ipdomain.UeDnnQos.DnnMbrDownlink < 0 {
 			ipdomain.UeDnnQos.DnnMbrDownlink = math.MaxInt64
 		}
-		ipdomain.UeDnnQos.DnnMbrUplink = ipdomain.UeDnnQos.DnnMbrUplink * 1000000
+		ipdomain.UeDnnQos.DnnMbrUplink = ipdomain.UeDnnQos.DnnMbrUplink * bitrate
 		if ipdomain.UeDnnQos.DnnMbrUplink < 0 {
 			ipdomain.UeDnnQos.DnnMbrUplink = math.MaxInt64
 		}
@@ -156,11 +169,22 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  sd          : %v", slice.Sd)
 
 	qos := &procReq.Qos
-	qos.Uplink = qos.Uplink * 1000000
+	var bitrate int64
+	if strings.EqualFold(qos.BitrateUnit, "kbps") {
+		bitrate = 1000
+	} else if strings.EqualFold(qos.BitrateUnit, "mbps") {
+		bitrate = 1000 * 1000
+	} else if strings.EqualFold(qos.BitrateUnit, "gbps") {
+		bitrate = 1000 * 1000 * 1000
+	} else {
+		// default consider it as mbps
+		bitrate = 1000 * 1000
+	}
+	qos.Uplink = qos.Uplink * bitrate
 	if qos.Uplink < 0 {
 		qos.Uplink = math.MaxInt32
 	}
-	qos.Downlink = qos.Downlink * 1000000
+	qos.Downlink = qos.Downlink * bitrate
 	if qos.Downlink < 0 {
 		qos.Downlink = math.MaxInt32
 	}
@@ -177,14 +201,14 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	denylist := procReq.DenyApplications
 	if len(denylist) > 0 {
 		configLog.Infof("Number of denied applications %v", len(denylist))
-		for _, d := range(denylist) {
+		for _, d := range denylist {
 			configLog.Infof("    deny application %v", d)
 		}
 	}
 	permitlist := procReq.PermitApplications
 	if len(permitlist) > 0 {
 		configLog.Infof("Number of permit applications %v", len(permitlist))
-		for _, p := range(permitlist) {
+		for _, p := range permitlist {
 			configLog.Infof("    permit application %v", p)
 		}
 	}
@@ -210,13 +234,27 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		configLog.Infof("\tProtocol         : %v", filter.Protocol)
 		configLog.Infof("\tStart Port       : %v", filter.StartPort)
 		configLog.Infof("\tEnd   Port       : %v", filter.EndPort)
-		procReq.ApplicationFilteringRules[index].AppMbrUplink = procReq.ApplicationFilteringRules[index].AppMbrUplink * 1000000
-		if procReq.ApplicationFilteringRules[index].AppMbrUplink < 0 {
-			procReq.ApplicationFilteringRules[index].AppMbrUplink = math.MaxInt32
+		ul := procReq.ApplicationFilteringRules[index].AppMbrUplink
+		dl := procReq.ApplicationFilteringRules[index].AppMbrDownlink
+		unit := procReq.ApplicationFilteringRules[index].BitrateUnit
+		var bitrate int64
+		if strings.EqualFold(unit, "kbps") {
+			bitrate = 1000
+		} else if strings.EqualFold(unit, "mbps") {
+			bitrate = 1000 * 1000
+		} else if strings.EqualFold(unit, "gbps") {
+			bitrate = 1000 * 1000 * 1000
+		} else {
+			// default consider it as mbps
+			bitrate = 1000 * 1000
 		}
-		procReq.ApplicationFilteringRules[index].AppMbrDownlink = procReq.ApplicationFilteringRules[index].AppMbrDownlink * 1000000
-		if procReq.ApplicationFilteringRules[index].AppMbrDownlink < 0 {
-			procReq.ApplicationFilteringRules[index].AppMbrDownlink = math.MaxInt32
+		procReq.ApplicationFilteringRules[index].AppMbrUplink = ul * bitrate
+		if ul < 0 {
+			procReq.ApplicationFilteringRules[index].AppMbrUplink = math.MaxInt64
+		}
+		procReq.ApplicationFilteringRules[index].AppMbrDownlink = dl * bitrate
+		if dl < 0 {
+			procReq.ApplicationFilteringRules[index].AppMbrDownlink = math.MaxInt64
 		}
 
 		configLog.Infof("\tApp MBR Uplink   : %v", procReq.ApplicationFilteringRules[index].AppMbrUplink)

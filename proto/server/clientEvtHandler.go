@@ -136,13 +136,13 @@ type arpInfo struct {
 
 type ruleQosInfo struct {
 	Qci       int32    `json:"QoS-Class-Identifier,omitempty"`
-	Mbr_ul    int32    `json:"Max-Requested-Bandwidth-UL,omitempty"`
-	Mbr_dl    int32    `json:"Max-Requested-Bandwidth-DL,omitempty"`
-	Gbr_ul    int32    `json:"Guaranteed-Bitrate-UL,omitempty"`
-	Gbr_dl    int32    `json:"Guaranteed-Bitrate-DL,omitempty"`
+	Mbr_ul    int64    `json:"Max-Requested-Bandwidth-UL,omitempty"`
+	Mbr_dl    int64    `json:"Max-Requested-Bandwidth-DL,omitempty"`
+	Gbr_ul    int64    `json:"Guaranteed-Bitrate-UL,omitempty"`
+	Gbr_dl    int64    `json:"Guaranteed-Bitrate-DL,omitempty"`
 	Arp       *arpInfo `json:"Allocation-Retention-Priority,omitempty"`
-	ApnAmbrUl int32    `json:"APN-Aggregate-Max-Bitrate-UL,omitempty"`
-	ApnAmbrDl int32    `json:"APN-Aggregate-Max-Bitrate-DL,omitempty"`
+	ApnAmbrUl int64    `json:"APN-Aggregate-Max-Bitrate-UL,omitempty"`
+	ApnAmbrDl int64    `json:"APN-Aggregate-Max-Bitrate-DL,omitempty"`
 }
 
 type pcrfRuledef struct {
@@ -311,14 +311,14 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 		if devGroupConfig.IpDomainExpanded.UeDnnQos != nil && devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
 			qos.Uplink = int32(devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrUplink)
 		} else {
-			qos.Uplink = sliceConf.Qos.Uplink
+			qos.Uplink = int32(sliceConf.Qos.Uplink)
 		}
 
 		//DL
 		if devGroupConfig.IpDomainExpanded.UeDnnQos != nil && devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
 			qos.Downlink = int32(devGroupConfig.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)
 		} else {
-			qos.Downlink = sliceConf.Qos.Downlink
+			qos.Downlink = int32(sliceConf.Qos.Downlink)
 		}
 
 		//Traffic Class
@@ -361,8 +361,8 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 
 		//Qos Info
 		ruleQos := protos.PccRuleQos{}
-		ruleQos.MaxbrUl = ruleConfig.AppMbrUplink
-		ruleQos.MaxbrDl = ruleConfig.AppMbrDownlink
+		ruleQos.MaxbrUl = int32(ruleConfig.AppMbrUplink)
+		ruleQos.MaxbrDl = int32(ruleConfig.AppMbrDownlink)
 		ruleQos.GbrUl = 0
 		ruleQos.GbrUl = 0
 
@@ -803,7 +803,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
 				config.AmbrUl = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink)
 			} else {
-				config.AmbrUl = sqos.Uplink
+				config.AmbrUl = int32(sqos.Uplink)
 			}
 
 			//DL AMBR
@@ -811,7 +811,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
 				config.AmbrDl = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)
 			} else {
-				config.AmbrDl = sqos.Downlink
+				config.AmbrDl = int32(sqos.Downlink)
 			}
 
 			var apnProf apnProfile
@@ -933,13 +933,13 @@ func postConfigPcrf(client *clientNF) {
 			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
 				pcrfService.Ambr_ul = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink)
 			} else {
-				pcrfService.Ambr_ul = sliceConfig.Qos.Uplink
+				pcrfService.Ambr_ul = int32(sliceConfig.Qos.Uplink)
 			}
 			//AMBR DL
 			if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
 				pcrfService.Ambr_dl = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)
 			} else {
-				pcrfService.Ambr_dl = sliceConfig.Qos.Downlink
+				pcrfService.Ambr_dl = int32(sliceConfig.Qos.Downlink)
 			}
 
 			if len(sliceConfig.ApplicationFilteringRules) == 0 {
@@ -976,21 +976,21 @@ func postConfigPcrf(client *clientNF) {
 					arpi = 0x7D
 				}
 
-				ruleQInfo.Mbr_ul = app.AppMbrUplink
-				ruleQInfo.Mbr_dl = app.AppMbrDownlink
+				ruleQInfo.Mbr_ul = int64(app.AppMbrUplink)
+				ruleQInfo.Mbr_dl = int64(app.AppMbrDownlink)
 				ruleQInfo.Gbr_ul = 0
 				ruleQInfo.Gbr_dl = 0
 
 				//override with device-group specific if available
 				if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink != 0 {
-					ruleQInfo.ApnAmbrUl = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink)
+					ruleQInfo.ApnAmbrUl = int64(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrUplink)
 				} else {
 					ruleQInfo.ApnAmbrUl = sliceConfig.Qos.Uplink
 				}
 
 				//override with device-group specific if available
 				if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
-					ruleQInfo.ApnAmbrDl = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)
+					ruleQInfo.ApnAmbrDl = int64(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)
 				} else {
 					ruleQInfo.ApnAmbrDl = sliceConfig.Qos.Downlink
 				}
@@ -1098,8 +1098,8 @@ func postConfigSpgw(client *clientNF) {
 			} else {
 				qosProf.Qci = 9
 				qosProf.Arp = 1
-				qosProf.Ambr = append(qosProf.Ambr, sqos.Uplink)
-				qosProf.Ambr = append(qosProf.Ambr, sqos.Downlink)
+				qosProf.Ambr = append(qosProf.Ambr, int32(sqos.Uplink))
+				qosProf.Ambr = append(qosProf.Ambr, int32(sqos.Downlink))
 			}
 
 			config.QosProfiles[qosProfName] = &qosProf

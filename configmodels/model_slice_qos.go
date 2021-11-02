@@ -17,10 +17,10 @@ package configmodels
 type SliceQos struct {
 
 	// uplink data rate in bps
-	Uplink int64 `json:"uplink,omitempty"`
+	Uplink int32 `json:"uplink,omitempty"`
 
 	// downlink data rate in bps
-	Downlink int64 `json:"downlink,omitempty"`
+	Downlink int32 `json:"downlink,omitempty"`
 
 	// data rate unit for uplink and downlink
 	BitrateUnit string `json:"bitrate-unit,omitempty"`

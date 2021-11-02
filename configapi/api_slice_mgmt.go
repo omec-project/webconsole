@@ -16,6 +16,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	KPS = 1000
+	MPS = 1000000
+	GPS = 1000000000
+)
+
 var configChannel chan *configmodels.ConfigMessage
 
 var configLog *logrus.Entry
@@ -45,6 +51,19 @@ func DeviceGroupDeleteHandler(c *gin.Context) bool {
 
 }
 
+func convertToBps(val int64, unit string) (bitrate int64) {
+	if strings.EqualFold(unit, "kbps") {
+		bitrate = val * KPS
+	} else if strings.EqualFold(unit, "mbps") {
+		bitrate = val * MPS
+	} else if strings.EqualFold(unit, "gbps") {
+		bitrate = val * GPS
+	} else {
+		// default consider it as mbps
+		bitrate = val * MPS
+	}
+	return bitrate
+}
 func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	var groupName string
 	var exists bool
@@ -85,30 +104,18 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  ip mtu : %v", ipdomain.Mtu)
 	configLog.Infof("Device Group Name :  %v ", groupName)
 	if ipdomain.UeDnnQos != nil {
-		var bitrate int64
-		if strings.EqualFold(ipdomain.UeDnnQos.BitrateUnit, "kbps") {
-			bitrate = 1000
-		} else if strings.EqualFold(ipdomain.UeDnnQos.BitrateUnit, "mbps") {
-			bitrate = 1000 * 1000
-		} else if strings.EqualFold(ipdomain.UeDnnQos.BitrateUnit, "gbps") {
-			bitrate = 1000 * 1000 * 1000
-		} else {
-			// default consider it as mbps
-			bitrate = 1000 * 1000
-		}
-
-		ipdomain.UeDnnQos.DnnMbrDownlink = ipdomain.UeDnnQos.DnnMbrDownlink * bitrate
+		ipdomain.UeDnnQos.DnnMbrDownlink = convertToBps(ipdomain.UeDnnQos.DnnMbrDownlink, ipdomain.UeDnnQos.BitrateUnit)
 		if ipdomain.UeDnnQos.DnnMbrDownlink < 0 {
 			ipdomain.UeDnnQos.DnnMbrDownlink = math.MaxInt64
 		}
-		ipdomain.UeDnnQos.DnnMbrUplink = ipdomain.UeDnnQos.DnnMbrUplink * bitrate
+		ipdomain.UeDnnQos.DnnMbrUplink = convertToBps(ipdomain.UeDnnQos.DnnMbrUplink, ipdomain.UeDnnQos.BitrateUnit)
 		if ipdomain.UeDnnQos.DnnMbrUplink < 0 {
 			ipdomain.UeDnnQos.DnnMbrUplink = math.MaxInt64
 		}
 	}
 
 	var msg configmodels.ConfigMessage
-	msg.DevGroupName = groupName
+	procReq.DeviceGroupName = groupName
 	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = msgOp
 	msg.DevGroup = &procReq
@@ -169,25 +176,20 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  sd          : %v", slice.Sd)
 
 	qos := &procReq.Qos
-	var bitrate int64
-	if strings.EqualFold(qos.BitrateUnit, "kbps") {
-		bitrate = 1000
-	} else if strings.EqualFold(qos.BitrateUnit, "mbps") {
-		bitrate = 1000 * 1000
-	} else if strings.EqualFold(qos.BitrateUnit, "gbps") {
-		bitrate = 1000 * 1000 * 1000
-	} else {
-		// default consider it as mbps
-		bitrate = 1000 * 1000
-	}
-	qos.Uplink = qos.Uplink * bitrate
-	if qos.Uplink < 0 {
+	bitrate := convertToBps(int64(qos.Uplink), qos.BitrateUnit)
+	if bitrate < 0 || bitrate > math.MaxInt32 {
 		qos.Uplink = math.MaxInt32
+	} else {
+		qos.Uplink = int32(bitrate)
 	}
-	qos.Downlink = qos.Downlink * bitrate
-	if qos.Downlink < 0 {
+
+	bitrate = convertToBps(int64(qos.Downlink), qos.BitrateUnit)
+	if bitrate < 0 || bitrate > math.MaxInt32 {
 		qos.Downlink = math.MaxInt32
+	} else {
+		qos.Downlink = int32(bitrate)
 	}
+
 	configLog.Infof("Slice QoS ")
 	configLog.Infof("  uplink bps    : %v", qos.Uplink)
 	configLog.Infof("  downlink bps  : %v", qos.Downlink)
@@ -237,24 +239,19 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		ul := procReq.ApplicationFilteringRules[index].AppMbrUplink
 		dl := procReq.ApplicationFilteringRules[index].AppMbrDownlink
 		unit := procReq.ApplicationFilteringRules[index].BitrateUnit
-		var bitrate int64
-		if strings.EqualFold(unit, "kbps") {
-			bitrate = 1000
-		} else if strings.EqualFold(unit, "mbps") {
-			bitrate = 1000 * 1000
-		} else if strings.EqualFold(unit, "gbps") {
-			bitrate = 1000 * 1000 * 1000
+
+		bitrate := convertToBps(int64(ul), unit)
+		if bitrate < 0 || bitrate > math.MaxInt32 {
+			procReq.ApplicationFilteringRules[index].AppMbrUplink = math.MaxInt32
 		} else {
-			// default consider it as mbps
-			bitrate = 1000 * 1000
+			procReq.ApplicationFilteringRules[index].AppMbrUplink = int32(bitrate)
 		}
-		procReq.ApplicationFilteringRules[index].AppMbrUplink = ul * bitrate
-		if ul < 0 {
-			procReq.ApplicationFilteringRules[index].AppMbrUplink = math.MaxInt64
-		}
-		procReq.ApplicationFilteringRules[index].AppMbrDownlink = dl * bitrate
-		if dl < 0 {
-			procReq.ApplicationFilteringRules[index].AppMbrDownlink = math.MaxInt64
+
+		bitrate = convertToBps(int64(dl), unit)
+		if bitrate < 0 || bitrate > math.MaxInt32 {
+			procReq.ApplicationFilteringRules[index].AppMbrDownlink = math.MaxInt32
+		} else {
+			procReq.ApplicationFilteringRules[index].AppMbrDownlink = int32(bitrate)
 		}
 
 		configLog.Infof("\tApp MBR Uplink   : %v", procReq.ApplicationFilteringRules[index].AppMbrUplink)
@@ -279,7 +276,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = msgOp
-	msg.SliceName = sliceName
+	procReq.SliceName = sliceName
 	msg.MsgType = configmodels.Network_slice
 	msg.Slice = &procReq
 	msg.SliceName = sliceName

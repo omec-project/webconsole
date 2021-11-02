@@ -612,8 +612,16 @@ func postConfigMme(client *clientNF) {
 
 		//keys.ServingPlmn.Tac = gnb.Tac
 		plmn := "mcc=" + siteInfo.Plmn.Mcc + ", mnc=" + siteInfo.Plmn.Mnc
-		client.clientLog.Infof("plmn for mme %v", plmn)
-		config.PlmnList = append(config.PlmnList, plmn)
+		var found bool
+		for _, p := range config.PlmnList {
+			if p == plmn {
+				found = true
+			}
+		}
+		if !found {
+			client.clientLog.Infof("Adding plmn for mme %v", plmn)
+			config.PlmnList = append(config.PlmnList, plmn)
+		}
 	}
 	client.clientLog.Infoln("Config sending to mme:")
 	b, err := json.Marshal(config)

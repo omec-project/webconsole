@@ -41,6 +41,9 @@ type SliceApplicationFilteringRules struct {
 
 	AppMbrDownlink int32 `json:"app-mbr-downlink,omitempty"`
 
+	// data rate unit for uplink and downlink
+	BitrateUnit string `json:"bitrate-unit,omitempty"`
+
 	TrafficClass *TrafficClassInfo `json:"traffic-class,omitempty"`
 
 	RuleTrigger string `json:"rule-trigger,omitempty"`

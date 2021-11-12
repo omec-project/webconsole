@@ -376,14 +376,17 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 			arpi = defaultQos.TrafficClass.Arp
 		} else {
 			var5qi = 9
-			arpi = 0x7D
+			arpi = 1
+		}
+		if arpi > 15 {
+			arpi = 15
 		}
 
 		ruleQos.Var5Qi = int32(var5qi)
 		arp := &protos.PccArp{}
-		arp.PL = int32((arpi & 0x3c) >> 2)
-		arp.PC = protos.PccArpPc((arpi & 0x40) >> 6)
-		arp.PV = protos.PccArpPv(arpi & 0x1)
+		arp.PL = arpi
+		arp.PC = protos.PccArpPc(1)
+		arp.PV = protos.PccArpPv(1)
 		ruleQos.Arp = arp
 		pccRule.Qos = &ruleQos
 
@@ -973,9 +976,11 @@ func postConfigPcrf(client *clientNF) {
 					arpi = devGroup.IpDomainExpanded.UeDnnQos.TrafficClass.Arp
 				} else {
 					ruleQInfo.Qci = 9
-					arpi = 0x7D
+					arpi = 1
 				}
-
+				if arpi > 15 {
+					arpi = 15
+				}
 				ruleQInfo.Mbr_ul = app.AppMbrUplink
 				ruleQInfo.Mbr_dl = app.AppMbrDownlink
 				ruleQInfo.Gbr_ul = 0
@@ -995,9 +1000,9 @@ func postConfigPcrf(client *clientNF) {
 					ruleQInfo.ApnAmbrDl = sliceConfig.Qos.Downlink
 				}
 				arp := &arpInfo{}
-				arp.Priority = int32((arpi & 0x3c) >> 2)
-				arp.PreEmptCap = (arpi & 0x40) >> 6
-				arp.PreEmpVulner = arpi & 0x1
+				arp.Priority = arpi
+				arp.PreEmptCap = 1
+				arp.PreEmpVulner = 1
 				ruleQInfo.Arp = arp
 				ruleFInfo := &ruleFlowInfo{}
 				// permit out udp from 8.8.8.8/32 to assigned sport-dport

@@ -52,7 +52,9 @@ func DeviceGroupDeleteHandler(c *gin.Context) bool {
 }
 
 func convertToBps(val int64, unit string) (bitrate int64) {
-	if strings.EqualFold(unit, "kbps") {
+	if strings.EqualFold(unit, "bps") {
+		return bitrate
+	} else if strings.EqualFold(unit, "kbps") {
 		bitrate = val * KPS
 	} else if strings.EqualFold(unit, "mbps") {
 		bitrate = val * MPS

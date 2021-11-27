@@ -992,12 +992,18 @@ func postConfigPcrf(client *clientNF) {
 				} else {
 					ruleQInfo.ApnAmbrUl = sliceConfig.Qos.Uplink
 				}
+				if ruleQInfo.Mbr_ul == 0 {
+					ruleQInfo.Mbr_ul = ruleQInfo.ApnAmbrUl
+				}
 
 				//override with device-group specific if available
 				if devGroup.IpDomainExpanded.UeDnnQos != nil && devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink != 0 {
 					ruleQInfo.ApnAmbrDl = int32(devGroup.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)
 				} else {
 					ruleQInfo.ApnAmbrDl = sliceConfig.Qos.Downlink
+				}
+				if ruleQInfo.Mbr_dl == 0 {
+					ruleQInfo.Mbr_dl = ruleQInfo.ApnAmbrDl
 				}
 				arp := &arpInfo{}
 				arp.Priority = arpi

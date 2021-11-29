@@ -32,10 +32,10 @@ type SliceApplicationFilteringRules struct {
 	Protocol int32 `json:"protocol,omitempty"`
 
 	// port range start
-	StartPort int32 `json:"start-port,omitempty"`
+	StartPort int32 `json:"dest-port-start,omitempty"`
 
 	// port range end
-	EndPort int32 `json:"end-port,omitempty"`
+	EndPort int32 `json:"dest-port-end,omitempty"`
 
 	AppMbrUplink int32 `json:"app-mbr-uplink,omitempty"`
 

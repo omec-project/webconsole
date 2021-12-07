@@ -819,7 +819,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 
 			var apnProf apnProfile
 			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
-			apnProfName := sliceName + "-apn"
+			apnProfName := sliceName + "-" + apnProf.ApnName + "-apn"
 			config.ApnProfiles[apnProfName] = &apnProf
 
 			var newImsis []string
@@ -1084,7 +1084,7 @@ func postConfigSpgw(client *clientNF) {
 			apnProf.ApnName = devGroup.IpDomainExpanded.Dnn
 			apnProf.Mtu = devGroup.IpDomainExpanded.Mtu
 			apnProf.GxEnabled = false
-			apnProfName := sliceName + "-apn"
+			apnProfName := sliceName + "-" + apnProf.ApnName + "-apn"
 			config.ApnProfiles[apnProfName] = &apnProf
 			rule.SelectedApnProfile = apnProfName
 

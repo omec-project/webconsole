@@ -11,10 +11,10 @@ import (
 	"os"
 	"time"
 
+	protos "github.com/omec-project/config5g/proto/sdcoreConfig"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
-	protos "github.com/omec-project/webconsole/proto/sdcoreConfig"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
@@ -112,6 +112,7 @@ func (c *ConfigServer) NetworkSliceSubscribe(req *protos.NetworkSliceRequest, st
 	// Post the message on client handler & wait to get response
 	if created == true {
 		reqMsg.newClient = true
+		client.metadataReqtd = req.MetadataRequested
 	}
 	client.tempGrpcReq <- &reqMsg
 	ctx := stream.Context()

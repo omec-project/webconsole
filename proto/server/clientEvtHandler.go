@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
+	protos "github.com/omec-project/config5g/proto/sdcoreConfig"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
-	protos "github.com/omec-project/webconsole/proto/sdcoreConfig"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,6 +34,7 @@ type clientNF struct {
 	resStream             protos.ConfigService_NetworkSliceSubscribeServer
 	resChannel            chan bool
 	clientLog             *logrus.Entry
+	metadataReqtd         bool
 }
 
 //message format received from grpc server thread to Client go routine
@@ -41,6 +42,10 @@ type clientReqMsg struct {
 	networkSliceReqMsg *protos.NetworkSliceRequest
 	grpcRspMsg         chan *clientRspMsg
 	newClient          bool
+	lastDevGroup       *configmodels.DeviceGroups
+	lastSlice          *configmodels.Slice
+	devGroup           *configmodels.DeviceGroups
+	slice              *configmodels.Slice
 }
 
 //message format to send response from client go routine to grpc server
@@ -492,9 +497,14 @@ func clientEventMachine(client *clientNF) {
 				client.clientLog.Infoln("resStream available")
 				var reqMsg clientReqMsg
 				var nReq protos.NetworkSliceRequest
+				nReq.MetadataRequested = client.metadataReqtd
 				reqMsg.networkSliceReqMsg = &nReq
 				reqMsg.grpcRspMsg = make(chan *clientRspMsg)
 				reqMsg.newClient = false
+				reqMsg.lastDevGroup = lastDevGroup
+				reqMsg.lastSlice = lastSlice
+				reqMsg.devGroup = configMsg.DevGroup
+				reqMsg.slice = configMsg.Slice
 				client.tempGrpcReq <- &reqMsg
 				client.clientLog.Infoln("sent data to client from push config ")
 			}
@@ -507,10 +517,12 @@ func clientEventMachine(client *clientNF) {
 						deleteConfigHss(client, imsiVal)
 					} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
 						for _, name := range lastSlice.SiteDeviceGroup {
-							if client.devgroupsConfigClient[name] != nil && !isDeviceGroupInExistingSlices(client, name) {
-								imsis := deletedImsis(client.devgroupsConfigClient[name], nil)
-								for _, val := range imsis {
-									deleteConfigHss(client, val)
+							if client.devgroupsConfigClient[name] != nil {
+								if ok, _ := isDeviceGroupInExistingSlices(client, name); !ok {
+									imsis := deletedImsis(client.devgroupsConfigClient[name], nil)
+									for _, val := range imsis {
+										deleteConfigHss(client, val)
+									}
 								}
 							}
 						}
@@ -564,16 +576,96 @@ func clientEventMachine(client *clientNF) {
 				continue
 			}
 			client.clientLog.Infof("Send complete snapshoot to client. Number of Network Slices %v ", len(client.slicesConfigClient))
-			for sliceName, sliceConfig := range client.slicesConfigClient {
-				if sliceConfig == nil {
-					continue
-				}
+
+			//currently pcf request for metadata
+			if client.metadataReqtd {
 				sliceProto := &protos.NetworkSlice{}
-				result := fillSlice(client, sliceName, sliceConfig, sliceProto)
-				if result == true {
-					sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
-				} else {
-					client.clientLog.Infoln("Not sending slice config")
+				prevSlice := cReqMsg.lastSlice
+				slice := cReqMsg.slice
+				//slice Added
+				if prevSlice == nil && slice != nil {
+					dgnames := getAddedGroupsList(slice, nil)
+					for _, dgname := range dgnames {
+						aimsis := getAddedImsisList(client.devgroupsConfigClient[dgname], nil)
+						sliceProto.AddUpdatedImsis = aimsis
+						sliceProto.OperationType = protos.OpType_SLICE_ADD
+					}
+				}
+				//slice updated
+				if prevSlice != nil && slice != nil {
+					fillSlice(client, slice.SliceName, slice, sliceProto)
+					dgnames := getDeleteGroupsList(slice, prevSlice)
+					for _, dgname := range dgnames {
+						dimsis := getDeletedImsisList(nil, client.devgroupsConfigClient[dgname])
+						sliceProto.DeletedImsis = dimsis
+						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
+					}
+					dgnames = getAddedGroupsList(slice, prevSlice)
+					for _, dgname := range dgnames {
+						aimsis := getAddedImsisList(client.devgroupsConfigClient[dgname], nil)
+						sliceProto.AddUpdatedImsis = aimsis
+						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
+					}
+					//updated other than device group list, adding all imsis because update is required for all
+					if sliceProto.OperationType != protos.OpType_SLICE_UPDATE {
+						dgnames = getAddedGroupsList(slice, nil)
+						for _, dgname := range dgnames {
+							aimsis := getAddedImsisList(client.devgroupsConfigClient[dgname], nil)
+							sliceProto.AddUpdatedImsis = aimsis
+							sliceProto.OperationType = protos.OpType_SLICE_UPDATE
+						}
+					}
+				}
+				//slice deleted
+				if prevSlice != nil && slice == nil {
+					fillSlice(client, slice.SliceName, prevSlice, sliceProto)
+					dgnames := getDeleteGroupsList(slice, prevSlice)
+					for _, dgname := range dgnames {
+						dimsis := getDeletedImsisList(nil, client.devgroupsConfigClient[dgname])
+						sliceProto.DeletedImsis = dimsis
+						sliceProto.OperationType = protos.OpType_SLICE_DELETE
+					}
+				}
+
+				//device add: Not Applicable
+
+				//device group updated (or)
+				//device group deleted
+				if cReqMsg.devGroup != nil || cReqMsg.lastDevGroup != nil {
+					var name string
+					if cReqMsg.devGroup != nil {
+						name = cReqMsg.devGroup.DeviceGroupName
+					} else {
+						name = cReqMsg.lastDevGroup.DeviceGroupName
+					}
+					if ok, sliceName := isDeviceGroupInExistingSlices(client, name); ok {
+						slice := client.slicesConfigClient[sliceName]
+						fillSlice(client, slice.SliceName, slice, sliceProto)
+						aimsis := getAddedImsisList(cReqMsg.devGroup, cReqMsg.lastDevGroup)
+						sliceProto.AddUpdatedImsis = aimsis
+						dimsis := getDeletedImsisList(cReqMsg.devGroup, cReqMsg.lastDevGroup)
+						sliceProto.DeletedImsis = dimsis
+						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
+					} else {
+						client.clientLog.Infof("Device Group: %s is not exist in available slices", name)
+						continue
+					}
+				}
+
+				sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
+
+			} else {
+				for sliceName, sliceConfig := range client.slicesConfigClient {
+					if sliceConfig == nil {
+						continue
+					}
+					sliceProto := &protos.NetworkSlice{}
+					result := fillSlice(client, sliceName, sliceConfig, sliceProto)
+					if result == true {
+						sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
+					} else {
+						client.clientLog.Infoln("Not sending slice config")
+					}
 				}
 			}
 			sliceDetails.ConfigUpdated = 1
@@ -735,16 +827,16 @@ func addedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	return
 }
 
-func isDeviceGroupInExistingSlices(client *clientNF, name string) bool {
-	for _, sliceConfig := range client.slicesConfigClient {
+func isDeviceGroupInExistingSlices(client *clientNF, name string) (bool, string) {
+	for sliceName, sliceConfig := range client.slicesConfigClient {
 		for _, dg := range sliceConfig.SiteDeviceGroup {
 			if dg == name {
-				return true
+				return true, sliceName
 			}
 		}
 	}
 
-	return false
+	return false, ""
 }
 
 func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, lastSlice *configmodels.Slice) {
@@ -769,11 +861,13 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 
 				//devGroup not exist in current but exist in lastSlice
 				devGroup := client.devgroupsConfigClient[oldG]
-				if !found && devGroup != nil && !isDeviceGroupInExistingSlices(client, oldG) {
-					imsis := deletedImsis(devGroup, nil)
-					client.clientLog.Infoln("DeviceGroup Deleted from Slice: ", oldG)
-					for _, val := range imsis {
-						deleteConfigHss(client, val)
+				if !found && devGroup != nil {
+					if ok, _ := isDeviceGroupInExistingSlices(client, oldG); !ok {
+						imsis := deletedImsis(devGroup, nil)
+						client.clientLog.Infoln("DeviceGroup Deleted from Slice: ", oldG)
+						for _, val := range imsis {
+							deleteConfigHss(client, val)
+						}
 					}
 				}
 			}

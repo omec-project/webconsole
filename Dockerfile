@@ -7,16 +7,11 @@ FROM golang:1.14.4-stretch AS builder
 
 LABEL maintainer="ONF <omec-dev@opennetworking.org>"
 
-#RUN apt remove cmdtest yarn
 RUN apt-get update
 RUN apt-get -y install apt-transport-https ca-certificates
 RUN apt-get -y upgrade
-RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg > pubkey.gpg
-RUN apt-key add pubkey.gpg
-RUN curl -sL https://deb.nodesource.com/setup_10.x | bash -
-RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" |  tee /etc/apt/sources.list.d/yarn.list
 RUN apt-get update
-RUN apt-get -y install gcc cmake autoconf libtool pkg-config libmnl-dev libyaml-dev  nodejs yarn unzip
+RUN apt-get -y install gcc cmake autoconf libtool pkg-config libmnl-dev libyaml-dev unzip
 RUN apt-get clean
 ENV PROTOC_ZIP=protoc-3.14.0-linux-x86_64.zip
 RUN curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/${PROTOC_ZIP}
@@ -58,4 +53,3 @@ RUN mkdir -p webconsole/
 
 # Copy executable and default certs
 COPY --from=builder /go/src/webconsole/webconsole ./webconsole
-COPY --from=builder /go/src/webconsole/public ./webconsole/public

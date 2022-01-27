@@ -31,15 +31,7 @@ $(WEBCONSOLE): $(GO_BIN_PATH)/$(WEBCONSOLE)
 
 $(GO_BIN_PATH)/$(WEBCONSOLE): server.go  $(WEBCONSOLE_GO_FILES)
 	@echo "Start building $(@F)...."
-	cd frontend && \
-	yarn install && \
-	yarn build && \
-	rm -rf ../public && \
-	cp -R build ../public
-#	cd $(WEBCONSOLE) && \
-#	go build -ldflags "$(WEBCONSOLE_LDFLAGS)" -o $(ROOT_PATH)/$@ ./server.go
-#
-
+	go build -ldflags "$(WEBCONSOLE_LDFLAGS)" -o $(ROOT_PATH)/$@ ./server.go
 
 vpath %.go $(addprefix $(GO_SRC_PATH)/, $(GO_NF))
 

@@ -291,7 +291,7 @@ func updateAmProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string)
 	MongoDBLibrary.RestfulAPIPost(amDataColl, filter, amDataBsonA)
 }
 
-func updateSmProviosionedData(snssai *models.Snssai, qos configmodels.SliceQos, mcc, mnc, dnn, imsi string) {
+func updateSmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) {
 	//TODO smData
 	smData := models.SessionManagementSubscriptionData{
 		SingleNssai: snssai,
@@ -309,8 +309,8 @@ func updateSmProviosionedData(snssai *models.Snssai, qos configmodels.SliceQos, 
 					},
 				},
 				SessionAmbr: &models.Ambr{
-					Downlink: convertToString(uint64(qos.Downlink)),
-					Uplink:   convertToString(uint64(qos.Uplink)),
+					Downlink: convertToString(uint64(qos.DnnMbrDownlink)),
+					Uplink:   convertToString(uint64(qos.DnnMbrUplink)),
 				},
 				Var5gQosProfile: &models.SubscribedDefaultQos{
 					Var5qi: 9,
@@ -422,7 +422,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					updateAmPolicyData(imsi)
 					updateSmPolicyData(snssai, dnn, imsi)
 					updateAmProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
-					updateSmProviosionedData(snssai, slice.Qos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+					updateSmProviosionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
 					updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
 				}
 
@@ -465,7 +465,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 							updateAmPolicyData(imsi)
 							updateSmPolicyData(snssai, dnn, imsi)
 							updateAmProviosionedData(snssai, mcc, mnc, dnn, imsi)
-							updateSmProviosionedData(snssai, slice.Qos, mcc, mnc, dnn, imsi)
+							updateSmProviosionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, dnn, imsi)
 							updateSmfSelectionProviosionedData(snssai, mcc, mnc, dnn, imsi)
 						}
 					}
@@ -524,6 +524,7 @@ func convertToString(val uint64) string {
 		retStr = strconv.FormatUint(uint64(val), 10) + " bps"
 	}
 
+	fmt.Println("convertToString value ", val, retStr)
 	return retStr
 }
 

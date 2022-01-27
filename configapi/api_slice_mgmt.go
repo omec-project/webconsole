@@ -110,10 +110,12 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 		if ipdomain.UeDnnQos.DnnMbrDownlink < 0 {
 			ipdomain.UeDnnQos.DnnMbrDownlink = math.MaxInt64
 		}
+		configLog.Infof("  MbrDownLink :  %v ", ipdomain.UeDnnQos.DnnMbrDownlink)
 		ipdomain.UeDnnQos.DnnMbrUplink = convertToBps(ipdomain.UeDnnQos.DnnMbrUplink, ipdomain.UeDnnQos.BitrateUnit)
 		if ipdomain.UeDnnQos.DnnMbrUplink < 0 {
 			ipdomain.UeDnnQos.DnnMbrUplink = math.MaxInt64
 		}
+		configLog.Infof("  MbrUpLink :  %v ", ipdomain.UeDnnQos.DnnMbrUplink)
 	}
 
 	var msg configmodels.ConfigMessage
@@ -177,57 +179,10 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  sst         : %v", slice.Sst)
 	configLog.Infof("  sd          : %v", slice.Sd)
 
-	qos := &procReq.Qos
-	bitrate := convertToBps(int64(qos.Uplink), qos.BitrateUnit)
-	if bitrate < 0 || bitrate > math.MaxInt32 {
-		qos.Uplink = math.MaxInt32
-	} else {
-		qos.Uplink = int32(bitrate)
-	}
-
-	bitrate = convertToBps(int64(qos.Downlink), qos.BitrateUnit)
-	if bitrate < 0 || bitrate > math.MaxInt32 {
-		qos.Downlink = math.MaxInt32
-	} else {
-		qos.Downlink = int32(bitrate)
-	}
-
-	configLog.Infof("Slice QoS ")
-	configLog.Infof("  uplink bps    : %v", qos.Uplink)
-	configLog.Infof("  downlink bps  : %v", qos.Downlink)
-	configLog.Infof("  traffic       : %v", qos.TrafficClass)
-
 	group := procReq.SiteDeviceGroup
 	configLog.Infof("Number of device groups %v", len(group))
 	for i := 0; i < len(group); i++ {
 		configLog.Infof("  device groups(%v) - %v \n", i+1, group[i])
-	}
-	denylist := procReq.DenyApplications
-	if len(denylist) > 0 {
-		configLog.Infof("Number of denied applications %v", len(denylist))
-		for _, d := range denylist {
-			configLog.Infof("    deny application %v", d)
-		}
-	}
-	permitlist := procReq.PermitApplications
-	if len(permitlist) > 0 {
-		configLog.Infof("Number of permit applications %v", len(permitlist))
-		for _, p := range permitlist {
-			configLog.Infof("    permit application %v", p)
-		}
-	}
-
-	appinfo := procReq.ApplicationsInformation
-	if len(appinfo) > 0 {
-		configLog.Infof("Length Application information %v", len(appinfo))
-		for a := 0; a < len(appinfo); a++ {
-			app := appinfo[a]
-			configLog.Infof("    appname   : %v", app.AppName)
-			configLog.Infof("    endpoint  : %v ", app.Endpoint)
-			configLog.Infof("    startPort : %v", app.StartPort)
-			configLog.Infof("    endPort   : %v", app.EndPort)
-			configLog.Infof("    protocol  : %v", app.Protocol)
-		}
 	}
 
 	for index, filter := range procReq.ApplicationFilteringRules {

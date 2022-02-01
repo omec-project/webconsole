@@ -200,7 +200,6 @@ func (webui *WEBUI) Start() {
 		MaxAge:           86400,
 	}))
 
-	subconfig_router.NoRoute(ReturnPublic())
 	go func() {
 		initLog.Infoln(subconfig_router.Run(":5000"))
 		initLog.Infoln("Webserver stopped/terminated/not-started ")

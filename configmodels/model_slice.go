@@ -19,17 +19,10 @@ type Slice struct {
 
 	SliceId SliceSliceId `json:"slice-id,omitempty"`
 
-	Qos SliceQos `json:"qos,omitempty"`
-
 	SiteDeviceGroup []string `json:"site-device-group,omitempty"`
 
 	SiteInfo SliceSiteInfo `json:"site-info,omitempty"`
 
 	ApplicationFilteringRules []SliceApplicationFilteringRules `json:"application-filtering-rules,omitempty"`
 
-	DenyApplications []string `json:"deny-applications,omitempty"`
-
-	PermitApplications []string `json:"permit-applications,omitempty"`
-
-	ApplicationsInformation []SliceApplicationsInformation `json:"applications-information,omitempty"`
 }

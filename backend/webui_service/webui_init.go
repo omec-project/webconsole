@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
 //
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
+//
 
 package webui_service
 
@@ -17,6 +17,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
+	_ "net/http"
+	_ "net/http/pprof"
+
 	"github.com/free5gc/MongoDBLibrary"
 	mongoDBLibLogger "github.com/free5gc/MongoDBLibrary/logger"
 	"github.com/free5gc/logger_util"
@@ -29,8 +32,6 @@ import (
 	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
 	gServ "github.com/omec-project/webconsole/proto/server"
-	_ "net/http"
-	_ "net/http/pprof"
 )
 
 type WEBUI struct{}

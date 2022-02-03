@@ -24,13 +24,6 @@ RUN cp -R ./proto/include/* ${BASE}/include/
 
 RUN cd $GOPATH/src && mkdir -p webconsole
 COPY . $GOPATH/src/webconsole
-RUN cd $GOPATH/src/webconsole/proto \
-    && go get -u google.golang.org/protobuf/cmd/protoc-gen-go \
-    && go install google.golang.org/protobuf/cmd/protoc-gen-go \
-    && go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc \
-    && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc \
-    && protoc -I ./ --go_out=. config.proto \
-    && protoc -I ./ --go-grpc_out=. config.proto
 
 RUN cd $GOPATH/src/webconsole \
     && make all \

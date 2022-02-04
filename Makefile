@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+
 PROJECT_NAME             := sdcore
 VERSION                  ?= $(shell cat ./VERSION)
 
@@ -72,11 +73,10 @@ docker-build:
                         --build-arg org_opencord_vcs_commit_date="${DOCKER_LABEL_COMMIT_DATE}" \
                         . \
                         || exit 1; \
-    done
+        done
 	rm -rf vendor
 
 docker-push:
 	for target in $(DOCKER_TARGETS); do \
                 docker push ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}5gc-$$target:${DOCKER_TAG}; \
         done
-#

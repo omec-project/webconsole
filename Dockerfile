@@ -1,4 +1,4 @@
-# Copyright 2019-present Open Networking Foundation
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -24,13 +24,6 @@ RUN cp -R ./proto/include/* ${BASE}/include/
 
 RUN cd $GOPATH/src && mkdir -p webconsole
 COPY . $GOPATH/src/webconsole
-RUN cd $GOPATH/src/webconsole/proto \
-    && go get -u google.golang.org/protobuf/cmd/protoc-gen-go \
-    && go install google.golang.org/protobuf/cmd/protoc-gen-go \
-    && go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc \
-    && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc \
-    && protoc -I ./ --go_out=. config.proto \
-    && protoc -I ./ --go-grpc_out=. config.proto
 
 RUN cd $GOPATH/src/webconsole \
     && make all \

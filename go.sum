@@ -60,7 +60,6 @@ github.com/evanphx/json-patch v4.9.0+incompatible h1:kLcOMZeuLAJvL2BPWLMIj5oaZQo
 github.com/evanphx/json-patch v4.9.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/free5gc/MongoDBLibrary v1.0.0 h1:+CN5t3G9AvI4iv7azq46KUK4VWYsprbR7OHBqVM9XSo=
 github.com/free5gc/MongoDBLibrary v1.0.0/go.mod h1:0TSgWaO+5KyIrylML6jbHqtgoJJKpHGiXHPFdHXXPts=
-github.com/free5gc/http2_util v1.0.0 h1:0laMypHUNizAE5zsLoeJQq0R4XrfbvsLCW4NHCPpc44=
 github.com/free5gc/http2_util v1.0.0/go.mod h1:GN2BCD8IINjtnAKYGwe+dEeTBRFEv4lQnZblFIIhbdE=
 github.com/free5gc/http_wrapper v1.0.0 h1:NdnDHkItXxUzoxggiQsnR9SObBdi6KmwcN+QUJs4CoQ=
 github.com/free5gc/http_wrapper v1.0.0/go.mod h1:vVArDqfCo7fvmYGi9WRPj4yurSu86GxRh3iQ70aq+OE=

@@ -1,8 +1,9 @@
-# Copyright 2019-present Open Networking Foundation
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+# Copyright 2019 free5GC.org
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-#
+
 
 PROJECT_NAME             := sdcore
 VERSION                  ?= $(shell cat ./VERSION)
@@ -79,5 +80,3 @@ docker-push:
 	for target in $(DOCKER_TARGETS); do \
                 docker push ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}5gc-$$target:${DOCKER_TAG}; \
         done
-
-

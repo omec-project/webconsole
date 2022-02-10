@@ -11,7 +11,6 @@ require (
 	github.com/free5gc/path_util v1.0.0
 	github.com/free5gc/version v1.0.0
 	github.com/gin-contrib/cors v1.3.1
-	github.com/gin-gonic/gin v1.7.2
 	github.com/mitchellh/mapstructure v1.4.0
 	github.com/omec-project/config5g v1.0.2
 	github.com/omec-project/webconsole/configapi v0.0.0-00010101000000-000000000000

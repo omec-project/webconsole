@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
 //
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
+//
 
 package server
 
@@ -322,7 +322,6 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 	appFilters := protos.AppFilterRules{
 		PccRuleBase: make([]*protos.PccRule, 0),
 	}
-
 	for _, ruleConfig := range sliceConf.ApplicationFilteringRules {
 		client.clientLog.Debugf("Received Rule config = %v ", ruleConfig)
 		pccRule := protos.PccRule{}
@@ -384,6 +383,11 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 		flowInfo.FlowDesc = desc
 		flowInfo.TosTrafficClass = "IPV4"
 		flowInfo.FlowDir = protos.PccFlowDirection_BIDIRECTIONAL
+		if ruleConfig.Action == "deny" {
+			flowInfo.FlowStatus = protos.PccFlowStatus_DISABLED
+		} else {
+			flowInfo.FlowStatus = protos.PccFlowStatus_ENABLED
+		}
 		pccRule.FlowInfos = append(pccRule.FlowInfos, &flowInfo)
 
 		//Add PCC rule to Rulebase

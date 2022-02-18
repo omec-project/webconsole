@@ -360,6 +360,9 @@ func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg) *configmodels.Slice {
 	return nil
 }
 
+func getAddedGroupsList(slice, prevSlice *configmodels.Slice) (names []string) {
+	return getDeleteGroupsList(prevSlice, slice)
+}
 func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) {
 	for prevSlice == nil {
 		return

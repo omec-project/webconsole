@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
+	protos "github.com/omec-project/config5g/proto/sdcoreConfig"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
-	protos "github.com/omec-project/webconsole/proto/sdcoreConfig"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,6 +34,7 @@ type clientNF struct {
 	resStream             protos.ConfigService_NetworkSliceSubscribeServer
 	resChannel            chan bool
 	clientLog             *logrus.Entry
+	metadataReqtd         bool
 }
 
 //message format received from grpc server thread to Client go routine
@@ -41,6 +42,10 @@ type clientReqMsg struct {
 	networkSliceReqMsg *protos.NetworkSliceRequest
 	grpcRspMsg         chan *clientRspMsg
 	newClient          bool
+	lastDevGroup       *configmodels.DeviceGroups
+	lastSlice          *configmodels.Slice
+	devGroup           *configmodels.DeviceGroups
+	slice              *configmodels.Slice
 }
 
 //message format to send response from client go routine to grpc server
@@ -317,13 +322,15 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 	appFilters := protos.AppFilterRules{
 		PccRuleBase: make([]*protos.PccRule, 0),
 	}
-
 	for _, ruleConfig := range sliceConf.ApplicationFilteringRules {
 		client.clientLog.Debugf("Received Rule config = %v ", ruleConfig)
 		pccRule := protos.PccRule{}
 
 		//RuleName
 		pccRule.RuleId = ruleConfig.RuleName
+
+		//Rule Precedence
+		pccRule.Priority = ruleConfig.Priority
 
 		//Qos Info
 		ruleQos := protos.PccRuleQos{}
@@ -360,13 +367,49 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 		//As of now config provides us only single flow
 		pccRule.FlowInfos = make([]*protos.PccFlowInfo, 0)
 		var desc string
-		if ruleConfig.Protocol == int32(protos.PccFlowTos_TCP.Number()) {
-			desc = "permit out tcp from " + ruleConfig.Endpoint + " to assigned " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10)
-		} else if ruleConfig.Protocol == int32(protos.PccFlowTos_UDP.Number()) {
-			desc = "permit out udp from " + ruleConfig.Endpoint + " to assigned " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10)
-		} else {
-			desc = "permit out ip from " + ruleConfig.Endpoint + " to assigned"
+		endp := ruleConfig.Endpoint
+		if strings.HasPrefix(endp, "0.0.0.0") {
+			endp = "any"
 		}
+		if ruleConfig.Protocol == int32(protos.PccFlowTos_TCP.Number()) {
+			desc = "permit out tcp from " + endp + " to assigned " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10)
+		} else if ruleConfig.Protocol == int32(protos.PccFlowTos_UDP.Number()) {
+			desc = "permit out udp from " + endp + " to assigned " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10)
+		} else {
+			desc = "permit out ip from " + endp + " to assigned"
+		}
+
+		flowInfo := protos.PccFlowInfo{}
+		flowInfo.FlowDesc = desc
+		flowInfo.TosTrafficClass = "IPV4"
+		flowInfo.FlowDir = protos.PccFlowDirection_BIDIRECTIONAL
+		if ruleConfig.Action == "deny" {
+			flowInfo.FlowStatus = protos.PccFlowStatus_DISABLED
+		} else {
+			flowInfo.FlowStatus = protos.PccFlowStatus_ENABLED
+		}
+		pccRule.FlowInfos = append(pccRule.FlowInfos, &flowInfo)
+
+		//Add PCC rule to Rulebase
+		appFilters.PccRuleBase = append(appFilters.PccRuleBase, &pccRule)
+	}
+	// AppFiltering rules not configured, so configuring default rule
+	if len(sliceConf.ApplicationFilteringRules) == 0 {
+		pccRule := protos.PccRule{}
+		//RuleName
+		pccRule.RuleId = "DefaultRule"
+		//Rule Precedence
+		pccRule.Priority = 255
+		//Qos Info
+		ruleQos := protos.PccRuleQos{}
+		ruleQos.Var5Qi = 9
+		arp := &protos.PccArp{}
+		arp.PL = 1
+		arp.PC = protos.PccArpPc(1)
+		arp.PV = protos.PccArpPv(1)
+		ruleQos.Arp = arp
+		pccRule.Qos = &ruleQos
+		desc := "permit out ip from any to assigned"
 
 		flowInfo := protos.PccFlowInfo{}
 		flowInfo.FlowDesc = desc
@@ -374,7 +417,6 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 		flowInfo.FlowDir = protos.PccFlowDirection_BIDIRECTIONAL
 		pccRule.FlowInfos = append(pccRule.FlowInfos, &flowInfo)
 
-		//Add PCC rule to Rulebase
 		appFilters.PccRuleBase = append(appFilters.PccRuleBase, &pccRule)
 	}
 
@@ -454,9 +496,14 @@ func clientEventMachine(client *clientNF) {
 				client.clientLog.Infoln("resStream available")
 				var reqMsg clientReqMsg
 				var nReq protos.NetworkSliceRequest
+				nReq.MetadataRequested = client.metadataReqtd
 				reqMsg.networkSliceReqMsg = &nReq
 				reqMsg.grpcRspMsg = make(chan *clientRspMsg)
 				reqMsg.newClient = false
+				reqMsg.lastDevGroup = lastDevGroup
+				reqMsg.lastSlice = lastSlice
+				reqMsg.devGroup = configMsg.DevGroup
+				reqMsg.slice = configMsg.Slice
 				client.tempGrpcReq <- &reqMsg
 				client.clientLog.Infoln("sent data to client from push config ")
 			}
@@ -469,10 +516,12 @@ func clientEventMachine(client *clientNF) {
 						deleteConfigHss(client, imsiVal)
 					} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
 						for _, name := range lastSlice.SiteDeviceGroup {
-							if client.devgroupsConfigClient[name] != nil && !isDeviceGroupInExistingSlices(client, name) {
-								imsis := deletedImsis(client.devgroupsConfigClient[name], nil)
-								for _, val := range imsis {
-									deleteConfigHss(client, val)
+							if client.devgroupsConfigClient[name] != nil {
+								if ok, _ := isDeviceGroupInExistingSlices(client, name); !ok {
+									imsis := deletedImsis(client.devgroupsConfigClient[name], nil)
+									for _, val := range imsis {
+										deleteConfigHss(client, val)
+									}
 								}
 							}
 						}
@@ -526,22 +575,128 @@ func clientEventMachine(client *clientNF) {
 				continue
 			}
 			client.clientLog.Infof("Send complete snapshoot to client. Number of Network Slices %v ", len(client.slicesConfigClient))
-			for sliceName, sliceConfig := range client.slicesConfigClient {
-				if sliceConfig == nil {
-					continue
-				}
+			client.clientLog.Debugf("is client requested for metadata: %v ", client.metadataReqtd)
+
+			//currently pcf request for metadata
+			if (client.metadataReqtd) && (cReqMsg.newClient == false) {
 				sliceProto := &protos.NetworkSlice{}
-				result := fillSlice(client, sliceName, sliceConfig, sliceProto)
-				if result == true {
+				prevSlice := cReqMsg.lastSlice
+				slice := cReqMsg.slice
+
+				//slice Added
+				if prevSlice == nil && slice != nil {
+					fillSlice(client, slice.SliceName, slice, sliceProto)
+					dgnames := getAddedGroupsList(slice, nil)
+					for _, dgname := range dgnames {
+						aimsis := getAddedImsisList(client.devgroupsConfigClient[dgname], nil)
+						sliceProto.AddUpdatedImsis = aimsis
+						sliceProto.OperationType = protos.OpType_SLICE_ADD
+					}
 					sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
-				} else {
-					client.clientLog.Infoln("Not sending slice config")
+				}
+				client.clientLog.Infof("PrevSlice Msg: %v", prevSlice)
+				client.clientLog.Infof("Slice Msg: %v", slice)
+
+				//slice updated
+				if prevSlice != nil && slice != nil {
+					client.clientLog.Infof("Slice: %v Updated", slice.SliceName)
+					fillSlice(client, slice.SliceName, slice, sliceProto)
+					dgnames := getDeleteGroupsList(slice, prevSlice)
+					for _, dgname := range dgnames {
+						dimsis := getDeletedImsisList(nil, client.devgroupsConfigClient[dgname])
+						sliceProto.DeletedImsis = dimsis
+						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
+					}
+					dgnames = getAddedGroupsList(slice, prevSlice)
+					for _, dgname := range dgnames {
+						aimsis := getAddedImsisList(client.devgroupsConfigClient[dgname], nil)
+						sliceProto.AddUpdatedImsis = aimsis
+						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
+					}
+					//updated other than device group list, adding all imsis because update is required for all
+					if sliceProto.OperationType != protos.OpType_SLICE_UPDATE {
+						dgnames = getAddedGroupsList(slice, nil)
+						for _, dgname := range dgnames {
+							aimsis := getAddedImsisList(client.devgroupsConfigClient[dgname], nil)
+							sliceProto.AddUpdatedImsis = aimsis
+							sliceProto.OperationType = protos.OpType_SLICE_UPDATE
+						}
+					}
+					sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
+				}
+				//slice deleted
+				if prevSlice != nil && slice == nil {
+					client.clientLog.Infof("Slice: %v Deleted", prevSlice.SliceName)
+					fillSlice(client, prevSlice.SliceName, prevSlice, sliceProto)
+					dgnames := getDeleteGroupsList(slice, prevSlice)
+					for _, dgname := range dgnames {
+						dimsis := getDeletedImsisList(nil, client.devgroupsConfigClient[dgname])
+						sliceProto.DeletedImsis = dimsis
+						sliceProto.OperationType = protos.OpType_SLICE_DELETE
+					}
+					sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
+				}
+
+				//device add: Not Applicable
+
+				//device group updated
+				if cReqMsg.devGroup != nil && cReqMsg.lastDevGroup != nil {
+					client.clientLog.Infof("PrevDevGroup Msg: %v", cReqMsg.lastDevGroup)
+					client.clientLog.Infof("DevGroup Msg: %v", cReqMsg.devGroup)
+					name := cReqMsg.devGroup.DeviceGroupName
+					if ok, sliceName := isDeviceGroupInExistingSlices(client, name); ok {
+						client.clientLog.Infof("DeviceGroup: %v updated, slice of this device group: %v", name, sliceName)
+						slice := client.slicesConfigClient[sliceName]
+						fillSlice(client, slice.SliceName, slice, sliceProto)
+						aimsis := getAddedImsisList(cReqMsg.devGroup, cReqMsg.lastDevGroup)
+						sliceProto.AddUpdatedImsis = aimsis
+						dimsis := getDeletedImsisList(cReqMsg.devGroup, cReqMsg.lastDevGroup)
+						sliceProto.DeletedImsis = dimsis
+						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
+						sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
+					} else {
+						client.clientLog.Infof("Device Group: %s is not exist in available slices", name)
+						client.configChanged = false
+						continue
+					}
+				}
+				//device group deleted
+				if cReqMsg.devGroup == nil && cReqMsg.lastDevGroup != nil {
+					name := cReqMsg.lastDevGroup.DeviceGroupName
+					if ok, sliceName := isDeviceGroupInExistingSlices(client, name); ok {
+						client.clientLog.Infof("DeviceGroup: %v deleted, slice of this device group: %v", name, sliceName)
+						slice := client.slicesConfigClient[sliceName]
+						fillSlice(client, slice.SliceName, slice, sliceProto)
+						dimsis := getDeletedImsisList(nil, cReqMsg.lastDevGroup)
+						sliceProto.DeletedImsis = dimsis
+						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
+						sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
+					} else {
+						client.clientLog.Infof("Device Group: %s is not exist in available slices", name)
+						client.configChanged = false
+						continue
+					}
+				}
+
+			} else {
+				for sliceName, sliceConfig := range client.slicesConfigClient {
+					if sliceConfig == nil {
+						continue
+					}
+					sliceProto := &protos.NetworkSlice{}
+					result := fillSlice(client, sliceName, sliceConfig, sliceProto)
+					if result == true {
+						sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
+					} else {
+						client.clientLog.Infoln("Not sending slice config")
+					}
 				}
 			}
 			sliceDetails.ConfigUpdated = 1
 			if client.resStream == nil {
 				cReqMsg.grpcRspMsg <- envMsg
 			} else {
+				client.clientLog.Infof("sliceDetails: %v", envMsg.networkSliceRspMsg)
 				if err := client.resStream.Send(
 					envMsg.networkSliceRspMsg); err != nil {
 					client.clientLog.Infoln("Failed to send data to client: ", err)
@@ -697,16 +852,16 @@ func addedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	return
 }
 
-func isDeviceGroupInExistingSlices(client *clientNF, name string) bool {
-	for _, sliceConfig := range client.slicesConfigClient {
+func isDeviceGroupInExistingSlices(client *clientNF, name string) (bool, string) {
+	for sliceName, sliceConfig := range client.slicesConfigClient {
 		for _, dg := range sliceConfig.SiteDeviceGroup {
 			if dg == name {
-				return true
+				return true, sliceName
 			}
 		}
 	}
 
-	return false
+	return false, ""
 }
 
 func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, lastSlice *configmodels.Slice) {
@@ -731,11 +886,13 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 
 				//devGroup not exist in current but exist in lastSlice
 				devGroup := client.devgroupsConfigClient[oldG]
-				if !found && devGroup != nil && !isDeviceGroupInExistingSlices(client, oldG) {
-					imsis := deletedImsis(devGroup, nil)
-					client.clientLog.Infoln("DeviceGroup Deleted from Slice: ", oldG)
-					for _, val := range imsis {
-						deleteConfigHss(client, val)
+				if !found && devGroup != nil {
+					if ok, _ := isDeviceGroupInExistingSlices(client, oldG); !ok {
+						imsis := deletedImsis(devGroup, nil)
+						client.clientLog.Infoln("DeviceGroup Deleted from Slice: ", oldG)
+						for _, val := range imsis {
+							deleteConfigHss(client, val)
+						}
 					}
 				}
 			}

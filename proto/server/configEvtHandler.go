@@ -513,9 +513,9 @@ func compareNssai(sNssai *models.Snssai,
 
 func convertToString(val uint64) string {
 	var mbVal, gbVal, kbVal uint64
-	kbVal = val / 1024
-	mbVal = val / 1048576
-	gbVal = val / 1073741824
+	kbVal = val / 1000
+	mbVal = val / 1000000
+	gbVal = val / 1000000000
 	var retStr string
 	if gbVal != 0 {
 		retStr = strconv.FormatUint(uint64(gbVal), 10) + " Gbps"
@@ -527,7 +527,6 @@ func convertToString(val uint64) string {
 		retStr = strconv.FormatUint(uint64(val), 10) + " bps"
 	}
 
-	fmt.Println("convertToString value ", val, retStr)
 	return retStr
 }
 

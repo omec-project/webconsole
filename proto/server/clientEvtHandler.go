@@ -372,9 +372,21 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 			endp = "any"
 		}
 		if ruleConfig.Protocol == int32(protos.PccFlowTos_TCP.Number()) {
-			desc = "permit out tcp from " + endp + " to assigned " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10)
+			if ruleConfig.StartPort != 0 && ruleConfig.EndPort != 0 {
+				desc = "permit out tcp from " + endp + " to assigned"
+			} else if factory.WebUIConfig.Configuration.SdfComp {
+				desc = "permit out tcp from " + endp + " " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10) + " to assigned"
+			} else {
+				desc = "permit out tcp from " + endp + " to assigned " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10)
+			}
 		} else if ruleConfig.Protocol == int32(protos.PccFlowTos_UDP.Number()) {
-			desc = "permit out udp from " + endp + " to assigned " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10)
+			if ruleConfig.StartPort != 0 && ruleConfig.EndPort != 0 {
+				desc = "permit out udp from " + endp + " to assigned"
+			} else if factory.WebUIConfig.Configuration.SdfComp {
+				desc = "permit out udp from " + endp + " " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10) + " to assigned"
+			} else {
+				desc = "permit out udp from " + endp + " to assigned " + strconv.FormatInt(int64(ruleConfig.StartPort), 10) + "-" + strconv.FormatInt(int64(ruleConfig.EndPort), 10)
+			}
 		} else {
 			desc = "permit out ip from " + endp + " to assigned"
 		}
@@ -1115,9 +1127,21 @@ func postConfigPcrf(client *clientNF) {
 				// permit out udp from 8.8.8.8/32 to assigned sport-dport
 				var desc string
 				if app.Protocol == 6 {
-					desc = "permit out tcp from " + app.Endpoint + " to assigned " + strconv.FormatInt(int64(app.StartPort), 10) + "-" + strconv.FormatInt(int64(app.EndPort), 10)
+					if app.StartPort != 0 && app.EndPort != 0 {
+						desc = "permit out tcp from " + app.Endpoint + " to assigned"
+					} else if factory.WebUIConfig.Configuration.SdfComp {
+						desc = "permit out tcp from " + app.Endpoint + " " + strconv.FormatInt(int64(app.StartPort), 10) + "-" + strconv.FormatInt(int64(app.EndPort), 10) + " to assigned "
+					} else {
+						desc = "permit out tcp from " + app.Endpoint + " to assigned " + strconv.FormatInt(int64(app.StartPort), 10) + "-" + strconv.FormatInt(int64(app.EndPort), 10)
+					}
 				} else if app.Protocol == 17 {
-					desc = "permit out udp from " + app.Endpoint + " to assigned " + strconv.FormatInt(int64(app.StartPort), 10) + "-" + strconv.FormatInt(int64(app.EndPort), 10)
+					if app.StartPort != 0 && app.EndPort != 0 {
+						desc = "permit out udp from " + app.Endpoint + " to assigned"
+					} else if factory.WebUIConfig.Configuration.SdfComp {
+						desc = "permit out udp from " + app.Endpoint + " " + strconv.FormatInt(int64(app.StartPort), 10) + "-" + strconv.FormatInt(int64(app.EndPort), 10) + " to assigned "
+					} else {
+						desc = "permit out udp from " + app.Endpoint + " to assigned " + strconv.FormatInt(int64(app.StartPort), 10) + "-" + strconv.FormatInt(int64(app.EndPort), 10)
+					}
 				} else {
 					desc = "permit out ip from " + app.Endpoint + " to assigned"
 				}

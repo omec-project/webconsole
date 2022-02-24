@@ -33,6 +33,7 @@ type Configuration struct {
 	Mongodb   *Mongodb    `yaml:"mongodb"`
 	RocEnd    *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
 	LteEnd    []*LteEndpt `yaml:"endpoints,omitempty"`          //LTE endpoints are configured and not auto-detected
+	SdfComp   bool        `yaml:"spec-compliant-sdf"`
 }
 
 type WebServer struct {

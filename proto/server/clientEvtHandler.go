@@ -616,13 +616,13 @@ func clientEventMachine(client *clientNF) {
 					dgnames := getDeleteGroupsList(slice, prevSlice)
 					for _, dgname := range dgnames {
 						dimsis := getDeletedImsisList(nil, client.devgroupsConfigClient[dgname])
-						sliceProto.DeletedImsis = dimsis
+						sliceProto.DeletedImsis = append(sliceProto.DeletedImsis, dimsis...)
 						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
 					}
 					dgnames = getAddedGroupsList(slice, prevSlice)
 					for _, dgname := range dgnames {
 						aimsis := getAddedImsisList(client.devgroupsConfigClient[dgname], nil)
-						sliceProto.AddUpdatedImsis = aimsis
+						sliceProto.AddUpdatedImsis = append(sliceProto.AddUpdatedImsis, aimsis...)
 						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
 					}
 					//updated other than device group list, adding all imsis because update is required for all
@@ -630,7 +630,7 @@ func clientEventMachine(client *clientNF) {
 						dgnames = getAddedGroupsList(slice, nil)
 						for _, dgname := range dgnames {
 							aimsis := getAddedImsisList(client.devgroupsConfigClient[dgname], nil)
-							sliceProto.AddUpdatedImsis = aimsis
+							sliceProto.AddUpdatedImsis = append(sliceProto.AddUpdatedImsis, aimsis...)
 							sliceProto.OperationType = protos.OpType_SLICE_UPDATE
 						}
 					}

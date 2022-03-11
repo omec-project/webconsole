@@ -60,10 +60,8 @@ func convertToBps(val int64, unit string) (bitrate int64) {
 		bitrate = val * MPS
 	} else if strings.EqualFold(unit, "gbps") {
 		bitrate = val * GPS
-	} else {
-		// default consider it as mbps
-		bitrate = val * MPS
 	}
+	// default consider it as bps
 	return bitrate
 }
 func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {

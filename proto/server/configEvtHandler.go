@@ -270,7 +270,7 @@ func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
 	MongoDBLibrary.RestfulAPIPost(smPolicyDataColl, filter, smPolicyDatBsonA)
 }
 
-func updateAmProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string) {
+func updateAmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) {
 	amData := models.AccessAndMobilitySubscriptionData{
 		Gpsis: []string{
 			"msisdn-0900000000",
@@ -280,8 +280,8 @@ func updateAmProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string)
 			SingleNssais:        []models.Snssai{*snssai},
 		},
 		SubscribedUeAmbr: &models.AmbrRm{
-			Downlink: "2 Gbps",
-			Uplink:   "1 Gbps",
+		    Downlink: convertToString(uint64(qos.DnnMbrDownlink)),
+			Uplink:   convertToString(uint64(qos.DnnMbrUplink)),
 		},
 	}
 	amDataBsonA := toBsonM(amData)
@@ -424,7 +424,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
 					updateAmPolicyData(imsi)
 					updateSmPolicyData(snssai, dnn, imsi)
-					updateAmProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+					updateAmProviosionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
 					updateSmProviosionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
 					updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
 				}
@@ -467,7 +467,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 							mnc := slice.SiteInfo.Plmn.Mnc
 							updateAmPolicyData(imsi)
 							updateSmPolicyData(snssai, dnn, imsi)
-							updateAmProviosionedData(snssai, mcc, mnc, dnn, imsi)
+							updateAmProviosionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, dnn, imsi)
 							updateSmProviosionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, dnn, imsi)
 							updateSmfSelectionProviosionedData(snssai, mcc, mnc, dnn, imsi)
 						}

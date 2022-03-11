@@ -619,21 +619,21 @@ func clientEventMachine(client *clientNF) {
 						sliceProto.DeletedImsis = append(sliceProto.DeletedImsis, dimsis...)
 						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
 					}
-					dgnames = getAddedGroupsList(slice, prevSlice)
+					/*dgnames = getAddedGroupsList(slice, prevSlice)
+					for _, dgname := range dgnames {
+						aimsis := getAddedImsisList(client.devgroupsConfigClient[dgname], nil)
+						sliceProto.AddUpdatedImsis = append(sliceProto.AddUpdatedImsis, aimsis...)
+						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
+					}*/
+					//updated other than device group list, adding all imsis because update is required for all
+					//if sliceProto.OperationType != protos.OpType_SLICE_UPDATE {
+					dgnames = getAddedGroupsList(slice, nil)
 					for _, dgname := range dgnames {
 						aimsis := getAddedImsisList(client.devgroupsConfigClient[dgname], nil)
 						sliceProto.AddUpdatedImsis = append(sliceProto.AddUpdatedImsis, aimsis...)
 						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
 					}
-					//updated other than device group list, adding all imsis because update is required for all
-					if sliceProto.OperationType != protos.OpType_SLICE_UPDATE {
-						dgnames = getAddedGroupsList(slice, nil)
-						for _, dgname := range dgnames {
-							aimsis := getAddedImsisList(client.devgroupsConfigClient[dgname], nil)
-							sliceProto.AddUpdatedImsis = append(sliceProto.AddUpdatedImsis, aimsis...)
-							sliceProto.OperationType = protos.OpType_SLICE_UPDATE
-						}
-					}
+					//}
 					sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
 				}
 				//slice deleted

@@ -498,6 +498,11 @@ func clientEventMachine(client *clientNF) {
 			} else if configMsg.SliceName != "" && configMsg.MsgMethod == configmodels.Delete_op {
 				lastSlice = client.slicesConfigClient[configMsg.SliceName]
 				client.clientLog.Infof("Received delete configuration for Slice: %v ", configMsg.SliceName)
+                //checking whether the slice is exist or not
+                if lastSlice == nil {
+                    client.clientLog.Warnf("Received non-exist slice: [%v] from Roc/Simapp",  configMsg.SliceName)
+                    continue
+                }
 				delete(client.slicesConfigClient, configMsg.SliceName)
 			}
 

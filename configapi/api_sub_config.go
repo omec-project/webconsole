@@ -15,8 +15,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 
-	"github.com/free5gc/MongoDBLibrary"
-	"github.com/free5gc/openapi/models"
+	"github.com/omec-project/MongoDBLibrary"
+	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
 	"github.com/omec-project/webconsole/configmodels"

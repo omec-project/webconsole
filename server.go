@@ -12,7 +12,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/free5gc/version"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_service"
 )
@@ -29,7 +28,6 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "webui"
 	appLog.Infoln(app.Name)
-	appLog.Infoln("webconsole version: ", version.GetVersion())
 	app.Usage = "-free5gccfg common configuration file -webuicfg webui configuration file"
 	app.Action = action
 	app.Flags = WEBUI.GetCliCmd()

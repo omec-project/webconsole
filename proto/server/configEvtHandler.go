@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/free5gc/MongoDBLibrary"
-	"github.com/free5gc/openapi/models"
+	"github.com/omec-project/MongoDBLibrary"
+	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -280,7 +280,7 @@ func updateAmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGro
 			SingleNssais:        []models.Snssai{*snssai},
 		},
 		SubscribedUeAmbr: &models.AmbrRm{
-		    Downlink: convertToString(uint64(qos.DnnMbrDownlink)),
+			Downlink: convertToString(uint64(qos.DnnMbrDownlink)),
 			Uplink:   convertToString(uint64(qos.DnnMbrUplink)),
 		},
 	}

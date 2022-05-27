@@ -12,8 +12,8 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/free5gc/MongoDBLibrary"
-	"github.com/free5gc/openapi/models"
+	"github.com/omec-project/MongoDBLibrary"
+	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 )
 

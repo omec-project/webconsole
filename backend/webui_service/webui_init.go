@@ -21,12 +21,11 @@ import (
 	_ "net/http"
 	_ "net/http/pprof"
 
-	"github.com/free5gc/MongoDBLibrary"
-	mongoDBLibLogger "github.com/free5gc/MongoDBLibrary/logger"
-	"github.com/free5gc/logger_util"
-	openApiLogger "github.com/free5gc/openapi/logger"
-	"github.com/free5gc/path_util"
-	pathUtilLogger "github.com/free5gc/path_util/logger"
+	"github.com/omec-project/MongoDBLibrary"
+	mongoDBLibLogger "github.com/omec-project/MongoDBLibrary/logger"
+	"github.com/omec-project/logger_util"
+	"github.com/omec-project/path_util"
+	pathUtilLogger "github.com/omec-project/path_util/logger"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
@@ -123,22 +122,6 @@ func (webui *WEBUI) setLogLevel() {
 			pathUtilLogger.SetLogLevel(logrus.InfoLevel)
 		}
 		pathUtilLogger.SetReportCaller(factory.WebUIConfig.Logger.PathUtil.ReportCaller)
-	}
-
-	if factory.WebUIConfig.Logger.OpenApi != nil {
-		if factory.WebUIConfig.Logger.OpenApi.DebugLevel != "" {
-			if level, err := logrus.ParseLevel(factory.WebUIConfig.Logger.OpenApi.DebugLevel); err != nil {
-				openApiLogger.OpenApiLog.Warnf("OpenAPI Log level [%s] is invalid, set to [info] level",
-					factory.WebUIConfig.Logger.OpenApi.DebugLevel)
-				openApiLogger.SetLogLevel(logrus.InfoLevel)
-			} else {
-				openApiLogger.SetLogLevel(level)
-			}
-		} else {
-			openApiLogger.OpenApiLog.Warnln("OpenAPI Log level not set. Default set to [info] level")
-			openApiLogger.SetLogLevel(logrus.InfoLevel)
-		}
-		openApiLogger.SetReportCaller(factory.WebUIConfig.Logger.OpenApi.ReportCaller)
 	}
 
 	if factory.WebUIConfig.Logger.MongoDBLibrary != nil {

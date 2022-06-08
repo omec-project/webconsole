@@ -1,4 +1,5 @@
-// SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+// SPDX-FileCopyrightText: 2022-present Intel Corporation
+//SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
 // Copyright 2019 free5GC.org
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -25,6 +26,7 @@ type Config struct {
 type Info struct {
 	Version     string `yaml:"version,omitempty"`
 	Description string `yaml:"description,omitempty"`
+	HttpVersion int    `yaml:"http-version,omitempty"`
 }
 
 type Configuration struct {
@@ -34,6 +36,7 @@ type Configuration struct {
 	RocEnd    *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
 	LteEnd    []*LteEndpt `yaml:"endpoints,omitempty"`          //LTE endpoints are configured and not auto-detected
 	SdfComp   bool        `yaml:"spec-compliant-sdf"`
+	CfgPort   int         `yaml:"cfgport,omitempty"`
 }
 
 type WebServer struct {

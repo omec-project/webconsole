@@ -9,6 +9,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/omec-project/MongoDBLibrary v1.1.0
 	github.com/omec-project/config5g v1.1.0
+	github.com/omec-project/http2_util v1.1.0
 	github.com/omec-project/http_wrapper v1.1.0
 	github.com/omec-project/logger_conf v1.1.0
 	github.com/omec-project/logger_util v1.1.0

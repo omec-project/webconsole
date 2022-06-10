@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2022-present Intel Corporation
 // SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
 // Copyright 2019 free5GC.org
 //
@@ -11,10 +12,12 @@ import (
 	"fmt"
 	"net/http"
 	"os/exec"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/omec-project/http2_util"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -155,7 +158,7 @@ func (webui *WEBUI) FilterCli(c *cli.Context) (args []string) {
 }
 
 func (webui *WEBUI) Start() {
-	if factory.WebUIConfig.Configuration.Mode5G == true {
+	if factory.WebUIConfig.Configuration.Mode5G {
 		// get config file info from WebUIConfig
 		mongodb := factory.WebUIConfig.Configuration.Mongodb
 
@@ -186,12 +189,33 @@ func (webui *WEBUI) Start() {
 	}))
 
 	go func() {
-		initLog.Infoln(subconfig_router.Run(":5000"))
-		initLog.Infoln("Webserver stopped/terminated/not-started ")
+		httpAddr := ":" + strconv.Itoa(factory.WebUIConfig.Configuration.CfgPort)
+		initLog.Infoln("Webui HTTP addr:", httpAddr, factory.WebUIConfig.Configuration.CfgPort)
+		if factory.WebUIConfig.Info.HttpVersion == 2 {
+			server, err := http2_util.NewServer(httpAddr, "", subconfig_router)
+			if server == nil {
+				initLog.Error("Initialize HTTP-2 server failed:", err)
+				return
+			}
+
+			if err != nil {
+				initLog.Warnln("Initialize HTTP-2 server:", err)
+				return
+			}
+
+			err = server.ListenAndServe()
+			if err != nil {
+				initLog.Fatalln("HTTP server setup failed:", err)
+				return
+			}
+		} else {
+			initLog.Infoln(subconfig_router.Run(httpAddr))
+			initLog.Infoln("Webserver stopped/terminated/not-started ")
+		}
 	}()
 	/* First HTTP server end */
 
-	if factory.WebUIConfig.Configuration.Mode5G == true {
+	if factory.WebUIConfig.Configuration.Mode5G {
 		self := webui_context.WEBUI_Self()
 		self.UpdateNfProfiles()
 	}
@@ -206,7 +230,7 @@ func (webui *WEBUI) Start() {
 	// this is to fetch existing config
 	go fetchConfigAdapater()
 
-	http.ListenAndServe("0.0.0.0:5001", nil)
+	//http.ListenAndServe("0.0.0.0:5001", nil)
 
 	select {}
 }

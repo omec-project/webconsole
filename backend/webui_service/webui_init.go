@@ -164,6 +164,15 @@ func (webui *WEBUI) Start() {
 
 		// Connect to MongoDB
 		MongoDBLibrary.SetMongoDB(mongodb.Name, mongodb.Url)
+		for {
+			if MongoDBLibrary.Client != nil {
+				break
+			} else {
+				MongoDBLibrary.SetMongoDB(mongodb.Name, mongodb.Url)
+				continue
+			}
+		}
+
 	}
 
 	initLog.Infoln("WebUI Server started")

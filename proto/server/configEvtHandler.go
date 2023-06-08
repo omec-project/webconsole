@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
 //
 // SPDX-License-Identifier: Apache-2.0
-//
 package server
 
 import (
@@ -28,6 +27,8 @@ const (
 	amPolicyDataColl = "policyData.ues.amData"
 	smPolicyDataColl = "policyData.ues.smData"
 	flowRuleDataColl = "policyData.ues.flowRule"
+	devGroupDataColl = "webconsoleData.snapshots.devGroupData"
+	sliceDataColl    = "webconsoleData.snapshots.sliceData"
 )
 
 var configLog *logrus.Entry
@@ -50,14 +51,7 @@ type Update5GSubscriberMsg struct {
 }
 
 var subsChannel chan *Update5GSubscriberMsg
-var slicesConfigSnapshot map[string]*configmodels.Slice
-var devgroupsConfigSnapshot map[string]*configmodels.DeviceGroups
 var rwLock sync.RWMutex
-
-func init() {
-	slicesConfigSnapshot = make(map[string]*configmodels.Slice)
-	devgroupsConfigSnapshot = make(map[string]*configmodels.DeviceGroups)
-}
 
 var initialConfigRcvd bool
 var imsiData map[string]*models.AuthenticationSubscription
@@ -108,28 +102,32 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				if configMsg.DevGroup != nil {
 					configLog.Infof("Received Device Group [%v] configuration from config channel", configMsg.DevGroupName)
 
+					rwLock.Lock()
 					if factory.WebUIConfig.Configuration.Mode5G == true {
 						var config5gMsg Update5GSubscriberMsg
 						config5gMsg.Msg = configMsg
-						config5gMsg.PrevDevGroup = devgroupsConfigSnapshot[configMsg.DevGroupName]
+						config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
 						subsUpdateChan <- &config5gMsg
 					}
-					rwLock.Lock()
-					devgroupsConfigSnapshot[configMsg.DevGroupName] = configMsg.DevGroup
+					filter := bson.M{"DeviceGroupName": configMsg.DevGroupName}
+					devGroupDataBsonA := toBsonM(configMsg.DevGroup)
+					MongoDBLibrary.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
 					rwLock.Unlock()
 				}
 
 				if configMsg.Slice != nil {
 					configLog.Infof("Received Slice [%v] configuration from config channel", configMsg.SliceName)
 
+					rwLock.Lock()
 					if factory.WebUIConfig.Configuration.Mode5G == true {
 						var config5gMsg Update5GSubscriberMsg
 						config5gMsg.Msg = configMsg
-						config5gMsg.PrevSlice = slicesConfigSnapshot[configMsg.SliceName]
+						config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
 						subsUpdateChan <- &config5gMsg
 					}
-					rwLock.Lock()
-					slicesConfigSnapshot[configMsg.SliceName] = configMsg.Slice
+					filter := bson.M{"SliceName": configMsg.SliceName}
+					sliceDataBsonA := toBsonM(configMsg.Slice)
+					MongoDBLibrary.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
 					rwLock.Unlock()
 				}
 
@@ -148,14 +146,16 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 					// update config snapshot
 					if configMsg.DevGroup == nil {
 						configLog.Infof("Received delete Device Group [%v] from config channel", configMsg.DevGroupName)
-						config5gMsg.PrevDevGroup = devgroupsConfigSnapshot[configMsg.DevGroupName]
-						delete(devgroupsConfigSnapshot, configMsg.DevGroupName)
+						config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
+						filter := bson.M{"DeviceGroupName": configMsg.DevGroupName}
+						MongoDBLibrary.RestfulAPIDeleteOne(devGroupDataColl, filter)
 					}
 
 					if configMsg.Slice == nil {
 						configLog.Infof("Received delete Slice [%v] from config channel", configMsg.SliceName)
-						config5gMsg.PrevSlice = slicesConfigSnapshot[configMsg.SliceName]
-						delete(slicesConfigSnapshot, configMsg.SliceName)
+						config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
+						filter := bson.M{"SliceName": configMsg.SliceName}
+						MongoDBLibrary.RestfulAPIDeleteOne(sliceDataColl, filter)
 					}
 					rwLock.Unlock()
 				} else {
@@ -178,8 +178,46 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 	}
 }
 
+func getDeviceGroups() []*configmodels.DeviceGroups {
+	rawDeviceGroups := MongoDBLibrary.RestfulAPIGetMany(devGroupDataColl, nil)
+	var deviceGroups []*configmodels.DeviceGroups
+	for _, rawDevGroup := range rawDeviceGroups {
+		var devGroupData configmodels.DeviceGroups
+		json.Unmarshal(mapToByte(rawDevGroup), &devGroupData)
+		deviceGroups = append(deviceGroups, &devGroupData)
+	}
+	return deviceGroups
+}
+
+func getDeviceGroupByName(name string) *configmodels.DeviceGroups {
+	filter := bson.M{"DeviceGroupName": name}
+	devGroupDataInterface := MongoDBLibrary.RestfulAPIGetOne(devGroupDataColl, filter)
+	var devGroupData configmodels.DeviceGroups
+	json.Unmarshal(mapToByte(devGroupDataInterface), &devGroupData)
+	return &devGroupData
+}
+
+func getSlices() []*configmodels.Slice {
+	rawSlices := MongoDBLibrary.RestfulAPIGetMany(sliceDataColl, nil)
+	var slices []*configmodels.Slice
+	for _, rawSlice := range rawSlices {
+		var sliceData configmodels.Slice
+		json.Unmarshal(mapToByte(rawSlice), &sliceData)
+		slices = append(slices, &sliceData)
+	}
+	return slices
+}
+
+func getSliceByName(name string) *configmodels.Slice {
+	filter := bson.M{"SliceName": name}
+	sliceDataInterface := MongoDBLibrary.RestfulAPIGetOne(sliceDataColl, filter)
+	var sliceData configmodels.Slice
+	json.Unmarshal(mapToByte(sliceDataInterface), &sliceData)
+	return &sliceData
+}
+
 func isImsiPartofDeviceGroup(imsi string) bool {
-	for _, devgroup := range devgroupsConfigSnapshot {
+	for _, devgroup := range getDeviceGroups() {
 		for _, val := range devgroup.Imsis {
 			if val == imsi {
 				return true
@@ -348,7 +386,7 @@ func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, im
 }
 
 func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg) *configmodels.Slice {
-	for name, slice := range slicesConfigSnapshot {
+	for name, slice := range getSlices() {
 		for _, dgName := range slice.SiteDeviceGroup {
 			if dgName == msg.Msg.DevGroupName {
 				logger.WebUILog.Infof("Device Group [%v] is part of slice: %v", dgName, name)
@@ -459,8 +497,8 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				}
 				for _, dgName := range slice.SiteDeviceGroup {
 					configLog.Infoln("dgName : ", dgName)
-					devGroupConfig := devgroupsConfigSnapshot[dgName]
-					if devgroupsConfigSnapshot[dgName] != nil {
+					devGroupConfig := getDeviceGroupByName(dgName)
+					if devGroupConfig != nil {
 						for _, imsi := range devGroupConfig.Imsis {
 							dnn := devGroupConfig.IpDomainExpanded.Dnn
 							mcc := slice.SiteInfo.Plmn.Mcc
@@ -477,8 +515,9 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 
 			dgnames := getDeleteGroupsList(slice, confData.PrevSlice)
 			for _, dgname := range dgnames {
-				if devgroupsConfigSnapshot[dgname] != nil {
-					for _, imsi := range devgroupsConfigSnapshot[dgname].Imsis {
+				devGroupConfig := getDeviceGroupByName(dgname)
+				if devGroupConfig != nil {
+					for _, imsi := range devGroupConfig.Imsis {
 						mcc := confData.PrevSlice.SiteInfo.Plmn.Mcc
 						mnc := confData.PrevSlice.SiteInfo.Plmn.Mnc
 						filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
@@ -534,6 +573,11 @@ func convertToString(val uint64) string {
 func toBsonM(data interface{}) (ret bson.M) {
 	tmp, _ := json.Marshal(data)
 	json.Unmarshal(tmp, &ret)
+	return
+}
+
+func mapToByte(data map[string]interface{}) (ret []byte) {
+	ret, _ = json.Marshal(data)
 	return
 }
 

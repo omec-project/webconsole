@@ -37,7 +37,7 @@ type clientNF struct {
 	metadataReqtd         bool
 }
 
-//message format received from grpc server thread to Client go routine
+// message format received from grpc server thread to Client go routine
 type clientReqMsg struct {
 	networkSliceReqMsg *protos.NetworkSliceRequest
 	grpcRspMsg         chan *clientRspMsg
@@ -48,7 +48,7 @@ type clientReqMsg struct {
 	slice              *configmodels.Slice
 }
 
-//message format to send response from client go routine to grpc server
+// message format to send response from client go routine to grpc server
 type clientRspMsg struct {
 	networkSliceRspMsg *protos.NetworkSliceResponse
 }
@@ -224,11 +224,11 @@ func getClient(id string) (*clientNF, bool) {
 	client.devgroupsConfigClient = make(map[string]*configmodels.DeviceGroups)
 	// TODO : should we lock global tables before copying them ?
 	rwLock.RLock()
-	for key, value := range slicesConfigSnapshot {
-		client.slicesConfigClient[key] = value
+	for _, value := range getSlices() {
+		client.slicesConfigClient[value.SliceName] = value
 	}
-	for key, value := range devgroupsConfigSnapshot {
-		client.devgroupsConfigClient[key] = value
+	for _, value := range getDeviceGroups() {
+		client.devgroupsConfigClient[value.DeviceGroupName] = value
 	}
 	rwLock.RUnlock()
 	go clientEventMachine(client)

@@ -9,8 +9,8 @@ import (
 	"math"
 	"strings"
 
-	"github.com/omec-project/http_wrapper"
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/http_wrapper"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/sirupsen/logrus"
@@ -79,7 +79,7 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 		err = c.ShouldBindJSON(&request)
 	}
 	if err != nil {
-		configLog.Infof(" err ", err)
+		configLog.Infof(" err %v", err)
 		return false
 	}
 	req := http_wrapper.NewRequest(c.Request, request)
@@ -157,7 +157,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		err = c.ShouldBindJSON(&request)
 	}
 	if err != nil {
-		configLog.Infof(" err ", err)
+		configLog.Infof(" err %v", err)
 		return false
 	}
 	//configLog.Infof("Printing request full after binding : %v ", request)

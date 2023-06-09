@@ -298,7 +298,7 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 		client.clientLog.Debugf("group %v, len of devgroupsConfigClient %v ", group, len(client.devgroupsConfigClient))
 		devGroupConfig := client.devgroupsConfigClient[group]
 		if devGroupConfig == nil {
-			client.clientLog.Infoln("Did not find group %v ", group)
+			client.clientLog.Infof("Did not find group %v ", group)
 			return false
 		}
 

@@ -124,7 +124,7 @@ func (c *ConfigServer) NetworkSliceSubscribe(req *protos.NetworkSliceRequest, st
 			delete(clientNFPool, req.ClientId)
 			return nil
 		case <-ctx.Done():
-			client.clientLog.Infof("Client ID %d has disconnected", req.ClientId)
+			client.clientLog.Infof("Client ID %s has disconnected", req.ClientId)
 			delete(clientNFPool, req.ClientId)
 			return nil
 		}

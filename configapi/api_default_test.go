@@ -94,12 +94,12 @@ func TestGetDeviceGroupsNoGroups(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
-		t.Fatalf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
 	if body != "[]" {
-		t.Fatalf("Expected empty JSON list, got %v", body)
+		t.Errorf("Expected empty JSON list, got %v", body)
 	}
 }
 
@@ -112,13 +112,13 @@ func TestGetDeviceGroupsOneGroup(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
-		t.Fatalf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
 	expected := `["group1"]`
 	if body != expected {
-		t.Fatalf("Expected %v, got %v", expected, body)
+		t.Errorf("Expected %v, got %v", expected, body)
 	}
 }
 
@@ -131,13 +131,13 @@ func TestGetDeviceGroupsManyGroup(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
-		t.Fatalf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
 	expected := `["group1","group2","group3"]`
 	if body != expected {
-		t.Fatalf("Expected %v, got %v", expected, body)
+		t.Errorf("Expected %v, got %v", expected, body)
 	}
 }
 
@@ -151,12 +151,12 @@ func TestGetDeviceGroupByNameDoesNotExist(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != 404 {
-		t.Fatalf("Expected StatusCode %d, got %d", 404, resp.StatusCode)
+		t.Errorf("Expected StatusCode %d, got %d", 404, resp.StatusCode)
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
 	if body != "null" {
-		t.Fatalf("Expected %v, got %v", "null", body)
+		t.Errorf("Expected %v, got %v", "null", body)
 	}
 }
 
@@ -170,13 +170,13 @@ func TestGetDeviceGroupByNameDoesExists(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
-		t.Fatalf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
 	expected := `{"DeviceGroupName":"group1","imsis":["1234","5678"],"site-info":"demo","ip-domain-name":"pool1","ip-domain-expanded":{"dnn":"internet","ue-ip-pool":"172.250.1.0/16","dns-primary":"1.1.1.1","dns-secondary":"8.8.8.8","mtu":1460,"ue-dnn-qos":{"dnn-mbr-uplink":10000000,"dnn-mbr-downlink":10000000,"bitrate-unit":"kbps","traffic-class":{"name":"platinum","qci":8,"arp":6,"pdb":300,"pelr":6}}}}`
 	if body != expected {
-		t.Fatalf("Expected %v, got %v", expected, body)
+		t.Errorf("Expected %v, got %v", expected, body)
 	}
 }
 
@@ -262,12 +262,12 @@ func TestGetNetworkSlicesNoSlices(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
-		t.Fatalf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
 	if body != "[]" {
-		t.Fatalf("Expected empty JSON list, got %v", body)
+		t.Errorf("Expected empty JSON list, got %v", body)
 	}
 }
 
@@ -280,13 +280,13 @@ func TestGetNetworkSlicesOneSlice(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
-		t.Fatalf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
 	expected := `["slice1"]`
 	if body != expected {
-		t.Fatalf("Expected %v, got %v", expected, body)
+		t.Errorf("Expected %v, got %v", expected, body)
 	}
 }
 
@@ -299,13 +299,13 @@ func TestGetNetworkSlicesManySlices(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
-		t.Fatalf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
 	expected := `["slice1","slice2","slice3"]`
 	if body != expected {
-		t.Fatalf("Expected %v, got %v", expected, body)
+		t.Errorf("Expected %v, got %v", expected, body)
 	}
 }
 
@@ -319,12 +319,12 @@ func TestGetNetworkSliceByNameDoesNotExist(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != 404 {
-		t.Fatalf("Expected StatusCode %d, got %d", 404, resp.StatusCode)
+		t.Errorf("Expected StatusCode %d, got %d", 404, resp.StatusCode)
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
 	if body != "null" {
-		t.Fatalf("Expected %v, got %v", "null", body)
+		t.Errorf("Expected %v, got %v", "null", body)
 	}
 }
 
@@ -338,12 +338,12 @@ func TestGetNetworkSliceByNameDoesExists(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
-		t.Fatalf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
 	expected := `{"SliceName":"slice1","slice-id":{"sst":"1","sd":"010203"},"site-device-group":["group1","group2"],"site-info":{"site-name":"demo","plmn":{"mcc":"208","mnc":"93"},"gNodeBs":[{"name":"demo-gnb1","tac":1}],"upf":{"upf-name":"upf","upf-port":"8805"}}}`
 	if body != expected {
-		t.Fatalf("Expected %v, got %v", expected, body)
+		t.Errorf("Expected %v, got %v", expected, body)
 	}
 }

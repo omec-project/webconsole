@@ -15,7 +15,7 @@
 package configmodels
 
 type DeviceGroups struct {
-	DeviceGroupName string
+	DeviceGroupName string `json:"group-name,omitempty"`
 
 	Imsis []string `json:"imsis"`
 

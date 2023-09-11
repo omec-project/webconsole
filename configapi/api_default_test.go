@@ -174,7 +174,7 @@ func TestGetDeviceGroupByNameDoesExists(t *testing.T) {
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
-	expected := `{"DeviceGroupName":"group1","imsis":["1234","5678"],"site-info":"demo","ip-domain-name":"pool1","ip-domain-expanded":{"dnn":"internet","ue-ip-pool":"172.250.1.0/16","dns-primary":"1.1.1.1","dns-secondary":"8.8.8.8","mtu":1460,"ue-dnn-qos":{"dnn-mbr-uplink":10000000,"dnn-mbr-downlink":10000000,"bitrate-unit":"kbps","traffic-class":{"name":"platinum","qci":8,"arp":6,"pdb":300,"pelr":6}}}}`
+	expected := `{"group-name":"group1","imsis":["1234","5678"],"site-info":"demo","ip-domain-name":"pool1","ip-domain-expanded":{"dnn":"internet","ue-ip-pool":"172.250.1.0/16","dns-primary":"1.1.1.1","dns-secondary":"8.8.8.8","mtu":1460,"ue-dnn-qos":{"dnn-mbr-uplink":10000000,"dnn-mbr-downlink":10000000,"bitrate-unit":"kbps","traffic-class":{"name":"platinum","qci":8,"arp":6,"pdb":300,"pelr":6}}}}`
 	if body != expected {
 		t.Errorf("Expected %v, got %v", expected, body)
 	}

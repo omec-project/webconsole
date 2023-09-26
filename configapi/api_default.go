@@ -43,7 +43,7 @@ func GetDeviceGroups(c *gin.Context) {
 	var deviceGroups []string = make([]string, 0)
 	rawDeviceGroups := RestfulAPIGetMany(devGroupDataColl, bson.M{})
 	for _, rawDeviceGroup := range rawDeviceGroups {
-		deviceGroups = append(deviceGroups, rawDeviceGroup["group-name"].(string))
+		deviceGroups = append(deviceGroups, rawDeviceGroup["DeviceGroupName"].(string))
 	}
 
 	c.JSON(http.StatusOK, deviceGroups)

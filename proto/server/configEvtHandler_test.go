@@ -89,7 +89,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
 		}
-		expected_filter := bson.M{"DeviceGroupName": testGroup.DeviceGroupName}
+		expected_filter := bson.M{"group-name": testGroup.DeviceGroupName}
 		if !reflect.DeepEqual(postData[0]["filter"], expected_filter) {
 			t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
 		}
@@ -135,7 +135,7 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
 		}
-		expected_filter := bson.M{"DeviceGroupName": testGroup.DeviceGroupName}
+		expected_filter := bson.M{"group-name": testGroup.DeviceGroupName}
 		if !reflect.DeepEqual(postData[0]["filter"], expected_filter) {
 			t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
 		}

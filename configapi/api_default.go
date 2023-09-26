@@ -43,7 +43,7 @@ func GetDeviceGroups(c *gin.Context) {
 	var deviceGroups []string = make([]string, 0)
 	rawDeviceGroups := RestfulAPIGetMany(devGroupDataColl, bson.M{})
 	for _, rawDeviceGroup := range rawDeviceGroups {
-		deviceGroups = append(deviceGroups, rawDeviceGroup["DeviceGroupName"].(string))
+		deviceGroups = append(deviceGroups, rawDeviceGroup["group-name"].(string))
 	}
 
 	c.JSON(http.StatusOK, deviceGroups)
@@ -55,7 +55,7 @@ func GetDeviceGroupByName(c *gin.Context) {
 	logger.WebUILog.Infoln("Get Device Group by name")
 
 	var deviceGroup configmodels.DeviceGroups
-	filter := bson.M{"DeviceGroupName": c.Param("group-name")}
+	filter := bson.M{"group-name": c.Param("group-name")}
 	rawDeviceGroup := RestfulAPIGetOne(devGroupDataColl, filter)
 	json.Unmarshal(mapToByte(rawDeviceGroup), &deviceGroup)
 

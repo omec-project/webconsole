@@ -132,7 +132,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 					if configMsg.DevGroup == nil {
 						configLog.Infof("Received delete Device Group [%v] from config channel", configMsg.DevGroupName)
 						config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
-						filter := bson.M{"DeviceGroupName": configMsg.DevGroupName}
+						filter := bson.M{"group-name": configMsg.DevGroupName}
 						RestfulAPIDeleteOne(devGroupDataColl, filter)
 					}
 
@@ -171,7 +171,7 @@ func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan
 		config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
 		subsUpdateChan <- &config5gMsg
 	}
-	filter := bson.M{"DeviceGroupName": configMsg.DevGroupName}
+	filter := bson.M{"group-name": configMsg.DevGroupName}
 	devGroupDataBsonA := toBsonM(configMsg.DevGroup)
 	RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
 	rwLock.Unlock()
@@ -203,7 +203,7 @@ func getDeviceGroups() []*configmodels.DeviceGroups {
 }
 
 func getDeviceGroupByName(name string) *configmodels.DeviceGroups {
-	filter := bson.M{"DeviceGroupName": name}
+	filter := bson.M{"group-name": name}
 	devGroupDataInterface := RestfulAPIGetOne(devGroupDataColl, filter)
 	var devGroupData configmodels.DeviceGroups
 	json.Unmarshal(mapToByte(devGroupDataInterface), &devGroupData)

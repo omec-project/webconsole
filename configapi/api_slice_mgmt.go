@@ -7,6 +7,7 @@ package configapi
 
 import (
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -178,6 +179,8 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  sd          : %v", slice.Sd)
 
 	group := procReq.SiteDeviceGroup
+	slices.Sort(group)
+	slices.Compact(group)
 	configLog.Infof("Number of device groups %v", len(group))
 	for i := 0; i < len(group); i++ {
 		configLog.Infof("  device groups(%v) - %v \n", i+1, group[i])

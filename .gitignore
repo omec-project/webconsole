@@ -27,3 +27,4 @@ cscope.*
 bin/
 public/
 !/frontend/public/*.license
+.coverage/

@@ -19,7 +19,7 @@ type Slice struct {
 
 	SliceId SliceSliceId `json:"slice-id,omitempty"`
 
-	SiteDeviceGroup []string `json:"site-device-group,omitempty"`
+	SiteDeviceGroup []string `json:"site-device-group"`
 
 	SiteInfo SliceSiteInfo `json:"site-info,omitempty"`
 

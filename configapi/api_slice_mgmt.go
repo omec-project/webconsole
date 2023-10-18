@@ -7,10 +7,11 @@ package configapi
 
 import (
 	"math"
+	"slices"
 	"strings"
 
-	"github.com/omec-project/http_wrapper"
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/http_wrapper"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/sirupsen/logrus"
@@ -79,7 +80,7 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 		err = c.ShouldBindJSON(&request)
 	}
 	if err != nil {
-		configLog.Infof(" err ", err)
+		configLog.Infof(" err %v", err)
 		return false
 	}
 	req := http_wrapper.NewRequest(c.Request, request)
@@ -157,7 +158,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		err = c.ShouldBindJSON(&request)
 	}
 	if err != nil {
-		configLog.Infof(" err ", err)
+		configLog.Infof(" err %v", err)
 		return false
 	}
 	//configLog.Infof("Printing request full after binding : %v ", request)
@@ -178,6 +179,8 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	configLog.Infof("  sd          : %v", slice.Sd)
 
 	group := procReq.SiteDeviceGroup
+	slices.Sort(group)
+	slices.Compact(group)
 	configLog.Infof("Number of device groups %v", len(group))
 	for i := 0; i < len(group); i++ {
 		configLog.Infof("  device groups(%v) - %v \n", i+1, group[i])

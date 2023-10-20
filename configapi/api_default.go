@@ -15,12 +15,56 @@
 package configapi
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/MongoDBLibrary"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
+	"go.mongodb.org/mongo-driver/bson"
 )
+
+const (
+	devGroupDataColl = "webconsoleData.snapshots.devGroupData"
+	sliceDataColl    = "webconsoleData.snapshots.sliceData"
+)
+
+var (
+	RestfulAPIGetMany = MongoDBLibrary.RestfulAPIGetMany
+	RestfulAPIGetOne  = MongoDBLibrary.RestfulAPIGetOne
+)
+
+// GetDeviceGroups -
+func GetDeviceGroups(c *gin.Context) {
+	setCorsHeader(c)
+	logger.WebUILog.Infoln("Get all Device Groups")
+
+	var deviceGroups []string = make([]string, 0)
+	rawDeviceGroups := RestfulAPIGetMany(devGroupDataColl, bson.M{})
+	for _, rawDeviceGroup := range rawDeviceGroups {
+		deviceGroups = append(deviceGroups, rawDeviceGroup["group-name"].(string))
+	}
+
+	c.JSON(http.StatusOK, deviceGroups)
+}
+
+// GetDeviceGroupsByName -
+func GetDeviceGroupByName(c *gin.Context) {
+	setCorsHeader(c)
+	logger.WebUILog.Infoln("Get Device Group by name")
+
+	var deviceGroup configmodels.DeviceGroups
+	filter := bson.M{"group-name": c.Param("group-name")}
+	rawDeviceGroup := RestfulAPIGetOne(devGroupDataColl, filter)
+	json.Unmarshal(mapToByte(rawDeviceGroup), &deviceGroup)
+
+	if deviceGroup.DeviceGroupName == "" {
+		c.JSON(http.StatusNotFound, nil)
+	} else {
+		c.JSON(http.StatusOK, deviceGroup)
+	}
+}
 
 // DeviceGroupGroupNameDelete -
 func DeviceGroupGroupNameDelete(c *gin.Context) {
@@ -55,6 +99,37 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{})
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{})
+	}
+}
+
+// GetNetworkSlices -
+func GetNetworkSlices(c *gin.Context) {
+	setCorsHeader(c)
+	logger.WebUILog.Infoln("Get all Network Slices")
+
+	var networkSlices []string = make([]string, 0)
+	rawNetworkSlices := RestfulAPIGetMany(sliceDataColl, bson.M{})
+	for _, rawNetworkSlice := range rawNetworkSlices {
+		networkSlices = append(networkSlices, rawNetworkSlice["SliceName"].(string))
+	}
+
+	c.JSON(http.StatusOK, networkSlices)
+}
+
+// GetNetworkSliceByName -
+func GetNetworkSliceByName(c *gin.Context) {
+	setCorsHeader(c)
+	logger.WebUILog.Infoln("Get Network Slice by name")
+
+	var networkSlice configmodels.Slice
+	filter := bson.M{"SliceName": c.Param("slice-name")}
+	rawNetworkSlice := RestfulAPIGetOne(sliceDataColl, filter)
+	json.Unmarshal(mapToByte(rawNetworkSlice), &networkSlice)
+
+	if networkSlice.SliceName == "" {
+		c.JSON(http.StatusNotFound, nil)
+	} else {
+		c.JSON(http.StatusOK, networkSlice)
 	}
 }
 

@@ -70,6 +70,20 @@ var routes = Routes{
 	},
 
 	{
+		"GetDeviceGroups",
+		http.MethodGet,
+		"/device-group",
+		GetDeviceGroups,
+	},
+
+	{
+		"GetDeviceGroupByName",
+		http.MethodGet,
+		"/device-group/:group-name",
+		GetDeviceGroupByName,
+	},
+
+	{
 		"DeviceGroupGroupNameDelete",
 		http.MethodDelete,
 		"/device-group/:group-name",
@@ -95,6 +109,20 @@ var routes = Routes{
 		http.MethodPost,
 		"/device-group/:group-name",
 		DeviceGroupGroupNamePost,
+	},
+
+	{
+		"GetNetworkSlices",
+		http.MethodGet,
+		"/network-slice",
+		GetNetworkSlices,
+	},
+
+	{
+		"GetNetworkSliceByName",
+		http.MethodGet,
+		"/network-slice/:slice-name",
+		GetNetworkSliceByName,
 	},
 
 	{

@@ -22,7 +22,7 @@ type SliceSiteInfo struct {
 
 	Plmn SliceSiteInfoPlmn `json:"plmn,omitempty"`
 
-	GNodeBs []SliceSiteInfoGNodeBs `json:"gNodeBs,omitempty"`
+	GNodeBs []SliceSiteInfoGNodeBs `json:"gNodeBs"`
 
 	// UPF which belong to this slice
 	Upf map[string]interface{} `json:"upf,omitempty"`

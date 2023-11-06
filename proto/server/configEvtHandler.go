@@ -426,6 +426,7 @@ func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg) *configmodels.Slice {
 func getAddedGroupsList(slice, prevSlice *configmodels.Slice) (names []string) {
 	return getDeleteGroupsList(prevSlice, slice)
 }
+
 func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) {
 	for prevSlice == nil {
 		return
@@ -452,6 +453,7 @@ func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) 
 
 	return
 }
+
 func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 	for confData := range confChan {
 		switch confData.Msg.MsgType {
@@ -469,6 +471,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				logger.WebUILog.Debugln("Delete AuthenticationSubscription", imsi)
 				filter := bson.M{"ueId": "imsi-" + imsi}
 				RestfulAPIDeleteOne(authSubsDataColl, filter)
+				RestfulAPIDeleteOne(amDataColl, filter)
 			}
 			rwLock.RUnlock()
 

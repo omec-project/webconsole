@@ -296,7 +296,6 @@ func GetSubscribers(c *gin.Context) {
 	c.JSON(http.StatusOK, subsList)
 }
 
-
 // Get subscriber by IMSI(ueId))
 func GetSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)

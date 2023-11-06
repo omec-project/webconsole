@@ -89,6 +89,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				imsiData[imsiVal] = configMsg.AuthSubData
 				rwLock.Unlock()
 				configLog.Infof("Received Imsi [%v] configuration from config channel", configMsg.Imsi)
+				handleSubscriberPost(configMsg)
 				if factory.WebUIConfig.Configuration.Mode5G == true {
 					var configUMsg Update5GSubscriberMsg
 					configUMsg.Msg = configMsg
@@ -161,6 +162,17 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			}
 		}
 	}
+}
+
+func handleSubscriberPost(configMsg *configmodels.ConfigMessage) {
+	rwLock.Lock()
+	basicAmData := map[string]interface{}{
+        "ueId": configMsg.Imsi,
+    }
+	filter := bson.M{"ueId": "imsi-" + configMsg.Imsi}
+	basicDataBson := toBsonM(basicAmData)
+	RestfulAPIPost(amDataColl, filter, basicDataBson)
+	rwLock.Unlock()
 }
 
 func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {

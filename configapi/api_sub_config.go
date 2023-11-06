@@ -278,17 +278,24 @@ func GetSubscribers(c *gin.Context) {
 	var subsList []configmodels.SubsListIE = make([]configmodels.SubsListIE, 0)
 	amDataList := MongoDBLibrary.RestfulAPIGetMany(amDataColl, bson.M{})
 	for _, amData := range amDataList {
-		ueId := amData["ueId"]
-		servingPlmnId := amData["servingPlmnId"]
+		ueId := amData["ueId"].(string)  // Since ueId is guaranteed to exist
+		servingPlmnId, plmnIdExists := amData["servingPlmnId"]
+
+		plmnIdStr := ""
+		if plmnIdExists {
+			plmnIdStr = servingPlmnId.(string)
+		}
+
 		tmp := configmodels.SubsListIE{
-			PlmnID: servingPlmnId.(string),
-			UeId:   ueId.(string),
+			PlmnID: plmnIdStr,
+			UeId:   ueId,
 		}
 		subsList = append(subsList, tmp)
 	}
 
 	c.JSON(http.StatusOK, subsList)
 }
+
 
 // Get subscriber by IMSI(ueId))
 func GetSubscriberByID(c *gin.Context) {

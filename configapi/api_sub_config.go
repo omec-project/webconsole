@@ -275,21 +275,18 @@ func GetSubscribers(c *gin.Context) {
 
 	logger.WebUILog.Infoln("Get All Subscribers List")
 
-	var subsList []configmodels.SubsListIE = make([]configmodels.SubsListIE, 0)
+	var subsList []configmodels.SubsListIE
 	amDataList := MongoDBLibrary.RestfulAPIGetMany(amDataColl, bson.M{})
 	for _, amData := range amDataList {
-		ueId := amData["ueId"].(string)  // Since ueId is guaranteed to exist
-		servingPlmnId, plmnIdExists := amData["servingPlmnId"]
+		ueId := amData["ueId"].(string) // Since ueId is guaranteed to exist
 
-		plmnIdStr := ""
-		if plmnIdExists {
-			plmnIdStr = servingPlmnId.(string)
+		var tmp configmodels.SubsListIE
+		tmp.UeId = ueId
+
+		if servingPlmnId, plmnIdExists := amData["servingPlmnId"]; plmnIdExists {
+			tmp.PlmnID = servingPlmnId.(string)
 		}
 
-		tmp := configmodels.SubsListIE{
-			PlmnID: plmnIdStr,
-			UeId:   ueId,
-		}
 		subsList = append(subsList, tmp)
 	}
 

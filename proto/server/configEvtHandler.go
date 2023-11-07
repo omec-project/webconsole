@@ -169,7 +169,7 @@ func handleSubscriberPost(configMsg *configmodels.ConfigMessage) {
 	basicAmData := map[string]interface{}{
         "ueId": configMsg.Imsi,
     }
-	filter := bson.M{"ueId": "imsi-" + configMsg.Imsi}
+	filter := bson.M{"ueId": configMsg.Imsi}
 	basicDataBson := toBsonM(basicAmData)
 	RestfulAPIPost(amDataColl, filter, basicDataBson)
 	rwLock.Unlock()
@@ -350,7 +350,13 @@ func updateAmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGro
 	amDataBsonA := toBsonM(amData)
 	amDataBsonA["ueId"] = "imsi-" + imsi
 	amDataBsonA["servingPlmnId"] = mcc + mnc
-	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
+	filter := bson.M{
+		"ueId": "imsi-" + imsi,
+		"$or": []bson.M{
+			{"servingPlmnId": mcc + mnc},
+			{"servingPlmnId": bson.M{"$exists": false}},
+		},
+	}
 	RestfulAPIPost(amDataColl, filter, amDataBsonA)
 }
 

@@ -272,3 +272,30 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 		}
 	}
 }
+
+func Test_handleSubscriberPost(* testing.T) {
+	imsi := "1234"
+	factory.WebUIConfig.Configuration.Mode5G = true
+	configMsg := configmodels.ConfigMessage{
+		MsgType: configmodels.Sub_data,
+		Imsi:   imsi,
+	}
+
+	postData = make([]map[string]interface{}, 0)
+	handleSubscriberPost(&configMsg)
+
+	expected_collection := "subscriptionData.provisionedData.amData"
+	if postData[0]["coll"] != expected_collection {
+		t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
+	}
+
+	expected_filter := bson.M{"ueId": imsi}
+	if !reflect.DeepEqual(postData[0]["filter"], expected_filter) {
+		t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
+	}
+
+	var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
+	if result["ueId"] != imsi {
+		t.Errorf("Expected ueId %v, got %v", imsi, result["ueId"])
+	}
+}

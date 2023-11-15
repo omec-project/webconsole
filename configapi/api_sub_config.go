@@ -278,10 +278,10 @@ func GetSubscribers(c *gin.Context) {
 	var subsList []configmodels.SubsListIE
 	amDataList := MongoDBLibrary.RestfulAPIGetMany(amDataColl, bson.M{})
 	for _, amData := range amDataList {
-		ueId := amData["ueId"].(string) // Since ueId is guaranteed to exist
 
-		var tmp configmodels.SubsListIE
-		tmp.UeId = ueId
+		tmp := configmodels.SubsListIE{
+		    UeId: amData["ueID"].(string),
+		}
 
 		if servingPlmnId, plmnIdExists := amData["servingPlmnId"]; plmnIdExists {
 			tmp.PlmnID = servingPlmnId.(string)

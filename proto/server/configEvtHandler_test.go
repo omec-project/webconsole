@@ -299,3 +299,50 @@ func Test_handleSubscriberPost(t *testing.T) {
 		t.Errorf("Expected ueId %v, got %v", ueId, result["ueId"])
 	}
 }
+
+func fakeTwoCallsMongoGetMany(one []map[string]interface{}, two []map[string]interface{}) func(string, primitive.M) []map[string]interface{} {
+	called := false
+	return func(_ string, _ primitive.M) []map[string]interface{} {
+		if !called {
+			called = true
+			return one
+		}
+		return two
+	}
+}
+
+func Test_firstConfigReceived_noConfigInDB(t *testing.T) {
+	RestfulAPIGetMany = fakeTwoCallsMongoGetMany(nil, nil)
+	result := firstConfigReceived()
+	if result {
+		t.Errorf("Expected firstConfigReceived to return false, got %v", result)
+	}
+}
+
+func Test_firstConfigReceived_deviceGroupInDB(t *testing.T) {
+	testGroup := deviceGroup("testGroup")
+	var previousGroupBson bson.M
+	previousGroup, _ := json.Marshal(testGroup)
+	json.Unmarshal(previousGroup, &previousGroupBson)
+	var groups []map[string]interface{}
+	groups = append(groups, previousGroupBson)
+	RestfulAPIGetMany = fakeTwoCallsMongoGetMany(groups, nil)
+	result := firstConfigReceived()
+	if !result {
+		t.Errorf("Expected firstConfigReceived to return true, got %v", result)
+	}
+}
+
+func Test_firstConfigReceived_sliceInDB(t *testing.T) {
+	testSlice := networkSlice("testGroup")
+	var previousSliceBson bson.M
+	previousSlice, _ := json.Marshal(testSlice)
+	json.Unmarshal(previousSlice, &previousSliceBson)
+	var slices []map[string]interface{}
+	slices = append(slices, previousSliceBson)
+	RestfulAPIGetMany = fakeTwoCallsMongoGetMany(nil, slices)
+	result := firstConfigReceived()
+	if !result {
+		t.Errorf("Expected firstConfigReceived to return true, got %v", result)
+	}
+}

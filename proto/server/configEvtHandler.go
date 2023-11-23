@@ -445,15 +445,16 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 		switch confData.Msg.MsgType {
 		case configmodels.Sub_data:
 			rwLock.RLock()
-			logger.WebUILog.Debugln("Insert/Update AuthenticationSubscription")
 			//check this Imsi is part of any of the devicegroup
 			imsi := strings.ReplaceAll(confData.Msg.Imsi, "imsi-", "")
 			if confData.Msg.MsgMethod != configmodels.Delete_op {
+				logger.WebUILog.Debugln("Insert/Update AuthenticationSubscription ", imsi)
 				filter := bson.M{"ueId": confData.Msg.Imsi}
 				authDataBsonA := toBsonM(confData.Msg.AuthSubData)
 				authDataBsonA["ueId"] = confData.Msg.Imsi
 				RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
 			} else {
+				logger.WebUILog.Debugln("Insert/Update AuthenticationSubscription delete ", imsi)
 				filter := bson.M{"ueId": "imsi-" + imsi}
 				RestfulAPIDeleteOne(authSubsDataColl, filter)
 			}

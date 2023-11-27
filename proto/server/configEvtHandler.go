@@ -454,7 +454,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				authDataBsonA["ueId"] = confData.Msg.Imsi
 				RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
 			} else {
-				logger.WebUILog.Debugln("Insert/Update AuthenticationSubscription delete ", imsi)
+				logger.WebUILog.Debugln("Delete AuthenticationSubscription", imsi)
 				filter := bson.M{"ueId": "imsi-" + imsi}
 				RestfulAPIDeleteOne(authSubsDataColl, filter)
 			}

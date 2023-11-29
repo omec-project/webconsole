@@ -273,7 +273,7 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 	}
 }
 
-func Test_handleSubscriberPost(* testing.T) {
+func Test_handleSubscriberPost(t *testing.T) {
 	imsi := "1234"
 	factory.WebUIConfig.Configuration.Mode5G = true
 	configMsg := configmodels.ConfigMessage{

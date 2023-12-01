@@ -6,7 +6,7 @@
 
 
 PROJECT_NAME             := sdcore
-DOCKER_VERSION                  ?= $(shell cat ./VERSION)
+DOCKER_VERSION           ?= $(shell cat ./VERSION)
 
 ## Docker related
 DOCKER_REGISTRY          ?=

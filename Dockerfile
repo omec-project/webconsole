@@ -22,7 +22,7 @@ RUN cd $GOPATH/src/webconsole \
     && make all \
     && CGO_ENABLED=0 go build -a -installsuffix nocgo -o webconsole -x server.go
 
-FROM alpine:3.8 as webui
+FROM alpine:3.18 as webui
 
 LABEL description="ONF open source 5G Core Network" \
     version="Stage 3"

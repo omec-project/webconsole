@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-FROM golang:1.21.4-bookworm AS builder
+FROM golang:1.21.5-bookworm AS builder
 
 LABEL maintainer="ONF <omec-dev@opennetworking.org>"
 
@@ -22,7 +22,7 @@ RUN cd $GOPATH/src/webconsole \
     && make all \
     && CGO_ENABLED=0 go build -a -installsuffix nocgo -o webconsole -x server.go
 
-FROM alpine:3.18 as webui
+FROM alpine:3.19 as webui
 
 LABEL description="ONF open source 5G Core Network" \
     version="Stage 3"

@@ -89,6 +89,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				imsiData[imsiVal] = configMsg.AuthSubData
 				rwLock.Unlock()
 				configLog.Infof("Received Imsi [%v] configuration from config channel", configMsg.Imsi)
+				handleSubscriberPost(configMsg)
 				if factory.WebUIConfig.Configuration.Mode5G == true {
 					var configUMsg Update5GSubscriberMsg
 					configUMsg.Msg = configMsg
@@ -161,6 +162,17 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			}
 		}
 	}
+}
+
+func handleSubscriberPost(configMsg *configmodels.ConfigMessage) {
+	rwLock.Lock()
+	basicAmData := map[string]interface{}{
+        "ueId": configMsg.Imsi,
+    }
+	filter := bson.M{"ueId": configMsg.Imsi}
+	basicDataBson := toBsonM(basicAmData)
+	RestfulAPIPost(amDataColl, filter, basicDataBson)
+	rwLock.Unlock()
 }
 
 func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
@@ -338,7 +350,13 @@ func updateAmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGro
 	amDataBsonA := toBsonM(amData)
 	amDataBsonA["ueId"] = "imsi-" + imsi
 	amDataBsonA["servingPlmnId"] = mcc + mnc
-	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
+	filter := bson.M{
+		"ueId": "imsi-" + imsi,
+		"$or": []bson.M{
+			{"servingPlmnId": mcc + mnc},
+			{"servingPlmnId": bson.M{"$exists": false}},
+		},
+	}
 	RestfulAPIPost(amDataColl, filter, amDataBsonA)
 }
 
@@ -414,6 +432,7 @@ func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg) *configmodels.Slice {
 func getAddedGroupsList(slice, prevSlice *configmodels.Slice) (names []string) {
 	return getDeleteGroupsList(prevSlice, slice)
 }
+
 func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) {
 	for prevSlice == nil {
 		return
@@ -440,6 +459,7 @@ func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) 
 
 	return
 }
+
 func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 	for confData := range confChan {
 		switch confData.Msg.MsgType {
@@ -457,6 +477,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				logger.WebUILog.Debugln("Delete AuthenticationSubscription", imsi)
 				filter := bson.M{"ueId": "imsi-" + imsi}
 				RestfulAPIDeleteOne(authSubsDataColl, filter)
+				RestfulAPIDeleteOne(amDataColl, filter)
 			}
 			rwLock.RUnlock()
 

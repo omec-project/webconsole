@@ -207,12 +207,7 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 }
 
 func firstConfigReceived() bool {
-	if len(getDeviceGroups()) > 0 {
-		return true
-	} else if len(getSlices()) > 0 {
-		return true
-	}
-	return false
+	return len(getDeviceGroups()) > 0 || len(getSlices()) > 0
 }
 
 func getDeviceGroups() []*configmodels.DeviceGroups {

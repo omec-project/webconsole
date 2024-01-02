@@ -76,7 +76,10 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 	if factory.WebUIConfig.Configuration.Mode5G == true {
 		go Config5GUpdateHandle(subsUpdateChan)
 	}
-	firstConfigRcvd := false
+	firstConfigRcvd := firstConfigReceived()
+	if firstConfigRcvd {
+		configReceived <- true
+	}
 	for {
 		configLog.Infoln("Waiting for configuration event ")
 		select {
@@ -201,6 +204,10 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 	sliceDataBsonA := toBsonM(configMsg.Slice)
 	RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
 	rwLock.Unlock()
+}
+
+func firstConfigReceived() bool {
+	return len(getDeviceGroups()) > 0 || len(getSlices()) > 0
 }
 
 func getDeviceGroups() []*configmodels.DeviceGroups {

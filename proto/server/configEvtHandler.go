@@ -68,9 +68,9 @@ func init() {
 func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceived chan bool) {
 	// Start Goroutine which will listens for subscriber config updates
 	// and update the mongoDB. Only for 5G
-	subsChannel := make(chan *Update5GSubscriberMsg, 10)
+	subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
 	if factory.WebUIConfig.Configuration.Mode5G == true {
-		go Config5GUpdateHandle(subsChannel)
+		go Config5GUpdateHandle(subsUpdateChan)
 	}
 	firstConfigRcvd := firstConfigReceived()
 	if firstConfigRcvd {
@@ -92,7 +92,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				if factory.WebUIConfig.Configuration.Mode5G == true {
 					var configUMsg Update5GSubscriberMsg
 					configUMsg.Msg = configMsg
-					subsChannel <- &configUMsg
+					subsUpdateChan <- &configUMsg
 				}
 			}
 
@@ -107,12 +107,12 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				// update config snapshot
 				if configMsg.DevGroup != nil {
 					configLog.Infof("Received Device Group [%v] configuration from config channel", configMsg.DevGroupName)
-					handleDeviceGroupPost(configMsg, subsChannel)
+					handleDeviceGroupPost(configMsg, subsUpdateChan)
 				}
 
 				if configMsg.Slice != nil {
 					configLog.Infof("Received Slice [%v] configuration from config channel", configMsg.SliceName)
-					handleNetworkSlicePost(configMsg, subsChannel)
+					handleNetworkSlicePost(configMsg, subsUpdateChan)
 				}
 
 				// loop through all clients and send this message to all clients
@@ -147,7 +147,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				}
 				if factory.WebUIConfig.Configuration.Mode5G == true {
 					config5gMsg.Msg = configMsg
-					subsChannel <- &config5gMsg
+					subsUpdateChan <- &config5gMsg
 				}
 				// loop through all clients and send this message to all clients
 				if len(clientNFPool) == 0 {

@@ -13,7 +13,6 @@ package factory
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"gopkg.in/yaml.v2"
@@ -31,7 +30,7 @@ func GetConfig() *Config {
 
 // TODO: Support configuration update from REST api
 func InitConfigFactory(f string) error {
-	if content, err := ioutil.ReadFile(f); err != nil {
+	if content, err := os.ReadFile(f); err != nil {
 		return fmt.Errorf("[Configuration] %+v", err)
 	} else {
 		if yamlErr := yaml.Unmarshal(content, WebUIConfig); yamlErr != nil {

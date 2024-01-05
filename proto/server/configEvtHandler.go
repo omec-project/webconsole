@@ -57,10 +57,8 @@ type Update5GSubscriberMsg struct {
 	PrevSlice    *configmodels.Slice
 }
 
-var subsChannel chan *Update5GSubscriberMsg
 var rwLock sync.RWMutex
 
-var initialConfigRcvd bool
 var imsiData map[string]*models.AuthenticationSubscription
 
 func init() {
@@ -68,13 +66,11 @@ func init() {
 }
 
 func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceived chan bool) {
-
 	// Start Goroutine which will listens for subscriber config updates
 	// and update the mongoDB. Only for 5G
-	subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
-	subsChannel = subsUpdateChan
+	subsChannel := make(chan *Update5GSubscriberMsg, 10)
 	if factory.WebUIConfig.Configuration.Mode5G == true {
-		go Config5GUpdateHandle(subsUpdateChan)
+		go Config5GUpdateHandle(subsChannel)
 	}
 	firstConfigRcvd := firstConfigReceived()
 	if firstConfigRcvd {
@@ -96,12 +92,11 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				if factory.WebUIConfig.Configuration.Mode5G == true {
 					var configUMsg Update5GSubscriberMsg
 					configUMsg.Msg = configMsg
-					subsUpdateChan <- &configUMsg
+					subsChannel <- &configUMsg
 				}
 			}
 
 			if configMsg.MsgMethod == configmodels.Post_op || configMsg.MsgMethod == configmodels.Put_op {
-
 				if firstConfigRcvd == false && (configMsg.MsgType == configmodels.Device_group || configMsg.MsgType == configmodels.Network_slice) {
 					configLog.Debugln("First config received from ROC")
 					firstConfigRcvd = true
@@ -112,12 +107,12 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				// update config snapshot
 				if configMsg.DevGroup != nil {
 					configLog.Infof("Received Device Group [%v] configuration from config channel", configMsg.DevGroupName)
-					handleDeviceGroupPost(configMsg, subsUpdateChan)
+					handleDeviceGroupPost(configMsg, subsChannel)
 				}
 
 				if configMsg.Slice != nil {
 					configLog.Infof("Received Slice [%v] configuration from config channel", configMsg.SliceName)
-					handleNetworkSlicePost(configMsg, subsUpdateChan)
+					handleNetworkSlicePost(configMsg, subsChannel)
 				}
 
 				// loop through all clients and send this message to all clients
@@ -152,7 +147,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				}
 				if factory.WebUIConfig.Configuration.Mode5G == true {
 					config5gMsg.Msg = configMsg
-					subsUpdateChan <- &config5gMsg
+					subsChannel <- &config5gMsg
 				}
 				// loop through all clients and send this message to all clients
 				if len(clientNFPool) == 0 {
@@ -248,17 +243,6 @@ func getSliceByName(name string) *configmodels.Slice {
 	return &sliceData
 }
 
-func isImsiPartofDeviceGroup(imsi string) bool {
-	for _, devgroup := range getDeviceGroups() {
-		for _, val := range devgroup.Imsis {
-			if val == imsi {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func getAddedImsisList(group, prevGroup *configmodels.DeviceGroups) (aimsis []string) {
 	if group == nil {
 		return
@@ -321,7 +305,6 @@ func updateAmPolicyData(imsi string) {
 }
 
 func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
-
 	var smPolicyData models.SmPolicyData
 	var smPolicySnssaiData models.SmPolicySnssaiData
 	dnnData := map[string]models.SmPolicyDnnData{
@@ -570,26 +553,11 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 						RestfulAPIDeleteOne(smDataColl, filter)
 						RestfulAPIDeleteOne(smfSelDataColl, filter)
 					}
-
 				}
 			}
 			rwLock.RUnlock()
 		}
 	} //end of for loop
-
-}
-
-func sliceToByte(data []map[string]interface{}) (ret []byte) {
-	ret, _ = json.Marshal(data)
-	return
-}
-
-func compareNssai(sNssai *models.Snssai,
-	sliceId *models.Snssai) int {
-	if sNssai.Sst != sliceId.Sst {
-		return 1
-	}
-	return strings.Compare(sNssai.Sd, sliceId.Sd)
 }
 
 func convertToString(val uint64) string {

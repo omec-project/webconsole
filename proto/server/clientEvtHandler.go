@@ -23,7 +23,6 @@ import (
 
 type clientNF struct {
 	id                    string
-	rc                    int
 	ConfigPushUrl         string
 	ConfigCheckUrl        string
 	configChanged         bool
@@ -79,12 +78,6 @@ type subSelectionRule struct {
 	SelectedQoSProfile       string        `json:"selected-qos-profile,omitempty"`
 	SelectedUserPlaneProfile string        `json:"selected-user-plane-profile,omitempty"`
 	SelectedApnProfile       string        `json:"selected-apn-profile,omitempty"`
-}
-
-type securityProfile struct {
-	Opc string `json:key",omitempty"`
-	Key string `json:opc",omitempty"`
-	Sqn uint64 `json:sqn",omitempty"`
 }
 
 type apnProfile struct {
@@ -546,7 +539,6 @@ func clientEventMachine(client *clientNF) {
 						rwLock.RLock()
 						postConfigHss(client, lastDevGroup, lastSlice)
 						rwLock.RUnlock()
-
 					}
 				} else if client.id == "mme-app" || client.id == "mme-s1ap" {
 					if (configMsg.SliceName != "") || (configMsg.DevGroupName != "") {
@@ -694,7 +686,6 @@ func clientEventMachine(client *clientNF) {
 						continue
 					}
 				}
-
 			} else {
 				for sliceName, sliceConfig := range client.slicesConfigClient {
 					if sliceConfig == nil {
@@ -826,7 +817,6 @@ func deletedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	}
 
 	for _, pval1 := range prev.Imsis {
-
 		var found bool
 		for _, cval2 := range curr.Imsis {
 			if pval1 == cval2 {
@@ -837,7 +827,6 @@ func deletedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 		if !found {
 			imsis = append(imsis, pval1)
 		}
-
 	}
 
 	return
@@ -852,7 +841,6 @@ func addedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 	}
 
 	for _, cval1 := range curr.Imsis {
-
 		var found bool
 		for _, pval2 := range prev.Imsis {
 			if cval1 == pval2 {
@@ -863,7 +851,6 @@ func addedImsis(prev, curr *configmodels.DeviceGroups) (imsis []string) {
 		if !found {
 			imsis = append(imsis, cval1)
 		}
-
 	}
 
 	return
@@ -889,7 +876,6 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 	client.clientLog.Infoln("postConfigHss API Enter")
 
 	for sliceName, sliceConfig := range client.slicesConfigClient {
-
 		/* handling of disable devicegroup in slice */
 		if lastSlice != nil && lastSlice.SliceId == sliceConfig.SliceId {
 			for _, oldG := range lastSlice.SiteDeviceGroup {
@@ -999,25 +985,9 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				} else {
 					client.clientLog.Infof("Message POST to HSS %v %v Success\n", reqMsgBody, resp.StatusCode)
 				}
-
 			}
 			// multiple groups handling?
 		}
-	}
-}
-
-func parseTrafficClass(traffic string) (int32, int32) {
-	switch traffic {
-	case "silver":
-		return 9, 0x7D
-	case "platinum":
-		return 8, 0x7D
-	case "gold":
-		return 7, 0x7D
-	case "diamond":
-		return 6, 0x7D
-	default:
-		return 9, 0x7D
 	}
 }
 

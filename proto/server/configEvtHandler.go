@@ -170,8 +170,8 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 func handleSubscriberPost(configMsg *configmodels.ConfigMessage) {
 	rwLock.Lock()
 	basicAmData := map[string]interface{}{
-        "ueId": configMsg.Imsi,
-    }
+		"ueId": configMsg.Imsi,
+	}
 	filter := bson.M{"ueId": configMsg.Imsi}
 	basicDataBson := toBsonM(basicAmData)
 	RestfulAPIPost(amDataColl, filter, basicDataBson)

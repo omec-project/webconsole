@@ -280,7 +280,7 @@ func GetSubscribers(c *gin.Context) {
 	for _, amData := range amDataList {
 
 		tmp := configmodels.SubsListIE{
-		    UeId: amData["ueId"].(string),
+			UeId: amData["ueId"].(string),
 		}
 
 		if servingPlmnId, plmnIdExists := amData["servingPlmnId"]; plmnIdExists {

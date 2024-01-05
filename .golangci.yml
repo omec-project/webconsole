@@ -219,7 +219,7 @@ linters-settings:
 
 linters:
   enable:
-    # - gofmt
+    - gofmt
     # - govet
     # - errcheck
     # - staticcheck

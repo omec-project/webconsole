@@ -31,8 +31,7 @@ type ServerConfig struct {
 
 type ConfigServer struct {
 	protos.ConfigServiceServer
-	serverCfg ServerConfig
-	Version   uint32
+	Version uint32
 }
 
 var kaep = keepalive.EnforcementPolicy{
@@ -46,7 +45,6 @@ var kasp = keepalive.ServerParameters{
 }
 
 func StartServer(host string, confServ *ConfigServer, configMsgChan chan *configmodels.ConfigMessage) {
-
 	// add 4G endpoints in the client list. 4G endpoints are configured in the
 	// yaml file
 	if os.Getenv("MANAGED_BY_CONFIG_POD") == "true" && factory.WebUIConfig.Configuration.Mode5G == false {

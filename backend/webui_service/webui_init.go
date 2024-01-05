@@ -172,7 +172,6 @@ func (webui *WEBUI) Start() {
 				continue
 			}
 		}
-
 	}
 
 	initLog.Infoln("WebUI Server started")

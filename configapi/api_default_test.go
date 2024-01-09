@@ -7,6 +7,7 @@ package configapi
 
 import (
 	"encoding/json"
+	"github.com/stretchr/testify/mock"
 	"io"
 	"net/http/httptest"
 	"testing"
@@ -15,6 +16,134 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+type MockMongoClientNoDeviceGroups struct {
+	mock.Mock
+}
+
+type MockMongoClientOneDeviceGroups struct {
+	mock.Mock
+}
+
+type MockMongoClientManyDeviceGroups struct {
+	mock.Mock
+}
+
+type MockMongoClientNotFoundDeviceGroup struct {
+	mock.Mock
+}
+
+type MockMongoClientFoundDeviceGroup struct {
+	mock.Mock
+}
+
+type MockMongoClientNoNetworkSlice struct {
+	mock.Mock
+}
+
+type MockMongoClientNotFoundNetworkSlice struct {
+	mock.Mock
+}
+
+type MockMongoClientFoundNetworkSlice struct {
+	mock.Mock
+}
+
+type MockMongoClientOneNetworkSlice struct {
+	mock.Mock
+}
+
+type MockMongoClientManyNetworkSlices struct {
+	mock.Mock
+}
+
+func (m *MockMongoClientNoDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+
+	var results []map[string]interface{}
+	return results, nil
+}
+
+func (m *MockMongoClientOneDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	dg := deviceGroup("group1")
+	var dgbson bson.M
+	tmp, _ := json.Marshal(dg)
+	json.Unmarshal(tmp, &dgbson)
+
+	results = append(results, dgbson)
+	return results, nil
+}
+
+func (m *MockMongoClientManyDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	var names = []string{"group1", "group2", "group3"}
+	for _, name := range names {
+		dg := deviceGroup(name)
+		var dgbson bson.M
+		tmp, _ := json.Marshal(dg)
+		json.Unmarshal(tmp, &dgbson)
+
+		results = append(results, dgbson)
+	}
+	return results, nil
+
+}
+
+func (m *MockMongoClientNotFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	return nil, nil
+
+}
+
+func (m *MockMongoClientFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	dg := deviceGroup("group1")
+	var dgbson bson.M
+	tmp, _ := json.Marshal(dg)
+	json.Unmarshal(tmp, &dgbson)
+	return dgbson, nil
+}
+
+func (m *MockMongoClientNoNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	return results, nil
+}
+
+func (m *MockMongoClientOneNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	ns := networkSlice("slice1")
+	var slicebson bson.M
+	tmp, _ := json.Marshal(ns)
+	json.Unmarshal(tmp, &slicebson)
+
+	results = append(results, slicebson)
+	return results, nil
+}
+
+func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	var names = []string{"slice1", "slice2", "slice3"}
+	for _, name := range names {
+		ns := networkSlice(name)
+		var slicebson bson.M
+		tmp, _ := json.Marshal(ns)
+		json.Unmarshal(tmp, &slicebson)
+
+		results = append(results, slicebson)
+	}
+	return results, nil
+}
+
+func (m *MockMongoClientNotFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	return nil, nil
+
+}
+
+func (m *MockMongoClientFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	ns := networkSlice("slice1")
+	var slicebson bson.M
+	tmp, _ := json.Marshal(ns)
+	json.Unmarshal(tmp, &slicebson)
+	return slicebson, nil
+}
 
 func deviceGroup(name string) configmodels.DeviceGroups {
 	traffic_class := configmodels.TrafficClassInfo{
@@ -48,54 +177,11 @@ func deviceGroup(name string) configmodels.DeviceGroups {
 	return deviceGroup
 }
 
-func noDeviceGroups(coll string, filter bson.M) []map[string]interface{} {
-	var results []map[string]interface{}
-	return results
-}
-
-func oneDeviceGroups(coll string, filter bson.M) []map[string]interface{} {
-	var results []map[string]interface{}
-	dg := deviceGroup("group1")
-	var dgbson bson.M
-	tmp, _ := json.Marshal(dg)
-	json.Unmarshal(tmp, &dgbson)
-
-	results = append(results, dgbson)
-	return results
-}
-
-func manyDeviceGroups(coll string, filter bson.M) []map[string]interface{} {
-	var results []map[string]interface{}
-	var names = []string{"group1", "group2", "group3"}
-	for _, name := range names {
-		dg := deviceGroup(name)
-		var dgbson bson.M
-		tmp, _ := json.Marshal(dg)
-		json.Unmarshal(tmp, &dgbson)
-
-		results = append(results, dgbson)
-	}
-	return results
-}
-
-func notFoundDeviceGroup(coll string, filter bson.M) map[string]interface{} {
-	return nil
-}
-
-func foundDeviceGroup(coll string, filter bson.M) map[string]interface{} {
-	dg := deviceGroup("group1")
-	var dgbson bson.M
-	tmp, _ := json.Marshal(dg)
-	json.Unmarshal(tmp, &dgbson)
-	return dgbson
-}
-
 func TestGetDeviceGroupsNoGroups(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-
-	RestfulAPIGetMany = noDeviceGroups
-	GetDeviceGroups(c)
+	m := &MockMongoClientNoDeviceGroups{}
+	GetDeviceGroups(m)(c)
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
@@ -111,9 +197,8 @@ func TestGetDeviceGroupsNoGroups(t *testing.T) {
 func TestGetDeviceGroupsOneGroup(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-
-	RestfulAPIGetMany = oneDeviceGroups
-	GetDeviceGroups(c)
+	m := &MockMongoClientOneDeviceGroups{}
+	GetDeviceGroups(m)(c)
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
@@ -130,9 +215,8 @@ func TestGetDeviceGroupsOneGroup(t *testing.T) {
 func TestGetDeviceGroupsManyGroup(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-
-	RestfulAPIGetMany = manyDeviceGroups
-	GetDeviceGroups(c)
+	m := &MockMongoClientManyDeviceGroups{}
+	GetDeviceGroups(m)(c)
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
@@ -149,10 +233,9 @@ func TestGetDeviceGroupsManyGroup(t *testing.T) {
 func TestGetDeviceGroupByNameDoesNotExist(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-
-	RestfulAPIGetOne = notFoundDeviceGroup
+	m := &MockMongoClientNotFoundDeviceGroup{}
 	c.Params = append(c.Params, gin.Param{Key: "device-name", Value: "group1"})
-	GetDeviceGroupByName(c)
+	GetDeviceGroupByName(m)(c)
 	resp := w.Result()
 
 	if resp.StatusCode != 404 {
@@ -168,10 +251,9 @@ func TestGetDeviceGroupByNameDoesNotExist(t *testing.T) {
 func TestGetDeviceGroupByNameDoesExists(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-
-	RestfulAPIGetOne = foundDeviceGroup
+	m := &MockMongoClientFoundDeviceGroup{}
 	c.Params = append(c.Params, gin.Param{Key: "device-name", Value: "group1"})
-	GetDeviceGroupByName(c)
+	GetDeviceGroupByName(m)(c)
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
@@ -216,54 +298,11 @@ func networkSlice(name string) configmodels.Slice {
 	return slice
 }
 
-func noNetworkSlices(coll string, filter bson.M) []map[string]interface{} {
-	var results []map[string]interface{}
-	return results
-}
-
-func oneNetworkSlice(coll string, filter bson.M) []map[string]interface{} {
-	var results []map[string]interface{}
-	ns := networkSlice("slice1")
-	var slicebson bson.M
-	tmp, _ := json.Marshal(ns)
-	json.Unmarshal(tmp, &slicebson)
-
-	results = append(results, slicebson)
-	return results
-}
-
-func manyNetworkSlices(coll string, filter bson.M) []map[string]interface{} {
-	var results []map[string]interface{}
-	var names = []string{"slice1", "slice2", "slice3"}
-	for _, name := range names {
-		ns := networkSlice(name)
-		var slicebson bson.M
-		tmp, _ := json.Marshal(ns)
-		json.Unmarshal(tmp, &slicebson)
-
-		results = append(results, slicebson)
-	}
-	return results
-}
-
-func notFoundNetworkSlice(coll string, filter bson.M) map[string]interface{} {
-	return nil
-}
-
-func foundNetworkSlice(coll string, filter bson.M) map[string]interface{} {
-	ns := networkSlice("slice1")
-	var slicebson bson.M
-	tmp, _ := json.Marshal(ns)
-	json.Unmarshal(tmp, &slicebson)
-	return slicebson
-}
-
 func TestGetNetworkSlicesNoSlices(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-
-	RestfulAPIGetMany = noNetworkSlices
-	GetNetworkSlices(c)
+	m := &MockMongoClientNoNetworkSlice{}
+	GetNetworkSlices(m)(c)
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
@@ -279,9 +318,8 @@ func TestGetNetworkSlicesNoSlices(t *testing.T) {
 func TestGetNetworkSlicesOneSlice(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-
-	RestfulAPIGetMany = oneNetworkSlice
-	GetNetworkSlices(c)
+	m := &MockMongoClientOneNetworkSlice{}
+	GetNetworkSlices(m)(c)
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
@@ -298,9 +336,8 @@ func TestGetNetworkSlicesOneSlice(t *testing.T) {
 func TestGetNetworkSlicesManySlices(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-
-	RestfulAPIGetMany = manyNetworkSlices
-	GetNetworkSlices(c)
+	m := &MockMongoClientManyNetworkSlices{}
+	GetNetworkSlices(m)(c)
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {
@@ -317,10 +354,9 @@ func TestGetNetworkSlicesManySlices(t *testing.T) {
 func TestGetNetworkSliceByNameDoesNotExist(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-
-	RestfulAPIGetOne = notFoundNetworkSlice
+	m := &MockMongoClientNotFoundNetworkSlice{}
 	c.Params = append(c.Params, gin.Param{Key: "slice-name", Value: "slice1"})
-	GetNetworkSliceByName(c)
+	GetNetworkSliceByName(m)(c)
 	resp := w.Result()
 
 	if resp.StatusCode != 404 {
@@ -336,10 +372,9 @@ func TestGetNetworkSliceByNameDoesNotExist(t *testing.T) {
 func TestGetNetworkSliceByNameDoesExists(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-
-	RestfulAPIGetOne = foundNetworkSlice
+	m := &MockMongoClientFoundNetworkSlice{}
 	c.Params = append(c.Params, gin.Param{Key: "slice-name", Value: "slice1"})
-	GetNetworkSliceByName(c)
+	GetNetworkSliceByName(m)(c)
 	resp := w.Result()
 
 	if resp.StatusCode != 200 {

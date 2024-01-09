@@ -199,7 +199,7 @@ func setClientConfigCheckUrl(client *clientNF, url string) {
 	client.ConfigCheckUrl = url
 }
 
-func getClient(id string) (*clientNF, bool) {
+func getClient(id string, m MongoManyGetter) (*clientNF, bool) {
 	client := clientNFPool[id]
 	if client != nil {
 		client.clientLog.Infof("Found client %v ", id)
@@ -217,10 +217,10 @@ func getClient(id string) (*clientNF, bool) {
 	client.devgroupsConfigClient = make(map[string]*configmodels.DeviceGroups)
 	// TODO : should we lock global tables before copying them ?
 	rwLock.RLock()
-	for _, value := range getSlices() {
+	for _, value := range getSlices(m) {
 		client.slicesConfigClient[value.SliceName] = value
 	}
-	for _, value := range getDeviceGroups() {
+	for _, value := range getDeviceGroups(m) {
 		client.devgroupsConfigClient[value.DeviceGroupName] = value
 	}
 	rwLock.RUnlock()

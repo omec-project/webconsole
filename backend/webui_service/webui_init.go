@@ -10,6 +10,7 @@ package webui_service
 import (
 	"bufio"
 	"fmt"
+	"github.com/omec-project/util/mongoapi"
 	"net/http"
 	"os/exec"
 	"strconv"
@@ -24,11 +25,10 @@ import (
 	_ "net/http"
 	_ "net/http/pprof"
 
-	"github.com/omec-project/MongoDBLibrary"
-	mongoDBLibLogger "github.com/omec-project/MongoDBLibrary/logger"
 	"github.com/omec-project/logger_util"
 	"github.com/omec-project/path_util"
 	pathUtilLogger "github.com/omec-project/path_util/logger"
+	mongoDBLibLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
@@ -45,6 +45,9 @@ type (
 		webuicfg string
 	}
 )
+
+var commonDBClient mongoapi.MongoClient
+var authDBClient mongoapi.MongoClient
 
 var config Config
 
@@ -130,14 +133,14 @@ func (webui *WEBUI) setLogLevel() {
 	if factory.WebUIConfig.Logger.MongoDBLibrary != nil {
 		if factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel != "" {
 			if level, err := logrus.ParseLevel(factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel); err != nil {
-				mongoDBLibLogger.MongoDBLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level",
+				mongoDBLibLogger.AppLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level",
 					factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel)
 				mongoDBLibLogger.SetLogLevel(logrus.InfoLevel)
 			} else {
 				mongoDBLibLogger.SetLogLevel(level)
 			}
 		} else {
-			mongoDBLibLogger.MongoDBLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
+			mongoDBLibLogger.AppLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
 			mongoDBLibLogger.SetLogLevel(logrus.InfoLevel)
 		}
 		mongoDBLibLogger.SetReportCaller(factory.WebUIConfig.Logger.MongoDBLibrary.ReportCaller)
@@ -161,14 +164,26 @@ func (webui *WEBUI) Start() {
 	if factory.WebUIConfig.Configuration.Mode5G {
 		// get config file info from WebUIConfig
 		mongodb := factory.WebUIConfig.Configuration.Mongodb
-
-		// Connect to MongoDB
-		MongoDBLibrary.SetMongoDB(mongodb.Name, mongodb.Url)
+		// Create MongoDB Clients for common DB and AuthKeysDB
+		var c, _ = mongoapi.NewMongoClient(mongodb.Url, mongodb.Name)
+		var a, _ = mongoapi.NewMongoClient(mongodb.Url, mongodb.AuthKeysDbName)
 		for {
-			if MongoDBLibrary.Client != nil {
+			if c.Client != nil {
+				commonDBClient.Client = c.Client
 				break
 			} else {
-				MongoDBLibrary.SetMongoDB(mongodb.Name, mongodb.Url)
+				c, _ = mongoapi.NewMongoClient(mongodb.Url, mongodb.Name)
+				commonDBClient.Client = c.Client
+				continue
+			}
+		}
+		for {
+			if a.Client != nil {
+				authDBClient.Client = a.Client
+				break
+			} else {
+				a, _ = mongoapi.NewMongoClient(mongodb.Url, mongodb.AuthKeysDbName)
+				authDBClient.Client = a.Client
 				continue
 			}
 		}
@@ -178,8 +193,10 @@ func (webui *WEBUI) Start() {
 
 	/* First HTTP Server running at port to receive Config from ROC */
 	subconfig_router := logger_util.NewGinWithLogrus(logger.GinLog)
-	configapi.AddServiceSub(subconfig_router)
-	configapi.AddService(subconfig_router)
+	configapi.AddServiceSub(subconfig_router, commonDBClient, authDBClient)
+	var manyGetter gServ.MongoManyGetter
+	var oneGetter gServ.MongoOneGetter
+	configapi.AddService(subconfig_router, oneGetter, manyGetter)
 
 	configMsgChan := make(chan *configmodels.ConfigMessage, 10)
 	configapi.SetChannel(configMsgChan)
@@ -225,15 +242,18 @@ func (webui *WEBUI) Start() {
 
 	if factory.WebUIConfig.Configuration.Mode5G {
 		self := webui_context.WEBUI_Self()
-		self.UpdateNfProfiles()
+		self.UpdateNfProfiles(commonDBClient)
 	}
 
 	// Start grpc Server. This has embedded functionality of sending
 	// 4G config over REST Api as well.
 	var host string = "0.0.0.0:9876"
 	confServ := &gServ.ConfigServer{}
-	go gServ.StartServer(host, confServ, configMsgChan)
-
+	var oneDeleter gServ.MongoOneDeleter
+	var authDBOneDeleter gServ.MongoOneDeleterfromAuthDB
+	var authDBPoster gServ.MongoPosterforAuthDB
+	var poster gServ.MongoPoster
+	go gServ.StartServer(host, confServ, configMsgChan, oneDeleter, authDBOneDeleter, authDBPoster, manyGetter, poster, oneGetter)
 	// fetch one time configuration from the simapp/roc on startup
 	// this is to fetch existing config
 	go fetchConfigAdapater()

@@ -7,13 +7,15 @@
 package configapi
 
 import (
+	"github.com/omec-project/util/mongoapi"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-func AddServiceSub(engine *gin.Engine) *gin.RouterGroup {
+func AddServiceSub(engine *gin.Engine, m mongoapi.MongoClient, a mongoapi.MongoClient) *gin.RouterGroup {
 	group := engine.Group("/api")
+	var routesL = GetRoutesList(m, a)
 
 	for _, route := range routesL {
 		switch route.Method {
@@ -33,74 +35,76 @@ func AddServiceSub(engine *gin.Engine) *gin.RouterGroup {
 	return group
 }
 
-var routesL = Routes{
-	{
-		"GetExample",
-		http.MethodGet,
-		"/sample",
-		GetSampleJSON,
-	},
+func GetRoutesList(m mongoapi.MongoClient, a mongoapi.MongoClient) Routes {
+	return Routes{
+		{
+			"GetExample",
+			http.MethodGet,
+			"/sample",
+			GetSampleJSON,
+		},
 
-	{
-		"GetSubscribers",
-		http.MethodGet,
-		"/subscriber",
-		GetSubscribers,
-	},
+		{
+			"GetSubscribers",
+			http.MethodGet,
+			"/subscriber",
+			GetSubscribers(m),
+		},
 
-	{
-		"GetSubscriberByID",
-		http.MethodGet,
-		"/subscriber/:ueId",
-		GetSubscriberByID,
-	},
+		{
+			"GetSubscriberByID",
+			http.MethodGet,
+			"/subscriber/:ueId",
+			GetSubscriberByID(m, a),
+		},
 
-	{
-		"PostSubscriberByID",
-		http.MethodPost,
-		"/subscriber/:ueId",
-		PostSubscriberByID,
-	},
+		{
+			"PostSubscriberByID",
+			http.MethodPost,
+			"/subscriber/:ueId",
+			PostSubscriberByID,
+		},
 
-	{
-		"PutSubscriberByID",
-		http.MethodPut,
-		"/subscriber/:ueId/:servingPlmnId",
-		PutSubscriberByID,
-	},
+		{
+			"PutSubscriberByID",
+			http.MethodPut,
+			"/subscriber/:ueId/:servingPlmnId",
+			PutSubscriberByID,
+		},
 
-	{
-		"DeleteSubscriberByID",
-		http.MethodDelete,
-		"/subscriber/:ueId",
-		DeleteSubscriberByID,
-	},
+		{
+			"DeleteSubscriberByID",
+			http.MethodDelete,
+			"/subscriber/:ueId",
+			DeleteSubscriberByID,
+		},
 
-	{
-		"PatchSubscriberByID",
-		http.MethodPatch,
-		"/subscriber/:ueId/:servingPlmnId",
-		PatchSubscriberByID,
-	},
+		{
+			"PatchSubscriberByID",
+			http.MethodPatch,
+			"/subscriber/:ueId/:servingPlmnId",
+			PatchSubscriberByID,
+		},
 
-	{
-		"Registered UE Context",
-		http.MethodGet,
-		"/registered-ue-context",
-		GetRegisteredUEContext,
-	},
+		{
+			"Registered UE Context",
+			http.MethodGet,
+			"/registered-ue-context",
+			GetRegisteredUEContext(m),
+		},
 
-	{
-		"Individual Registered UE Context",
-		http.MethodGet,
-		"/registered-ue-context/:supi",
-		GetRegisteredUEContext,
-	},
+		{
+			"Individual Registered UE Context",
+			http.MethodGet,
+			"/registered-ue-context/:supi",
+			GetRegisteredUEContext(m),
+		},
 
-	{
-		"UE PDU Session Info",
-		http.MethodGet,
-		"/ue-pdu-session-info/:smContextRef",
-		GetUEPDUSessionInfo,
-	},
+		{
+			"UE PDU Session Info",
+			http.MethodGet,
+			"/ue-pdu-session-info/:smContextRef",
+			GetUEPDUSessionInfo(m),
+		},
+	}
 }

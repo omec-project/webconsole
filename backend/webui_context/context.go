@@ -11,9 +11,8 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
-
-	"github.com/omec-project/MongoDBLibrary"
 	"github.com/omec-project/openapi/models"
+	"github.com/omec-project/util/mongoapi"
 	"github.com/omec-project/webconsole/backend/logger"
 )
 
@@ -33,8 +32,8 @@ type NfOamInstance struct {
 func init() {
 }
 
-func (context *WEBUIContext) UpdateNfProfiles() {
-	nfProfilesRaw := MongoDBLibrary.RestfulAPIGetMany("NfProfile", nil)
+func (context *WEBUIContext) UpdateNfProfiles(m mongoapi.MongoClient) {
+	nfProfilesRaw, _ := m.RestfulAPIGetMany("NfProfile", nil)
 	nfProfiles, err := decode(nfProfilesRaw, time.RFC3339)
 	if err != nil {
 		logger.ContextLog.Error(err)

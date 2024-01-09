@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/omec-project/MongoDBLibrary"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -37,20 +36,6 @@ func init() {
 	configLog = logger.ConfigLog
 }
 
-var (
-	RestfulAPIGetMany   = MongoDBLibrary.RestfulAPIGetMany
-	RestfulAPIGetOne    = MongoDBLibrary.RestfulAPIGetOne
-	RestfulAPIPost      = MongoDBLibrary.RestfulAPIPost
-	RestfulAPIDeleteOne = MongoDBLibrary.RestfulAPIDeleteOne
-)
-
-/*type SubsUpdMsg struct {
-	UeIds         []string
-	Nssai         models.Snssai
-	ServingPlmnId string
-	Qos           configmodels.SliceQos
-}*/
-
 type Update5GSubscriberMsg struct {
 	Msg          *configmodels.ConfigMessage
 	PrevDevGroup *configmodels.DeviceGroups
@@ -65,14 +50,39 @@ func init() {
 	imsiData = make(map[string]*models.AuthenticationSubscription)
 }
 
-func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceived chan bool) {
+type MongoManyGetter interface {
+	RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error)
+}
+
+type MongoOneGetter interface {
+	RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error)
+}
+
+type MongoOneDeleterfromAuthDB interface {
+	RestfulAPIDeleteOne(collName string, filter bson.M) error
+}
+
+type MongoOneDeleter interface {
+	RestfulAPIDeleteOne(collName string, filter bson.M) error
+}
+
+type MongoPoster interface {
+	RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error)
+}
+
+type MongoPosterforAuthDB interface {
+	RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error)
+}
+
+func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceived chan bool, oneDeleter MongoOneDeleter, authDBOneDeleter MongoOneDeleterfromAuthDB, authDBPoster MongoPosterforAuthDB, manyGetter MongoManyGetter, poster MongoPoster, oneGetter MongoOneGetter) {
+
 	// Start Goroutine which will listens for subscriber config updates
 	// and update the mongoDB. Only for 5G
 	subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
 	if factory.WebUIConfig.Configuration.Mode5G == true {
-		go Config5GUpdateHandle(subsUpdateChan)
+		go Config5GUpdateHandle(subsUpdateChan, oneDeleter, authDBOneDeleter, authDBPoster, manyGetter, poster, oneGetter)
 	}
-	firstConfigRcvd := firstConfigReceived()
+	firstConfigRcvd := firstConfigReceived(manyGetter)
 	if firstConfigRcvd {
 		configReceived <- true
 	}
@@ -88,7 +98,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				imsiData[imsiVal] = configMsg.AuthSubData
 				rwLock.Unlock()
 				configLog.Infof("Received Imsi [%v] configuration from config channel", configMsg.Imsi)
-				handleSubscriberPost(configMsg)
+				handleSubscriberPost(configMsg, poster)
 				if factory.WebUIConfig.Configuration.Mode5G == true {
 					var configUMsg Update5GSubscriberMsg
 					configUMsg.Msg = configMsg
@@ -107,12 +117,12 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				// update config snapshot
 				if configMsg.DevGroup != nil {
 					configLog.Infof("Received Device Group [%v] configuration from config channel", configMsg.DevGroupName)
-					handleDeviceGroupPost(configMsg, subsUpdateChan)
+					handleDeviceGroupPost(configMsg, subsUpdateChan, poster, oneGetter)
 				}
 
 				if configMsg.Slice != nil {
 					configLog.Infof("Received Slice [%v] configuration from config channel", configMsg.SliceName)
-					handleNetworkSlicePost(configMsg, subsUpdateChan)
+					handleNetworkSlicePost(configMsg, subsUpdateChan, poster, oneGetter)
 				}
 
 				// loop through all clients and send this message to all clients
@@ -130,16 +140,16 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 					// update config snapshot
 					if configMsg.DevGroup == nil {
 						configLog.Infof("Received delete Device Group [%v] from config channel", configMsg.DevGroupName)
-						config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
+						config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName, oneGetter)
 						filter := bson.M{"group-name": configMsg.DevGroupName}
-						RestfulAPIDeleteOne(devGroupDataColl, filter)
+						oneDeleter.RestfulAPIDeleteOne(devGroupDataColl, filter)
 					}
 
 					if configMsg.Slice == nil {
 						configLog.Infof("Received delete Slice [%v] from config channel", configMsg.SliceName)
-						config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
+						config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName, oneGetter)
 						filter := bson.M{"SliceName": configMsg.SliceName}
-						RestfulAPIDeleteOne(sliceDataColl, filter)
+						oneDeleter.RestfulAPIDeleteOne(sliceDataColl, filter)
 					}
 					rwLock.Unlock()
 				} else {
@@ -162,51 +172,51 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 	}
 }
 
-func handleSubscriberPost(configMsg *configmodels.ConfigMessage) {
+func handleSubscriberPost(configMsg *configmodels.ConfigMessage, poster MongoPoster) {
 	rwLock.Lock()
 	basicAmData := map[string]interface{}{
 		"ueId": configMsg.Imsi,
 	}
 	filter := bson.M{"ueId": configMsg.Imsi}
 	basicDataBson := toBsonM(basicAmData)
-	RestfulAPIPost(amDataColl, filter, basicDataBson)
+	poster.RestfulAPIPost(amDataColl, filter, basicDataBson)
 	rwLock.Unlock()
 }
 
-func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg, poster MongoPoster, oneGetter MongoOneGetter) {
 	rwLock.Lock()
 	if factory.WebUIConfig.Configuration.Mode5G == true {
 		var config5gMsg Update5GSubscriberMsg
 		config5gMsg.Msg = configMsg
-		config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
+		config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName, oneGetter)
 		subsUpdateChan <- &config5gMsg
 	}
 	filter := bson.M{"group-name": configMsg.DevGroupName}
 	devGroupDataBsonA := toBsonM(configMsg.DevGroup)
-	RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
+	poster.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
 	rwLock.Unlock()
 }
 
-func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg, poster MongoPoster, oneGetter MongoOneGetter) {
 	rwLock.Lock()
 	if factory.WebUIConfig.Configuration.Mode5G == true {
 		var config5gMsg Update5GSubscriberMsg
 		config5gMsg.Msg = configMsg
-		config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
+		config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName, oneGetter)
 		subsUpdateChan <- &config5gMsg
 	}
 	filter := bson.M{"SliceName": configMsg.SliceName}
 	sliceDataBsonA := toBsonM(configMsg.Slice)
-	RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
+	poster.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
 	rwLock.Unlock()
 }
 
-func firstConfigReceived() bool {
-	return len(getDeviceGroups()) > 0 || len(getSlices()) > 0
+func firstConfigReceived(manyGetter MongoManyGetter) bool {
+	return len(getDeviceGroups(manyGetter)) > 0 || len(getSlices(manyGetter)) > 0
 }
 
-func getDeviceGroups() []*configmodels.DeviceGroups {
-	rawDeviceGroups := RestfulAPIGetMany(devGroupDataColl, nil)
+func getDeviceGroups(manyGetter MongoManyGetter) []*configmodels.DeviceGroups {
+	rawDeviceGroups, _ := manyGetter.RestfulAPIGetMany(devGroupDataColl, nil)
 	var deviceGroups []*configmodels.DeviceGroups
 	for _, rawDevGroup := range rawDeviceGroups {
 		var devGroupData configmodels.DeviceGroups
@@ -216,16 +226,16 @@ func getDeviceGroups() []*configmodels.DeviceGroups {
 	return deviceGroups
 }
 
-func getDeviceGroupByName(name string) *configmodels.DeviceGroups {
+func getDeviceGroupByName(name string, oneGetter MongoOneGetter) *configmodels.DeviceGroups {
 	filter := bson.M{"group-name": name}
-	devGroupDataInterface := RestfulAPIGetOne(devGroupDataColl, filter)
+	devGroupDataInterface, _ := oneGetter.RestfulAPIGetOne(devGroupDataColl, filter)
 	var devGroupData configmodels.DeviceGroups
 	json.Unmarshal(mapToByte(devGroupDataInterface), &devGroupData)
 	return &devGroupData
 }
 
-func getSlices() []*configmodels.Slice {
-	rawSlices := RestfulAPIGetMany(sliceDataColl, nil)
+func getSlices(manyGetter MongoManyGetter) []*configmodels.Slice {
+	rawSlices, _ := manyGetter.RestfulAPIGetMany(sliceDataColl, nil)
 	var slices []*configmodels.Slice
 	for _, rawSlice := range rawSlices {
 		var sliceData configmodels.Slice
@@ -235,9 +245,9 @@ func getSlices() []*configmodels.Slice {
 	return slices
 }
 
-func getSliceByName(name string) *configmodels.Slice {
+func getSliceByName(name string, oneGetter MongoOneGetter) *configmodels.Slice {
 	filter := bson.M{"SliceName": name}
-	sliceDataInterface := RestfulAPIGetOne(sliceDataColl, filter)
+	sliceDataInterface, _ := oneGetter.RestfulAPIGetOne(sliceDataColl, filter)
 	var sliceData configmodels.Slice
 	json.Unmarshal(mapToByte(sliceDataInterface), &sliceData)
 	return &sliceData
@@ -294,17 +304,17 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 	return
 }
 
-func updateAmPolicyData(imsi string) {
+func updateAmPolicyData(imsi string, poster MongoPoster) {
 	//ampolicydata
 	var amPolicy models.AmPolicyData
 	amPolicy.SubscCats = append(amPolicy.SubscCats, "free5gc")
 	amPolicyDatBsonA := toBsonM(amPolicy)
 	amPolicyDatBsonA["ueId"] = "imsi-" + imsi
 	filter := bson.M{"ueId": "imsi-" + imsi}
-	RestfulAPIPost(amPolicyDataColl, filter, amPolicyDatBsonA)
+	poster.RestfulAPIPost(amPolicyDataColl, filter, amPolicyDatBsonA)
 }
 
-func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
+func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string, poster MongoPoster) {
 	var smPolicyData models.SmPolicyData
 	var smPolicySnssaiData models.SmPolicySnssaiData
 	dnnData := map[string]models.SmPolicyDnnData{
@@ -320,10 +330,10 @@ func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
 	smPolicyDatBsonA := toBsonM(smPolicyData)
 	smPolicyDatBsonA["ueId"] = "imsi-" + imsi
 	filter := bson.M{"ueId": "imsi-" + imsi}
-	RestfulAPIPost(smPolicyDataColl, filter, smPolicyDatBsonA)
+	poster.RestfulAPIPost(smPolicyDataColl, filter, smPolicyDatBsonA)
 }
 
-func updateAmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) {
+func updateAmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string, poster MongoPoster) {
 	amData := models.AccessAndMobilitySubscriptionData{
 		Gpsis: []string{
 			"msisdn-0900000000",
@@ -347,10 +357,10 @@ func updateAmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGro
 			{"servingPlmnId": bson.M{"$exists": false}},
 		},
 	}
-	RestfulAPIPost(amDataColl, filter, amDataBsonA)
+	poster.RestfulAPIPost(amDataColl, filter, amDataBsonA)
 }
 
-func updateSmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) {
+func updateSmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string, poster MongoPoster) {
 	//TODO smData
 	smData := models.SessionManagementSubscriptionData{
 		SingleNssai: snssai,
@@ -385,10 +395,10 @@ func updateSmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGro
 	smDataBsonA["ueId"] = "imsi-" + imsi
 	smDataBsonA["servingPlmnId"] = mcc + mnc
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
-	RestfulAPIPost(smDataColl, filter, smDataBsonA)
+	poster.RestfulAPIPost(smDataColl, filter, smDataBsonA)
 }
 
-func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string) {
+func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string, poster MongoPoster) {
 	smfSelData := models.SmfSelectionSubscriptionData{
 		SubscribedSnssaiInfos: map[string]models.SnssaiInfo{
 			SnssaiModelsToHex(*snssai): {
@@ -403,11 +413,11 @@ func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, im
 	smfSelecDataBsonA["ueId"] = "imsi-" + imsi
 	smfSelecDataBsonA["servingPlmnId"] = mcc + mnc
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
-	RestfulAPIPost(smfSelDataColl, filter, smfSelecDataBsonA)
+	poster.RestfulAPIPost(smfSelDataColl, filter, smfSelecDataBsonA)
 }
 
-func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg) *configmodels.Slice {
-	for name, slice := range getSlices() {
+func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg, manyGetter MongoManyGetter) *configmodels.Slice {
+	for name, slice := range getSlices(manyGetter) {
 		for _, dgName := range slice.SiteDeviceGroup {
 			if dgName == msg.Msg.DevGroupName {
 				logger.WebUILog.Infof("Device Group [%v] is part of slice: %v", dgName, name)
@@ -450,31 +460,31 @@ func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) 
 	return
 }
 
-func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
+func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg, oneDeleter MongoOneDeleter, authDBOneDeleter MongoOneDeleterfromAuthDB, authDBPoster MongoPosterforAuthDB, manyGetter MongoManyGetter, poster MongoPoster, oneGetter MongoOneGetter) {
 	for confData := range confChan {
 		switch confData.Msg.MsgType {
 		case configmodels.Sub_data:
 			rwLock.RLock()
-			//check this Imsi is part of any of the devicegroup
+			// Check this IMSI is part of any device group
 			imsi := strings.ReplaceAll(confData.Msg.Imsi, "imsi-", "")
 			if confData.Msg.MsgMethod != configmodels.Delete_op {
 				logger.WebUILog.Debugln("Insert/Update AuthenticationSubscription ", imsi)
 				filter := bson.M{"ueId": confData.Msg.Imsi}
 				authDataBsonA := toBsonM(confData.Msg.AuthSubData)
 				authDataBsonA["ueId"] = confData.Msg.Imsi
-				RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
+				authDBPoster.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
 			} else {
 				logger.WebUILog.Debugln("Delete AuthenticationSubscription", imsi)
 				filter := bson.M{"ueId": "imsi-" + imsi}
-				RestfulAPIDeleteOne(authSubsDataColl, filter)
-				RestfulAPIDeleteOne(amDataColl, filter)
+				authDBOneDeleter.RestfulAPIDeleteOne(authSubsDataColl, filter)
+				oneDeleter.RestfulAPIDeleteOne(amDataColl, filter)
 			}
 			rwLock.RUnlock()
 
 		case configmodels.Device_group:
 			rwLock.RLock()
 			/* is this devicegroup part of any existing slice */
-			slice := isDeviceGroupExistInSlice(confData)
+			slice := isDeviceGroupExistInSlice(confData, manyGetter)
 			if slice != nil {
 				sVal, _ := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 				snssai := &models.Snssai{
@@ -485,11 +495,11 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				aimsis := getAddedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)
 				for _, imsi := range aimsis {
 					dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
-					updateAmPolicyData(imsi)
-					updateSmPolicyData(snssai, dnn, imsi)
-					updateAmProviosionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
-					updateSmProviosionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
-					updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+					updateAmPolicyData(imsi, poster)
+					updateSmPolicyData(snssai, dnn, imsi, poster)
+					updateAmProviosionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi, poster)
+					updateSmProviosionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi, poster)
+					updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi, poster)
 				}
 
 				dimsis := getDeletedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)
@@ -498,11 +508,11 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					mnc := slice.SiteInfo.Plmn.Mnc
 					filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
 					filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
-					RestfulAPIDeleteOne(amPolicyDataColl, filterImsiOnly)
-					RestfulAPIDeleteOne(smPolicyDataColl, filterImsiOnly)
-					RestfulAPIDeleteOne(amDataColl, filter)
-					RestfulAPIDeleteOne(smDataColl, filter)
-					RestfulAPIDeleteOne(smfSelDataColl, filter)
+					oneDeleter.RestfulAPIDeleteOne(amPolicyDataColl, filterImsiOnly)
+					oneDeleter.RestfulAPIDeleteOne(smPolicyDataColl, filterImsiOnly)
+					oneDeleter.RestfulAPIDeleteOne(amDataColl, filter)
+					oneDeleter.RestfulAPIDeleteOne(smDataColl, filter)
+					oneDeleter.RestfulAPIDeleteOne(smfSelDataColl, filter)
 				}
 			}
 			rwLock.RUnlock()
@@ -522,17 +532,17 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				}
 				for _, dgName := range slice.SiteDeviceGroup {
 					configLog.Infoln("dgName : ", dgName)
-					devGroupConfig := getDeviceGroupByName(dgName)
+					devGroupConfig := getDeviceGroupByName(dgName, oneGetter)
 					if devGroupConfig != nil {
 						for _, imsi := range devGroupConfig.Imsis {
 							dnn := devGroupConfig.IpDomainExpanded.Dnn
 							mcc := slice.SiteInfo.Plmn.Mcc
 							mnc := slice.SiteInfo.Plmn.Mnc
-							updateAmPolicyData(imsi)
-							updateSmPolicyData(snssai, dnn, imsi)
-							updateAmProviosionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, dnn, imsi)
-							updateSmProviosionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, dnn, imsi)
-							updateSmfSelectionProviosionedData(snssai, mcc, mnc, dnn, imsi)
+							updateAmPolicyData(imsi, poster)
+							updateSmPolicyData(snssai, dnn, imsi, poster)
+							updateAmProviosionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, dnn, imsi, poster)
+							updateSmProviosionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, dnn, imsi, poster)
+							updateSmfSelectionProviosionedData(snssai, mcc, mnc, dnn, imsi, poster)
 						}
 					}
 				}
@@ -540,18 +550,18 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 
 			dgnames := getDeleteGroupsList(slice, confData.PrevSlice)
 			for _, dgname := range dgnames {
-				devGroupConfig := getDeviceGroupByName(dgname)
+				devGroupConfig := getDeviceGroupByName(dgname, oneGetter)
 				if devGroupConfig != nil {
 					for _, imsi := range devGroupConfig.Imsis {
 						mcc := confData.PrevSlice.SiteInfo.Plmn.Mcc
 						mnc := confData.PrevSlice.SiteInfo.Plmn.Mnc
 						filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
 						filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
-						RestfulAPIDeleteOne(amPolicyDataColl, filterImsiOnly)
-						RestfulAPIDeleteOne(smPolicyDataColl, filterImsiOnly)
-						RestfulAPIDeleteOne(amDataColl, filter)
-						RestfulAPIDeleteOne(smDataColl, filter)
-						RestfulAPIDeleteOne(smfSelDataColl, filter)
+						oneDeleter.RestfulAPIDeleteOne(amPolicyDataColl, filterImsiOnly)
+						oneDeleter.RestfulAPIDeleteOne(smPolicyDataColl, filterImsiOnly)
+						oneDeleter.RestfulAPIDeleteOne(amDataColl, filter)
+						oneDeleter.RestfulAPIDeleteOne(smDataColl, filter)
+						oneDeleter.RestfulAPIDeleteOne(smfSelDataColl, filter)
 					}
 				}
 			}

@@ -6,7 +6,7 @@
 package server
 
 import (
-	context "context"
+	"context"
 	"net"
 	"os"
 	"time"
@@ -44,7 +44,7 @@ var kasp = keepalive.ServerParameters{
 	Timeout: 5 * time.Second,  // Wait 1 second for the ping ack before assuming the connection is dead
 }
 
-func StartServer(host string, confServ *ConfigServer, configMsgChan chan *configmodels.ConfigMessage) {
+func StartServer(host string, confServ *ConfigServer, configMsgChan chan *configmodels.ConfigMessage, oneDeleter MongoOneDeleter, authDBOneDeleter MongoOneDeleterfromAuthDB, authDBPoster MongoPosterforAuthDB, manyGetter MongoManyGetter, poster MongoPoster, oneGetter MongoOneGetter) {
 	// add 4G endpoints in the client list. 4G endpoints are configured in the
 	// yaml file
 	if os.Getenv("MANAGED_BY_CONFIG_POD") == "true" && factory.WebUIConfig.Configuration.Mode5G == false {
@@ -53,7 +53,7 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 		if config != nil && config.Configuration != nil && config.Configuration.LteEnd != nil {
 			for _, end := range config.Configuration.LteEnd {
 				grpcLog.Infoln("Adding Client endpoint ", end.NodeType, end.ConfigPushUrl)
-				c, _ := getClient(end.NodeType)
+				c, _ := getClient(end.NodeType, manyGetter)
 				setClientConfigPushUrl(c, end.ConfigPushUrl)
 				setClientConfigCheckUrl(c, end.ConfigCheckUrl)
 			}
@@ -62,7 +62,7 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 	// we wish to start grpc server only if we received at least one config
 	// from the simapp/ROC
 	configReady := make(chan bool)
-	go configHandler(configMsgChan, configReady)
+	go configHandler(configMsgChan, configReady, oneDeleter, authDBOneDeleter, authDBPoster, manyGetter, poster, oneGetter)
 	ready := <-configReady
 
 	time.Sleep(2 * time.Second)
@@ -74,16 +74,16 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 	}
 
 	grpcServer := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
-	protos.RegisterConfigServiceServer(grpcServer, confServ)
+	protos.RegisterConfigServiceServer(grpcServer, confServ.ConfigServiceServer)
 	if err = grpcServer.Serve(lis); err != nil {
 		grpcLog.Fatalf("failed to serve: %v", err)
 	}
 	grpcLog.Infoln("Completed grpc server goroutine")
 }
 
-func (c *ConfigServer) GetNetworkSlice(ctx context.Context, rReq *protos.NetworkSliceRequest) (*protos.NetworkSliceResponse, error) {
+func (c *ConfigServer) GetNetworkSlice(ctx context.Context, rReq *protos.NetworkSliceRequest, manyGetter MongoManyGetter) (*protos.NetworkSliceResponse, error) {
 	grpcLog.Infof("Network Slice config req:Client %v, rst counter %v\n", rReq.ClientId, rReq.RestartCounter)
-	client, created := getClient(rReq.ClientId)
+	client, created := getClient(rReq.ClientId, manyGetter)
 	var reqMsg clientReqMsg
 	reqMsg.networkSliceReqMsg = rReq
 	reqMsg.grpcRspMsg = make(chan *clientRspMsg)
@@ -97,11 +97,11 @@ func (c *ConfigServer) GetNetworkSlice(ctx context.Context, rReq *protos.Network
 	return rResp.networkSliceRspMsg, nil
 }
 
-func (c *ConfigServer) NetworkSliceSubscribe(req *protos.NetworkSliceRequest, stream protos.ConfigService_NetworkSliceSubscribeServer) error {
+func (c *ConfigServer) NetworkSliceSubscribe(req *protos.NetworkSliceRequest, stream protos.ConfigService_NetworkSliceSubscribeServer, manyGetter MongoManyGetter) error {
 	grpcLog.Infoln("NetworkSliceSubscribe call from client ID ", req.ClientId)
 	fin := make(chan bool)
 	// Save the subscriber stream according to the given client ID
-	client, created := getClient(req.ClientId)
+	client, created := getClient(req.ClientId, manyGetter)
 	client.resStream = stream
 	client.resChannel = fin
 

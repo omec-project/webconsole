@@ -22,10 +22,6 @@ import (
 )
 
 type clientNF struct {
-	id                    string
-	ConfigPushUrl         string
-	ConfigCheckUrl        string
-	configChanged         bool
 	slicesConfigClient    map[string]*configmodels.Slice
 	devgroupsConfigClient map[string]*configmodels.DeviceGroups
 	outStandingPushConfig chan *configmodels.ConfigMessage
@@ -33,6 +29,10 @@ type clientNF struct {
 	resStream             protos.ConfigService_NetworkSliceSubscribeServer
 	resChannel            chan bool
 	clientLog             *logrus.Entry
+	id                    string
+	ConfigPushUrl         string
+	ConfigCheckUrl        string
+	configChanged         bool
 	metadataReqtd         bool
 }
 
@@ -40,11 +40,11 @@ type clientNF struct {
 type clientReqMsg struct {
 	networkSliceReqMsg *protos.NetworkSliceRequest
 	grpcRspMsg         chan *clientRspMsg
-	newClient          bool
 	lastDevGroup       *configmodels.DeviceGroups
 	lastSlice          *configmodels.Slice
 	devGroup           *configmodels.DeviceGroups
 	slice              *configmodels.Slice
+	newClient          bool
 }
 
 // message format to send response from client go routine to grpc server
@@ -68,16 +68,16 @@ type ImsiRange struct {
 
 type selectionKeys struct {
 	ServingPlmn  *ServingPlmn `json:"serving-plmn,omitempty"`
-	RequestedApn string       `json:"requested-apn,omitempty"`
 	ImsiRange    *ImsiRange   `json:"imsi-range,omitempty"`
+	RequestedApn string       `json:"requested-apn,omitempty"`
 }
 
 type subSelectionRule struct {
 	Keys                     selectionKeys `json:"keys,omitempty"`
-	Priority                 int32         `json:"priority,omitempty"`
 	SelectedQoSProfile       string        `json:"selected-qos-profile,omitempty"`
 	SelectedUserPlaneProfile string        `json:"selected-user-plane-profile,omitempty"`
 	SelectedApnProfile       string        `json:"selected-apn-profile,omitempty"`
+	Priority                 int32         `json:"priority,omitempty"`
 }
 
 type apnProfile struct {
@@ -94,29 +94,29 @@ type userPlaneProfile struct {
 }
 
 type qosProfile struct {
+	Ambr []int32 `json:"apn-ambr,omitempty"`
 	Qci  int32   `json:"qci,omitempty"`
 	Arp  int32   `json:"arp,omitempty"`
-	Ambr []int32 `json:"apn-ambr,omitempty"`
 }
 
 type configSpgw struct {
-	SubSelectRules    []*subSelectionRule          `json:"subscriber-selection-rules,omitempty"`
 	ApnProfiles       map[string]*apnProfile       `json:"apn-profiles,omitempty"`
 	UserPlaneProfiles map[string]*userPlaneProfile `json:"user-plane-profiles,omitempty"`
 	QosProfiles       map[string]*qosProfile       `json:"qos-profiles,omitempty"`
+	SubSelectRules    []*subSelectionRule          `json:"subscriber-selection-rules,omitempty"`
 }
 
 type configHss struct {
+	Key         string                 `json:"Key,omitempty"`
+	ApnProfiles map[string]*apnProfile `json:"apn-profiles,omitempty"`
+	Opc         string                 `json:"Opc,omitempty"`
+	Rand        string                 `json:"rand,omitempty"`
 	StartImsi   uint64                 `json:"start-imsi,omitempty"`
 	EndImsi     uint64                 `json:"end-imsi,omitempty"`
-	Opc         string                 `json:"Opc,omitempty"`
-	Key         string                 `json:"Key,omitempty"`
 	Sqn         uint64                 `json:"sqn,omitempty"`
-	Rand        string                 `json:"rand,omitempty"`
 	Msisdn      int64                  `json:"msisdn,omitempty"`
 	AmbrUl      int32                  `json:"ambr-up,omitempty"`
 	AmbrDl      int32                  `json:"ambr-dl,omitempty"`
-	ApnProfiles map[string]*apnProfile `json:"apn-profiles,omitempty"`
 	Qci         int32                  `json:"qci,omitempty"`
 	Arp         int32                  `json:"arp,omitempty"`
 }
@@ -133,22 +133,22 @@ type arpInfo struct {
 }
 
 type ruleQosInfo struct {
+	Arp       *arpInfo `json:"Allocation-Retention-Priority,omitempty"`
 	Qci       int32    `json:"QoS-Class-Identifier,omitempty"`
 	Mbr_ul    int32    `json:"Max-Requested-Bandwidth-UL,omitempty"`
 	Mbr_dl    int32    `json:"Max-Requested-Bandwidth-DL,omitempty"`
 	Gbr_ul    int32    `json:"Guaranteed-Bitrate-UL,omitempty"`
 	Gbr_dl    int32    `json:"Guaranteed-Bitrate-DL,omitempty"`
-	Arp       *arpInfo `json:"Allocation-Retention-Priority,omitempty"`
 	ApnAmbrUl int32    `json:"APN-Aggregate-Max-Bitrate-UL,omitempty"`
 	ApnAmbrDl int32    `json:"APN-Aggregate-Max-Bitrate-DL,omitempty"`
 }
 
 type pcrfRuledef struct {
+	QosInfo    *ruleQosInfo  `json:"QoS-Information,omitempty"`
+	FlowInfo   *ruleFlowInfo `json:"Flow-Information,omitempty"`
 	RuleName   string        `json:"Charging-Rule-Name,omitempty"`
 	Precedence int32         `json:"Precedence,omitempty"`
 	FlowStatus uint32        `json:"Flow-Status,omitempty"`
-	QosInfo    *ruleQosInfo  `json:"QoS-Information,omitempty"`
-	FlowInfo   *ruleFlowInfo `json:"Flow-Information,omitempty"`
 }
 
 type pcrfRules struct {
@@ -156,14 +156,14 @@ type pcrfRules struct {
 }
 
 type pcrfServices struct {
-	Qci                   int32    `json:"qci,omitempty"`
-	Arp                   int32    `json:"arp,omitempty"`
-	Ambr_ul               int32    `json:"AMBR_UL,omitempty"`
-	Ambr_dl               int32    `json:"AMBR_DL,omitempty"`
 	Rules                 []string `json:"service-activation-rules,omitempty"`
 	Activate_conditions   []string `json:"activate-confitions,omitempty"`
 	Deactivate_conditions []string `json:"deactivate-conditions-rules,omitempty"`
 	Deactivate_actions    []string `json:"deactivate-actions,omitempty"`
+	Qci                   int32    `json:"qci,omitempty"`
+	Arp                   int32    `json:"arp,omitempty"`
+	Ambr_ul               int32    `json:"AMBR_UL,omitempty"`
+	Ambr_dl               int32    `json:"AMBR_DL,omitempty"`
 }
 
 type pcrfServiceGroup struct {

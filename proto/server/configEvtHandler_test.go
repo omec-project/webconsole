@@ -7,6 +7,7 @@ package server
 
 import (
 	"encoding/json"
+	"github.com/stretchr/testify/mock"
 	"reflect"
 	"testing"
 
@@ -50,20 +51,63 @@ func deviceGroup(name string) configmodels.DeviceGroups {
 	return deviceGroup
 }
 
-func fakeMongoPost(coll string, filter primitive.M, data map[string]interface{}) bool {
+type MockMongoPost struct {
+	mock.Mock
+}
+
+type MockMongoGetOneNil struct {
+	mock.Mock
+}
+
+type MockMongoGetManyNil struct {
+	mock.Mock
+}
+
+type MockMongoGetManyGroups struct {
+	mock.Mock
+}
+
+type MockMongoGetManySlices struct {
+	mock.Mock
+}
+
+type MockMongoDeviceGroupGetOne struct {
+	mock.Mock
+	testGroup configmodels.DeviceGroups
+}
+
+type MockMongoSliceGetOne struct {
+	mock.Mock
+	testSlice configmodels.Slice
+}
+
+func (m *MockMongoPost) RestfulAPIPost(coll string, filter primitive.M, data map[string]interface{}) (bool, error) {
 	params := map[string]interface{}{
 		"coll":   coll,
 		"filter": filter,
 		"data":   data,
 	}
 	postData = append(postData, params)
-	return true
+	return true, nil
 }
 
-func fakeMongoGetOne(value map[string]interface{}) func(string, primitive.M) map[string]interface{} {
-	return func(_ string, _ primitive.M) map[string]interface{} {
-		return value
-	}
+func (m *MockMongoGetOneNil) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
+	var value map[string]interface{}
+	return value, nil
+}
+
+func (m *MockMongoDeviceGroupGetOne) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
+	var previousGroupBson bson.M
+	previousGroup, _ := json.Marshal(m.testGroup)
+	json.Unmarshal(previousGroup, &previousGroupBson)
+	return previousGroupBson, nil
+}
+
+func (m *MockMongoSliceGetOne) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
+	var previousSliceBson bson.M
+	previousSlice, _ := json.Marshal(m.testSlice)
+	json.Unmarshal(previousSlice, &previousSliceBson)
+	return previousSliceBson, nil
 }
 
 func Test_handleDeviceGroupPost(t *testing.T) {
@@ -80,10 +124,10 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		}
 		subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
 		postData = make([]map[string]interface{}, 0)
-		RestfulAPIPost = fakeMongoPost
-		RestfulAPIGetOne = fakeMongoGetOne(nil)
+		mongoPost := &MockMongoPost{}
+		mongoGetOne := &MockMongoGetOneNil{}
 
-		handleDeviceGroupPost(&configMsg, subsUpdateChan)
+		handleDeviceGroupPost(&configMsg, subsUpdateChan, mongoPost, mongoGetOne)
 
 		expected_collection := "webconsoleData.snapshots.devGroupData"
 		if postData[0]["coll"] != expected_collection {
@@ -123,13 +167,9 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		}
 		subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
 		postData = make([]map[string]interface{}, 0)
-		var previousGroupBson bson.M
-		previousGroup, _ := json.Marshal(testGroup)
-		json.Unmarshal(previousGroup, &previousGroupBson)
-		RestfulAPIPost = fakeMongoPost
-		RestfulAPIGetOne = fakeMongoGetOne(previousGroupBson)
-
-		handleDeviceGroupPost(&configMsg, subsUpdateChan)
+		mongoPost := &MockMongoPost{}
+		mongoGetOne := &MockMongoDeviceGroupGetOne{testGroup: testGroup}
+		handleDeviceGroupPost(&configMsg, subsUpdateChan, mongoPost, mongoGetOne)
 
 		expected_collection := "webconsoleData.snapshots.devGroupData"
 		if postData[0]["coll"] != expected_collection {
@@ -199,10 +239,10 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 		}
 		subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
 		postData = make([]map[string]interface{}, 0)
-		RestfulAPIPost = fakeMongoPost
-		RestfulAPIGetOne = fakeMongoGetOne(nil)
+		mongoPost := &MockMongoPost{}
+		mongoGetOne := &MockMongoGetOneNil{}
 
-		handleNetworkSlicePost(&configMsg, subsUpdateChan)
+		handleNetworkSlicePost(&configMsg, subsUpdateChan, mongoPost, mongoGetOne)
 
 		expected_collection := "webconsoleData.snapshots.sliceData"
 		if postData[0]["coll"] != expected_collection {
@@ -244,10 +284,10 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 		var previousSliceBson bson.M
 		previousSlice, _ := json.Marshal(testSlice)
 		json.Unmarshal(previousSlice, &previousSliceBson)
-		RestfulAPIPost = fakeMongoPost
-		RestfulAPIGetOne = fakeMongoGetOne(previousSliceBson)
+		mongoPost := &MockMongoPost{}
+		mongoGetOne := &MockMongoSliceGetOne{testSlice: testSlice}
 
-		handleNetworkSlicePost(&configMsg, subsUpdateChan)
+		handleNetworkSlicePost(&configMsg, subsUpdateChan, mongoPost, mongoGetOne)
 
 		expected_collection := "webconsoleData.snapshots.sliceData"
 		if postData[0]["coll"] != expected_collection {
@@ -282,7 +322,8 @@ func Test_handleSubscriberPost(t *testing.T) {
 	}
 
 	postData = make([]map[string]interface{}, 0)
-	handleSubscriberPost(&configMsg)
+	mongoPost := &MockMongoPost{}
+	handleSubscriberPost(&configMsg, mongoPost)
 
 	expected_collection := "subscriptionData.provisionedData.amData"
 	if postData[0]["coll"] != expected_collection {
@@ -300,48 +341,50 @@ func Test_handleSubscriberPost(t *testing.T) {
 	}
 }
 
-func fakeTwoCallsMongoGetMany(one []map[string]interface{}, two []map[string]interface{}) func(string, primitive.M) []map[string]interface{} {
-	called := false
-	return func(_ string, _ primitive.M) []map[string]interface{} {
-		if !called {
-			called = true
-			return one
-		}
-		return two
-	}
+func (m *MockMongoGetManyNil) RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error) {
+	var value []map[string]interface{}
+	return value, nil
 }
 
-func Test_firstConfigReceived_noConfigInDB(t *testing.T) {
-	RestfulAPIGetMany = fakeTwoCallsMongoGetMany(nil, nil)
-	result := firstConfigReceived()
-	if result {
-		t.Errorf("Expected firstConfigReceived to return false, got %v", result)
-	}
-}
-
-func Test_firstConfigReceived_deviceGroupInDB(t *testing.T) {
+func (m *MockMongoGetManyGroups) RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error) {
 	testGroup := deviceGroup("testGroup")
 	var previousGroupBson bson.M
 	previousGroup, _ := json.Marshal(testGroup)
 	json.Unmarshal(previousGroup, &previousGroupBson)
 	var groups []map[string]interface{}
 	groups = append(groups, previousGroupBson)
-	RestfulAPIGetMany = fakeTwoCallsMongoGetMany(groups, nil)
-	result := firstConfigReceived()
-	if !result {
-		t.Errorf("Expected firstConfigReceived to return true, got %v", result)
-	}
+	return groups, nil
 }
 
-func Test_firstConfigReceived_sliceInDB(t *testing.T) {
+func (m *MockMongoGetManySlices) RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error) {
 	testSlice := networkSlice("testGroup")
 	var previousSliceBson bson.M
 	previousSlice, _ := json.Marshal(testSlice)
 	json.Unmarshal(previousSlice, &previousSliceBson)
 	var slices []map[string]interface{}
 	slices = append(slices, previousSliceBson)
-	RestfulAPIGetMany = fakeTwoCallsMongoGetMany(nil, slices)
-	result := firstConfigReceived()
+	return slices, nil
+}
+
+func Test_firstConfigReceived_noConfigInDB(t *testing.T) {
+	mongoGetMany := &MockMongoGetManyNil{}
+	result := firstConfigReceived(mongoGetMany)
+	if result {
+		t.Errorf("Expected firstConfigReceived to return false, got %v", result)
+	}
+}
+
+func Test_firstConfigReceived_deviceGroupInDB(t *testing.T) {
+	mongoGetMany := &MockMongoGetManyGroups{}
+	result := firstConfigReceived(mongoGetMany)
+	if !result {
+		t.Errorf("Expected firstConfigReceived to return true, got %v", result)
+	}
+}
+
+func Test_firstConfigReceived_sliceInDB(t *testing.T) {
+	mongoGetMany := &MockMongoGetManySlices{}
+	result := firstConfigReceived(mongoGetMany)
 	if !result {
 		t.Errorf("Expected firstConfigReceived to return true, got %v", result)
 	}

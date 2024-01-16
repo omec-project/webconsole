@@ -10,12 +10,12 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/omec-project/util/mongoapi"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 
-	"github.com/omec-project/MongoDBLibrary"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
@@ -269,78 +269,80 @@ func GetSampleJSON(c *gin.Context) {
 	c.JSON(http.StatusOK, subsData)
 }
 
-// Get all subscribers list
-func GetSubscribers(c *gin.Context) {
-	setCorsHeader(c)
+func GetSubscribers(m mongoapi.MongoClient) gin.HandlerFunc {
+	// Get all subscribers list.
+	return func(c *gin.Context) {
+		setCorsHeader(c)
 
-	logger.WebUILog.Infoln("Get All Subscribers List")
+		logger.WebUILog.Infoln("Get All Subscribers List")
 
-	var subsList []configmodels.SubsListIE
-	amDataList := MongoDBLibrary.RestfulAPIGetMany(amDataColl, bson.M{})
-	for _, amData := range amDataList {
+		var subsList []configmodels.SubsListIE
+		amDataList, _ := m.RestfulAPIGetMany(amDataColl, bson.M{})
+		for _, amData := range amDataList {
 
-		tmp := configmodels.SubsListIE{
-			UeId: amData["ueId"].(string),
+			tmp := configmodels.SubsListIE{
+				UeId: amData["ueId"].(string),
+			}
+
+			if servingPlmnId, plmnIdExists := amData["servingPlmnId"]; plmnIdExists {
+				tmp.PlmnID = servingPlmnId.(string)
+			}
+
+			subsList = append(subsList, tmp)
 		}
-
-		if servingPlmnId, plmnIdExists := amData["servingPlmnId"]; plmnIdExists {
-			tmp.PlmnID = servingPlmnId.(string)
-		}
-
-		subsList = append(subsList, tmp)
+		c.JSON(http.StatusOK, subsList)
 	}
-
-	c.JSON(http.StatusOK, subsList)
 }
 
-// Get subscriber by IMSI(ueId))
-func GetSubscriberByID(c *gin.Context) {
-	setCorsHeader(c)
+func GetSubscriberByID(m mongoapi.MongoClient) gin.HandlerFunc {
+	// Get subscriber by IMSI(ueId)).
+	return func(c *gin.Context) {
+		setCorsHeader(c)
 
-	logger.WebUILog.Infoln("Get One Subscriber Data")
+		logger.WebUILog.Infoln("Get One Subscriber Data")
 
-	var subsData configmodels.SubsData
+		var subsData configmodels.SubsData
 
-	ueId := c.Param("ueId")
+		ueId := c.Param("ueId")
 
-	filterUeIdOnly := bson.M{"ueId": ueId}
+		filterUeIdOnly := bson.M{"ueId": ueId}
 
-	authSubsDataInterface := MongoDBLibrary.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
-	amDataDataInterface := MongoDBLibrary.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
-	smDataDataInterface := MongoDBLibrary.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
-	smfSelDataInterface := MongoDBLibrary.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
-	amPolicyDataInterface := MongoDBLibrary.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
-	smPolicyDataInterface := MongoDBLibrary.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
+		authSubsDataInterface, _ := m.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
+		amDataDataInterface, _ := m.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
+		smDataDataInterface, _ := m.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
+		smfSelDataInterface, _ := m.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
+		amPolicyDataInterface, _ := m.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
+		smPolicyDataInterface, _ := m.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
 
-	var authSubsData models.AuthenticationSubscription
-	json.Unmarshal(mapToByte(authSubsDataInterface), &authSubsData)
-	var amDataData models.AccessAndMobilitySubscriptionData
-	json.Unmarshal(mapToByte(amDataDataInterface), &amDataData)
-	var smDataData []models.SessionManagementSubscriptionData
-	json.Unmarshal(sliceToByte(smDataDataInterface), &smDataData)
-	var smfSelData models.SmfSelectionSubscriptionData
-	json.Unmarshal(mapToByte(smfSelDataInterface), &smfSelData)
-	var amPolicyData models.AmPolicyData
-	json.Unmarshal(mapToByte(amPolicyDataInterface), &amPolicyData)
-	var smPolicyData models.SmPolicyData
-	json.Unmarshal(mapToByte(smPolicyDataInterface), &smPolicyData)
+		var authSubsData models.AuthenticationSubscription
+		json.Unmarshal(mapToByte(authSubsDataInterface), &authSubsData)
+		var amDataData models.AccessAndMobilitySubscriptionData
+		json.Unmarshal(mapToByte(amDataDataInterface), &amDataData)
+		var smDataData []models.SessionManagementSubscriptionData
+		json.Unmarshal(sliceToByte(smDataDataInterface), &smDataData)
+		var smfSelData models.SmfSelectionSubscriptionData
+		json.Unmarshal(mapToByte(smfSelDataInterface), &smfSelData)
+		var amPolicyData models.AmPolicyData
+		json.Unmarshal(mapToByte(amPolicyDataInterface), &amPolicyData)
+		var smPolicyData models.SmPolicyData
+		json.Unmarshal(mapToByte(smPolicyDataInterface), &smPolicyData)
 
-	subsData = configmodels.SubsData{
-		UeId:                              ueId,
-		AuthenticationSubscription:        authSubsData,
-		AccessAndMobilitySubscriptionData: amDataData,
-		SessionManagementSubscriptionData: smDataData,
-		SmfSelectionSubscriptionData:      smfSelData,
-		AmPolicyData:                      amPolicyData,
-		SmPolicyData:                      smPolicyData,
+		subsData = configmodels.SubsData{
+			UeId:                              ueId,
+			AuthenticationSubscription:        authSubsData,
+			AccessAndMobilitySubscriptionData: amDataData,
+			SessionManagementSubscriptionData: smDataData,
+			SmfSelectionSubscriptionData:      smfSelData,
+			AmPolicyData:                      amPolicyData,
+			SmPolicyData:                      smPolicyData,
+		}
+
+		c.JSON(http.StatusOK, subsData)
 	}
-
-	c.JSON(http.StatusOK, subsData)
 }
 
-// Post subscriber by IMSI(ueId)
 func PostSubscriberByID(c *gin.Context) {
-
+	// Post subscriber by IMSI(ueId).
 	setCorsHeader(c)
 
 	var subsOverrideData configmodels.SubsOverrideData
@@ -400,8 +402,8 @@ func PostSubscriberByID(c *gin.Context) {
 	logger.WebUILog.Infoln("Sucessfully Added Subscriber Data to ConfigChannel: ", ueId)
 }
 
-// Put subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
 func PutSubscriberByID(c *gin.Context) {
+	// Put subscriber by IMSI(ueId) and PlmnID(servingPlmnId).
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Put One Subscriber Data")
 
@@ -421,8 +423,8 @@ func PutSubscriberByID(c *gin.Context) {
 	logger.WebUILog.Infoln("Put Subscriber Data complete")
 }
 
-// Patch subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
 func PatchSubscriberByID(c *gin.Context) {
+	// Patch subscriber by IMSI(ueId) and PlmnID(servingPlmnId).
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Patch One Subscriber Data")
 
@@ -471,8 +473,8 @@ func PatchSubscriberByID(c *gin.Context) {
 	*/
 }
 
-// Delete subscriber by IMSI(ueId)
 func DeleteSubscriberByID(c *gin.Context) {
+	// Delete subscriber by IMSI(ueId)
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Delete One Subscriber Data")
 
@@ -487,68 +489,72 @@ func DeleteSubscriberByID(c *gin.Context) {
 	logger.WebUILog.Infoln("Delete Subscriber Data complete")
 }
 
-func GetRegisteredUEContext(c *gin.Context) {
-	setCorsHeader(c)
+func GetRegisteredUEContext(m mongoapi.MongoClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		setCorsHeader(c)
 
-	logger.WebUILog.Infoln("Get Registered UE Context")
+		logger.WebUILog.Infoln("Get Registered UE Context")
 
-	webuiSelf := webui_context.WEBUI_Self()
-	webuiSelf.UpdateNfProfiles()
+		webuiSelf := webui_context.WEBUI_Self()
+		webuiSelf.UpdateNfProfiles(m)
 
-	supi, supiExists := c.Params.Get("supi")
+		supi, supiExists := c.Params.Get("supi")
 
-	// TODO: support fetching data from multiple AMFs
-	if amfUris := webuiSelf.GetOamUris(models.NfType_AMF); amfUris != nil {
-		var requestUri string
+		// TODO: support fetching data from multiple AMFs
+		if amfUris := webuiSelf.GetOamUris(models.NfType_AMF); amfUris != nil {
+			var requestUri string
 
-		if supiExists {
-			requestUri = fmt.Sprintf("%s/namf-oam/v1/registered-ue-context/%s", amfUris[0], supi)
+			if supiExists {
+				requestUri = fmt.Sprintf("%s/namf-oam/v1/registered-ue-context/%s", amfUris[0], supi)
+			} else {
+				requestUri = fmt.Sprintf("%s/namf-oam/v1/registered-ue-context", amfUris[0])
+			}
+
+			resp, err := httpsClient.Get(requestUri)
+			if err != nil {
+				logger.WebUILog.Error(err)
+				c.JSON(http.StatusInternalServerError, gin.H{})
+				return
+			}
+			sendResponseToClient(c, resp)
 		} else {
-			requestUri = fmt.Sprintf("%s/namf-oam/v1/registered-ue-context", amfUris[0])
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"cause": "No AMF Found",
+			})
 		}
-
-		resp, err := httpsClient.Get(requestUri)
-		if err != nil {
-			logger.WebUILog.Error(err)
-			c.JSON(http.StatusInternalServerError, gin.H{})
-			return
-		}
-		sendResponseToClient(c, resp)
-	} else {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"cause": "No AMF Found",
-		})
 	}
 }
 
-func GetUEPDUSessionInfo(c *gin.Context) {
-	setCorsHeader(c)
+func GetUEPDUSessionInfo(m mongoapi.MongoClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		setCorsHeader(c)
 
-	logger.WebUILog.Infoln("Get UE PDU Session Info")
+		logger.WebUILog.Infoln("Get UE PDU Session Info")
 
-	webuiSelf := webui_context.WEBUI_Self()
-	webuiSelf.UpdateNfProfiles()
+		webuiSelf := webui_context.WEBUI_Self()
+		webuiSelf.UpdateNfProfiles(m)
 
-	smContextRef, smContextRefExists := c.Params.Get("smContextRef")
-	if !smContextRefExists {
-		c.JSON(http.StatusBadRequest, gin.H{})
-		return
-	}
-
-	// TODO: support fetching data from multiple SMF
-	if smfUris := webuiSelf.GetOamUris(models.NfType_SMF); smfUris != nil {
-		requestUri := fmt.Sprintf("%s/nsmf-oam/v1/ue-pdu-session-info/%s", smfUris[0], smContextRef)
-		resp, err := httpsClient.Get(requestUri)
-		if err != nil {
-			logger.WebUILog.Error(err)
-			c.JSON(http.StatusInternalServerError, gin.H{})
+		smContextRef, smContextRefExists := c.Params.Get("smContextRef")
+		if !smContextRefExists {
+			c.JSON(http.StatusBadRequest, gin.H{})
 			return
 		}
 
-		sendResponseToClient(c, resp)
-	} else {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"cause": "No SMF Found",
-		})
+		// TODO: support fetching data from multiple SMF
+		if smfUris := webuiSelf.GetOamUris(models.NfType_SMF); smfUris != nil {
+			requestUri := fmt.Sprintf("%s/nsmf-oam/v1/ue-pdu-session-info/%s", smfUris[0], smContextRef)
+			resp, err := httpsClient.Get(requestUri)
+			if err != nil {
+				logger.WebUILog.Error(err)
+				c.JSON(http.StatusInternalServerError, gin.H{})
+				return
+			}
+
+			sendResponseToClient(c, resp)
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"cause": "No SMF Found",
+			})
+		}
 	}
 }

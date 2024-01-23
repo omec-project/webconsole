@@ -22,14 +22,14 @@ const (
 )
 
 type ConfigMessage struct {
-	MsgType      int
-	MsgMethod    int
 	DevGroup     *DeviceGroups
 	Slice        *Slice
+	AuthSubData  *models.AuthenticationSubscription
 	DevGroupName string
 	SliceName    string
-	AuthSubData  *models.AuthenticationSubscription
 	Imsi         string
+	MsgType      int
+	MsgMethod    int
 }
 
 // Slice + attached device group
@@ -40,6 +40,6 @@ type SliceConfigSnapshot struct {
 
 // DevGroup + slice name
 type DevGroupConfigSnapshot struct {
-	SliceName string
 	DevGroup  *DeviceGroups
+	SliceName string
 }

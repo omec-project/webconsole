@@ -24,9 +24,9 @@ const (
 type ConfigMessage struct {
 	DevGroup     *DeviceGroups
 	Slice        *Slice
+	AuthSubData  *models.AuthenticationSubscription
 	DevGroupName string
 	SliceName    string
-	AuthSubData  *models.AuthenticationSubscription
 	Imsi         string
 	MsgType      int
 	MsgMethod    int

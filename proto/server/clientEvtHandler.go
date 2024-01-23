@@ -107,8 +107,8 @@ type configSpgw struct {
 }
 
 type configHss struct {
-	Key         string                 `json:"Key,omitempty"`
 	ApnProfiles map[string]*apnProfile `json:"apn-profiles,omitempty"`
+	Key         string                 `json:"Key,omitempty"`
 	Opc         string                 `json:"Opc,omitempty"`
 	Rand        string                 `json:"rand,omitempty"`
 	StartImsi   uint64                 `json:"start-imsi,omitempty"`

@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omec-project/http_wrapper"
+	"github.com/omec-project/util/httpwrapper"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/sirupsen/logrus"
@@ -83,7 +83,7 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 		configLog.Infof(" err %v", err)
 		return false
 	}
-	req := http_wrapper.NewRequest(c.Request, request)
+	req := httpwrapper.NewRequest(c.Request, request)
 
 	configLog.Infof("Printing Device Group [%v] : %+v", groupName, req)
 	configLog.Infof("params : %v", req.Params)
@@ -163,7 +163,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	}
 	//configLog.Infof("Printing request full after binding : %v ", request)
 
-	req := http_wrapper.NewRequest(c.Request, request)
+	req := httpwrapper.NewRequest(c.Request, request)
 
 	configLog.Infof("Printing Slice: [%v] received from Roc/Simapp : %v", sliceName, request)
 	configLog.Infof("params : %v ", req.Params)

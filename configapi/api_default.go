@@ -16,10 +16,10 @@ package configapi
 
 import (
 	"encoding/json"
+	"github.com/omec-project/webconsole/dbadapter"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omec-project/MongoDBLibrary"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"go.mongodb.org/mongo-driver/bson"
@@ -30,18 +30,16 @@ const (
 	sliceDataColl    = "webconsoleData.snapshots.sliceData"
 )
 
-var (
-	RestfulAPIGetMany = MongoDBLibrary.RestfulAPIGetMany
-	RestfulAPIGetOne  = MongoDBLibrary.RestfulAPIGetOne
-)
-
 // GetDeviceGroups -
 func GetDeviceGroups(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Get all Device Groups")
 
 	var deviceGroups []string = make([]string, 0)
-	rawDeviceGroups := RestfulAPIGetMany(devGroupDataColl, bson.M{})
+	rawDeviceGroups, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, bson.M{})
+	if errGetMany != nil {
+		logger.DbLog.Warnln(errGetMany)
+	}
 	for _, rawDeviceGroup := range rawDeviceGroups {
 		deviceGroups = append(deviceGroups, rawDeviceGroup["group-name"].(string))
 	}
@@ -56,7 +54,10 @@ func GetDeviceGroupByName(c *gin.Context) {
 
 	var deviceGroup configmodels.DeviceGroups
 	filter := bson.M{"group-name": c.Param("group-name")}
-	rawDeviceGroup := RestfulAPIGetOne(devGroupDataColl, filter)
+	rawDeviceGroup, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(devGroupDataColl, filter)
+	if errGetOne != nil {
+		logger.DbLog.Warnln(errGetOne)
+	}
 	json.Unmarshal(mapToByte(rawDeviceGroup), &deviceGroup)
 
 	if deviceGroup.DeviceGroupName == "" {
@@ -108,7 +109,10 @@ func GetNetworkSlices(c *gin.Context) {
 	logger.WebUILog.Infoln("Get all Network Slices")
 
 	var networkSlices []string = make([]string, 0)
-	rawNetworkSlices := RestfulAPIGetMany(sliceDataColl, bson.M{})
+	rawNetworkSlices, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, bson.M{})
+	if errGetMany != nil {
+		logger.DbLog.Warnln(errGetMany)
+	}
 	for _, rawNetworkSlice := range rawNetworkSlices {
 		networkSlices = append(networkSlices, rawNetworkSlice["SliceName"].(string))
 	}
@@ -123,7 +127,10 @@ func GetNetworkSliceByName(c *gin.Context) {
 
 	var networkSlice configmodels.Slice
 	filter := bson.M{"SliceName": c.Param("slice-name")}
-	rawNetworkSlice := RestfulAPIGetOne(sliceDataColl, filter)
+	rawNetworkSlice, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(sliceDataColl, filter)
+	if errGetOne != nil {
+		logger.DbLog.Warnln(errGetOne)
+	}
 	json.Unmarshal(mapToByte(rawNetworkSlice), &networkSlice)
 
 	if networkSlice.SliceName == "" {

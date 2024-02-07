@@ -10,6 +10,7 @@ package webui_service
 import (
 	"bufio"
 	"fmt"
+	"github.com/omec-project/webconsole/dbadapter"
 	"net/http"
 	"os/exec"
 	"strconv"
@@ -24,11 +25,10 @@ import (
 	_ "net/http"
 	_ "net/http/pprof"
 
-	"github.com/omec-project/MongoDBLibrary"
-	mongoDBLibLogger "github.com/omec-project/MongoDBLibrary/logger"
 	"github.com/omec-project/logger_util"
 	"github.com/omec-project/path_util"
 	pathUtilLogger "github.com/omec-project/path_util/logger"
+	mongoDBLibLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
@@ -130,14 +130,14 @@ func (webui *WEBUI) setLogLevel() {
 	if factory.WebUIConfig.Logger.MongoDBLibrary != nil {
 		if factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel != "" {
 			if level, err := logrus.ParseLevel(factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel); err != nil {
-				mongoDBLibLogger.MongoDBLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level",
+				mongoDBLibLogger.AppLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level",
 					factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel)
 				mongoDBLibLogger.SetLogLevel(logrus.InfoLevel)
 			} else {
 				mongoDBLibLogger.SetLogLevel(level)
 			}
 		} else {
-			mongoDBLibLogger.MongoDBLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
+			mongoDBLibLogger.AppLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
 			mongoDBLibLogger.SetLogLevel(logrus.InfoLevel)
 		}
 		mongoDBLibLogger.SetReportCaller(factory.WebUIConfig.Logger.MongoDBLibrary.ReportCaller)
@@ -163,15 +163,7 @@ func (webui *WEBUI) Start() {
 		mongodb := factory.WebUIConfig.Configuration.Mongodb
 
 		// Connect to MongoDB
-		MongoDBLibrary.SetMongoDB(mongodb.Name, mongodb.Url)
-		for {
-			if MongoDBLibrary.Client != nil {
-				break
-			} else {
-				MongoDBLibrary.SetMongoDB(mongodb.Name, mongodb.Url)
-				continue
-			}
-		}
+		dbadapter.ConnectMongo(mongodb.Url, mongodb.Name)
 	}
 
 	initLog.Infoln("WebUI Server started")

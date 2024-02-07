@@ -10,16 +10,15 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/omec-project/webconsole/dbadapter"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
-
-	"github.com/omec-project/MongoDBLibrary"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
 	"github.com/omec-project/webconsole/configmodels"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 const (
@@ -276,7 +275,10 @@ func GetSubscribers(c *gin.Context) {
 	logger.WebUILog.Infoln("Get All Subscribers List")
 
 	var subsList []configmodels.SubsListIE
-	amDataList := MongoDBLibrary.RestfulAPIGetMany(amDataColl, bson.M{})
+	amDataList, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(amDataColl, bson.M{})
+	if errGetMany != nil {
+		logger.DbLog.Warnln(errGetMany)
+	}
 	for _, amData := range amDataList {
 
 		tmp := configmodels.SubsListIE{
@@ -305,13 +307,30 @@ func GetSubscriberByID(c *gin.Context) {
 
 	filterUeIdOnly := bson.M{"ueId": ueId}
 
-	authSubsDataInterface := MongoDBLibrary.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
-	amDataDataInterface := MongoDBLibrary.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
-	smDataDataInterface := MongoDBLibrary.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
-	smfSelDataInterface := MongoDBLibrary.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
-	amPolicyDataInterface := MongoDBLibrary.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
-	smPolicyDataInterface := MongoDBLibrary.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
-
+	authSubsDataInterface, errGetOneAuth := dbadapter.CommonDBClient.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
+	if errGetOneAuth != nil {
+		logger.DbLog.Warnln(errGetOneAuth)
+	}
+	amDataDataInterface, errGetOneAmData := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
+	if errGetOneAmData != nil {
+		logger.DbLog.Warnln(errGetOneAmData)
+	}
+	smDataDataInterface, errGetManySmData := dbadapter.CommonDBClient.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
+	if errGetManySmData != nil {
+		logger.DbLog.Warnln(errGetManySmData)
+	}
+	smfSelDataInterface, errGetOneSmfSel := dbadapter.CommonDBClient.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
+	if errGetOneSmfSel != nil {
+		logger.DbLog.Warnln(errGetOneSmfSel)
+	}
+	amPolicyDataInterface, errGetOneAmPol := dbadapter.CommonDBClient.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
+	if errGetOneAmPol != nil {
+		logger.DbLog.Warnln(errGetOneAmPol)
+	}
+	smPolicyDataInterface, errGetManySmPol := dbadapter.CommonDBClient.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
+	if errGetManySmPol != nil {
+		logger.DbLog.Warnln(errGetManySmPol)
+	}
 	var authSubsData models.AuthenticationSubscription
 	json.Unmarshal(mapToByte(authSubsDataInterface), &authSubsData)
 	var amDataData models.AccessAndMobilitySubscriptionData
@@ -425,50 +444,6 @@ func PutSubscriberByID(c *gin.Context) {
 func PatchSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Patch One Subscriber Data")
-
-	/*var subsData configmodels.SubsData
-	if err := c.ShouldBindJSON(&subsData); err != nil {
-		logger.WebUILog.Panic(err.Error())
-	}
-
-	ueId := c.Param("ueId")
-	servingPlmnId := c.Param("servingPlmnId")
-
-	filterUeIdOnly := bson.M{"ueId": ueId}
-	filter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
-
-	authSubsBsonM := toBsonM(subsData.AuthenticationSubscription)
-	authSubsBsonM["ueId"] = ueId
-	amDataBsonM := toBsonM(subsData.AccessAndMobilitySubscriptionData)
-	amDataBsonM["ueId"] = ueId
-	amDataBsonM["servingPlmnId"] = servingPlmnId
-
-	// Replace all data with new one
-	MongoDBLibrary.RestfulAPIDeleteMany(smDataColl, filter)
-	for _, data := range subsData.SessionManagementSubscriptionData {
-		smDataBsonM := toBsonM(data)
-		smDataBsonM["ueId"] = ueId
-		smDataBsonM["servingPlmnId"] = servingPlmnId
-		filterSmData := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId, "snssai": data.SingleNssai}
-		MongoDBLibrary.RestfulAPIMergePatch(smDataColl, filterSmData, smDataBsonM)
-	}
-
-	smfSelSubsBsonM := toBsonM(subsData.SmfSelectionSubscriptionData)
-	smfSelSubsBsonM["ueId"] = ueId
-	smfSelSubsBsonM["servingPlmnId"] = servingPlmnId
-	amPolicyDataBsonM := toBsonM(subsData.AmPolicyData)
-	amPolicyDataBsonM["ueId"] = ueId
-	smPolicyDataBsonM := toBsonM(subsData.SmPolicyData)
-	smPolicyDataBsonM["ueId"] = ueId
-
-	MongoDBLibrary.RestfulAPIMergePatch(authSubsDataColl, filterUeIdOnly, authSubsBsonM)
-	MongoDBLibrary.RestfulAPIMergePatch(amDataColl, filter, amDataBsonM)
-	MongoDBLibrary.RestfulAPIMergePatch(smfSelDataColl, filter, smfSelSubsBsonM)
-	MongoDBLibrary.RestfulAPIMergePatch(amPolicyDataColl, filterUeIdOnly, amPolicyDataBsonM)
-	MongoDBLibrary.RestfulAPIMergePatch(smPolicyDataColl, filterUeIdOnly, smPolicyDataBsonM)
-
-	c.JSON(http.StatusNoContent, gin.H{})
-	*/
 }
 
 // Delete subscriber by IMSI(ueId)

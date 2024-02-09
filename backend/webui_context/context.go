@@ -7,12 +7,11 @@ package webui_context
 
 import (
 	"fmt"
+	"github.com/omec-project/webconsole/dbadapter"
 	"reflect"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
-
-	"github.com/omec-project/MongoDBLibrary"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 )
@@ -34,7 +33,10 @@ func init() {
 }
 
 func (context *WEBUIContext) UpdateNfProfiles() {
-	nfProfilesRaw := MongoDBLibrary.RestfulAPIGetMany("NfProfile", nil)
+	nfProfilesRaw, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany("NfProfile", nil)
+	if errGetMany != nil {
+		logger.DbLog.Warnln(errGetMany)
+	}
 	nfProfiles, err := decode(nfProfilesRaw, time.RFC3339)
 	if err != nil {
 		logger.ContextLog.Error(err)

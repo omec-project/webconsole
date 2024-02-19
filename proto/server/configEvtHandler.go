@@ -490,14 +490,14 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				filter := bson.M{"ueId": confData.Msg.Imsi}
 				authDataBsonA := toBsonM(confData.Msg.AuthSubData)
 				authDataBsonA["ueId"] = confData.Msg.Imsi
-				_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
+				_, errPost := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
 				if errPost != nil {
 					logger.DbLog.Warnln(errPost)
 				}
 			} else {
 				logger.WebUILog.Debugln("Delete AuthenticationSubscription", imsi)
 				filter := bson.M{"ueId": "imsi-" + imsi}
-				errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
+				errDelOne := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
 				if errDelOne != nil {
 					logger.DbLog.Warnln(errDelOne)
 				}

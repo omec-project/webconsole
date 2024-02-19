@@ -30,12 +30,14 @@ type DBInterface interface {
 }
 
 var CommonDBClient DBInterface
+var AuthDBClient DBInterface
 
 type MongoDBClient struct {
 	mongoapi.MongoClient
 }
 
-func getMongoClient(url string, dbname string) error {
+// Set CommonDBClient
+func setCommonDBClient(url string, dbname string) error {
 	var mClient, errConnect = mongoapi.NewMongoClient(url, dbname)
 	if mClient.Client != nil {
 		CommonDBClient = mClient
@@ -44,14 +46,26 @@ func getMongoClient(url string, dbname string) error {
 	return errConnect
 }
 
-func ConnectMongo(url string, dbname string) {
+// Set AuthDBClient
+func setAuthDBClient(authurl string, authkeysdbname string) error {
+	var mClient, errConnect = mongoapi.NewMongoClient(authurl, authkeysdbname)
+	if mClient.Client != nil {
+		AuthDBClient = mClient
+		AuthDBClient.(*mongoapi.MongoClient).Client.Database(authkeysdbname)
+	}
+	return errConnect
+}
+
+func ConnectMongo(url string, dbname string, authurl string, authkeysdbname string) {
 	// Connect to MongoDB
 	ticker := time.NewTicker(2 * time.Second)
 	defer func() { ticker.Stop() }()
 	timer := time.After(180 * time.Second)
 ConnectMongo:
 	for {
-		if err := getMongoClient(url, dbname); err == nil {
+		commonDbErr := setCommonDBClient(url, dbname)
+		authDbErr := setAuthDBClient(authurl, authkeysdbname)
+		if commonDbErr == nil && authDbErr == nil {
 			break ConnectMongo
 		}
 		select {

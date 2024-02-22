@@ -7,13 +7,12 @@ require (
 	github.com/gin-contrib/cors v1.5.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/omec-project/config5g v1.2.0
+	github.com/omec-project/config5g v1.2.1-0.20240216144508-a6c2195300d4
 	github.com/omec-project/http2_util v1.1.0
-	github.com/omec-project/logger_conf v1.1.0
+	github.com/omec-project/logger_conf v1.1.1-0.20240213150911-6ea2670f1fc0
 	github.com/omec-project/logger_util v1.1.0
 	github.com/omec-project/openapi v1.1.0
-	github.com/omec-project/path_util v1.1.0
-	github.com/omec-project/util v1.0.12
+	github.com/omec-project/util v1.0.13-0.20240207024358-eb30f7e970e8
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli v1.22.14
 	go.mongodb.org/mongo-driver v1.10.1

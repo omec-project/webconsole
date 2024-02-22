@@ -26,9 +26,9 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/omec-project/logger_util"
-	"github.com/omec-project/path_util"
-	pathUtilLogger "github.com/omec-project/path_util/logger"
 	mongoDBLibLogger "github.com/omec-project/util/logger"
+	"github.com/omec-project/util/path_util"
+	pathUtilLogger "github.com/omec-project/util/path_util/logger"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"

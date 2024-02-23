@@ -36,6 +36,13 @@ func InitConfigFactory(f string) error {
 		if yamlErr := yaml.Unmarshal(content, WebUIConfig); yamlErr != nil {
 			return fmt.Errorf("[Configuration] %+v", yamlErr)
 		}
+		if WebUIConfig.Configuration.Mongodb.AuthUrl == "" {
+			authUrl := WebUIConfig.Configuration.Mongodb.Url
+			WebUIConfig.Configuration.Mongodb.AuthUrl = authUrl
+		}
+		if WebUIConfig.Configuration.Mongodb.AuthKeysDbName == "" {
+			WebUIConfig.Configuration.Mongodb.AuthKeysDbName = "authentication"
+		}
 		// we dont want Mode5G coming from the helm chart, since
 		// there is chance of misconfiguration
 		if os.Getenv("CONFIGPOD_DEPLOYMENT") == "4G" {

@@ -307,7 +307,7 @@ func GetSubscriberByID(c *gin.Context) {
 
 	filterUeIdOnly := bson.M{"ueId": ueId}
 
-	authSubsDataInterface, errGetOneAuth := dbadapter.CommonDBClient.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
+	authSubsDataInterface, errGetOneAuth := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
 	if errGetOneAuth != nil {
 		logger.DbLog.Warnln(errGetOneAuth)
 	}

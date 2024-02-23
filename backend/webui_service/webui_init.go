@@ -163,7 +163,7 @@ func (webui *WEBUI) Start() {
 		mongodb := factory.WebUIConfig.Configuration.Mongodb
 
 		// Connect to MongoDB
-		dbadapter.ConnectMongo(mongodb.Url, mongodb.Name)
+		dbadapter.ConnectMongo(mongodb.Url, mongodb.Name, mongodb.AuthUrl, mongodb.AuthKeysDbName)
 	}
 
 	initLog.Infoln("WebUI Server started")

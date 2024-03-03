@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+# SPDX-FileCopyrightText: 2024 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -7,20 +8,24 @@ FROM golang:1.22.0-bookworm AS builder
 
 LABEL maintainer="ONF <omec-dev@opennetworking.org>"
 
-RUN apt-get update
-RUN apt-get -y install apt-transport-https ca-certificates
-RUN apt-get -y upgrade
-RUN apt-get update
-RUN apt-get -y install gcc cmake autoconf libtool pkg-config libmnl-dev libyaml-dev unzip
-RUN apt-get clean
-ARG l
-RUN go env > l
-RUN echo $l
-RUN cd $GOPATH/src && mkdir -p webconsole
-COPY . $GOPATH/src/webconsole
-RUN cd $GOPATH/src/webconsole \
-    && make all \
-    && CGO_ENABLED=0 go build -a -installsuffix nocgo -o webconsole -x server.go
+RUN apt-get update && \
+    apt-get -y install --no-install-recommends \
+    apt-transport-https \
+    ca-certificates \
+    gcc \
+    cmake \
+    autoconf \
+    libtool \
+    pkg-config \
+    libmnl-dev \
+    libyaml-dev \
+    unzip && \
+    apt-get clean
+
+WORKDIR $GOPATH/src/webconsole
+COPY . .
+RUN make all && \
+    CGO_ENABLED=0 go build -a -installsuffix nocgo -o webconsole -x server.go
 
 FROM alpine:3.19 as webui
 
@@ -29,14 +34,14 @@ LABEL description="ONF open source 5G Core Network" \
 
 ARG DEBUG_TOOLS
 
-# Install debug tools ~ 100MB (if DEBUG_TOOLS is set to true)
-RUN apk update
-RUN apk add -U vim strace net-tools curl netcat-openbsd bind-tools
 
+# Install debug tools ~85MB (if DEBUG_TOOLS is set to true)
+RUN if [ "$DEBUG_TOOLS" = "true" ]; then \
+        apk update && apk add --no-cache -U vim strace net-tools curl netcat-openbsd bind-tools; \
+        fi
 
 # Set working dir
-WORKDIR /free5gc
-RUN mkdir -p webconsole/
+WORKDIR /free5gc/webconsole
 
 # Copy executable and default certs
-COPY --from=builder /go/src/webconsole/webconsole ./webconsole
+COPY --from=builder /go/src/webconsole/webconsole .

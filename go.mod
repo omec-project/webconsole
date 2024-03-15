@@ -9,7 +9,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/omec-project/config5g v1.2.1-0.20240216144508-a6c2195300d4
 	github.com/omec-project/http2_util v1.2.0
-	github.com/omec-project/logger_conf v1.1.1-0.20240213150911-6ea2670f1fc0
+	github.com/omec-project/logger_conf v1.1.1
 	github.com/omec-project/logger_util v1.2.0
 	github.com/omec-project/openapi v1.1.0
 	github.com/omec-project/util v1.0.13

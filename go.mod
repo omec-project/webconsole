@@ -7,7 +7,7 @@ require (
 	github.com/gin-contrib/cors v1.7.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/omec-project/config5g v1.2.1-0.20240216144508-a6c2195300d4
+	github.com/omec-project/config5g v1.3.0
 	github.com/omec-project/http2_util v1.2.0
 	github.com/omec-project/logger_conf v1.1.1
 	github.com/omec-project/logger_util v1.2.0

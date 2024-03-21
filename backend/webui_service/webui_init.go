@@ -10,12 +10,13 @@ package webui_service
 import (
 	"bufio"
 	"fmt"
-	"github.com/omec-project/webconsole/dbadapter"
 	"net/http"
 	"os/exec"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/omec-project/webconsole/dbadapter"
 
 	"github.com/gin-contrib/cors"
 	"github.com/omec-project/http2_util"
@@ -187,7 +188,7 @@ func (webui *WEBUI) Start() {
 		AllowAllOrigins:  true,
 		MaxAge:           86400,
 	}))
-
+	webui.SetUpStaticFiles(subconfig_router)
 	go func() {
 		httpAddr := ":" + strconv.Itoa(factory.WebUIConfig.Configuration.CfgPort)
 		initLog.Infoln("Webui HTTP addr:", httpAddr, factory.WebUIConfig.Configuration.CfgPort)

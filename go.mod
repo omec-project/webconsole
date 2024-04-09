@@ -7,7 +7,7 @@ require (
 	github.com/gin-contrib/cors v1.7.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/omec-project/config5g v1.3.2
+	github.com/omec-project/config5g v1.3.3
 	github.com/omec-project/http2_util v1.2.0
 	github.com/omec-project/logger_conf v1.1.1
 	github.com/omec-project/logger_util v1.2.0
@@ -16,7 +16,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli v1.22.14
 	go.mongodb.org/mongo-driver v1.10.1
-	google.golang.org/grpc v1.63.0
+	google.golang.org/grpc v1.63.2
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/yaml.v2 v2.4.0
 )

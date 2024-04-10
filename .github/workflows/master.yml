@@ -25,17 +25,13 @@ jobs:
       - name: Build
         run: go build
 
-  unit-tests:
+  docker-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Unit tests
-        run: go test ./...
+      - name: Build Docker image
+        run: make docker-build
 
   lint:
     runs-on: ubuntu-latest
@@ -85,3 +81,15 @@ jobs:
         uses: fossa-contrib/fossa-action@v3
         with:
           fossa-api-key: 0c3bbcdf20e157bbd487dae173751b28
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Unit tests
+        run: go test ./...

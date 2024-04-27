@@ -10,12 +10,14 @@ package webui_service
 import (
 	"bufio"
 	"fmt"
-	"github.com/omec-project/webconsole/dbadapter"
 	"net/http"
 	"os/exec"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/omec-project/webconsole/backend/metrics"
+	"github.com/omec-project/webconsole/dbadapter"
 
 	"github.com/gin-contrib/cors"
 	"github.com/omec-project/http2_util"
@@ -172,6 +174,8 @@ func (webui *WEBUI) Start() {
 	subconfig_router := logger_util.NewGinWithLogrus(logger.GinLog)
 	configapi.AddServiceSub(subconfig_router)
 	configapi.AddService(subconfig_router)
+
+	go metrics.InitMetrics()
 
 	configMsgChan := make(chan *configmodels.ConfigMessage, 10)
 	configapi.SetChannel(configMsgChan)

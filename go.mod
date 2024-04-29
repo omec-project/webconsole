@@ -15,7 +15,7 @@ require (
 	github.com/omec-project/util v1.0.13
 	github.com/prometheus/client_golang v1.19.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/urfave/cli v1.22.14
+	github.com/urfave/cli v1.22.15
 	go.mongodb.org/mongo-driver v1.10.1
 	google.golang.org/grpc v1.63.2
 	google.golang.org/protobuf v1.33.0
@@ -29,7 +29,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
 	github.com/chenzhuoyu/iasm v0.9.1 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/evanphx/json-patch v4.11.0+incompatible // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect

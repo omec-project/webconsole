@@ -7,12 +7,9 @@ require (
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/omec-project/config5g v1.3.5
-	github.com/omec-project/http2_util v1.2.0
-	github.com/omec-project/logger_conf v1.1.1
-	github.com/omec-project/logger_util v1.2.0
+	github.com/omec-project/config5g v1.4.0
 	github.com/omec-project/openapi v1.2.0
-	github.com/omec-project/util v1.0.13
+	github.com/omec-project/util v1.1.0
 	github.com/prometheus/client_golang v1.19.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli v1.22.15

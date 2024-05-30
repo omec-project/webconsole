@@ -49,7 +49,7 @@ func InitConfigFactory(f string) error {
 			fmt.Println("ConfigPod running in 4G deployment")
 			WebUIConfig.Configuration.Mode5G = false
 		} else {
-			//default mode
+			// default mode
 			fmt.Println("ConfigPod running in 5G deployment")
 			WebUIConfig.Configuration.Mode5G = true
 		}

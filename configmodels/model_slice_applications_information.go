@@ -15,7 +15,6 @@
 package configmodels
 
 type SliceApplicationsInformation struct {
-
 	// Single App or group of application identification
 	AppName string `json:"app-name,omitempty"`
 

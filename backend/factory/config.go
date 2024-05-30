@@ -33,7 +33,7 @@ type Configuration struct {
 	WebServer *WebServer  `yaml:"WebServer,omitempty"`
 	Mongodb   *Mongodb    `yaml:"mongodb"`
 	RocEnd    *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
-	LteEnd    []*LteEndpt `yaml:"endpoints,omitempty"`          //LTE endpoints are configured and not auto-detected
+	LteEnd    []*LteEndpt `yaml:"endpoints,omitempty"`          // LTE endpoints are configured and not auto-detected
 	Mode5G    bool        `yaml:"mode5G,omitempty"`
 	SdfComp   bool        `yaml:"spec-compliant-sdf"`
 	CfgPort   int         `yaml:"cfgport,omitempty"`

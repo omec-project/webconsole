@@ -6,7 +6,6 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/omec-project/webconsole/dbadapter"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -66,7 +66,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		configLog.Infoln("Waiting for configuration event ")
 		select {
 		case configMsg := <-configMsgChan:
-			//configLog.Infof("Received configuration event %v ", configMsg)
+			// configLog.Infof("Received configuration event %v ", configMsg)
 			if configMsg.MsgType == configmodels.Sub_data {
 				imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
 				configLog.Infoln("Received imsi from config channel: ", imsiVal)
@@ -89,7 +89,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 					configReceived <- true
 				}
 
-				//configLog.Infoln("Received msg from configApi package ", configMsg)
+				// configLog.Infoln("Received msg from configApi package ", configMsg)
 				// update config snapshot
 				if configMsg.DevGroup != nil {
 					configLog.Infof("Received Device Group [%v] configuration from config channel", configMsg.DevGroupName)
@@ -308,7 +308,7 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 }
 
 func updateAmPolicyData(imsi string) {
-	//ampolicydata
+	// ampolicydata
 	var amPolicy models.AmPolicyData
 	amPolicy.SubscCats = append(amPolicy.SubscCats, "free5gc")
 	amPolicyDatBsonA := toBsonM(amPolicy)
@@ -328,7 +328,7 @@ func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
 			Dnn: dnn,
 		},
 	}
-	//smpolicydata
+	// smpolicydata
 	smPolicySnssaiData.Snssai = snssai
 	smPolicySnssaiData.SmPolicyDnnData = dnnData
 	smPolicyData.SmPolicySnssaiData = make(map[string]models.SmPolicySnssaiData)
@@ -373,7 +373,7 @@ func updateAmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGro
 }
 
 func updateSmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) {
-	//TODO smData
+	// TODO smData
 	smData := models.SessionManagementSubscriptionData{
 		SingleNssai: snssai,
 		DnnConfigurations: map[string]models.DnnConfiguration{
@@ -423,7 +423,8 @@ func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, im
 					},
 				},
 			},
-		}}
+		},
+	}
 	smfSelecDataBsonA := toBsonM(smfSelData)
 	smfSelecDataBsonA["ueId"] = "imsi-" + imsi
 	smfSelecDataBsonA["servingPlmnId"] = mcc + mnc
@@ -483,7 +484,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 		switch confData.Msg.MsgType {
 		case configmodels.Sub_data:
 			rwLock.RLock()
-			//check this Imsi is part of any of the devicegroup
+			// check this Imsi is part of any of the devicegroup
 			imsi := strings.ReplaceAll(confData.Msg.Imsi, "imsi-", "")
 			if confData.Msg.MsgMethod != configmodels.Delete_op {
 				logger.WebUILog.Debugln("Insert/Update AuthenticationSubscription ", imsi)
@@ -624,7 +625,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 			}
 			rwLock.RUnlock()
 		}
-	} //end of for loop
+	} // end of for loop
 }
 
 func convertToString(val uint64) string {

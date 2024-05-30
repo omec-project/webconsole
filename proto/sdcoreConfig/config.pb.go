@@ -12,10 +12,11 @@
 package sdcoreConfig
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -1163,7 +1164,7 @@ type PccFlowInfo struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	FlowDesc        string           `protobuf:"bytes,1,opt,name=FlowDesc,proto3" json:"FlowDesc,omitempty"` //packet filters of the IP flow
+	FlowDesc        string           `protobuf:"bytes,1,opt,name=FlowDesc,proto3" json:"FlowDesc,omitempty"` // packet filters of the IP flow
 	TosTrafficClass string           `protobuf:"bytes,2,opt,name=TosTrafficClass,proto3" json:"TosTrafficClass,omitempty"`
 	FlowDir         PccFlowDirection `protobuf:"varint,3,opt,name=FlowDir,proto3,enum=sdcoreConfig.PccFlowDirection" json:"FlowDir,omitempty"`
 	FlowStatus      PccFlowStatus    `protobuf:"varint,4,opt,name=FlowStatus,proto3,enum=sdcoreConfig.PccFlowStatus" json:"FlowStatus,omitempty"`
@@ -1385,7 +1386,7 @@ type PccRule struct {
 	unknownFields protoimpl.UnknownFields
 
 	FlowInfos []*PccFlowInfo `protobuf:"bytes,1,rep,name=FlowInfos,proto3" json:"FlowInfos,omitempty"`
-	RuleId    string         `protobuf:"bytes,2,opt,name=RuleId,proto3" json:"RuleId,omitempty"` //Name of Rule
+	RuleId    string         `protobuf:"bytes,2,opt,name=RuleId,proto3" json:"RuleId,omitempty"` // Name of Rule
 	Qos       *PccRuleQos    `protobuf:"bytes,3,opt,name=Qos,proto3" json:"Qos,omitempty"`
 }
 
@@ -1833,35 +1834,37 @@ func file_config_proto_rawDescGZIP() []byte {
 	return file_config_proto_rawDescData
 }
 
-var file_config_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_config_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
-var file_config_proto_goTypes = []interface{}{
-	(Status)(0),                  // 0: sdcoreConfig.Status
-	(PccFlowDirection)(0),        // 1: sdcoreConfig.PccFlowDirection
-	(PccArpPc)(0),                // 2: sdcoreConfig.PccArpPc
-	(PccArpPv)(0),                // 3: sdcoreConfig.PccArpPv
-	(PccFlowTos)(0),              // 4: sdcoreConfig.PccFlowTos
-	(PccFlowStatus)(0),           // 5: sdcoreConfig.PccFlowStatus
-	(*PlmnId)(nil),               // 6: sdcoreConfig.PlmnId
-	(*NSSAI)(nil),                // 7: sdcoreConfig.NSSAI
-	(*QoS)(nil),                  // 8: sdcoreConfig.QoS
-	(*GNodeB)(nil),               // 9: sdcoreConfig.GNodeB
-	(*UpfInfo)(nil),              // 10: sdcoreConfig.UpfInfo
-	(*SiteInfo)(nil),             // 11: sdcoreConfig.SiteInfo
-	(*AppInfo)(nil),              // 12: sdcoreConfig.AppInfo
-	(*NetworkSlice)(nil),         // 13: sdcoreConfig.NetworkSlice
-	(*DeviceGroup)(nil),          // 14: sdcoreConfig.DeviceGroup
-	(*IpDomain)(nil),             // 15: sdcoreConfig.IpDomain
-	(*UeDnnQosInfo)(nil),         // 16: sdcoreConfig.UeDnnQosInfo
-	(*TrafficClassInfo)(nil),     // 17: sdcoreConfig.TrafficClassInfo
-	(*PccFlowInfo)(nil),          // 18: sdcoreConfig.PccFlowInfo
-	(*PccArp)(nil),               // 19: sdcoreConfig.PccArp
-	(*PccRuleQos)(nil),           // 20: sdcoreConfig.PccRuleQos
-	(*PccRule)(nil),              // 21: sdcoreConfig.PccRule
-	(*AppFilterRules)(nil),       // 22: sdcoreConfig.AppFilterRules
-	(*NetworkSliceRequest)(nil),  // 23: sdcoreConfig.NetworkSliceRequest
-	(*NetworkSliceResponse)(nil), // 24: sdcoreConfig.NetworkSliceResponse
-}
+var (
+	file_config_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+	file_config_proto_msgTypes  = make([]protoimpl.MessageInfo, 19)
+	file_config_proto_goTypes   = []interface{}{
+		(Status)(0),                  // 0: sdcoreConfig.Status
+		(PccFlowDirection)(0),        // 1: sdcoreConfig.PccFlowDirection
+		(PccArpPc)(0),                // 2: sdcoreConfig.PccArpPc
+		(PccArpPv)(0),                // 3: sdcoreConfig.PccArpPv
+		(PccFlowTos)(0),              // 4: sdcoreConfig.PccFlowTos
+		(PccFlowStatus)(0),           // 5: sdcoreConfig.PccFlowStatus
+		(*PlmnId)(nil),               // 6: sdcoreConfig.PlmnId
+		(*NSSAI)(nil),                // 7: sdcoreConfig.NSSAI
+		(*QoS)(nil),                  // 8: sdcoreConfig.QoS
+		(*GNodeB)(nil),               // 9: sdcoreConfig.GNodeB
+		(*UpfInfo)(nil),              // 10: sdcoreConfig.UpfInfo
+		(*SiteInfo)(nil),             // 11: sdcoreConfig.SiteInfo
+		(*AppInfo)(nil),              // 12: sdcoreConfig.AppInfo
+		(*NetworkSlice)(nil),         // 13: sdcoreConfig.NetworkSlice
+		(*DeviceGroup)(nil),          // 14: sdcoreConfig.DeviceGroup
+		(*IpDomain)(nil),             // 15: sdcoreConfig.IpDomain
+		(*UeDnnQosInfo)(nil),         // 16: sdcoreConfig.UeDnnQosInfo
+		(*TrafficClassInfo)(nil),     // 17: sdcoreConfig.TrafficClassInfo
+		(*PccFlowInfo)(nil),          // 18: sdcoreConfig.PccFlowInfo
+		(*PccArp)(nil),               // 19: sdcoreConfig.PccArp
+		(*PccRuleQos)(nil),           // 20: sdcoreConfig.PccRuleQos
+		(*PccRule)(nil),              // 21: sdcoreConfig.PccRule
+		(*AppFilterRules)(nil),       // 22: sdcoreConfig.AppFilterRules
+		(*NetworkSliceRequest)(nil),  // 23: sdcoreConfig.NetworkSliceRequest
+		(*NetworkSliceResponse)(nil), // 24: sdcoreConfig.NetworkSliceResponse
+	}
+)
 var file_config_proto_depIdxs = []int32{
 	9,  // 0: sdcoreConfig.SiteInfo.Gnb:type_name -> sdcoreConfig.GNodeB
 	6,  // 1: sdcoreConfig.SiteInfo.Plmn:type_name -> sdcoreConfig.PlmnId

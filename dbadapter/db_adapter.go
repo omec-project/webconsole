@@ -29,8 +29,10 @@ type DBInterface interface {
 	RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error
 }
 
-var CommonDBClient DBInterface
-var AuthDBClient DBInterface
+var (
+	CommonDBClient DBInterface
+	AuthDBClient   DBInterface
+)
 
 type MongoDBClient struct {
 	mongoapi.MongoClient
@@ -38,7 +40,7 @@ type MongoDBClient struct {
 
 // Set CommonDBClient
 func setCommonDBClient(url string, dbname string) error {
-	var mClient, errConnect = mongoapi.NewMongoClient(url, dbname)
+	mClient, errConnect := mongoapi.NewMongoClient(url, dbname)
 	if mClient.Client != nil {
 		CommonDBClient = mClient
 		CommonDBClient.(*mongoapi.MongoClient).Client.Database(dbname)
@@ -48,7 +50,7 @@ func setCommonDBClient(url string, dbname string) error {
 
 // Set AuthDBClient
 func setAuthDBClient(authurl string, authkeysdbname string) error {
-	var mClient, errConnect = mongoapi.NewMongoClient(authurl, authkeysdbname)
+	mClient, errConnect := mongoapi.NewMongoClient(authurl, authkeysdbname)
 	if mClient.Client != nil {
 		AuthDBClient = mClient
 		AuthDBClient.(*mongoapi.MongoClient).Client.Database(authkeysdbname)
@@ -87,6 +89,7 @@ func (db *MongoDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[s
 func (db *MongoDBClient) RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error) {
 	return db.MongoClient.RestfulAPIGetMany(collName, filter)
 }
+
 func (db *MongoDBClient) RestfulAPIPutOneTimeout(collName string, filter bson.M, putData map[string]interface{}, timeout int32, timeField string) bool {
 	return db.MongoClient.RestfulAPIPutOneTimeout(collName, filter, putData, timeout, timeField)
 }

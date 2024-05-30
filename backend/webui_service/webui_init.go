@@ -11,32 +11,29 @@ import (
 	"bufio"
 	"fmt"
 	"net/http"
+	_ "net/http"
+	_ "net/http/pprof"
 	"os/exec"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/omec-project/webconsole/backend/metrics"
-	"github.com/omec-project/webconsole/dbadapter"
-
 	"github.com/gin-contrib/cors"
 	"github.com/omec-project/util/http2_util"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
-
-	_ "net/http"
-	_ "net/http/pprof"
-
 	logger_util "github.com/omec-project/util/logger"
 	mongoDBLibLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/util/path_util"
 	pathUtilLogger "github.com/omec-project/util/path_util/logger"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/backend/metrics"
 	"github.com/omec-project/webconsole/backend/webui_context"
 	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
 	gServ "github.com/omec-project/webconsole/proto/server"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
 type WEBUI struct{}
@@ -234,7 +231,7 @@ func (webui *WEBUI) Start() {
 	// this is to fetch existing config
 	go fetchConfigAdapater()
 
-	//http.ListenAndServe("0.0.0.0:5001", nil)
+	// http.ListenAndServe("0.0.0.0:5001", nil)
 
 	select {}
 }
@@ -294,16 +291,16 @@ func fetchConfigAdapater() {
 			(factory.WebUIConfig.Configuration.RocEnd.Enabled == false) ||
 			(factory.WebUIConfig.Configuration.RocEnd.SyncUrl == "") {
 			time.Sleep(1 * time.Second)
-			//fmt.Printf("Continue polling config change %v ", factory.WebUIConfig.Configuration)
+			// fmt.Printf("Continue polling config change %v ", factory.WebUIConfig.Configuration)
 			continue
 		}
 
 		client := &http.Client{}
 		httpend := factory.WebUIConfig.Configuration.RocEnd.SyncUrl
 		req, err := http.NewRequest(http.MethodPost, httpend, nil)
-		//Handle Error
+		// Handle Error
 		if err != nil {
-			fmt.Printf("An Error Occured %v\n", err)
+			fmt.Printf("An Error Occurred %v\n", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
@@ -311,7 +308,7 @@ func fetchConfigAdapater() {
 		req.Header.Set("Content-Type", "application/json; charset=utf-8")
 		resp, err := client.Do(req)
 		if err != nil {
-			fmt.Printf("An Error Occured %v\n", err)
+			fmt.Printf("An Error Occurred %v\n", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}

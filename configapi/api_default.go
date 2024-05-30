@@ -16,12 +16,12 @@ package configapi
 
 import (
 	"encoding/json"
-	"github.com/omec-project/webconsole/dbadapter"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

@@ -15,7 +15,6 @@
 package configmodels
 
 type SliceQos struct {
-
 	// uplink data rate in bps
 	Uplink int32 `json:"uplink,omitempty"`
 

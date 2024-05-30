@@ -53,7 +53,6 @@ func AddService(engine *gin.Engine) *gin.RouterGroup {
 		}
 	}
 	return group
-
 }
 
 // Index is the index handler.

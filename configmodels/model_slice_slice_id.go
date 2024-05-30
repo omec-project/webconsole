@@ -15,7 +15,6 @@
 package configmodels
 
 type SliceSliceId struct {
-
 	// Slice Service Type
 	Sst string `json:"sst,omitempty"`
 

@@ -9,11 +9,10 @@ package main
 import (
 	"os"
 
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
-
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_service"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
 var WEBUI = &webui_service.WEBUI{}

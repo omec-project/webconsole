@@ -15,20 +15,19 @@
 package configmodels
 
 type SliceApplicationFilteringRules struct {
-
 	// Rule name
 	RuleName string `json:"rule-name,omitempty"`
 
-	//priority
+	// priority
 	Priority int32 `json:"priority,omitempty"`
 
-	//action
+	// action
 	Action string `json:"action,omitempty"`
 
 	// Application Desination IP or network
 	Endpoint string `json:"endpoint,omitempty"`
 
-	//protocol
+	// protocol
 	Protocol int32 `json:"protocol,omitempty"`
 
 	// port range start

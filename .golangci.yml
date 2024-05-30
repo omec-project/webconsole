@@ -226,7 +226,7 @@ linters:
     # - lll
     - godox
     #- gomnd
-    #- goconst
+    - goconst
     # - gocognit
     # - maligned
     # - nestif

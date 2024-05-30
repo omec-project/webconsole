@@ -2,7 +2,7 @@
 # Copyright 2019 free5GC.org
 #
 # SPDX-License-Identifier: Apache-2.0
-# 
+#
 
 # This file contains all available configuration options
 # with their default values.
@@ -233,7 +233,7 @@ linters:
     # - gomodguard
     - nakedret
     # - gci
-    # - misspell
+    - misspell
     # - gofumpt
     - whitespace
     # - unconvert

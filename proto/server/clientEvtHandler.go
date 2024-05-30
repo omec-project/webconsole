@@ -445,11 +445,11 @@ func clientEventMachine(client *clientNF) {
 					httpend := client.ConfigCheckUrl
 					req, err := http.NewRequest(http.MethodPost, httpend, nil)
 					if err != nil {
-						client.clientLog.Infof("An Error Occured %v for channel %v \n", err, t)
+						client.clientLog.Infof("An Error Occurred %v for channel %v \n", err, t)
 					}
 					resp, err := c.Do(req)
 					if err != nil {
-						client.clientLog.Infof("An Error Occured %v\n", err)
+						client.clientLog.Infof("An Error Occurred %v\n", err)
 					} else {
 						if factory.WebUIConfig.Configuration.Mode5G == false && resp.StatusCode == http.StatusNotFound {
 							client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
@@ -763,12 +763,12 @@ func postConfigMme(client *clientNF) {
 	httpend := client.ConfigPushUrl
 	req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)
 	if err != nil {
-		client.clientLog.Infof("An Error Occured %v", err)
+		client.clientLog.Infof("An Error Occurred %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	resp, err := c.Do(req)
 	if err != nil {
-		client.clientLog.Infof("An Error Occured %v", err)
+		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
 		client.clientLog.Infof("mme Message POST %v %v \n", reqMsgBody, resp.StatusCode)
 	}
@@ -793,12 +793,12 @@ func deleteConfigHss(client *clientNF, imsi string) {
 	httpend := client.ConfigPushUrl
 	req, err := http.NewRequest(http.MethodDelete, httpend, reqMsgBody)
 	if err != nil {
-		client.clientLog.Infof("An Error Occured %v", err)
+		client.clientLog.Infof("An Error Occurred %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	resp, err := c.Do(req)
 	if err != nil {
-		client.clientLog.Infof("An Error Occured %v", err)
+		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
 		client.clientLog.Infof("Message DELETE to HSS %v %v Success\n", reqMsgBody, resp.StatusCode)
 	}
@@ -976,12 +976,12 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				httpend := client.ConfigPushUrl
 				req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)
 				if err != nil {
-					client.clientLog.Infof("An Error Occured %v", err)
+					client.clientLog.Infof("An Error Occurred %v", err)
 				}
 				req.Header.Set("Content-Type", "application/json; charset=utf-8")
 				resp, err := c.Do(req)
 				if err != nil {
-					client.clientLog.Infof("An Error Occured %v", err)
+					client.clientLog.Infof("An Error Occurred %v", err)
 				} else {
 					client.clientLog.Infof("Message POST to HSS %v %v Success\n", reqMsgBody, resp.StatusCode)
 				}
@@ -1141,12 +1141,12 @@ func postConfigPcrf(client *clientNF) {
 	httpend := client.ConfigPushUrl
 	req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)
 	if err != nil {
-		client.clientLog.Infof("An Error Occured %v", err)
+		client.clientLog.Infof("An Error Occurred %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	resp, err := c.Do(req)
 	if err != nil {
-		client.clientLog.Infof("An Error Occured %v", err)
+		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
 		client.clientLog.Infof("PCRF Message POST %v %v Success\n", reqMsgBody, resp.StatusCode)
 	}
@@ -1228,12 +1228,12 @@ func postConfigSpgw(client *clientNF) {
 	httpend := client.ConfigPushUrl
 	req, err := http.NewRequest(http.MethodPost, httpend, reqMsgBody)
 	if err != nil {
-		client.clientLog.Infof("An Error Occured %v", err)
+		client.clientLog.Infof("An Error Occurred %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	resp, err := c.Do(req)
 	if err != nil {
-		client.clientLog.Infof("An Error Occured %v", err)
+		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
 		client.clientLog.Infof("spgw Message POST %v %v Success\n", reqMsgBody, resp.StatusCode)
 	}

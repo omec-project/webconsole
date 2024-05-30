@@ -303,7 +303,7 @@ func fetchConfigAdapater() {
 		req, err := http.NewRequest(http.MethodPost, httpend, nil)
 		//Handle Error
 		if err != nil {
-			fmt.Printf("An Error Occured %v\n", err)
+			fmt.Printf("An Error Occurred %v\n", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
@@ -311,7 +311,7 @@ func fetchConfigAdapater() {
 		req.Header.Set("Content-Type", "application/json; charset=utf-8")
 		resp, err := client.Do(req)
 		if err != nil {
-			fmt.Printf("An Error Occured %v\n", err)
+			fmt.Printf("An Error Occurred %v\n", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}

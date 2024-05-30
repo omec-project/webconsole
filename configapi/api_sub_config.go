@@ -416,7 +416,7 @@ func PostSubscriberByID(c *gin.Context) {
 		AuthSubData: &authSubsData,
 		Imsi:        ueId}
 	configChannel <- &msg
-	logger.WebUILog.Infoln("Sucessfully Added Subscriber Data to ConfigChannel: ", ueId)
+	logger.WebUILog.Infoln("Successfully Added Subscriber Data to ConfigChannel: ", ueId)
 }
 
 // Put subscriber by IMSI(ueId) and PlmnID(servingPlmnId)

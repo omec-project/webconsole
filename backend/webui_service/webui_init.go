@@ -20,14 +20,14 @@ import (
 	"github.com/omec-project/webconsole/dbadapter"
 
 	"github.com/gin-contrib/cors"
-	"github.com/omec-project/http2_util"
+	"github.com/omec-project/util/http2_util"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	_ "net/http"
 	_ "net/http/pprof"
 
-	"github.com/omec-project/logger_util"
+	logger_util "github.com/omec-project/util/logger"
 	mongoDBLibLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/util/path_util"
 	pathUtilLogger "github.com/omec-project/util/path_util/logger"

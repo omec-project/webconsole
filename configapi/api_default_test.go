@@ -7,10 +7,11 @@ package configapi
 
 import (
 	"encoding/json"
-	"github.com/omec-project/webconsole/dbadapter"
 	"io"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/omec-project/webconsole/dbadapter"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/configmodels"
@@ -75,7 +76,7 @@ func (m *MockMongoClientOneDeviceGroups) RestfulAPIGetMany(coll string, filter b
 
 func (m *MockMongoClientManyDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
-	var names = []string{"group1", "group2", "group3"}
+	names := []string{"group1", "group2", "group3"}
 	for _, name := range names {
 		dg := deviceGroup(name)
 		var dgbson bson.M
@@ -85,12 +86,10 @@ func (m *MockMongoClientManyDeviceGroups) RestfulAPIGetMany(coll string, filter 
 		results = append(results, dgbson)
 	}
 	return results, nil
-
 }
 
 func (m *MockMongoClientNotFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	return nil, nil
-
 }
 
 func (m *MockMongoClientFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
@@ -118,7 +117,7 @@ func (m *MockMongoClientOneNetworkSlice) RestfulAPIGetMany(coll string, filter b
 
 func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
-	var names = []string{"slice1", "slice2", "slice3"}
+	names := []string{"slice1", "slice2", "slice3"}
 	for _, name := range names {
 		ns := networkSlice(name)
 		var slicebson bson.M
@@ -132,7 +131,6 @@ func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetMany(coll string, filter
 
 func (m *MockMongoClientNotFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	return nil, nil
-
 }
 
 func (m *MockMongoClientFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {

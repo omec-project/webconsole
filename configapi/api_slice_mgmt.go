@@ -49,7 +49,6 @@ func DeviceGroupDeleteHandler(c *gin.Context) bool {
 	configChannel <- &msg
 	configLog.Infof("Successfully Added Device Group [%v] with delete_op to config channel.", groupName)
 	return true
-
 }
 
 func convertToBps(val int64, unit string) (bitrate int64) {
@@ -65,6 +64,7 @@ func convertToBps(val int64, unit string) (bitrate int64) {
 	// default consider it as bps
 	return bitrate
 }
+
 func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	var groupName string
 	var exists bool
@@ -161,7 +161,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		configLog.Infof(" err %v", err)
 		return false
 	}
-	//configLog.Infof("Printing request full after binding : %v ", request)
+	// configLog.Infof("Printing request full after binding : %v ", request)
 
 	req := httpwrapper.NewRequest(c.Request, request)
 

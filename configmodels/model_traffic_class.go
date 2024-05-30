@@ -15,7 +15,6 @@
 package configmodels
 
 type TrafficClassInfo struct {
-
 	// Traffic class name
 	Name string `json:"name,omitempty"`
 

@@ -234,7 +234,7 @@ func (webui *WEBUI) Start() {
 	// this is to fetch existing config
 	go fetchConfigAdapater()
 
-	//http.ListenAndServe("0.0.0.0:5001", nil)
+	// http.ListenAndServe("0.0.0.0:5001", nil)
 
 	select {}
 }
@@ -294,14 +294,14 @@ func fetchConfigAdapater() {
 			(factory.WebUIConfig.Configuration.RocEnd.Enabled == false) ||
 			(factory.WebUIConfig.Configuration.RocEnd.SyncUrl == "") {
 			time.Sleep(1 * time.Second)
-			//fmt.Printf("Continue polling config change %v ", factory.WebUIConfig.Configuration)
+			// fmt.Printf("Continue polling config change %v ", factory.WebUIConfig.Configuration)
 			continue
 		}
 
 		client := &http.Client{}
 		httpend := factory.WebUIConfig.Configuration.RocEnd.SyncUrl
 		req, err := http.NewRequest(http.MethodPost, httpend, nil)
-		//Handle Error
+		// Handle Error
 		if err != nil {
 			fmt.Printf("An Error Occurred %v\n", err)
 			time.Sleep(1 * time.Second)

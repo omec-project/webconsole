@@ -7,9 +7,10 @@ package server
 
 import (
 	"encoding/json"
-	"github.com/omec-project/webconsole/dbadapter"
 	"reflect"
 	"testing"
+
+	"github.com/omec-project/webconsole/dbadapter"
 
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/configmodels"
@@ -111,7 +112,7 @@ func (m *MockMongoSliceGetOne) RestfulAPIGetOne(collName string, filter bson.M) 
 }
 
 func Test_handleDeviceGroupPost(t *testing.T) {
-	var deviceGroups = []configmodels.DeviceGroups{deviceGroup("group1"), deviceGroup("group2"), deviceGroup("group_no_imsis"), deviceGroup("group_no_traf_class"), deviceGroup("group_no_qos")}
+	deviceGroups := []configmodels.DeviceGroups{deviceGroup("group1"), deviceGroup("group2"), deviceGroup("group_no_imsis"), deviceGroup("group_no_traf_class"), deviceGroup("group_no_qos")}
 	deviceGroups[2].Imsis = []string{}
 	deviceGroups[3].IpDomainExpanded.UeDnnQos.TrafficClass = nil
 	deviceGroups[4].IpDomainExpanded.UeDnnQos = nil
@@ -151,7 +152,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 }
 
 func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
-	var deviceGroups = []configmodels.DeviceGroups{deviceGroup("group1"), deviceGroup("group2"), deviceGroup("group_no_imsis"), deviceGroup("group_no_traf_class"), deviceGroup("group_no_qos")}
+	deviceGroups := []configmodels.DeviceGroups{deviceGroup("group1"), deviceGroup("group2"), deviceGroup("group_no_imsis"), deviceGroup("group_no_traf_class"), deviceGroup("group_no_qos")}
 	deviceGroups[2].Imsis = []string{}
 	deviceGroups[3].IpDomainExpanded.UeDnnQos.TrafficClass = nil
 	deviceGroups[4].IpDomainExpanded.UeDnnQos = nil
@@ -223,7 +224,7 @@ func networkSlice(name string) configmodels.Slice {
 }
 
 func Test_handleNetworkSlicePost(t *testing.T) {
-	var networkSlices = []configmodels.Slice{networkSlice("slice1"), networkSlice("slice2"), networkSlice("slice_no_gnodeb"), networkSlice("slice_no_device_groups")}
+	networkSlices := []configmodels.Slice{networkSlice("slice1"), networkSlice("slice2"), networkSlice("slice_no_gnodeb"), networkSlice("slice_no_device_groups")}
 	networkSlices[2].SiteInfo.GNodeBs = []configmodels.SliceSiteInfoGNodeBs{}
 	networkSlices[3].SiteDeviceGroup = []string{}
 	factory.WebUIConfig.Configuration.Mode5G = true
@@ -264,7 +265,7 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 }
 
 func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
-	var networkSlices = []configmodels.Slice{networkSlice("slice1"), networkSlice("slice2"), networkSlice("slice_no_gnodeb"), networkSlice("slice_no_device_groups")}
+	networkSlices := []configmodels.Slice{networkSlice("slice1"), networkSlice("slice2"), networkSlice("slice_no_gnodeb"), networkSlice("slice_no_device_groups")}
 	networkSlices[2].SiteInfo.GNodeBs = []configmodels.SliceSiteInfoGNodeBs{}
 	networkSlices[3].SiteDeviceGroup = []string{}
 	factory.WebUIConfig.Configuration.Mode5G = true

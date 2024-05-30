@@ -10,8 +10,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/omec-project/webconsole/dbadapter"
 	"net/http"
+
+	"github.com/omec-project/webconsole/dbadapter"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/openapi/models"
@@ -359,7 +360,6 @@ func GetSubscriberByID(c *gin.Context) {
 
 // Post subscriber by IMSI(ueId)
 func PostSubscriberByID(c *gin.Context) {
-
 	setCorsHeader(c)
 
 	var subsOverrideData configmodels.SubsOverrideData
@@ -386,14 +386,14 @@ func PostSubscriberByID(c *gin.Context) {
 		Opc: &models.Opc{
 			EncryptionAlgorithm: 0,
 			EncryptionKey:       0,
-			//OpcValue:            "8e27b6af0e692e750f32667a3b14605d", // Required
+			// OpcValue:            "8e27b6af0e692e750f32667a3b14605d", // Required
 		},
 		PermanentKey: &models.PermanentKey{
 			EncryptionAlgorithm: 0,
 			EncryptionKey:       0,
-			//PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862", // Required
+			// PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862", // Required
 		},
-		//SequenceNumber: "16f3b3f70fc2",
+		// SequenceNumber: "16f3b3f70fc2",
 	}
 
 	// override values
@@ -411,10 +411,12 @@ func PostSubscriberByID(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, gin.H{})
 
-	msg := configmodels.ConfigMessage{MsgType: configmodels.Sub_data,
+	msg := configmodels.ConfigMessage{
+		MsgType:     configmodels.Sub_data,
 		MsgMethod:   configmodels.Post_op,
 		AuthSubData: &authSubsData,
-		Imsi:        ueId}
+		Imsi:        ueId,
+	}
 	configChannel <- &msg
 	logger.WebUILog.Infoln("Successfully Added Subscriber Data to ConfigChannel: ", ueId)
 }
@@ -432,10 +434,12 @@ func PutSubscriberByID(c *gin.Context) {
 	ueId := c.Param("ueId")
 	c.JSON(http.StatusNoContent, gin.H{})
 
-	msg := configmodels.ConfigMessage{MsgType: configmodels.Sub_data,
+	msg := configmodels.ConfigMessage{
+		MsgType:     configmodels.Sub_data,
 		MsgMethod:   configmodels.Post_op,
 		AuthSubData: &subsData.AuthenticationSubscription,
-		Imsi:        ueId}
+		Imsi:        ueId,
+	}
 	configChannel <- &msg
 	logger.WebUILog.Infoln("Put Subscriber Data complete")
 }
@@ -455,9 +459,11 @@ func DeleteSubscriberByID(c *gin.Context) {
 
 	c.JSON(http.StatusNoContent, gin.H{})
 
-	msg := configmodels.ConfigMessage{MsgType: configmodels.Sub_data,
+	msg := configmodels.ConfigMessage{
+		MsgType:   configmodels.Sub_data,
 		MsgMethod: configmodels.Delete_op,
-		Imsi:      ueId}
+		Imsi:      ueId,
+	}
 	configChannel <- &msg
 	logger.WebUILog.Infoln("Delete Subscriber Data complete")
 }

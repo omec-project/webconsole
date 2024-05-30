@@ -26,8 +26,7 @@ func init() {
 	grpcLog = logger.GrpcLog
 }
 
-type ServerConfig struct {
-}
+type ServerConfig struct{}
 
 type ConfigServer struct {
 	protos.ConfigServiceServer

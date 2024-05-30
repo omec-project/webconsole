@@ -9,6 +9,7 @@ package sdcoreConfig
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -86,12 +87,12 @@ type ConfigServiceServer interface {
 }
 
 // UnimplementedConfigServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedConfigServiceServer struct {
-}
+type UnimplementedConfigServiceServer struct{}
 
 func (UnimplementedConfigServiceServer) GetNetworkSlice(context.Context, *NetworkSliceRequest) (*NetworkSliceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetNetworkSlice not implemented")
 }
+
 func (UnimplementedConfigServiceServer) NetworkSliceSubscribe(*NetworkSliceRequest, ConfigService_NetworkSliceSubscribeServer) error {
 	return status.Errorf(codes.Unimplemented, "method NetworkSliceSubscribe not implemented")
 }

@@ -16,7 +16,6 @@ package configmodels
 
 // SliceSiteInfo - give details of the site where this device group is activated
 type SliceSiteInfo struct {
-
 	// Unique name per Site.
 	SiteName string `json:"site-name,omitempty"`
 

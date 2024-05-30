@@ -10,12 +10,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/omec-project/webconsole/dbadapter"
-
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 )

@@ -18,11 +18,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/omec-project/webconsole/dbadapter"
-
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

@@ -11,32 +11,29 @@ import (
 	"bufio"
 	"fmt"
 	"net/http"
+	_ "net/http"
+	_ "net/http/pprof"
 	"os/exec"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/omec-project/webconsole/backend/metrics"
-	"github.com/omec-project/webconsole/dbadapter"
-
 	"github.com/gin-contrib/cors"
 	"github.com/omec-project/util/http2_util"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
-
-	_ "net/http"
-	_ "net/http/pprof"
-
 	logger_util "github.com/omec-project/util/logger"
 	mongoDBLibLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/util/path_util"
 	pathUtilLogger "github.com/omec-project/util/path_util/logger"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/backend/metrics"
 	"github.com/omec-project/webconsole/backend/webui_context"
 	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
 	gServ "github.com/omec-project/webconsole/proto/server"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
 type WEBUI struct{}

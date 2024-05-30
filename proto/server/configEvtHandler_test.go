@@ -10,10 +10,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/omec-project/webconsole/dbadapter"
-
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )

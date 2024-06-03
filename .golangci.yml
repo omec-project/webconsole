@@ -258,7 +258,7 @@ linters:
     - bodyclose
     - asciicheck
       #- stylecheck
-      # - unparam
+    - unparam
       # - wsl
 
   #disable-all: false

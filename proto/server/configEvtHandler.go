@@ -352,7 +352,7 @@ func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
 	}
 }
 
-func updateAmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) {
+func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string) {
 	amData := models.AccessAndMobilitySubscriptionData{
 		Gpsis: []string{
 			"msisdn-0900000000",
@@ -382,7 +382,7 @@ func updateAmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGro
 	}
 }
 
-func updateSmProviosionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) {
+func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) {
 	// TODO smData
 	smData := models.SessionManagementSubscriptionData{
 		SingleNssai: snssai,
@@ -536,8 +536,8 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
 					updateAmPolicyData(imsi)
 					updateSmPolicyData(snssai, dnn, imsi)
-					updateAmProviosionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
-					updateSmProviosionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+					updateAmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
+					updateSmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
 					updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
 				}
 
@@ -597,8 +597,8 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 							mnc := slice.SiteInfo.Plmn.Mnc
 							updateAmPolicyData(imsi)
 							updateSmPolicyData(snssai, dnn, imsi)
-							updateAmProviosionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, dnn, imsi)
-							updateSmProviosionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, dnn, imsi)
+							updateAmProvisionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, imsi)
+							updateSmProvisionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, dnn, imsi)
 							updateSmfSelectionProviosionedData(snssai, mcc, mnc, dnn, imsi)
 						}
 					}

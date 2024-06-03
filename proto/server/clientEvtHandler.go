@@ -778,7 +778,10 @@ func postConfigMme(client *clientNF) {
 
 func deleteConfigHss(client *clientNF, imsi string) {
 	config := configHss{}
-	num, _ := strconv.ParseInt(imsi, 10, 64)
+	num, err := strconv.ParseInt(imsi, 10, 64)
+	if err != nil {
+		client.clientLog.Errorf("Could not parse IMSI: %v", imsi)
+	}
 	config.StartImsi = uint64(num)
 	config.EndImsi = uint64(num)
 	client.clientLog.Infoln("HSS config ", config)
@@ -954,7 +957,11 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 			}
 
 			for _, imsi := range newImsis {
-				num, _ := strconv.ParseInt(imsi, 10, 64)
+				num, err := strconv.ParseInt(imsi, 10, 64)
+				if err != nil {
+					client.clientLog.Errorf("Could not parse IMSI %v", imsi)
+					continue
+				}
 				config.StartImsi = uint64(num)
 				config.EndImsi = uint64(num)
 				authSubsData := imsiData[imsi]
@@ -964,7 +971,11 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				}
 				config.Opc = authSubsData.Opc.OpcValue
 				config.Key = authSubsData.PermanentKey.PermanentKeyValue
-				num, _ = strconv.ParseInt(authSubsData.SequenceNumber, 10, 64)
+				num, err = strconv.ParseInt(authSubsData.SequenceNumber, 10, 64)
+				if err != nil {
+					client.clientLog.Errorf("Could not parse SequenceNumber %v", authSubsData.SequenceNumber)
+					continue
+				}
 				config.Sqn = uint64(num)
 				client.clientLog.Infof("Adding SubscritionData for IMSI: %v in HSS ", imsi)
 				b, err := json.Marshal(config)

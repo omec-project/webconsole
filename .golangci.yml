@@ -241,7 +241,7 @@ linters:
     - errcheck
     - staticcheck
     - unused
-    # - gosimple
+    - gosimple
     - ineffassign
     - typecheck
     # Additional

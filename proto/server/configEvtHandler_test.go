@@ -155,7 +155,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		if !reflect.DeepEqual(resultGroup, testGroup) {
 			t.Errorf("Expected group %v, got %v", testGroup, resultGroup)
 		}
-		receivedConfigMsg, _ := <-subsUpdateChan
+		receivedConfigMsg := <-subsUpdateChan
 		if !reflect.DeepEqual(receivedConfigMsg.Msg, &configMsg) {
 			t.Errorf("Expected config message %v, got %v", configMsg, receivedConfigMsg.Msg)
 		}
@@ -199,7 +199,7 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		if !reflect.DeepEqual(resultGroup, testGroup) {
 			t.Errorf("Expected group %v, got %v", testGroup, resultGroup)
 		}
-		receivedConfigMsg, _ := <-subsUpdateChan
+		receivedConfigMsg := <-subsUpdateChan
 		if !reflect.DeepEqual(receivedConfigMsg.Msg, &configMsg) {
 			t.Errorf("Expected config message %v, got %v", configMsg, receivedConfigMsg.Msg)
 		}
@@ -274,7 +274,7 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 		if !reflect.DeepEqual(resultSlice, testSlice) {
 			t.Errorf("Expected slice %v, got %v", testSlice, resultSlice)
 		}
-		receivedConfigMsg, _ := <-subsUpdateChan
+		receivedConfigMsg := <-subsUpdateChan
 		if !reflect.DeepEqual(receivedConfigMsg.Msg, &configMsg) {
 			t.Errorf("Expected config message %v, got %v", configMsg, receivedConfigMsg.Msg)
 		}
@@ -327,7 +327,7 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 		if !reflect.DeepEqual(resultSlice, testSlice) {
 			t.Errorf("Expected slice %v, got %v", testSlice, resultSlice)
 		}
-		receivedConfigMsg, _ := <-subsUpdateChan
+		receivedConfigMsg := <-subsUpdateChan
 		if !reflect.DeepEqual(receivedConfigMsg.Msg, &configMsg) {
 			t.Errorf("Expected config message %v, got %v", configMsg, receivedConfigMsg.Msg)
 		}

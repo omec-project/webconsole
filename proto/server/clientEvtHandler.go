@@ -453,7 +453,7 @@ func clientEventMachine(client *clientNF) {
 					if err != nil {
 						client.clientLog.Infof("An Error Occurred %v\n", err)
 					} else {
-						if factory.WebUIConfig.Configuration.Mode5G == false && resp.StatusCode == http.StatusNotFound {
+						if !factory.WebUIConfig.Configuration.Mode5G && resp.StatusCode == http.StatusNotFound {
 							client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
 							if client.id == "hss" {
 								rwLock.RLock()
@@ -519,7 +519,7 @@ func clientEventMachine(client *clientNF) {
 				client.tempGrpcReq <- &reqMsg
 				client.clientLog.Infoln("sent data to client from push config ")
 			}
-			if factory.WebUIConfig.Configuration.Mode5G == false {
+			if !factory.WebUIConfig.Configuration.Mode5G {
 				// push config to 4G network functions
 				if client.id == "hss" {
 					// client.clientLog.Debugf("Received configuration: %v", spew.Sdump(configMsg))
@@ -566,7 +566,7 @@ func clientEventMachine(client *clientNF) {
 			envMsg := &clientRspMsg{}
 			envMsg.networkSliceRspMsg = sliceDetails
 
-			if client.configChanged == false && cReqMsg.newClient == false {
+			if !client.configChanged && !cReqMsg.newClient {
 				client.clientLog.Infoln("No new update to be sent")
 				if client.resStream == nil {
 					cReqMsg.grpcRspMsg <- envMsg
@@ -589,7 +589,7 @@ func clientEventMachine(client *clientNF) {
 			client.clientLog.Debugf("is client requested for metadata: %v ", client.metadataReqtd)
 
 			// currently pcf request for metadata
-			if (client.metadataReqtd) && (cReqMsg.newClient == false) {
+			if client.metadataReqtd && !cReqMsg.newClient {
 				sliceProto := &protos.NetworkSlice{}
 				prevSlice := cReqMsg.lastSlice
 				slice := cReqMsg.slice
@@ -695,7 +695,7 @@ func clientEventMachine(client *clientNF) {
 					}
 					sliceProto := &protos.NetworkSlice{}
 					result := fillSlice(client, sliceName, sliceConfig, sliceProto)
-					if result == true {
+					if result {
 						sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
 					} else {
 						client.clientLog.Infoln("Not sending slice config")

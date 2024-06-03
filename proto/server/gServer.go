@@ -46,9 +46,8 @@ var kasp = keepalive.ServerParameters{
 func StartServer(host string, confServ *ConfigServer, configMsgChan chan *configmodels.ConfigMessage) {
 	// add 4G endpoints in the client list. 4G endpoints are configured in the
 	// yaml file
-	if os.Getenv("MANAGED_BY_CONFIG_POD") == "true" && factory.WebUIConfig.Configuration.Mode5G == false {
-		var config *factory.Config
-		config = factory.GetConfig()
+	if os.Getenv("MANAGED_BY_CONFIG_POD") == "true" && !factory.WebUIConfig.Configuration.Mode5G {
+		config := factory.GetConfig()
 		if config != nil && config.Configuration != nil && config.Configuration.LteEnd != nil {
 			for _, end := range config.Configuration.LteEnd {
 				grpcLog.Infoln("Adding Client endpoint ", end.NodeType, end.ConfigPushUrl)
@@ -87,7 +86,7 @@ func (c *ConfigServer) GetNetworkSlice(ctx context.Context, rReq *protos.Network
 	reqMsg.networkSliceReqMsg = rReq
 	reqMsg.grpcRspMsg = make(chan *clientRspMsg)
 	// Post the message on client handler & wait to get response
-	if created == true {
+	if created {
 		reqMsg.newClient = true
 	}
 	client.tempGrpcReq <- &reqMsg
@@ -107,7 +106,7 @@ func (c *ConfigServer) NetworkSliceSubscribe(req *protos.NetworkSliceRequest, st
 	var reqMsg clientReqMsg
 	reqMsg.networkSliceReqMsg = req
 	// Post the message on client handler & wait to get response
-	if created == true {
+	if created {
 		reqMsg.newClient = true
 		client.metadataReqtd = req.MetadataRequested
 	}

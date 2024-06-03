@@ -288,7 +288,7 @@ func fetchConfigAdapater() {
 	for {
 		if (factory.WebUIConfig.Configuration == nil) ||
 			(factory.WebUIConfig.Configuration.RocEnd == nil) ||
-			(factory.WebUIConfig.Configuration.RocEnd.Enabled == false) ||
+			(!factory.WebUIConfig.Configuration.RocEnd.Enabled) ||
 			(factory.WebUIConfig.Configuration.RocEnd.SyncUrl == "") {
 			time.Sleep(1 * time.Second)
 			// fmt.Printf("Continue polling config change %v ", factory.WebUIConfig.Configuration)

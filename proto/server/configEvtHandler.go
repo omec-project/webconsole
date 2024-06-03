@@ -55,7 +55,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 	// Start Goroutine which will listens for subscriber config updates
 	// and update the mongoDB. Only for 5G
 	subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
-	if factory.WebUIConfig.Configuration.Mode5G == true {
+	if factory.WebUIConfig.Configuration.Mode5G {
 		go Config5GUpdateHandle(subsUpdateChan)
 	}
 	firstConfigRcvd := firstConfigReceived()
@@ -64,91 +64,89 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 	}
 	for {
 		configLog.Infoln("Waiting for configuration event ")
-		select {
-		case configMsg := <-configMsgChan:
-			// configLog.Infof("Received configuration event %v ", configMsg)
-			if configMsg.MsgType == configmodels.Sub_data {
-				imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
-				configLog.Infoln("Received imsi from config channel: ", imsiVal)
-				rwLock.Lock()
-				imsiData[imsiVal] = configMsg.AuthSubData
-				rwLock.Unlock()
-				configLog.Infof("Received Imsi [%v] configuration from config channel", configMsg.Imsi)
-				handleSubscriberPost(configMsg)
-				if factory.WebUIConfig.Configuration.Mode5G == true {
-					var configUMsg Update5GSubscriberMsg
-					configUMsg.Msg = configMsg
-					subsUpdateChan <- &configUMsg
-				}
+		configMsg := <-configMsgChan
+		// configLog.Infof("Received configuration event %v ", configMsg)
+		if configMsg.MsgType == configmodels.Sub_data {
+			imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
+			configLog.Infoln("Received imsi from config channel: ", imsiVal)
+			rwLock.Lock()
+			imsiData[imsiVal] = configMsg.AuthSubData
+			rwLock.Unlock()
+			configLog.Infof("Received Imsi [%v] configuration from config channel", configMsg.Imsi)
+			handleSubscriberPost(configMsg)
+			if factory.WebUIConfig.Configuration.Mode5G {
+				var configUMsg Update5GSubscriberMsg
+				configUMsg.Msg = configMsg
+				subsUpdateChan <- &configUMsg
+			}
+		}
+
+		if configMsg.MsgMethod == configmodels.Post_op || configMsg.MsgMethod == configmodels.Put_op {
+			if !firstConfigRcvd && (configMsg.MsgType == configmodels.Device_group || configMsg.MsgType == configmodels.Network_slice) {
+				configLog.Debugln("First config received from ROC")
+				firstConfigRcvd = true
+				configReceived <- true
 			}
 
-			if configMsg.MsgMethod == configmodels.Post_op || configMsg.MsgMethod == configmodels.Put_op {
-				if firstConfigRcvd == false && (configMsg.MsgType == configmodels.Device_group || configMsg.MsgType == configmodels.Network_slice) {
-					configLog.Debugln("First config received from ROC")
-					firstConfigRcvd = true
-					configReceived <- true
-				}
+			// configLog.Infoln("Received msg from configApi package ", configMsg)
+			// update config snapshot
+			if configMsg.DevGroup != nil {
+				configLog.Infof("Received Device Group [%v] configuration from config channel", configMsg.DevGroupName)
+				handleDeviceGroupPost(configMsg, subsUpdateChan)
+			}
 
-				// configLog.Infoln("Received msg from configApi package ", configMsg)
+			if configMsg.Slice != nil {
+				configLog.Infof("Received Slice [%v] configuration from config channel", configMsg.SliceName)
+				handleNetworkSlicePost(configMsg, subsUpdateChan)
+			}
+
+			// loop through all clients and send this message to all clients
+			if len(clientNFPool) == 0 {
+				configLog.Infoln("No client available. No need to send config")
+			}
+			for _, client := range clientNFPool {
+				configLog.Infoln("Push config for client : ", client.id)
+				client.outStandingPushConfig <- configMsg
+			}
+		} else {
+			var config5gMsg Update5GSubscriberMsg
+			if configMsg.MsgType != configmodels.Sub_data {
+				rwLock.Lock()
 				// update config snapshot
-				if configMsg.DevGroup != nil {
-					configLog.Infof("Received Device Group [%v] configuration from config channel", configMsg.DevGroupName)
-					handleDeviceGroupPost(configMsg, subsUpdateChan)
+				if configMsg.DevGroup == nil {
+					configLog.Infof("Received delete Device Group [%v] from config channel", configMsg.DevGroupName)
+					config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
+					filter := bson.M{"group-name": configMsg.DevGroupName}
+					errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
+					if errDelOne != nil {
+						logger.DbLog.Warnln(errDelOne)
+					}
 				}
 
-				if configMsg.Slice != nil {
-					configLog.Infof("Received Slice [%v] configuration from config channel", configMsg.SliceName)
-					handleNetworkSlicePost(configMsg, subsUpdateChan)
+				if configMsg.Slice == nil {
+					configLog.Infof("Received delete Slice [%v] from config channel", configMsg.SliceName)
+					config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
+					filter := bson.M{"SliceName": configMsg.SliceName}
+					errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
+					if errDelOne != nil {
+						logger.DbLog.Warnln(errDelOne)
+					}
 				}
-
-				// loop through all clients and send this message to all clients
-				if len(clientNFPool) == 0 {
-					configLog.Infoln("No client available. No need to send config")
-				}
-				for _, client := range clientNFPool {
-					configLog.Infoln("Push config for client : ", client.id)
-					client.outStandingPushConfig <- configMsg
-				}
+				rwLock.Unlock()
 			} else {
-				var config5gMsg Update5GSubscriberMsg
-				if configMsg.MsgType != configmodels.Sub_data {
-					rwLock.Lock()
-					// update config snapshot
-					if configMsg.DevGroup == nil {
-						configLog.Infof("Received delete Device Group [%v] from config channel", configMsg.DevGroupName)
-						config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
-						filter := bson.M{"group-name": configMsg.DevGroupName}
-						errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
-						if errDelOne != nil {
-							logger.DbLog.Warnln(errDelOne)
-						}
-					}
-
-					if configMsg.Slice == nil {
-						configLog.Infof("Received delete Slice [%v] from config channel", configMsg.SliceName)
-						config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
-						filter := bson.M{"SliceName": configMsg.SliceName}
-						errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
-						if errDelOne != nil {
-							logger.DbLog.Warnln(errDelOne)
-						}
-					}
-					rwLock.Unlock()
-				} else {
-					configLog.Infof("Received delete Subscriber [%v] from config channel", configMsg.Imsi)
-				}
-				if factory.WebUIConfig.Configuration.Mode5G == true {
-					config5gMsg.Msg = configMsg
-					subsUpdateChan <- &config5gMsg
-				}
-				// loop through all clients and send this message to all clients
-				if len(clientNFPool) == 0 {
-					configLog.Infoln("No client available. No need to send config")
-				}
-				for _, client := range clientNFPool {
-					configLog.Infoln("Push config for client : ", client.id)
-					client.outStandingPushConfig <- configMsg
-				}
+				configLog.Infof("Received delete Subscriber [%v] from config channel", configMsg.Imsi)
+			}
+			if factory.WebUIConfig.Configuration.Mode5G {
+				config5gMsg.Msg = configMsg
+				subsUpdateChan <- &config5gMsg
+			}
+			// loop through all clients and send this message to all clients
+			if len(clientNFPool) == 0 {
+				configLog.Infoln("No client available. No need to send config")
+			}
+			for _, client := range clientNFPool {
+				configLog.Infoln("Push config for client : ", client.id)
+				client.outStandingPushConfig <- configMsg
 			}
 		}
 	}
@@ -170,7 +168,7 @@ func handleSubscriberPost(configMsg *configmodels.ConfigMessage) {
 
 func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
 	rwLock.Lock()
-	if factory.WebUIConfig.Configuration.Mode5G == true {
+	if factory.WebUIConfig.Configuration.Mode5G {
 		var config5gMsg Update5GSubscriberMsg
 		config5gMsg.Msg = configMsg
 		config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
@@ -187,7 +185,7 @@ func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan
 
 func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
 	rwLock.Lock()
-	if factory.WebUIConfig.Configuration.Mode5G == true {
+	if factory.WebUIConfig.Configuration.Mode5G {
 		var config5gMsg Update5GSubscriberMsg
 		config5gMsg.Msg = configMsg
 		config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
@@ -483,9 +481,7 @@ func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) 
 			}
 		}
 	} else {
-		for _, pdgName := range prevSlice.SiteDeviceGroup {
-			names = append(names, pdgName)
-		}
+		names = append(names, prevSlice.SiteDeviceGroup...)
 	}
 
 	return

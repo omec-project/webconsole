@@ -239,7 +239,7 @@ linters:
     - gofmt
     - govet
     - errcheck
-    # - staticcheck
+    - staticcheck
     - unused
     # - gosimple
     - ineffassign

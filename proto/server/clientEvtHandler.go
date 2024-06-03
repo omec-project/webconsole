@@ -453,6 +453,10 @@ func clientEventMachine(client *clientNF) {
 					if err != nil {
 						client.clientLog.Infof("An Error Occurred %v\n", err)
 					} else {
+						err = resp.Body.Close()
+						if err != nil {
+							client.clientLog.Infof("An Error Occurred %v\n", err)
+						}
 						if !factory.WebUIConfig.Configuration.Mode5G && resp.StatusCode == http.StatusNotFound {
 							client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
 							if client.id == "hss" {
@@ -772,6 +776,10 @@ func postConfigMme(client *clientNF) {
 	if err != nil {
 		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
+		err = resp.Body.Close()
+		if err != nil {
+			client.clientLog.Infof("An Error Occurred %v", err)
+		}
 		client.clientLog.Infof("mme Message POST %v %v \n", reqMsgBody, resp.StatusCode)
 	}
 }
@@ -805,6 +813,10 @@ func deleteConfigHss(client *clientNF, imsi string) {
 	if err != nil {
 		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
+		err = resp.Body.Close()
+		if err != nil {
+			client.clientLog.Infof("An Error Occurred %v", err)
+		}
 		client.clientLog.Infof("Message DELETE to HSS %v %v Success\n", reqMsgBody, resp.StatusCode)
 	}
 }
@@ -996,6 +1008,10 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				if err != nil {
 					client.clientLog.Infof("An Error Occurred %v", err)
 				} else {
+					err = resp.Body.Close()
+					if err != nil {
+						client.clientLog.Infof("An Error Occurred %v", err)
+					}
 					client.clientLog.Infof("Message POST to HSS %v %v Success\n", reqMsgBody, resp.StatusCode)
 				}
 			}
@@ -1161,6 +1177,10 @@ func postConfigPcrf(client *clientNF) {
 	if err != nil {
 		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
+		err = resp.Body.Close()
+		if err != nil {
+			client.clientLog.Infof("An Error Occurred %v", err)
+		}
 		client.clientLog.Infof("PCRF Message POST %v %v Success\n", reqMsgBody, resp.StatusCode)
 	}
 }
@@ -1248,6 +1268,10 @@ func postConfigSpgw(client *clientNF) {
 	if err != nil {
 		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
+		err = resp.Body.Close()
+		if err != nil {
+			client.clientLog.Infof("An Error Occurred %v", err)
+		}
 		client.clientLog.Infof("spgw Message POST %v %v Success\n", reqMsgBody, resp.StatusCode)
 	}
 }

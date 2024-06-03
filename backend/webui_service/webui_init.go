@@ -312,6 +312,10 @@ func fetchConfigAdapater() {
 			time.Sleep(1 * time.Second)
 			continue
 		}
+		err = resp.Body.Close()
+		if err != nil {
+			fmt.Printf("An Error Occurred %v\n", err)
+		}
 		fmt.Printf("Fetching config from simapp/roc. Response code = %d \n", resp.StatusCode)
 		break
 	}

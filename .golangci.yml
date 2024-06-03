@@ -255,7 +255,7 @@ linters:
     - predeclared
     # - noctx
     - dogsled
-    # - bodyclose
+    - bodyclose
     - asciicheck
       #- stylecheck
       # - unparam

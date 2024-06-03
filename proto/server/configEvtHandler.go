@@ -649,13 +649,13 @@ func convertToString(val uint64) string {
 	gbVal = val / 1000000000
 	var retStr string
 	if gbVal != 0 {
-		retStr = strconv.FormatUint(uint64(gbVal), 10) + " Gbps"
+		retStr = strconv.FormatUint(gbVal, 10) + " Gbps"
 	} else if mbVal != 0 {
-		retStr = strconv.FormatUint(uint64(mbVal), 10) + " Mbps"
+		retStr = strconv.FormatUint(mbVal, 10) + " Mbps"
 	} else if kbVal != 0 {
-		retStr = strconv.FormatUint(uint64(kbVal), 10) + " Kbps"
+		retStr = strconv.FormatUint(kbVal, 10) + " Kbps"
 	} else {
-		retStr = strconv.FormatUint(uint64(val), 10) + " bps"
+		retStr = strconv.FormatUint(val, 10) + " bps"
 	}
 
 	return retStr

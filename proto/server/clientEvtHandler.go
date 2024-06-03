@@ -350,7 +350,7 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 			arpi = 15
 		}
 
-		ruleQos.Var5Qi = int32(var5qi)
+		ruleQos.Var5Qi = var5qi
 		arp := &protos.PccArp{}
 		arp.PL = arpi
 		arp.PC = protos.PccArpPc(1)

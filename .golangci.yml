@@ -251,7 +251,7 @@ linters:
     - misspell
     - gofumpt
     - whitespace
-    # - unconvert
+    - unconvert
     - predeclared
     # - noctx
     - dogsled

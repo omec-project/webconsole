@@ -138,11 +138,6 @@ linters-settings:
   golint:
     # minimal confidence for issues, default is 0.8
     min-confidence: 0.8
-  gomnd:
-    settings:
-      mnd:
-        # the list of enabled checks, see https://github.com/tommy-muehle/go-mnd/#checks for description.
-        checks: argument,case,condition,operation,return,assign
   gomodguard:
     allowed:
       modules:                                                        # List of allowed modules
@@ -247,7 +242,6 @@ linters:
     # Additional
     # - lll
     - godox
-    #- gomnd
     - goconst
     # - gocognit
     # - nestif
@@ -317,12 +311,3 @@ severity:
   # The default value is false.
   # If set to true severity-rules regular expressions become case sensitive.
   case-sensitive: false
-  # Default value is empty list.
-  # When a list of severity rules are provided, severity information will be added to lint
-  # issues. Severity rules have the same filtering capability as exclude rules except you
-  # are allowed to specify one matcher per severity rule.
-  # Only affects out formats that support setting severity information.
-  rules:
-    - linters:
-      - gomnd
-      severity: ignore

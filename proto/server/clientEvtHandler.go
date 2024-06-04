@@ -350,7 +350,7 @@ func fillSlice(client *clientNF, sliceName string, sliceConf *configmodels.Slice
 			arpi = 15
 		}
 
-		ruleQos.Var5Qi = int32(var5qi)
+		ruleQos.Var5Qi = var5qi
 		arp := &protos.PccArp{}
 		arp.PL = arpi
 		arp.PC = protos.PccArpPc(1)
@@ -453,7 +453,11 @@ func clientEventMachine(client *clientNF) {
 					if err != nil {
 						client.clientLog.Infof("An Error Occurred %v\n", err)
 					} else {
-						if factory.WebUIConfig.Configuration.Mode5G == false && resp.StatusCode == http.StatusNotFound {
+						err = resp.Body.Close()
+						if err != nil {
+							client.clientLog.Infof("An Error Occurred %v\n", err)
+						}
+						if !factory.WebUIConfig.Configuration.Mode5G && resp.StatusCode == http.StatusNotFound {
 							client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
 							if client.id == "hss" {
 								rwLock.RLock()
@@ -519,7 +523,7 @@ func clientEventMachine(client *clientNF) {
 				client.tempGrpcReq <- &reqMsg
 				client.clientLog.Infoln("sent data to client from push config ")
 			}
-			if factory.WebUIConfig.Configuration.Mode5G == false {
+			if !factory.WebUIConfig.Configuration.Mode5G {
 				// push config to 4G network functions
 				if client.id == "hss" {
 					// client.clientLog.Debugf("Received configuration: %v", spew.Sdump(configMsg))
@@ -566,7 +570,7 @@ func clientEventMachine(client *clientNF) {
 			envMsg := &clientRspMsg{}
 			envMsg.networkSliceRspMsg = sliceDetails
 
-			if client.configChanged == false && cReqMsg.newClient == false {
+			if !client.configChanged && !cReqMsg.newClient {
 				client.clientLog.Infoln("No new update to be sent")
 				if client.resStream == nil {
 					cReqMsg.grpcRspMsg <- envMsg
@@ -589,7 +593,7 @@ func clientEventMachine(client *clientNF) {
 			client.clientLog.Debugf("is client requested for metadata: %v ", client.metadataReqtd)
 
 			// currently pcf request for metadata
-			if (client.metadataReqtd) && (cReqMsg.newClient == false) {
+			if client.metadataReqtd && !cReqMsg.newClient {
 				sliceProto := &protos.NetworkSlice{}
 				prevSlice := cReqMsg.lastSlice
 				slice := cReqMsg.slice
@@ -695,7 +699,7 @@ func clientEventMachine(client *clientNF) {
 					}
 					sliceProto := &protos.NetworkSlice{}
 					result := fillSlice(client, sliceName, sliceConfig, sliceProto)
-					if result == true {
+					if result {
 						sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
 					} else {
 						client.clientLog.Infoln("Not sending slice config")
@@ -772,13 +776,20 @@ func postConfigMme(client *clientNF) {
 	if err != nil {
 		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
+		err = resp.Body.Close()
+		if err != nil {
+			client.clientLog.Infof("An Error Occurred %v", err)
+		}
 		client.clientLog.Infof("mme Message POST %v %v \n", reqMsgBody, resp.StatusCode)
 	}
 }
 
 func deleteConfigHss(client *clientNF, imsi string) {
 	config := configHss{}
-	num, _ := strconv.ParseInt(imsi, 10, 64)
+	num, err := strconv.ParseInt(imsi, 10, 64)
+	if err != nil {
+		client.clientLog.Errorf("Could not parse IMSI: %v", imsi)
+	}
 	config.StartImsi = uint64(num)
 	config.EndImsi = uint64(num)
 	client.clientLog.Infoln("HSS config ", config)
@@ -802,6 +813,10 @@ func deleteConfigHss(client *clientNF, imsi string) {
 	if err != nil {
 		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
+		err = resp.Body.Close()
+		if err != nil {
+			client.clientLog.Infof("An Error Occurred %v", err)
+		}
 		client.clientLog.Infof("Message DELETE to HSS %v %v Success\n", reqMsgBody, resp.StatusCode)
 	}
 }
@@ -954,7 +969,11 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 			}
 
 			for _, imsi := range newImsis {
-				num, _ := strconv.ParseInt(imsi, 10, 64)
+				num, err := strconv.ParseInt(imsi, 10, 64)
+				if err != nil {
+					client.clientLog.Errorf("Could not parse IMSI %v", imsi)
+					continue
+				}
 				config.StartImsi = uint64(num)
 				config.EndImsi = uint64(num)
 				authSubsData := imsiData[imsi]
@@ -964,7 +983,11 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				}
 				config.Opc = authSubsData.Opc.OpcValue
 				config.Key = authSubsData.PermanentKey.PermanentKeyValue
-				num, _ = strconv.ParseInt(authSubsData.SequenceNumber, 10, 64)
+				num, err = strconv.ParseInt(authSubsData.SequenceNumber, 10, 64)
+				if err != nil {
+					client.clientLog.Errorf("Could not parse SequenceNumber %v", authSubsData.SequenceNumber)
+					continue
+				}
 				config.Sqn = uint64(num)
 				client.clientLog.Infof("Adding SubscritionData for IMSI: %v in HSS ", imsi)
 				b, err := json.Marshal(config)
@@ -985,6 +1008,10 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				if err != nil {
 					client.clientLog.Infof("An Error Occurred %v", err)
 				} else {
+					err = resp.Body.Close()
+					if err != nil {
+						client.clientLog.Infof("An Error Occurred %v", err)
+					}
 					client.clientLog.Infof("Message POST to HSS %v %v Success\n", reqMsgBody, resp.StatusCode)
 				}
 			}
@@ -1150,6 +1177,10 @@ func postConfigPcrf(client *clientNF) {
 	if err != nil {
 		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
+		err = resp.Body.Close()
+		if err != nil {
+			client.clientLog.Infof("An Error Occurred %v", err)
+		}
 		client.clientLog.Infof("PCRF Message POST %v %v Success\n", reqMsgBody, resp.StatusCode)
 	}
 }
@@ -1237,6 +1268,10 @@ func postConfigSpgw(client *clientNF) {
 	if err != nil {
 		client.clientLog.Infof("An Error Occurred %v", err)
 	} else {
+		err = resp.Body.Close()
+		if err != nil {
+			client.clientLog.Infof("An Error Occurred %v", err)
+		}
 		client.clientLog.Infof("spgw Message POST %v %v Success\n", reqMsgBody, resp.StatusCode)
 	}
 }

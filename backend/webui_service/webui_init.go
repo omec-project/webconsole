@@ -288,7 +288,7 @@ func fetchConfigAdapater() {
 	for {
 		if (factory.WebUIConfig.Configuration == nil) ||
 			(factory.WebUIConfig.Configuration.RocEnd == nil) ||
-			(factory.WebUIConfig.Configuration.RocEnd.Enabled == false) ||
+			(!factory.WebUIConfig.Configuration.RocEnd.Enabled) ||
 			(factory.WebUIConfig.Configuration.RocEnd.SyncUrl == "") {
 			time.Sleep(1 * time.Second)
 			// fmt.Printf("Continue polling config change %v ", factory.WebUIConfig.Configuration)
@@ -311,6 +311,10 @@ func fetchConfigAdapater() {
 			fmt.Printf("An Error Occurred %v\n", err)
 			time.Sleep(1 * time.Second)
 			continue
+		}
+		err = resp.Body.Close()
+		if err != nil {
+			fmt.Printf("An Error Occurred %v\n", err)
 		}
 		fmt.Printf("Fetching config from simapp/roc. Response code = %d \n", resp.StatusCode)
 		break

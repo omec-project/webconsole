@@ -98,15 +98,27 @@ func (m *MockMongoGetOneNil) RestfulAPIGetOne(collName string, filter bson.M) (m
 
 func (m *MockMongoDeviceGroupGetOne) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
 	var previousGroupBson bson.M
-	previousGroup, _ := json.Marshal(m.testGroup)
-	json.Unmarshal(previousGroup, &previousGroupBson)
+	previousGroup, err := json.Marshal(m.testGroup)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(previousGroup, &previousGroupBson)
+	if err != nil {
+		return nil, err
+	}
 	return previousGroupBson, nil
 }
 
 func (m *MockMongoSliceGetOne) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
 	var previousSliceBson bson.M
-	previousSlice, _ := json.Marshal(m.testSlice)
-	json.Unmarshal(previousSlice, &previousSliceBson)
+	previousSlice, err := json.Marshal(m.testSlice)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(previousSlice, &previousSliceBson)
+	if err != nil {
+		return nil, err
+	}
 	return previousSliceBson, nil
 }
 
@@ -136,11 +148,14 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		}
 		var resultGroup configmodels.DeviceGroups
 		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
-		json.Unmarshal(mapToByte(result), &resultGroup)
+		err := json.Unmarshal(mapToByte(result), &resultGroup)
+		if err != nil {
+			t.Errorf("Could not unmarshall result %v", result)
+		}
 		if !reflect.DeepEqual(resultGroup, testGroup) {
 			t.Errorf("Expected group %v, got %v", testGroup, resultGroup)
 		}
-		receivedConfigMsg, _ := <-subsUpdateChan
+		receivedConfigMsg := <-subsUpdateChan
 		if !reflect.DeepEqual(receivedConfigMsg.Msg, &configMsg) {
 			t.Errorf("Expected config message %v, got %v", configMsg, receivedConfigMsg.Msg)
 		}
@@ -177,11 +192,14 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		}
 		var resultGroup configmodels.DeviceGroups
 		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
-		json.Unmarshal(mapToByte(result), &resultGroup)
+		err := json.Unmarshal(mapToByte(result), &resultGroup)
+		if err != nil {
+			t.Errorf("Could not unmarshall result %v", result)
+		}
 		if !reflect.DeepEqual(resultGroup, testGroup) {
 			t.Errorf("Expected group %v, got %v", testGroup, resultGroup)
 		}
-		receivedConfigMsg, _ := <-subsUpdateChan
+		receivedConfigMsg := <-subsUpdateChan
 		if !reflect.DeepEqual(receivedConfigMsg.Msg, &configMsg) {
 			t.Errorf("Expected config message %v, got %v", configMsg, receivedConfigMsg.Msg)
 		}
@@ -249,11 +267,14 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 		}
 		var resultSlice configmodels.Slice
 		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
-		json.Unmarshal(mapToByte(result), &resultSlice)
+		err := json.Unmarshal(mapToByte(result), &resultSlice)
+		if err != nil {
+			t.Errorf("Could not unmarshal result %v", result)
+		}
 		if !reflect.DeepEqual(resultSlice, testSlice) {
 			t.Errorf("Expected slice %v, got %v", testSlice, resultSlice)
 		}
-		receivedConfigMsg, _ := <-subsUpdateChan
+		receivedConfigMsg := <-subsUpdateChan
 		if !reflect.DeepEqual(receivedConfigMsg.Msg, &configMsg) {
 			t.Errorf("Expected config message %v, got %v", configMsg, receivedConfigMsg.Msg)
 		}
@@ -277,8 +298,14 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 		subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
 		postData = make([]map[string]interface{}, 0)
 		var previousSliceBson bson.M
-		previousSlice, _ := json.Marshal(testSlice)
-		json.Unmarshal(previousSlice, &previousSliceBson)
+		previousSlice, err := json.Marshal(testSlice)
+		if err != nil {
+			t.Errorf("Could not marshal result %v", testSlice)
+		}
+		err = json.Unmarshal(previousSlice, &previousSliceBson)
+		if err != nil {
+			t.Errorf("Could not unmarshal previousSlice %v", previousSlice)
+		}
 		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &MockMongoSliceGetOne{dbadapter.CommonDBClient, testSlice}
 		handleNetworkSlicePost(&configMsg, subsUpdateChan)
@@ -293,11 +320,14 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 		}
 		var resultSlice configmodels.Slice
 		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
-		json.Unmarshal(mapToByte(result), &resultSlice)
+		err = json.Unmarshal(mapToByte(result), &resultSlice)
+		if err != nil {
+			t.Errorf("Could not unmarshal result %v", result)
+		}
 		if !reflect.DeepEqual(resultSlice, testSlice) {
 			t.Errorf("Expected slice %v, got %v", testSlice, resultSlice)
 		}
-		receivedConfigMsg, _ := <-subsUpdateChan
+		receivedConfigMsg := <-subsUpdateChan
 		if !reflect.DeepEqual(receivedConfigMsg.Msg, &configMsg) {
 			t.Errorf("Expected config message %v, got %v", configMsg, receivedConfigMsg.Msg)
 		}
@@ -343,8 +373,14 @@ func (m *MockMongoGetManyNil) RestfulAPIGetMany(collName string, filter bson.M) 
 func (m *MockMongoGetManyGroups) RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error) {
 	testGroup := deviceGroup("testGroup")
 	var previousGroupBson bson.M
-	previousGroup, _ := json.Marshal(testGroup)
-	json.Unmarshal(previousGroup, &previousGroupBson)
+	previousGroup, err := json.Marshal(testGroup)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(previousGroup, &previousGroupBson)
+	if err != nil {
+		return nil, err
+	}
 	var groups []map[string]interface{}
 	groups = append(groups, previousGroupBson)
 	return groups, nil
@@ -353,8 +389,14 @@ func (m *MockMongoGetManyGroups) RestfulAPIGetMany(collName string, filter bson.
 func (m *MockMongoGetManySlices) RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error) {
 	testSlice := networkSlice("testGroup")
 	var previousSliceBson bson.M
-	previousSlice, _ := json.Marshal(testSlice)
-	json.Unmarshal(previousSlice, &previousSliceBson)
+	previousSlice, err := json.Marshal(testSlice)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(previousSlice, &previousSliceBson)
+	if err != nil {
+		return nil, err
+	}
 	var slices []map[string]interface{}
 	slices = append(slices, previousSliceBson)
 	return slices, nil

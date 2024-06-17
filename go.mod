@@ -7,7 +7,7 @@ require (
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/omec-project/config5g v1.4.0
+	github.com/omec-project/config5g v1.4.1
 	github.com/omec-project/openapi v1.2.0
 	github.com/omec-project/util v1.1.0
 	github.com/prometheus/client_golang v1.19.1
@@ -15,7 +15,7 @@ require (
 	github.com/urfave/cli v1.22.15
 	go.mongodb.org/mongo-driver v1.10.1
 	google.golang.org/grpc v1.64.0
-	google.golang.org/protobuf v1.34.1
+	google.golang.org/protobuf v1.34.2
 	gopkg.in/yaml.v2 v2.4.0
 )
 

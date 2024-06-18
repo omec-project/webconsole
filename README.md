@@ -17,6 +17,26 @@ features Configuration Service provides APIs for subscriber management.
 4. 5G clients can connect & get complete configuration copy through grpc interface.
 5. 4G clients communicate with Webconsole through REST interface
 
+# UI
+
+Webconsole can optionally serve static files, which constitute the frontend part of the application.
+
+This functionality is not mandatory. The frontend files must be provided and placed in `webconsole/ui/frontend_files` before compilation, as they are not included in the webconsole codebase.
+
+To compile the webconsole including the UI option:
+```
+make webconsole-ui
+```
+or
+```
+go build --tags ui -o <output-file> ./server.go
+```
+
+Once the webconsole is running, the UI will be seen on:
+```
+http://<webconsole-ip>:5000/ui/
+```
+
 ## Webconsole Architecture diagram
 
 ![Architecture](/docs/images/architecture1.png)

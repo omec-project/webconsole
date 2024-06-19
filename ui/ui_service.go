@@ -5,31 +5,43 @@
 
 // +build ui
 
- package ui
+package ui
 
 import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
 )
 
 //go:embed all:frontend_files
-var FrontendFS embed.FS
+var frontendFS embed.FS
 
-func AddUiService(engine *gin.Engine) *gin.RouterGroup {
-	group := engine.Group("/ui")
+func AddUiService(engine *gin.Engine) {
 	logger.WebUILog.Infoln("Adding UI service")
+	staticFilesSystem, err := fs.Sub(frontendFS, "frontend_files")
+    if err != nil {
+        logger.WebUILog.Fatal(err)
+    }
 
-	dist, err := fs.Sub(FrontendFS, "frontend_files")
-	if err != nil {
-		logger.WebUILog.Fatal(err)
-		return nil
-	}
-	group.StaticFS("/", http.FS(dist))
-	return group
+    engine.Use(func(c *gin.Context) {
+        if !isApiUrlPath(c.Request.URL.Path){
+            htmlPath := strings.TrimPrefix(c.Request.URL.Path, "/") + ".html"
+			if _, err := staticFilesSystem.Open(htmlPath); err == nil {
+				c.Request.URL.Path = htmlPath
+			}
+            fileServer := http.FileServer(http.FS(staticFilesSystem))
+            fileServer.ServeHTTP(c.Writer, c.Request)
+            c.Abort()
+        }
+    })
+}
+
+func isApiUrlPath(path string) bool{
+	return strings.HasPrefix(path, "/config/v1/") || strings.HasPrefix(path, "/api/");
 }
 
 

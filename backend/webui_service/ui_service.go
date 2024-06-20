@@ -1,28 +1,22 @@
-// SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
-//
 // SPDX-License-Identifier: Apache-2.0
-//
 
 // +build ui
 
-package ui
+package webui_service
 
 import (
-	"embed"
 	"io/fs"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/ui"
 )
-
-//go:embed all:frontend_files
-var frontendFS embed.FS
 
 func AddUiService(engine *gin.Engine) {
 	logger.WebUILog.Infoln("Adding UI service")
-	staticFilesSystem, err := fs.Sub(frontendFS, "frontend_files")
+	staticFilesSystem, err := fs.Sub(ui.FrontendFS, "frontend_files")
     if err != nil {
         logger.WebUILog.Fatal(err)
     }

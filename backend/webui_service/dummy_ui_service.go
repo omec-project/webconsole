@@ -1,11 +1,8 @@
-// SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
-//
 // SPDX-License-Identifier: Apache-2.0
-//
 
 // +build !ui
 
-package ui
+package webui_service
 
 import (
 	"github.com/gin-gonic/gin"

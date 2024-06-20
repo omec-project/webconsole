@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// +build !ui
+//go:build !ui
 
 package webui_service
 

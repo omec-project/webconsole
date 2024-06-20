@@ -34,7 +34,7 @@ go build --tags ui -o <output-file> ./server.go
 
 Once the webconsole is running, the UI will be seen on:
 ```
-http://<webconsole-ip>:5000/ui/
+http://<webconsole-ip>:5000/
 ```
 
 ## Webconsole Architecture diagram

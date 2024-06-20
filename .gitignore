@@ -28,5 +28,5 @@ bin/
 public/
 !/frontend/public/*.license
 .coverage/
-ui/frontend_files
+ui/frontend_files/
 vendor/

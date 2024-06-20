@@ -5,7 +5,7 @@
 package ui
 
 import (
-	"embed"
+    "embed"
 )
 
 //go:embed all:frontend_files

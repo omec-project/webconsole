@@ -21,7 +21,7 @@ features Configuration Service provides APIs for subscriber management.
 
 Webconsole can optionally serve static files, which constitute the frontend part of the application.
 
-This functionality is not mandatory. The frontend files must be provided and placed in `webconsole/ui/frontend_files` before compilation, as they are not included in the webconsole codebase.
+To build webui with a frontend, place the static files under `webconsole/ui/frontend_files` before compilation.
 
 To compile the webconsole including the UI option:
 ```

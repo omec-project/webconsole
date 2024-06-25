@@ -23,7 +23,7 @@ Webconsole can optionally serve static files, which constitute the frontend part
 
 To build webui with a frontend, place the static files under `webconsole/ui/frontend_files` before compilation.
 
-To compile the webconsole including the UI option:
+To build the webconsole including the UI option:
 ```
 make webconsole-ui
 ```
@@ -32,6 +32,8 @@ Access the UI at:
 ```
 http://<webconsole-ip>:5000/
 ```
+
+A collection of example files has been placed in the `webconsole/ui/example` directory, corresponding to the static files of a basic Next.js application.
 
 ## Webconsole Architecture diagram
 

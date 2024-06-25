@@ -27,10 +27,6 @@ To compile the webconsole including the UI option:
 ```
 make webconsole-ui
 ```
-or
-```
-go build --tags ui -o <output-file> ./server.go
-```
 
 Once the webconsole is running, the UI will be seen on:
 ```

@@ -33,7 +33,7 @@ Access the UI at:
 http://<webconsole-ip>:5000/
 ```
 
-A collection of example files has been placed in the `webconsole/ui/example` directory, corresponding to the static files of a basic Next.js application.
+A collection of example files has been placed in the `webconsole/ui/frontend_files` directory, corresponding to the static files of a basic Next.js application.
 
 ## Webconsole Architecture diagram
 

@@ -28,7 +28,7 @@ To compile the webconsole including the UI option:
 make webconsole-ui
 ```
 
-Once the webconsole is running, the UI will be seen on:
+Access the UI at:
 ```
 http://<webconsole-ip>:5000/
 ```

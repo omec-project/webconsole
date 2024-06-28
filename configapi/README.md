@@ -48,7 +48,7 @@ Endpoints sharing a common path may result in issues. For example, `/v2/pet/find
 
 A workaround is to manually update the path and handler. Please refer to [gin-gonic/gin/issues/205#issuecomment-296155497](https://github.com/gin-gonic/gin/issues/205#issuecomment-296155497) for more information.
 
-### Swagger UI Documentation
+### Swagger UI
 
 The swagger UI for the API documentation is automatically generated from comments.
 ```

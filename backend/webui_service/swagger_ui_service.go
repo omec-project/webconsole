@@ -4,11 +4,9 @@
 package webui_service
 
 import (
-	//"net/http"
-
-    "github.com/gin-gonic/gin"
-    "github.com/omec-project/webconsole/backend/logger"
-    _ "github.com/omec-project/webconsole/docs"
+	"github.com/gin-gonic/gin"
+	"github.com/omec-project/webconsole/backend/logger"
+	_ "github.com/omec-project/webconsole/docs"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -22,8 +20,8 @@ import (
 //	@license.name	Apache 2.0
 //	@license.url	http://www.apache.org/licenses/LICENSE-2.0.html
 
-//	@host		localhost:5000
-//	@BasePath	/
+// @host		localhost:5000
+// @BasePath	/
 func AddSwaggerUiService(engine *gin.Engine) {
 	logger.WebUILog.Infoln("Adding Swagger UI service")
 	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

@@ -48,3 +48,19 @@ Endpoints sharing a common path may result in issues. For example, `/v2/pet/find
 
 A workaround is to manually update the path and handler. Please refer to [gin-gonic/gin/issues/205#issuecomment-296155497](https://github.com/gin-gonic/gin/issues/205#issuecomment-296155497) for more information.
 
+### Swagger UI Documentation
+
+The swagger UI for the API documentation is automatically generated from comments.
+```
+swag init -g backend/webui_service/swagger_ui_service.go --outputTypes go,json
+```
+The swagger files will automatically be created in `webconsole/docs`
+
+Access the swagger UI at:
+```
+http://<webconsole-ip>:5000/swagger/index.html
+```
+The json doc is available at:
+```
+http://<webconsole-ip>:5000/swagger/doc.json
+```

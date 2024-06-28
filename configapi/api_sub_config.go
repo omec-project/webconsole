@@ -19,6 +19,7 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	
 )
 
 const (
@@ -268,7 +269,13 @@ func GetSampleJSON(c *gin.Context) {
 	c.JSON(http.StatusOK, subsData)
 }
 
-// Get all subscribers list
+// GetSubscribers godoc
+//	@Description	Return the list of subscribers
+//	@Tags			Subscribers
+//	@Produce		json
+//	@Success		200	{object}	configmodels.SubsListIE	"List of subscribers"
+//	@Failure		500	{object}	nil						"Error retrieving subscribers"
+//	@Router			/api/subscriber/ [get]
 func GetSubscribers(c *gin.Context) {
 	setCorsHeader(c)
 
@@ -295,7 +302,15 @@ func GetSubscribers(c *gin.Context) {
 	c.JSON(http.StatusOK, subsList)
 }
 
-// Get subscriber by IMSI(ueId))
+// GetSubscriber godoc
+//	@Description	Get subscriber by IMSI (UE ID)
+//	@Tags			Subscribers
+//	@Param			imsi	path	string	true	"IMSI (UE ID)"	example(imsi-208930100007487)
+//	@Produce		json
+//	@Success		200	{object}	nil	"Subscriber"
+//	@Failure		404	{object}	nil	"Subscriber not found"
+//	@Failure		500	{object}	nil	"Error retrieving subscriber"
+//	@Router			/api/subscriber/{imsi} [get]
 func GetSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 
@@ -357,7 +372,15 @@ func GetSubscriberByID(c *gin.Context) {
 	c.JSON(http.StatusOK, subsData)
 }
 
-// Post subscriber by IMSI(ueId)
+// PostSubscriber godoc
+//	@Description	Create subscriber by IMSI (UE ID)
+//	@Tags			Subscribers
+//	@Param			imsi	path		string							true	"IMSI (UE ID)"
+//	@Param			content	body		configmodels.SubsOverrideData	true	" "
+//	@Success		201		{object}	nil								"Subscriber created"
+//	@Failure		400		{object}	nil								"Invalid subscriber content"
+//	@Failure		500		{object}	nil								"Error creating subscriber"
+//	@Router			/api/subscriber/{imsi} [post]
 func PostSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 
@@ -449,7 +472,13 @@ func PatchSubscriberByID(c *gin.Context) {
 	logger.WebUILog.Infoln("Patch One Subscriber Data")
 }
 
-// Delete subscriber by IMSI(ueId)
+// DeleteSubscriber godoc
+//	@Description	Delete an existing subscriber
+//	@Tags			Subscribers
+//	@Param			imsi	path		string	true	"IMSI (UE ID)"
+//	@Success		204		{object}	nil		"Subscriber deleted successfully"
+//	@Failure		500		{object}	nil		"Error deleting subscriber"
+//	@Router			/api/subscriber/{imsi} [delete]
 func DeleteSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Delete One Subscriber Data")

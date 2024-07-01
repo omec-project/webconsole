@@ -24,6 +24,7 @@ import (
 	mongoDBLibLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/util/path_util"
 	pathUtilLogger "github.com/omec-project/util/path_util/logger"
+	"github.com/omec-project/webconsole/backend/dynamic_parameter_service"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/metrics"
@@ -170,6 +171,7 @@ func (webui *WEBUI) Start() {
 	/* First HTTP Server running at port to receive Config from ROC */
 	subconfig_router := logger_util.NewGinWithLogrus(logger.GinLog)
 	AddUiService(subconfig_router)
+	dynamic_parameter_service.AddDynamicParameterService(subconfig_router)
 	configapi.AddServiceSub(subconfig_router)
 	configapi.AddService(subconfig_router)
 

@@ -50,7 +50,7 @@ A workaround is to manually update the path and handler. Please refer to [gin-go
 
 ### Swagger UI
 
-The swagger UI for the API documentation is automatically generated from comments.
+The swagger UI for the API documentation is automatically generated from code annotations.
 ```
 swag init -g backend/webui_service/swagger_ui_service.go --outputTypes go,json
 ```

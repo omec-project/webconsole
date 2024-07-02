@@ -139,7 +139,7 @@ func NetworkSliceDeleteHandler(c *gin.Context) bool {
 	msg.MsgType = configmodels.Network_slice
 	msg.SliceName = sliceName
 	configChannel <- &msg
-	configLog.Infof("Successfully Added Device Group [%v] with delete_op to config channel.", sliceName)
+	configLog.Infof("Successfully Added Network Slice [%v] with delete_op to config channel.", sliceName)
 	return true
 }
 

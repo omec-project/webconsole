@@ -273,7 +273,7 @@ func GetSampleJSON(c *gin.Context) {
 //	@Description	Return the list of subscribers
 //	@Tags			Subscribers
 //	@Produce		json
-//	@Success		200	{object}	configmodels.SubsListIE	"List of subscribers"
+//	@Success		200	{object}	configmodels.SubsListIE	"List of subscribers. Null if there are no subscribers"
 //	@Failure		500	{object}	nil						"Error retrieving subscribers"
 //	@Router			/api/subscriber/ [get]
 func GetSubscribers(c *gin.Context) {

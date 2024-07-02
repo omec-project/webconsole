@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024 Canonical Ltd.
 
+// +build ui
+
 package webui_service
 
 import (

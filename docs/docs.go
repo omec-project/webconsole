@@ -36,7 +36,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of subscribers",
+                        "description": "List of subscribers. Null if there are no subscribers",
                         "schema": {
                             "$ref": "#/definitions/configmodels.SubsListIE"
                         }

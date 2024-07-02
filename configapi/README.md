@@ -47,20 +47,3 @@ docker run --rm -it configapi
 Endpoints sharing a common path may result in issues. For example, `/v2/pet/findByTags` and `/v2/pet/:petId` will result in an issue with the Gin framework. For more information about this known limitation, please refer to [gin-gonic/gin#388](https://github.com/gin-gonic/gin/issues/388) for more information.
 
 A workaround is to manually update the path and handler. Please refer to [gin-gonic/gin/issues/205#issuecomment-296155497](https://github.com/gin-gonic/gin/issues/205#issuecomment-296155497) for more information.
-
-### Swagger UI
-
-The [swagger UI](https://github.com/swaggo/swag) for the API documentation is automatically generated from code annotations.
-```
-swag init -g backend/webui_service/swagger_ui_service.go --outputTypes go,json
-```
-The swagger files will automatically be created in `webconsole/docs`
-
-Access the swagger UI at:
-```
-http://<webconsole-ip>:5000/swagger/index.html
-```
-The json doc is available at:
-```
-http://<webconsole-ip>:5000/swagger/doc.json
-```

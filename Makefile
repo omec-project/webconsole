@@ -53,8 +53,15 @@ $(GO_BIN_PATH)/$(WEBCONSOLE): server.go  $(WEBCONSOLE_GO_FILES)
 
 vpath %.go $(addprefix $(GO_SRC_PATH)/, $(GO_NF))
 
+webconsole-ui: $(GO_BIN_PATH)/$(WEBCONSOLE)-ui
+
+$(GO_BIN_PATH)/$(WEBCONSOLE)-ui: server.go  $(WEBCONSOLE_GO_FILES)
+	@echo "Start building $(@F)...."
+	go build --tags ui -o $(ROOT_PATH)/$@ ./server.go
+
 clean:
-	rm -rf $(WEBCONSOLE)/$(GO_BIN_PATH)/$(WEBCONSOLE)
+	rm -rf $(ROOT_PATH)/$(GO_BIN_PATH)/$(WEBCONSOLE)
+	rm -rf $(ROOT_PATH)/$(GO_BIN_PATH)/$(WEBCONSOLE)-ui
 
 docker-build:
 	@go mod vendor

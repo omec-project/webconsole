@@ -14,9 +14,9 @@ swag init -g backend/webui_service/swagger_ui_service.go --outputTypes go
 ```
 The `docs.go` file will automatically be created in `webconsole/docs`
 
-The swagger UI runs by default on `localhost`. If the webconsole server runs remotely, set the following environment variable.
+The swagger UI operations are executed by default on `localhost`. If the webconsole server runs remotely, set the following environment variable.
 ```
-export SWAGGER_HOST=<webconsole-ip>
+export WEBUI_ENDPOINT=<webconsole-ip>:5000
 ```
 Build the webconsole including the UI option:
 ```

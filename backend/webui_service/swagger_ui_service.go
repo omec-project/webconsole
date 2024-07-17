@@ -28,10 +28,9 @@ import (
 // @BasePath	/
 func AddSwaggerUiService(engine *gin.Engine) {
     logger.WebUILog.Infoln("Adding Swagger UI service")
-    host := os.Getenv("SWAGGER_HOST")
-    if host != "" {
-        docs.SwaggerInfo.Host = host + ":5000"
-        logger.WebUILog.Infoln(docs.SwaggerInfo.Host)
+    endpoint := os.Getenv("WEBUI_ENDPOINT")
+    if endpoint != "" {
+        docs.SwaggerInfo.Host = endpoint
     }
     engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }

@@ -154,7 +154,7 @@ var routes = Routes{
 		"GnbPostByName",
 		http.MethodPost,
 		"/inventory/gnb/:gnb-name",
-		GnbDeleteByName,
+		GnbPostByName,
 	},
 	{
 		"GnbDeleteByName",

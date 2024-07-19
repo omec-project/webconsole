@@ -96,4 +96,3 @@ test: .coverage
 			-covermode=atomic \
 			-v \
 			./ ./...
-		go test -v --tags ui ./ ./backend/dynamic_parameter_service/

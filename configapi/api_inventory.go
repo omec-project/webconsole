@@ -1,7 +1,5 @@
-// SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
-//
 // SPDX-License-Identifier: Apache-2.0
-//
+// Copyright 2024 Canonical Ltd.
 
 package configapi
 
@@ -37,6 +35,7 @@ func GetGnbs(c *gin.Context) {
 	}
 
 	var gnbs []*configmodels.Gnb
+	gnbs = make([]*configmodels.Gnb, 0)
 	for _, rawGnb := range rawGnbs {
 		var gnbData configmodels.Gnb
 		err := json.Unmarshal(mapToByte(rawGnb), &gnbData)
@@ -107,7 +106,7 @@ func gnbDeletetHandler(c *gin.Context) bool {
 		configLog.Infof("Delete gNB request is missing gnb-name")
 		return false
 	}
-	configLog.Infof("Received Delete gNB %v", gnbName)
+	configLog.Infof("Received delete gNB %v request", gnbName)
 	var msg configmodels.ConfigMessage
 	msg.MsgType = configmodels.Inventory
 	msg.MsgMethod = configmodels.Delete_op
@@ -127,6 +126,7 @@ func GetUpfs(c *gin.Context) {
 	}
 
 	var upfs []*configmodels.Upf
+	upfs = make([]*configmodels.Upf, 0)
 	for _, rawUpf := range rawUpfs {
 		var upfData configmodels.Upf
 		err := json.Unmarshal(mapToByte(rawUpf), &upfData)

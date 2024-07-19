@@ -425,3 +425,71 @@ func Test_firstConfigReceived_sliceInDB(t *testing.T) {
 		t.Errorf("Expected firstConfigReceived to return true, got %v", result)
 	}
 }
+
+func TestPostGnb(t *testing.T) {
+	gnbName := "some-gnb"
+	newGnb := configmodels.Gnb{
+		GnbName: gnbName,
+		Tac:     "1233",
+	}
+
+	configMsg := configmodels.ConfigMessage{
+		MsgType:   configmodels.Inventory,
+		MsgMethod: configmodels.Post_op,
+		GnbName:   gnbName,
+		Gnb:       &newGnb,
+	}
+
+	postData = make([]map[string]interface{}, 0)
+	dbadapter.CommonDBClient = &MockMongoPost{}
+	handleGnbPost(&configMsg)
+
+	expected_collection := "webconsoleData.snapshots.gnbData"
+	if postData[0]["coll"] != expected_collection {
+		t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
+	}
+
+	expected_filter := bson.M{"gnbName": gnbName}
+	if !reflect.DeepEqual(postData[0]["filter"], expected_filter) {
+		t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
+	}
+
+	var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
+	if result["tac"] != newGnb.Tac {
+		t.Errorf("Expected port %v, got %v", newGnb.Tac, result["tac"])
+	}
+}
+
+func TestPostUpf(t *testing.T) {
+	upfHostname := "some-upf"
+	newUpf := configmodels.Upf{
+		Hostname: upfHostname,
+		Port:     "1233",
+	}
+
+	configMsg := configmodels.ConfigMessage{
+		MsgType:     configmodels.Inventory,
+		MsgMethod:   configmodels.Post_op,
+		UpfHostname: upfHostname,
+		Upf:         &newUpf,
+	}
+
+	postData = make([]map[string]interface{}, 0)
+	dbadapter.CommonDBClient = &MockMongoPost{}
+	handleUpfPost(&configMsg)
+
+	expected_collection := "webconsoleData.snapshots.upfData"
+	if postData[0]["coll"] != expected_collection {
+		t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
+	}
+
+	expected_filter := bson.M{"hostname": upfHostname}
+	if !reflect.DeepEqual(postData[0]["filter"], expected_filter) {
+		t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
+	}
+
+	var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
+	if result["port"] != newUpf.Port {
+		t.Errorf("Expected port %v, got %v", newUpf.Port, result["port"])
+	}
+}

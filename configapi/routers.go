@@ -144,4 +144,40 @@ var routes = Routes{
 		"/network-slice/:slice-name",
 		NetworkSliceSliceNamePut,
 	},
+	{
+		"GetGnbs",
+		http.MethodGet,
+		"/inventory/gnb",
+		GetGnbs,
+	},
+	{
+		"GnbPostByName",
+		http.MethodPost,
+		"/inventory/gnb/:gnb-name",
+		GnbDeleteByName,
+	},
+	{
+		"GnbDeleteByName",
+		http.MethodDelete,
+		"/inventory/gnb/:gnb-name",
+		GnbDeleteByName,
+	},
+	{
+		"GetUpfs",
+		http.MethodGet,
+		"/inventory/upf",
+		GetUpfs,
+	},
+	{
+		"UpfPostByName",
+		http.MethodPost,
+		"/inventory/upf/:upf-hostname",
+		UpfPostByName,
+	},
+	{
+		"UpfDeleteByName",
+		http.MethodDelete,
+		"/inventory/upf/:upf-hostname",
+		UpfDeleteByName,
+	},
 }

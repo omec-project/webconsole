@@ -4,6 +4,8 @@
 package configapi
 
 import (
+	"errors"
+	"fmt"
 	"encoding/json"
 	"strings"
 	"net/http"
@@ -21,21 +23,25 @@ const (
 	upfDataColl = "webconsoleData.snapshots.upfData"
 )
 
-//var configChannel chan *configmodels.ConfigMessage
-
-//var configLog *logrus.Entry
+func setInventoryCorsHeader(c *gin.Context) {
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+	c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, DELETE")
+}
 
 func GetGnbs(c *gin.Context) {
-	setCorsHeader(c)
+	setInventoryCorsHeader(c)
 	logger.WebUILog.Infoln("Get all gNBs")
-
-	rawGnbs, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(gnbDataColl, bson.M{})
-	if errGetMany != nil {
-		logger.DbLog.Warnln(errGetMany)
-	}
 
 	var gnbs []*configmodels.Gnb
 	gnbs = make([]*configmodels.Gnb, 0)
+	rawGnbs, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(gnbDataColl, bson.M{})
+	if errGetMany != nil {
+		logger.DbLog.Errorln(errGetMany)
+		c.JSON(http.StatusInternalServerError, gnbs)
+	}
+
 	for _, rawGnb := range rawGnbs {
 		var gnbData configmodels.Gnb
 		err := json.Unmarshal(mapToByte(rawGnb), &gnbData)
@@ -48,8 +54,8 @@ func GetGnbs(c *gin.Context) {
 }
 
 func GnbPostByName(c *gin.Context) {
-	logger.ConfigLog.Debugf("Received GnbPostByName ")
-	if ret := gnbPostHandler(c); ret == true {
+	setInventoryCorsHeader(c)
+	if ret := gnbPostHandler(c); ret == nil {
 		c.JSON(http.StatusOK, gin.H{})
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{})
@@ -57,20 +63,21 @@ func GnbPostByName(c *gin.Context) {
 }
 
 func GnbDeleteByName(c *gin.Context) {
-	logger.ConfigLog.Debugf("Received GnbDeleteByName ")
-	if ret := gnbDeletetHandler(c); ret == true {
+	setInventoryCorsHeader(c)
+	if ret := gnbDeletetHandler(c); ret == nil {
 		c.JSON(http.StatusOK, gin.H{})
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{})
 	}
 }
 
-func gnbPostHandler(c *gin.Context) bool {
+func gnbPostHandler(c *gin.Context) error {
 	var gnbName string
 	var exists bool
 	if gnbName, exists = c.Params.Get("gnb-name"); !exists {
-		configLog.Infof("Post gNB request is missing gnb-name")
-		return false
+		errorMessage := "Post gNB request is missing gnb-name"
+		configLog.Errorf(errorMessage)
+		return errors.New(errorMessage)
 	}
 	configLog.Infof("Received gNB %v", gnbName)
 	var err error
@@ -82,51 +89,54 @@ func gnbPostHandler(c *gin.Context) bool {
 		err = c.ShouldBindJSON(&request)
 	}
 	if err != nil {
-		configLog.Infof(" err %v", err)
-		return false
+		configLog.Errorf("err %v", err)
+		return fmt.Errorf("Failed to create gNB %v: %w", gnbName, err)
 	}
 	req := httpwrapper.NewRequest(c.Request, request)
 	procReq := req.Body.(configmodels.Gnb)
-
-	var msg configmodels.ConfigMessage
 	procReq.GnbName = gnbName
-	msg.MsgType = configmodels.Inventory
-	msg.MsgMethod = configmodels.Post_op
-	msg.Gnb = &procReq
-	msg.GnbName = gnbName
+	var msg = configmodels.ConfigMessage{
+		MsgType:     configmodels.Inventory,
+		MsgMethod:   configmodels.Post_op,
+		GnbName: gnbName,
+		Gnb: &procReq,
+	}
 	configChannel <- &msg
 	configLog.Infof("Successfully added gNB [%v] to config channel.", gnbName)
-	return true
+	return nil
 }
 
-func gnbDeletetHandler(c *gin.Context) bool {
+func gnbDeletetHandler(c *gin.Context) error {
 	var gnbName string
 	var exists bool
 	if gnbName, exists = c.Params.Get("gnb-name"); !exists {
-		configLog.Infof("Delete gNB request is missing gnb-name")
-		return false
+		errorMessage := "Delete gNB request is missing gnb-name"
+		configLog.Errorf(errorMessage)
+		return fmt.Errorf(errorMessage)
 	}
 	configLog.Infof("Received delete gNB %v request", gnbName)
-	var msg configmodels.ConfigMessage
-	msg.MsgType = configmodels.Inventory
-	msg.MsgMethod = configmodels.Delete_op
-	msg.GnbName = gnbName
+	var msg = configmodels.ConfigMessage{
+		MsgType:   configmodels.Inventory,
+		MsgMethod: configmodels.Delete_op,
+		GnbName:   gnbName,
+	}
 	configChannel <- &msg
 	configLog.Infof("Successfully added gNB [%v] with delete_op to config channel.", gnbName)
-	return true
+	return nil
 }
 
 func GetUpfs(c *gin.Context) {
-	setCorsHeader(c)
+	setInventoryCorsHeader(c)
 	logger.WebUILog.Infoln("Get all UPFs")
-
-	rawUpfs, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(upfDataColl, bson.M{})
-	if errGetMany != nil {
-		logger.DbLog.Warnln(errGetMany)
-	}
 
 	var upfs []*configmodels.Upf
 	upfs = make([]*configmodels.Upf, 0)
+	rawUpfs, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(upfDataColl, bson.M{})
+	if errGetMany != nil {
+		logger.DbLog.Errorln(errGetMany)
+		c.JSON(http.StatusInternalServerError, upfs)
+	}
+
 	for _, rawUpf := range rawUpfs {
 		var upfData configmodels.Upf
 		err := json.Unmarshal(mapToByte(rawUpf), &upfData)
@@ -139,29 +149,31 @@ func GetUpfs(c *gin.Context) {
 }
 
 func UpfPostByName(c *gin.Context) {
-	logger.ConfigLog.Debugf("Received UpfPostByName ")
-	if ret := upfPostHandler(c); ret == true {
+	setInventoryCorsHeader(c)
+	if err := upfPostHandler(c); err == nil {
 		c.JSON(http.StatusOK, gin.H{})
+		return
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{})
 	}
 }
 
 func UpfDeleteByName(c *gin.Context) {
-	logger.ConfigLog.Debugf("Received UpfDeleteByName ")
-	if ret := upfDeletetHandler(c); ret == true {
+	setInventoryCorsHeader(c)
+	if err := upfDeleteHandler(c); err == nil {
 		c.JSON(http.StatusOK, gin.H{})
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{})
 	}
 }
 
-func upfPostHandler(c *gin.Context) bool {
+func upfPostHandler(c *gin.Context) error {
 	var upfHostname string
 	var exists bool
 	if upfHostname, exists = c.Params.Get("upf-hostname"); !exists {
-		configLog.Infof("Post UPF request is missing upf-hostname")
-		return false
+		errorMessage := "Post UPF request is missing upf-hostname"
+		configLog.Errorf(errorMessage)
+		return errors.New(errorMessage)
 	}
 	configLog.Infof("Received UPF %v", upfHostname)
 	var err error
@@ -173,36 +185,38 @@ func upfPostHandler(c *gin.Context) bool {
 		err = c.ShouldBindJSON(&request)
 	}
 	if err != nil {
-		configLog.Infof(" err %v", err)
-		return false
+		configLog.Errorf("err %v", err)
+		return fmt.Errorf("Failed to create UPF %v: %w", upfHostname, err)
 	}
 	req := httpwrapper.NewRequest(c.Request, request)
 	procReq := req.Body.(configmodels.Upf)
-
-	var msg configmodels.ConfigMessage
 	procReq.Hostname = upfHostname
-	msg.MsgType = configmodels.Inventory
-	msg.MsgMethod = configmodels.Post_op
-	msg.Upf = &procReq
-	msg.UpfHostname = upfHostname
+	var msg = configmodels.ConfigMessage{
+		MsgType:     configmodels.Inventory,
+		MsgMethod:   configmodels.Post_op,
+		UpfHostname: upfHostname,
+		Upf: &procReq,
+	}
 	configChannel <- &msg
 	configLog.Infof("Successfully added UPF [%v] to config channel.", upfHostname)
-	return true
+	return nil
 }
 
-func upfDeletetHandler(c *gin.Context) bool {
+func upfDeleteHandler(c *gin.Context) error {
 	var upfHostname string
 	var exists bool
 	if upfHostname, exists = c.Params.Get("upf-hostname"); !exists {
-		configLog.Infof("Delete UPF request is missing upf-hostname")
-		return false
+		errorMessage := "Delete UPF request is missing upf-hostname"
+		configLog.Errorf(errorMessage)
+		return fmt.Errorf(errorMessage)
 	}
 	configLog.Infof("Received Delete UPF %v", upfHostname)
-	var msg configmodels.ConfigMessage
-	msg.MsgType = configmodels.Inventory
-	msg.MsgMethod = configmodels.Delete_op
-	msg.UpfHostname = upfHostname
+	var msg = configmodels.ConfigMessage{
+		MsgType:     configmodels.Inventory,
+		MsgMethod:   configmodels.Delete_op,
+		UpfHostname: upfHostname,
+	}
 	configChannel <- &msg
 	configLog.Infof("Successfully added UPF [%v] with delete_op to config channel.", upfHostname)
-	return true
+	return nil
 }

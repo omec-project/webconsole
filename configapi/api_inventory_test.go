@@ -15,7 +15,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-
 type MockMongoClientNoGnbs struct {
 	dbadapter.DBInterface
 }
@@ -114,7 +113,7 @@ func (m *MockMongoClientManyUpfs) RestfulAPIGetMany(coll string, filter bson.M) 
 	return results, nil
 }
 
-func TestGetGnbsNoGnbs(t *testing.T) {
+func TestGivenNoGnbsWhenGetGnbsThenReturnsAnEmptyList(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	dbadapter.CommonDBClient = &MockMongoClientNoGnbs{}
@@ -131,7 +130,7 @@ func TestGetGnbsNoGnbs(t *testing.T) {
 	}
 }
 
-func TestGetGnbsOneGnb(t *testing.T) {
+func TestGivenOneGnbWhenGetGnbsThenReturnsAListWithOneElement(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
@@ -150,7 +149,7 @@ func TestGetGnbsOneGnb(t *testing.T) {
 	}
 }
 
-func TestGetGnbsManyGnbs(t *testing.T) {
+func TestGivenManyGnbsWhenGetGnbsThenReturnsAListWithManyGnbs(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
@@ -170,7 +169,7 @@ func TestGetGnbsManyGnbs(t *testing.T) {
 	}
 }
 
-func TestGetUpfsNoUpfs(t *testing.T) {
+func TestGivenNoUpfsWhenGetUpfsThenReturnsAnEmptyList(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	dbadapter.CommonDBClient = &MockMongoClientNoUpfs{}
@@ -187,7 +186,7 @@ func TestGetUpfsNoUpfs(t *testing.T) {
 	}
 }
 
-func TestGetUpfsOneUpf(t *testing.T) {
+func TestGivenOneUpfWhenGetUpfsThenReturnsAListWithOneUpf(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
@@ -206,7 +205,7 @@ func TestGetUpfsOneUpf(t *testing.T) {
 	}
 }
 
-func TestGetUpfsManyUpfs(t *testing.T) {
+func TestGivenManyUpfsWhenGetUpfThenReturnsAListWithManyUpfs(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 

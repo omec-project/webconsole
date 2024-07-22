@@ -29,8 +29,8 @@ const (
 	flowRuleDataColl = "policyData.ues.flowRule"
 	devGroupDataColl = "webconsoleData.snapshots.devGroupData"
 	sliceDataColl    = "webconsoleData.snapshots.sliceData"
-	gnbDataColl = "webconsoleData.snapshots.gnbData"
-	upfDataColl = "webconsoleData.snapshots.upfData"
+	gnbDataColl      = "webconsoleData.snapshots.gnbData"
+	upfDataColl      = "webconsoleData.snapshots.upfData"
 )
 
 var configLog *logrus.Entry

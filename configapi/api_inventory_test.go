@@ -49,7 +49,7 @@ func (m *MockMongoClientNoGnbs) RestfulAPIGetMany(coll string, filter bson.M) ([
 func (m *MockMongoClientOneGnb) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
     var results []map[string]interface{}
     gnb := configmodels.Gnb{
-        GnbName: "gnb1",
+        Name: "gnb1",
         Tac: "123",
     }
     var gnbBson bson.M
@@ -68,7 +68,7 @@ func (m *MockMongoClientManyGnbs) RestfulAPIGetMany(coll string, filter bson.M) 
     tacs := []string{"12", "345", "678"}
     for i, name := range names {
         gnb := configmodels.Gnb{
-            GnbName: name,
+            Name: name,
             Tac:  tacs[i],
         }
         var gnbBson bson.M
@@ -148,7 +148,7 @@ func TestGivenOneGnbWhenGetGnbsThenReturnsAListWithOneElement(t *testing.T) {
     }
     body_bytes, _ := io.ReadAll(resp.Body)
     body := string(body_bytes)
-    expected := `[{"gnbName":"gnb1","tac":"123"}]`
+    expected := `[{"name":"gnb1","tac":"123"}]`
     if body != expected {
         t.Errorf("Expected %v, got %v", expected, body)
     }
@@ -167,7 +167,7 @@ func TestGivenManyGnbsWhenGetGnbsThenReturnsAListWithManyGnbs(t *testing.T) {
     }
     body_bytes, _ := io.ReadAll(resp.Body)
     body := string(body_bytes)
-    expected := `[{"gnbName":"gnb0","tac":"12"},{"gnbName":"gnb1","tac":"345"},{"gnbName":"gnb2","tac":"678"}]`
+    expected := `[{"name":"gnb0","tac":"12"},{"name":"gnb1","tac":"345"},{"name":"gnb2","tac":"678"}]`
     if body != expected {
         t.Errorf("Expected %v, got %v", expected, body)
     }
@@ -185,7 +185,7 @@ func TestPostGnbByName(t *testing.T){
         req.Header.Set("Content-Type", "application/json")
         c.Request = req
 
-        GnbPostByName(c)
+        PostGnb(c)
     
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
@@ -204,7 +204,7 @@ func TestPostGnbByName(t *testing.T){
         req.Header.Set("Content-Type", "application/json")
         c.Request = req
 
-        GnbPostByName(c)
+        PostGnb(c)
 
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
@@ -222,7 +222,7 @@ func TestPostGnbByName(t *testing.T){
         req, _ := http.NewRequest(http.MethodPost, "/gnb", nil)
         c.Request = req
 
-        GnbPostByName(c)
+        PostGnb(c)
 
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
@@ -243,7 +243,7 @@ func TestDeleteGnbByName(t *testing.T){
         req, _ := http.NewRequest(http.MethodPost, "/gnb", nil)
         c.Request = req
 
-        GnbDeleteByName(c)
+        DeleteGnb(c)
 
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
@@ -322,7 +322,7 @@ func TestPostUpfByName(t *testing.T){
         req.Header.Set("Content-Type", "application/json")
         c.Request = req
 
-        UpfPostByName(c)
+        PostUpf(c)
     
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
@@ -341,7 +341,7 @@ func TestPostUpfByName(t *testing.T){
         req.Header.Set("Content-Type", "application/json")
         c.Request = req
 
-        UpfPostByName(c)
+        PostUpf(c)
 
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
@@ -359,7 +359,7 @@ func TestPostUpfByName(t *testing.T){
         req, _ := http.NewRequest(http.MethodPost, "/upf", nil)
         c.Request = req
 
-        UpfPostByName(c)
+        PostUpf(c)
 
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
@@ -380,7 +380,7 @@ func TestDeleteUpfByName(t *testing.T){
         req, _ := http.NewRequest(http.MethodPost, "/upf", nil)
         c.Request = req
 
-        UpfDeleteByName(c)
+        DeleteUpf(c)
 
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)

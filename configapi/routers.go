@@ -151,16 +151,16 @@ var routes = Routes{
 		GetGnbs,
 	},
 	{
-		"GnbPostByName",
+		"PostGnb",
 		http.MethodPost,
 		"/inventory/gnb/:gnb-name",
-		GnbPostByName,
+		PostGnb,
 	},
 	{
-		"GnbDeleteByName",
+		"DeleteGnb",
 		http.MethodDelete,
 		"/inventory/gnb/:gnb-name",
-		GnbDeleteByName,
+		DeleteGnb,
 	},
 	{
 		"GetUpfs",
@@ -169,15 +169,15 @@ var routes = Routes{
 		GetUpfs,
 	},
 	{
-		"UpfPostByName",
+		"PostUpf",
 		http.MethodPost,
 		"/inventory/upf/:upf-hostname",
-		UpfPostByName,
+		PostUpf,
 	},
 	{
-		"UpfDeleteByName",
+		"DeleteUpf",
 		http.MethodDelete,
 		"/inventory/upf/:upf-hostname",
-		UpfDeleteByName,
+		DeleteUpf,
 	},
 }

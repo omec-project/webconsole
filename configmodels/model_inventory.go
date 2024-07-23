@@ -4,8 +4,8 @@
 package configmodels
 
 type Gnb struct {
-	GnbName string `json:"gnbName"`
-	Tac     string `json:"tac"`
+	Name string `json:"name"`
+	Tac  string `json:"tac"`
 }
 
 type Upf struct {

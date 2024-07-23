@@ -53,25 +53,25 @@ func GetGnbs(c *gin.Context) {
     c.JSON(http.StatusOK, gnbs)
 }
 
-func GnbPostByName(c *gin.Context) {
+func PostGnb(c *gin.Context) {
     setInventoryCorsHeader(c)
-    if err := gnbPostHandler(c); err == nil {
+    if err := handlePostGnb(c); err == nil {
         c.JSON(http.StatusOK, gin.H{})
     } else {
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
     }
 }
 
-func GnbDeleteByName(c *gin.Context) {
+func DeleteGnb(c *gin.Context) {
     setInventoryCorsHeader(c)
-    if err := gnbDeletetHandler(c); err == nil {
+    if err := handleDeleteGnb(c); err == nil {
         c.JSON(http.StatusOK, gin.H{})
     } else {
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
     }
 }
 
-func gnbPostHandler(c *gin.Context) error {
+func handlePostGnb(c *gin.Context) error {
     var gnbName string
     var exists bool
     if gnbName, exists = c.Params.Get("gnb-name"); !exists {
@@ -99,7 +99,7 @@ func gnbPostHandler(c *gin.Context) error {
     }
     req := httpwrapper.NewRequest(c.Request, newGnb)
     procReq := req.Body.(configmodels.Gnb)
-    procReq.GnbName = gnbName
+    procReq.Name = gnbName
     msg := configmodels.ConfigMessage{
         MsgType:     configmodels.Inventory,
         MsgMethod:   configmodels.Post_op,
@@ -111,7 +111,7 @@ func gnbPostHandler(c *gin.Context) error {
     return nil
 }
 
-func gnbDeletetHandler(c *gin.Context) error {
+func handleDeleteGnb(c *gin.Context) error {
     var gnbName string
     var exists bool
     if gnbName, exists = c.Params.Get("gnb-name"); !exists {
@@ -153,25 +153,25 @@ func GetUpfs(c *gin.Context) {
     c.JSON(http.StatusOK, upfs)
 }
 
-func UpfPostByName(c *gin.Context) {
+func PostUpf(c *gin.Context) {
     setInventoryCorsHeader(c)
-    if err := upfPostHandler(c); err == nil {
+    if err := handlePostUpf(c); err == nil {
         c.JSON(http.StatusOK, gin.H{})
     } else {
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
     }
 }
 
-func UpfDeleteByName(c *gin.Context) {
+func DeleteUpf(c *gin.Context) {
     setInventoryCorsHeader(c)
-    if err := upfDeleteHandler(c); err == nil {
+    if err := handleDeleteUpf(c); err == nil {
         c.JSON(http.StatusOK, gin.H{})
     } else {
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
     }
 }
 
-func upfPostHandler(c *gin.Context) error {
+func handlePostUpf(c *gin.Context) error {
     var upfHostname string
     var exists bool
     if upfHostname, exists = c.Params.Get("upf-hostname"); !exists {
@@ -211,7 +211,7 @@ func upfPostHandler(c *gin.Context) error {
     return nil
 }
 
-func upfDeleteHandler(c *gin.Context) error {
+func handleDeleteUpf(c *gin.Context) error {
     var upfHostname string
     var exists bool
     if upfHostname, exists = c.Params.Get("upf-hostname"); !exists {

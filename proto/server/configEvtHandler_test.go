@@ -429,8 +429,8 @@ func Test_firstConfigReceived_sliceInDB(t *testing.T) {
 func TestPostGnb(t *testing.T) {
 	gnbName := "some-gnb"
 	newGnb := configmodels.Gnb{
-		GnbName: gnbName,
-		Tac:     "1233",
+		Name: gnbName,
+		Tac:  "1233",
 	}
 
 	configMsg := configmodels.ConfigMessage{
@@ -449,7 +449,7 @@ func TestPostGnb(t *testing.T) {
 		t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
 	}
 
-	expected_filter := bson.M{"gnbName": gnbName}
+	expected_filter := bson.M{"name": gnbName}
 	if !reflect.DeepEqual(postData[0]["filter"], expected_filter) {
 		t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
 	}

@@ -223,7 +223,7 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 
 func handleGnbPost(configMsg *configmodels.ConfigMessage) {
 	rwLock.Lock()
-	filter := bson.M{"gnbName": configMsg.GnbName}
+	filter := bson.M{"name": configMsg.GnbName}
 	gnbDataBson := toBsonM(configMsg.Gnb)
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(gnbDataColl, filter, gnbDataBson)
 	if errPost != nil {
@@ -234,7 +234,7 @@ func handleGnbPost(configMsg *configmodels.ConfigMessage) {
 
 func handleGnbDelete(configMsg *configmodels.ConfigMessage) {
 	rwLock.Lock()
-	filter := bson.M{"gnbName": configMsg.GnbName}
+	filter := bson.M{"name": configMsg.GnbName}
 	errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(gnbDataColl, filter)
 	if errDelOne != nil {
 		logger.DbLog.Warnln(errDelOne)

@@ -84,7 +84,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		}
 
 		if configMsg.MsgMethod == configmodels.Post_op || configMsg.MsgMethod == configmodels.Put_op {
-			if !firstConfigRcvd && (configMsg.MsgType == configmodels.Device_group || configMsg.MsgType == configmodels.Network_slice || configMsg.MsgType == configmodels.Inventory) {
+			if !firstConfigRcvd && (configMsg.MsgType == configmodels.Device_group || configMsg.MsgType == configmodels.Network_slice) {
 				configLog.Debugln("First config received from ROC")
 				firstConfigRcvd = true
 				configReceived <- true

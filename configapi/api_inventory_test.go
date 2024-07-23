@@ -175,9 +175,9 @@ func TestGivenManyGnbsWhenGetGnbsThenReturnsAListWithManyGnbs(t *testing.T) {
 
 
 func TestPostGnbByName(t *testing.T){
-	gin.SetMode(gin.TestMode)
+    gin.SetMode(gin.TestMode)
 
-	t.Run("gNB TAC is not a string", func(t *testing.T) {
+    t.Run("gNB TAC is not a string", func(t *testing.T) {
         w := httptest.NewRecorder()
         c, _ := gin.CreateTestContext(w)
         c.Params = gin.Params{{Key: "gnb-name", Value: "test-gnb"}}
@@ -187,14 +187,13 @@ func TestPostGnbByName(t *testing.T){
 
         GnbPostByName(c)
 	
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
-		}
-		expectedError := `{"error":"Failed to create gNB test-gnb: json: cannot unmarshal number into Go struct field Gnb.tac of type string"}`
-		if w.Body.String() != expectedError {
-			t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
-		
-		}
+        if w.Code != http.StatusBadRequest {
+            t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
+        }
+        expectedError := `{"error":"Failed to create gNB test-gnb: json: cannot unmarshal number into Go struct field Gnb.tac of type string"}`
+        if w.Body.String() != expectedError {
+            t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
+        }
     })
 
 	t.Run("Missing TAC in JSON body", func(t *testing.T) {
@@ -207,18 +206,17 @@ func TestPostGnbByName(t *testing.T){
 
         GnbPostByName(c)
 
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
-		}	
+        if w.Code != http.StatusBadRequest {
+            t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
+        }	
 
-		expectedError := `{"error":"Post gNB request body is missing tac"}`
-		if w.Body.String() != expectedError {
-			t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
-		
-		}
+        expectedError := `{"error":"Post gNB request body is missing tac"}`
+        if w.Body.String() != expectedError {
+            t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
+        }
     })
 
-	t.Run("Missing gNB name", func(t *testing.T) {
+    t.Run("Missing gNB name", func(t *testing.T) {
         w := httptest.NewRecorder()
         c, _ := gin.CreateTestContext(w)
         req, _ := http.NewRequest(http.MethodPost, "/gnb", nil)
@@ -226,21 +224,20 @@ func TestPostGnbByName(t *testing.T){
 
         GnbPostByName(c)
 
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
-		}
-		expectedError := `{"error":"Post gNB request is missing gnb-name"}`
-		if w.Body.String() != expectedError {
-			t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
-		
-		}
+        if w.Code != http.StatusBadRequest {
+            t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
+        }
+        expectedError := `{"error":"Post gNB request is missing gnb-name"}`
+        if w.Body.String() != expectedError {
+            t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
+        }
     })
 }
 
 func TestDeleteGnbByName(t *testing.T){
-	gin.SetMode(gin.TestMode)
+    gin.SetMode(gin.TestMode)
 
-	t.Run("Missing gNB name", func(t *testing.T) {
+    t.Run("Missing gNB name", func(t *testing.T) {
         w := httptest.NewRecorder()
         c, _ := gin.CreateTestContext(w)
         req, _ := http.NewRequest(http.MethodPost, "/gnb", nil)
@@ -248,77 +245,76 @@ func TestDeleteGnbByName(t *testing.T){
 
         GnbDeleteByName(c)
 
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
-		}
-		expectedError := `{"error":"Delete gNB request is missing gnb-name"}`
-		if w.Body.String() != expectedError {
-			t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
-		
-		}
+        if w.Code != http.StatusBadRequest {
+            t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
+        }
+        expectedError := `{"error":"Delete gNB request is missing gnb-name"}`
+        if w.Body.String() != expectedError {
+            t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
+        }
     })
 }
 
 func TestGivenNoUpfsWhenGetUpfsThenReturnsAnEmptyList(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	dbadapter.CommonDBClient = &MockMongoClientNoUpfs{}
+    w := httptest.NewRecorder()
+    c, _ := gin.CreateTestContext(w)
+    dbadapter.CommonDBClient = &MockMongoClientNoUpfs{}
 
-	GetUpfs(c)
+    GetUpfs(c)
 
-	resp := w.Result()
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
-	}
-	body_bytes, _ := io.ReadAll(resp.Body)
-	body := string(body_bytes)
-	if body != "[]" {
-		t.Errorf("Expected empty JSON list, got %v", body)
-	}
+    resp := w.Result()
+    if resp.StatusCode != 200 {
+        t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+    }
+    body_bytes, _ := io.ReadAll(resp.Body)
+    body := string(body_bytes)
+    if body != "[]" {
+        t.Errorf("Expected empty JSON list, got %v", body)
+    }
 }
 
 func TestGivenOneUpfWhenGetUpfsThenReturnsAListWithOneUpf(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	dbadapter.CommonDBClient = &MockMongoClientOneUpf{}
+    w := httptest.NewRecorder()
+    c, _ := gin.CreateTestContext(w)
+    dbadapter.CommonDBClient = &MockMongoClientOneUpf{}
 
-	GetUpfs(c)
+    GetUpfs(c)
 
-	resp := w.Result()
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
-	}
-	body_bytes, _ := io.ReadAll(resp.Body)
-	body := string(body_bytes)
-	expected := `[{"hostname":"upf1","port":"123"}]`
-	if body != expected {
-		t.Errorf("Expected %v, got %v", expected, body)
-	}
+    resp := w.Result()
+    if resp.StatusCode != 200 {
+    t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+    }
+    body_bytes, _ := io.ReadAll(resp.Body)
+    body := string(body_bytes)
+    expected := `[{"hostname":"upf1","port":"123"}]`
+    if body != expected {
+        t.Errorf("Expected %v, got %v", expected, body)
+    }
 }
 
 func TestGivenManyUpfsWhenGetUpfThenReturnsAListWithManyUpfs(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	dbadapter.CommonDBClient = &MockMongoClientManyUpfs{}
+    w := httptest.NewRecorder()
+    c, _ := gin.CreateTestContext(w)
+    dbadapter.CommonDBClient = &MockMongoClientManyUpfs{}
 
-	GetUpfs(c)
+    GetUpfs(c)
 
-	resp := w.Result()
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
-	}
-	body_bytes, _ := io.ReadAll(resp.Body)
-	body := string(body_bytes)
-	expected := `[{"hostname":"upf0","port":"12"},{"hostname":"upf1","port":"345"},{"hostname":"upf2","port":"678"}]`
-	if body != expected {
-		t.Errorf("Expected %v, got %v", expected, body)
-	}
+    resp := w.Result()
+    if resp.StatusCode != 200 {
+        t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+    }
+    body_bytes, _ := io.ReadAll(resp.Body)
+    body := string(body_bytes)
+    expected := `[{"hostname":"upf0","port":"12"},{"hostname":"upf1","port":"345"},{"hostname":"upf2","port":"678"}]`
+    if body != expected {
+        t.Errorf("Expected %v, got %v", expected, body)
+    }
 }
 
 func TestPostUpfByName(t *testing.T){
-	gin.SetMode(gin.TestMode)
+    gin.SetMode(gin.TestMode)
 
-	t.Run("UPF port is not a string", func(t *testing.T) {
+    t.Run("UPF port is not a string", func(t *testing.T) {
         w := httptest.NewRecorder()
         c, _ := gin.CreateTestContext(w)
         c.Params = gin.Params{{Key: "upf-hostname", Value: "test-upf"}}
@@ -328,17 +324,16 @@ func TestPostUpfByName(t *testing.T){
 
         UpfPostByName(c)
 	
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
-		}
-		expectedError := `{"error":"Failed to create UPF test-upf: json: cannot unmarshal number into Go struct field Upf.port of type string"}`
-		if w.Body.String() != expectedError {
-			t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
-		
-		}
+        if w.Code != http.StatusBadRequest {
+            t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
+        }
+        expectedError := `{"error":"Failed to create UPF test-upf: json: cannot unmarshal number into Go struct field Upf.port of type string"}`
+        if w.Body.String() != expectedError {
+            t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
+        }
     })
 
-	t.Run("Missing port in JSON body", func(t *testing.T) {
+    t.Run("Missing port in JSON body", func(t *testing.T) {
         w := httptest.NewRecorder()
         c, _ := gin.CreateTestContext(w)
         c.Params = gin.Params{{Key: "upf-hostname", Value: "test-upf"}}
@@ -348,18 +343,17 @@ func TestPostUpfByName(t *testing.T){
 
         UpfPostByName(c)
 
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
-		}	
+        if w.Code != http.StatusBadRequest {
+            t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
+        }	
 
-		expectedError := `{"error":"Post UPF request body is missing port"}`
-		if w.Body.String() != expectedError {
-			t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
-		
-		}
+        expectedError := `{"error":"Post UPF request body is missing port"}`
+        if w.Body.String() != expectedError {
+            t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
+        }
     })
 
-	t.Run("Missing UPF hostname", func(t *testing.T) {
+    t.Run("Missing UPF hostname", func(t *testing.T) {
         w := httptest.NewRecorder()
         c, _ := gin.CreateTestContext(w)
         req, _ := http.NewRequest(http.MethodPost, "/upf", nil)
@@ -367,21 +361,20 @@ func TestPostUpfByName(t *testing.T){
 
         UpfPostByName(c)
 
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
-		}
-		expectedError := `{"error":"Post UPF request is missing upf-hostname"}`
-		if w.Body.String() != expectedError {
-			t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
-		
-		}
+        if w.Code != http.StatusBadRequest {
+            t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
+        }
+        expectedError := `{"error":"Post UPF request is missing upf-hostname"}`
+        if w.Body.String() != expectedError {
+            t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
+        }
     })
 }
 
 func TestDeleteUpfByName(t *testing.T){
-	gin.SetMode(gin.TestMode)
+    gin.SetMode(gin.TestMode)
 
-	t.Run("Missing UPF hostname", func(t *testing.T) {
+    t.Run("Missing UPF hostname", func(t *testing.T) {
         w := httptest.NewRecorder()
         c, _ := gin.CreateTestContext(w)
         req, _ := http.NewRequest(http.MethodPost, "/upf", nil)
@@ -389,13 +382,12 @@ func TestDeleteUpfByName(t *testing.T){
 
         UpfDeleteByName(c)
 
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
-		}
-		expectedError := `{"error":"Delete UPF request is missing upf-hostname"}`
-		if w.Body.String() != expectedError {
-			t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
-		
-		}
+        if w.Code != http.StatusBadRequest {
+            t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
+        }
+        expectedError := `{"error":"Delete UPF request is missing upf-hostname"}`
+        if w.Body.String() != expectedError {
+            t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
+        }
     })
 }

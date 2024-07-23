@@ -1,7 +1,5 @@
-// SPDX-FileCopyrightText: 2024 Open Networking Foundation <info@opennetworking.org>
-//
 // SPDX-License-Identifier: Apache-2.0
-//
+// Copyright 2024 Canonical Ltd.
 
 package configmodels
 

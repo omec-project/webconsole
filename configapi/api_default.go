@@ -53,7 +53,7 @@ func GetDeviceGroups(c *gin.Context) {
 	c.JSON(http.StatusOK, deviceGroups)
 }
 
-// GetDeviceGroupsByName godoc
+// GetDeviceGroupByName godoc
 //	@Description	Return the device group
 //	@Tags			Device Groups
 //	@Param			deviceGroupName	path	string	true	" "

@@ -302,7 +302,7 @@ func GetSubscribers(c *gin.Context) {
 	c.JSON(http.StatusOK, subsList)
 }
 
-// GetSubscriber godoc
+// GetSubscriberByID godoc
 //	@Description	Get subscriber by IMSI (UE ID)
 //	@Tags			Subscribers
 //	@Param			imsi	path	string	true	"IMSI (UE ID)"	example(imsi-208930100007487)
@@ -372,7 +372,7 @@ func GetSubscriberByID(c *gin.Context) {
 	c.JSON(http.StatusOK, subsData)
 }
 
-// PostSubscriber godoc
+// PostSubscriberByID godoc
 //	@Description	Create subscriber by IMSI (UE ID)
 //	@Tags			Subscribers
 //	@Param			imsi	path		string							true	"IMSI (UE ID)"
@@ -472,7 +472,7 @@ func PatchSubscriberByID(c *gin.Context) {
 	logger.WebUILog.Infoln("Patch One Subscriber Data")
 }
 
-// DeleteSubscriber godoc
+// DeleteSubscriberByID godoc
 //	@Description	Delete an existing subscriber
 //	@Tags			Subscribers
 //	@Param			imsi	path		string	true	"IMSI (UE ID)"

@@ -75,11 +75,11 @@ func handlePostGnb(c *gin.Context) error {
     var gnbName string
     var exists bool
     if gnbName, exists = c.Params.Get("gnb-name"); !exists {
-        errorMessage := "Post gNB request is missing gnb-name"
+        errorMessage := "post gNB request is missing gnb-name"
         configLog.Errorf(errorMessage)
         return errors.New(errorMessage)
     }
-    configLog.Infof("Received gNB %v", gnbName)
+    configLog.Infof("received gNB %v", gnbName)
     var err error
     var newGnb configmodels.Gnb
 
@@ -90,10 +90,10 @@ func handlePostGnb(c *gin.Context) error {
     }
     if err != nil {
         configLog.Errorf("err %v", err)
-        return fmt.Errorf("Failed to create gNB %v: %w", gnbName, err)
+        return fmt.Errorf("failed to create gNB %v: %w", gnbName, err)
     }
     if newGnb.Tac == "" {
-        errorMessage := "Post gNB request body is missing tac"
+        errorMessage := "post gNB request body is missing tac"
         configLog.Errorf(errorMessage)
         return errors.New(errorMessage)
     }
@@ -107,7 +107,7 @@ func handlePostGnb(c *gin.Context) error {
         Gnb: &procReq,
     }
     configChannel <- &msg
-    configLog.Infof("Successfully added gNB [%v] to config channel.", gnbName)
+    configLog.Infof("successfully added gNB [%v] to config channel.", gnbName)
     return nil
 }
 
@@ -115,24 +115,24 @@ func handleDeleteGnb(c *gin.Context) error {
     var gnbName string
     var exists bool
     if gnbName, exists = c.Params.Get("gnb-name"); !exists {
-        errorMessage := "Delete gNB request is missing gnb-name"
+        errorMessage := "delete gNB request is missing gnb-name"
         configLog.Errorf(errorMessage)
-        return fmt.Errorf(errorMessage)
+        return errors.New(errorMessage)
     }
-    configLog.Infof("Received delete gNB %v request", gnbName)
+    configLog.Infof("received delete gNB %v request", gnbName)
     msg := configmodels.ConfigMessage{
         MsgType:   configmodels.Inventory,
         MsgMethod: configmodels.Delete_op,
         GnbName:   gnbName,
     }
     configChannel <- &msg
-    configLog.Infof("Successfully added gNB [%v] with delete_op to config channel.", gnbName)
+    configLog.Infof("successfully added gNB [%v] with delete_op to config channel.", gnbName)
     return nil
 }
 
 func GetUpfs(c *gin.Context) {
     setInventoryCorsHeader(c)
-    logger.WebUILog.Infoln("Get all UPFs")
+    logger.WebUILog.Infoln("get all UPFs")
 
     var upfs []*configmodels.Upf
     upfs = make([]*configmodels.Upf, 0)
@@ -146,7 +146,7 @@ func GetUpfs(c *gin.Context) {
         var upfData configmodels.Upf
         err := json.Unmarshal(mapToByte(rawUpf), &upfData)
         if err != nil {
-            logger.DbLog.Errorf("Could not unmarshall UPF %v", rawUpf)
+            logger.DbLog.Errorf("could not unmarshall UPF %v", rawUpf)
         }
         upfs = append(upfs, &upfData)
     }
@@ -175,7 +175,7 @@ func handlePostUpf(c *gin.Context) error {
     var upfHostname string
     var exists bool
     if upfHostname, exists = c.Params.Get("upf-hostname"); !exists {
-        errorMessage := "Post UPF request is missing upf-hostname"
+        errorMessage := "post UPF request is missing upf-hostname"
         configLog.Errorf(errorMessage)
         return errors.New(errorMessage)
     }
@@ -190,10 +190,10 @@ func handlePostUpf(c *gin.Context) error {
     }
     if err != nil {
         configLog.Errorf("err %v", err)
-        return fmt.Errorf("Failed to create UPF %v: %w", upfHostname, err)
+        return fmt.Errorf("failed to create UPF %v: %w", upfHostname, err)
     }
     if newUpf.Port == "" {
-        errorMessage := "Post UPF request body is missing port"
+        errorMessage := "post UPF request body is missing port"
         configLog.Errorf(errorMessage)
         return errors.New(errorMessage)
     }
@@ -207,7 +207,7 @@ func handlePostUpf(c *gin.Context) error {
         Upf: &procReq,
     }
     configChannel <- &msg
-    configLog.Infof("Successfully added UPF [%v] to config channel.", upfHostname)
+    configLog.Infof("successfully added UPF [%v] to config channel.", upfHostname)
     return nil
 }
 
@@ -215,17 +215,17 @@ func handleDeleteUpf(c *gin.Context) error {
     var upfHostname string
     var exists bool
     if upfHostname, exists = c.Params.Get("upf-hostname"); !exists {
-        errorMessage := "Delete UPF request is missing upf-hostname"
+        errorMessage := "delete UPF request is missing upf-hostname"
         configLog.Errorf(errorMessage)
-        return fmt.Errorf(errorMessage)
+        return errors.New(errorMessage)
     }
-    configLog.Infof("Received Delete UPF %v", upfHostname)
+    configLog.Infof("received Delete UPF %v", upfHostname)
     msg := configmodels.ConfigMessage{
         MsgType:     configmodels.Inventory,
         MsgMethod:   configmodels.Delete_op,
         UpfHostname: upfHostname,
     }
     configChannel <- &msg
-    configLog.Infof("Successfully added UPF [%v] with delete_op to config channel.", upfHostname)
+    configLog.Infof("successfully added UPF [%v] with delete_op to config channel.", upfHostname)
     return nil
 }

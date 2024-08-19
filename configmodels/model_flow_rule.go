@@ -14,5 +14,5 @@ type FlowRule struct {
 	MBRDL       string `json:"mbrDL,omitempty" yaml:"mbrDL" bson:"mbrDL" mapstructure:"mbrDL"`
 	GBRUL       string `json:"gbrUL,omitempty" yaml:"gbrUL" bson:"gbrUL" mapstructure:"gbrUL"`
 	GBRDL       string `json:"gbrDL,omitempty" yaml:"gbrDL" bson:"gbrDL" mapstructure:"gbrDL"`
-	BitRateUnit string `json:"bitrate-unit,iyaml:"bitrate-unit" bson:"bitrate-unit" mapstructure:"bitrate-unit" omitempty"`
+	BitRateUnit string `json:"bitrate-unit" yaml:"bitrate-unit" bson:"bitrate-unit" mapstructure:"bitrate-unit,omitempty"`
 }

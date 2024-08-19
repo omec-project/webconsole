@@ -19,7 +19,6 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
-	
 )
 
 const (
@@ -49,19 +48,6 @@ func mapToByte(data map[string]interface{}) (ret []byte) {
 
 func sliceToByte(data []map[string]interface{}) (ret []byte) {
 	ret, _ = json.Marshal(data)
-	return
-}
-
-// seems something which we should move to mongolib
-func toBsonM(data interface{}) (ret bson.M) {
-	tmp, _ := json.Marshal(data)
-	json.Unmarshal(tmp, &ret)
-	return
-}
-
-func toBsonA(data interface{}) (ret bson.A) {
-	tmp, _ := json.Marshal(data)
-	json.Unmarshal(tmp, &ret)
 	return
 }
 

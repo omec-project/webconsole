@@ -11,7 +11,6 @@ import (
 	"bufio"
 	"fmt"
 	"net/http"
-	_ "net/http"
 	_ "net/http/pprof"
 	"os/exec"
 	"strconv"
@@ -20,8 +19,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/omec-project/util/http2_util"
-	logger_util "github.com/omec-project/util/logger"
-	mongoDBLibLogger "github.com/omec-project/util/logger"
+	loggerUtil "github.com/omec-project/util/logger"
 	"github.com/omec-project/util/path_util"
 	pathUtilLogger "github.com/omec-project/util/path_util/logger"
 	"github.com/omec-project/webconsole/backend/factory"
@@ -129,17 +127,17 @@ func (webui *WEBUI) setLogLevel() {
 	if factory.WebUIConfig.Logger.MongoDBLibrary != nil {
 		if factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel != "" {
 			if level, err := logrus.ParseLevel(factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel); err != nil {
-				mongoDBLibLogger.AppLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level",
+				loggerUtil.AppLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level",
 					factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel)
-				mongoDBLibLogger.SetLogLevel(logrus.InfoLevel)
+				loggerUtil.SetLogLevel(logrus.InfoLevel)
 			} else {
-				mongoDBLibLogger.SetLogLevel(level)
+				loggerUtil.SetLogLevel(level)
 			}
 		} else {
-			mongoDBLibLogger.AppLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
-			mongoDBLibLogger.SetLogLevel(logrus.InfoLevel)
+			loggerUtil.AppLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
+			loggerUtil.SetLogLevel(logrus.InfoLevel)
 		}
-		mongoDBLibLogger.SetReportCaller(factory.WebUIConfig.Logger.MongoDBLibrary.ReportCaller)
+		loggerUtil.SetReportCaller(factory.WebUIConfig.Logger.MongoDBLibrary.ReportCaller)
 	}
 }
 
@@ -168,7 +166,7 @@ func (webui *WEBUI) Start() {
 	initLog.Infoln("WebUI Server started")
 
 	/* First HTTP Server running at port to receive Config from ROC */
-	subconfig_router := logger_util.NewGinWithLogrus(logger.GinLog)
+	subconfig_router := loggerUtil.NewGinWithLogrus(logger.GinLog)
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
 	configapi.AddServiceSub(subconfig_router)

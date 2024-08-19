@@ -60,8 +60,6 @@ func (m *MockMongoClientOneGnb) RestfulAPIGetMany(coll string, filter bson.M) ([
     return results, nil
 }
 
-var mockConfigChannel chan *configmodels.ConfigMessage
-
 func (m *MockMongoClientManyGnbs) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
     var results []map[string]interface{}
     names := []string{"gnb0", "gnb1", "gnb2"}
@@ -186,11 +184,11 @@ func TestPostGnbByName(t *testing.T){
         c.Request = req
 
         PostGnb(c)
-    
+
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
         }
-        expectedError := `{"error":"Failed to create gNB test-gnb: json: cannot unmarshal number into Go struct field Gnb.tac of type string"}`
+        expectedError := `{"error":"failed to create gNB test-gnb: json: cannot unmarshal number into Go struct field Gnb.tac of type string"}`
         if w.Body.String() != expectedError {
             t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
         }
@@ -208,9 +206,9 @@ func TestPostGnbByName(t *testing.T){
 
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
-        }    
+        }
 
-        expectedError := `{"error":"Post gNB request body is missing tac"}`
+        expectedError := `{"error":"post gNB request body is missing tac"}`
         if w.Body.String() != expectedError {
             t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
         }
@@ -227,7 +225,7 @@ func TestPostGnbByName(t *testing.T){
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
         }
-        expectedError := `{"error":"Post gNB request is missing gnb-name"}`
+        expectedError := `{"error":"post gNB request is missing gnb-name"}`
         if w.Body.String() != expectedError {
             t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
         }
@@ -248,7 +246,7 @@ func TestDeleteGnbByName(t *testing.T){
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
         }
-        expectedError := `{"error":"Delete gNB request is missing gnb-name"}`
+        expectedError := `{"error":"delete gNB request is missing gnb-name"}`
         if w.Body.String() != expectedError {
             t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
         }
@@ -323,11 +321,11 @@ func TestPostUpfByName(t *testing.T){
         c.Request = req
 
         PostUpf(c)
-    
+
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
         }
-        expectedError := `{"error":"Failed to create UPF test-upf: json: cannot unmarshal number into Go struct field Upf.port of type string"}`
+        expectedError := `{"error":"failed to create UPF test-upf: json: cannot unmarshal number into Go struct field Upf.port of type string"}`
         if w.Body.String() != expectedError {
             t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
         }
@@ -345,9 +343,9 @@ func TestPostUpfByName(t *testing.T){
 
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
-        }    
+        }
 
-        expectedError := `{"error":"Post UPF request body is missing port"}`
+        expectedError := `{"error":"post UPF request body is missing port"}`
         if w.Body.String() != expectedError {
             t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
         }
@@ -364,7 +362,7 @@ func TestPostUpfByName(t *testing.T){
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
         }
-        expectedError := `{"error":"Post UPF request is missing upf-hostname"}`
+        expectedError := `{"error":"post UPF request is missing upf-hostname"}`
         if w.Body.String() != expectedError {
             t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
         }
@@ -385,7 +383,7 @@ func TestDeleteUpfByName(t *testing.T){
         if w.Code != http.StatusBadRequest {
             t.Errorf("Expected StatusCode %d, got %d", http.StatusBadRequest, w.Code)
         }
-        expectedError := `{"error":"Delete UPF request is missing upf-hostname"}`
+        expectedError := `{"error":"delete UPF request is missing upf-hostname"}`
         if w.Body.String() != expectedError {
             t.Errorf("Expected error %v, got %v", expectedError, w.Body.String())
         }

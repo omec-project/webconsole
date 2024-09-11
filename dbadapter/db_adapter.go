@@ -30,44 +30,33 @@ type DBInterface interface {
 }
 
 var (
-	CommonDBClient DBInterface
-	AuthDBClient   DBInterface
+	CommonDBClient      DBInterface
+	AuthDBClient        DBInterface
+	UserAccountDBClient DBInterface
 )
 
 type MongoDBClient struct {
 	mongoapi.MongoClient
 }
 
-// Set CommonDBClient
-func setCommonDBClient(url string, dbname string) error {
+func setDBClient(url, dbname string) (DBInterface, error) {
 	mClient, errConnect := mongoapi.NewMongoClient(url, dbname)
 	if mClient.Client != nil {
-		CommonDBClient = mClient
-		CommonDBClient.(*mongoapi.MongoClient).Client.Database(dbname)
+		return mClient, nil
 	}
-	return errConnect
+	return nil, errConnect
 }
 
-// Set AuthDBClient
-func setAuthDBClient(authurl string, authkeysdbname string) error {
-	mClient, errConnect := mongoapi.NewMongoClient(authurl, authkeysdbname)
-	if mClient.Client != nil {
-		AuthDBClient = mClient
-		AuthDBClient.(*mongoapi.MongoClient).Client.Database(authkeysdbname)
-	}
-	return errConnect
-}
-
-func ConnectMongo(url string, dbname string, authurl string, authkeysdbname string) {
+func ConnectMongo(url string, dbname string, client *DBInterface) error {
 	// Connect to MongoDB
 	ticker := time.NewTicker(2 * time.Second)
 	defer func() { ticker.Stop() }()
 	timer := time.After(180 * time.Second)
 ConnectMongo:
 	for {
-		commonDbErr := setCommonDBClient(url, dbname)
-		authDbErr := setAuthDBClient(authurl, authkeysdbname)
-		if commonDbErr == nil && authDbErr == nil {
+		var err error
+		*client, err = setDBClient(url, dbname)
+		if err == nil {
 			break ConnectMongo
 		}
 		select {
@@ -75,11 +64,11 @@ ConnectMongo:
 			continue
 		case <-timer:
 			logger.DbLog.Errorln("Timed out while connecting to MongoDB in 3 minutes.")
-			return
+			return err
 		}
 	}
-
 	logger.DbLog.Infoln("Connected to MongoDB.")
+	return nil
 }
 
 func (db *MongoDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {

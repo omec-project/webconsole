@@ -30,13 +30,14 @@ type Info struct {
 }
 
 type Configuration struct {
-	WebServer *WebServer  `yaml:"WebServer,omitempty"`
-	Mongodb   *Mongodb    `yaml:"mongodb"`
-	RocEnd    *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
-	LteEnd    []*LteEndpt `yaml:"endpoints,omitempty"`          // LTE endpoints are configured and not auto-detected
-	Mode5G    bool        `yaml:"mode5G,omitempty"`
-	SdfComp   bool        `yaml:"spec-compliant-sdf"`
-	CfgPort   int         `yaml:"cfgport,omitempty"`
+	WebServer            *WebServer  `yaml:"WebServer,omitempty"`
+	Mongodb              *Mongodb    `yaml:"mongodb"`
+	RocEnd               *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
+	LteEnd               []*LteEndpt `yaml:"endpoints,omitempty"`          // LTE endpoints are configured and not auto-detected
+	Mode5G               bool        `yaml:"mode5G,omitempty"`
+	SdfComp              bool        `yaml:"spec-compliant-sdf"`
+	EnableAuthentication bool        `yaml:"enableAuthentication,omitempty"`
+	CfgPort              int         `yaml:"cfgport,omitempty"`
 }
 
 type WebServer struct {
@@ -46,10 +47,12 @@ type WebServer struct {
 }
 
 type Mongodb struct {
-	Name           string `yaml:"name,omitempty"`
-	Url            string `yaml:"url,omitempty"`
-	AuthKeysDbName string `yaml:"authKeysDbName"`
-	AuthUrl        string `yaml:"authUrl"`
+	Name            string `yaml:"name,omitempty"`
+	Url             string `yaml:"url,omitempty"`
+	AuthKeysDbName  string `yaml:"authKeysDbName"`
+	AuthUrl         string `yaml:"authUrl"`
+	UserAccountName string `yaml:"userAccountDbName,omitempty"`
+	UserAccountUrl  string `yaml:"userAccountUrl,omitempty"`
 }
 
 type RocEndpt struct {

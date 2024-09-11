@@ -22,6 +22,7 @@ import (
 	loggerUtil "github.com/omec-project/util/logger"
 	"github.com/omec-project/util/path_util"
 	pathUtilLogger "github.com/omec-project/util/path_util/logger"
+	"github.com/omec-project/webconsole/backend/authentication"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/metrics"
@@ -155,18 +156,28 @@ func (webui *WEBUI) FilterCli(c *cli.Context) (args []string) {
 }
 
 func (webui *WEBUI) Start() {
+	// get config file info from WebUIConfig
+	mongodb := factory.WebUIConfig.Configuration.Mongodb
 	if factory.WebUIConfig.Configuration.Mode5G {
-		// get config file info from WebUIConfig
-		mongodb := factory.WebUIConfig.Configuration.Mongodb
-
 		// Connect to MongoDB
-		dbadapter.ConnectMongo(mongodb.Url, mongodb.Name, mongodb.AuthUrl, mongodb.AuthKeysDbName)
+		dbadapter.ConnectMongo(mongodb.Url, mongodb.Name, &dbadapter.CommonDBClient)
+		dbadapter.ConnectMongo(mongodb.AuthUrl, mongodb.AuthKeysDbName, &dbadapter.AuthDBClient)
 	}
 
 	initLog.Infoln("WebUI Server started")
 
 	/* First HTTP Server running at port to receive Config from ROC */
 	subconfig_router := loggerUtil.NewGinWithLogrus(logger.GinLog)
+	if factory.WebUIConfig.Configuration.EnableAuthentication {
+		jwtSecret, err := authentication.GenerateJWTSecret()
+		if err != nil {
+			initLog.Error(err)
+		} else {
+			dbadapter.ConnectMongo(mongodb.UserAccountUrl, mongodb.UserAccountName, &dbadapter.UserAccountDBClient)
+			subconfig_router.Use(authentication.AuthMiddleware(jwtSecret))
+			authentication.AddService(subconfig_router, jwtSecret)
+		}
+	}
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
 	configapi.AddServiceSub(subconfig_router)

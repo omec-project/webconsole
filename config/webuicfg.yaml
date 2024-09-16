@@ -7,8 +7,8 @@ configuration:
     url: mongodb://localhost:27017/mydatabase
     authKeysDbName: mydatabase
     authUrl: mongodb://localhost:27017/mydatabase
-    userAccountDbName: mydatabase
-    userAccountUrl: mongodb://localhost:27017/mydatabase
+    webuiDbName: mydatabase
+    webuiDbUrl: mongodb://localhost:27017/mydatabase
   spec-compliant-sdf: false
   enableAuthentication: true
 info:

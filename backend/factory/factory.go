@@ -41,13 +41,13 @@ func InitConfigFactory(f string) error {
 			WebUIConfig.Configuration.Mongodb.AuthUrl = authUrl
 		}
 		if WebUIConfig.Configuration.Mongodb.AuthKeysDbName == "" {
-			WebUIConfig.Configuration.Mongodb.AuthKeysDbName = "authentication"
+			WebUIConfig.Configuration.Mongodb.AuthKeysDbName = "auth"
 		}
 
 		if WebUIConfig.Configuration.EnableAuthentication {
-			if WebUIConfig.Configuration.Mongodb.UserAccountName == "" ||
-				WebUIConfig.Configuration.Mongodb.UserAccountUrl == "" {
-				return fmt.Errorf("[Configuration] if EnableAuthentication is set, UserAccountDB must be set")
+			if WebUIConfig.Configuration.Mongodb.WebuiDBName == "" ||
+				WebUIConfig.Configuration.Mongodb.WebuiDBUrl == "" {
+				return fmt.Errorf("[Configuration] if EnableAuthentication is set, WebuiDB must be set")
 			}
 		}
 		// we dont want Mode5G coming from the helm chart, since

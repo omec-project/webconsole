@@ -47,12 +47,12 @@ type WebServer struct {
 }
 
 type Mongodb struct {
-	Name            string `yaml:"name,omitempty"`
-	Url             string `yaml:"url,omitempty"`
-	AuthKeysDbName  string `yaml:"authKeysDbName"`
-	AuthUrl         string `yaml:"authUrl"`
-	UserAccountName string `yaml:"userAccountDbName,omitempty"`
-	UserAccountUrl  string `yaml:"userAccountUrl,omitempty"`
+	Name           string `yaml:"name,omitempty"`
+	Url            string `yaml:"url,omitempty"`
+	AuthKeysDbName string `yaml:"authKeysDbName"`
+	AuthUrl        string `yaml:"authUrl"`
+	WebuiDBName    string `yaml:"webuiDbName,omitempty"`
+	WebuiDBUrl     string `yaml:"webuiDbUrl,omitempty"`
 }
 
 type RocEndpt struct {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024 Canonical Ltd.
 
-package authentication
+package auth
 
 import (
 	"crypto/rand"
@@ -35,7 +35,6 @@ func GenerateJWTSecret() ([]byte, error) {
 	return bytes, nil
 }
 
-// Helper function to generate a JWT
 var generateJWT = func(username string, permissions int, jwtSecret []byte) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtGocertClaims{
 		Username:    username,
@@ -48,7 +47,6 @@ var generateJWT = func(username string, permissions int, jwtSecret []byte) (stri
 	if err != nil {
 		return "", err
 	}
-
 	return tokenString, nil
 }
 
@@ -81,7 +79,7 @@ func AuthMiddleware(jwtSecret []byte) gin.HandlerFunc {
 			return
 		}
 		if claims.Permissions == USER_ACCOUNT && strings.HasPrefix(c.Request.URL.Path, "/config/v1/account") {
-			requestAllowed, err := AllowRequest(claims, c.Request.Method, c.Request.URL.Path)
+			requestAllowed, err := isRequestAllowForRegularUser(claims, c.Request.Method, c.Request.URL.Path)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to authorize operation"})
 				c.Abort()
@@ -126,7 +124,7 @@ func getClaimsFromJWT(bearerToken string, JwtSecret []byte) (*jwtGocertClaims, e
 	return &claims, nil
 }
 
-func AllowRequest(claims *jwtGocertClaims, method, path string) (bool, error) {
+func isRequestAllowForRegularUser(claims *jwtGocertClaims, method, path string) (bool, error) {
 	allowedPaths := []struct {
 		method, pathRegex string
 	}{

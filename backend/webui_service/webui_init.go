@@ -22,7 +22,7 @@ import (
 	loggerUtil "github.com/omec-project/util/logger"
 	"github.com/omec-project/util/path_util"
 	pathUtilLogger "github.com/omec-project/util/path_util/logger"
-	"github.com/omec-project/webconsole/backend/authentication"
+	"github.com/omec-project/webconsole/backend/auth"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/metrics"
@@ -169,19 +169,19 @@ func (webui *WEBUI) Start() {
 	/* First HTTP Server running at port to receive Config from ROC */
 	subconfig_router := loggerUtil.NewGinWithLogrus(logger.GinLog)
 	if factory.WebUIConfig.Configuration.EnableAuthentication {
-		jwtSecret, err := authentication.GenerateJWTSecret()
+		jwtSecret, err := auth.GenerateJWTSecret()
 		if err != nil {
 			initLog.Error(err)
 		} else {
-			dbadapter.ConnectMongo(mongodb.UserAccountUrl, mongodb.UserAccountName, &dbadapter.UserAccountDBClient)
-			subconfig_router.Use(authentication.AuthMiddleware(jwtSecret))
-			authentication.AddService(subconfig_router, jwtSecret)
+			dbadapter.ConnectMongo(mongodb.WebuiDBUrl, mongodb.WebuiDBName, &dbadapter.WebuiDBClient)
+			subconfig_router.Use(auth.AuthMiddleware(jwtSecret))
+			configapi.AddAuthService(subconfig_router, jwtSecret)
 		}
 	}
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
-	configapi.AddServiceSub(subconfig_router)
-	configapi.AddService(subconfig_router)
+	configapi.AddSubconfigService(subconfig_router)
+	configapi.AddConfigService(subconfig_router)
 
 	go metrics.InitMetrics()
 

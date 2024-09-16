@@ -30,9 +30,9 @@ type DBInterface interface {
 }
 
 var (
-	CommonDBClient      DBInterface
-	AuthDBClient        DBInterface
-	UserAccountDBClient DBInterface
+	CommonDBClient DBInterface
+	AuthDBClient   DBInterface
+	WebuiDBClient  DBInterface
 )
 
 type MongoDBClient struct {
@@ -48,7 +48,6 @@ func setDBClient(url, dbname string) (DBInterface, error) {
 }
 
 func ConnectMongo(url string, dbname string, client *DBInterface) error {
-	// Connect to MongoDB
 	ticker := time.NewTicker(2 * time.Second)
 	defer func() { ticker.Stop() }()
 	timer := time.After(180 * time.Second)

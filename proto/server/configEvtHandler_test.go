@@ -148,7 +148,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		}
 		var resultGroup configmodels.DeviceGroups
 		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
-		err := json.Unmarshal(mapToByte(result), &resultGroup)
+		err := json.Unmarshal(configmodels.MapToByte(result), &resultGroup)
 		if err != nil {
 			t.Errorf("Could not unmarshall result %v", result)
 		}
@@ -192,7 +192,7 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		}
 		var resultGroup configmodels.DeviceGroups
 		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
-		err := json.Unmarshal(mapToByte(result), &resultGroup)
+		err := json.Unmarshal(configmodels.MapToByte(result), &resultGroup)
 		if err != nil {
 			t.Errorf("Could not unmarshall result %v", result)
 		}
@@ -267,7 +267,7 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 		}
 		var resultSlice configmodels.Slice
 		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
-		err := json.Unmarshal(mapToByte(result), &resultSlice)
+		err := json.Unmarshal(configmodels.MapToByte(result), &resultSlice)
 		if err != nil {
 			t.Errorf("Could not unmarshal result %v", result)
 		}
@@ -320,7 +320,7 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 		}
 		var resultSlice configmodels.Slice
 		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
-		err = json.Unmarshal(mapToByte(result), &resultSlice)
+		err = json.Unmarshal(configmodels.MapToByte(result), &resultSlice)
 		if err != nil {
 			t.Errorf("Could not unmarshal result %v", result)
 		}

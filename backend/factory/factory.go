@@ -41,7 +41,7 @@ func InitConfigFactory(f string) error {
 			WebUIConfig.Configuration.Mongodb.AuthUrl = authUrl
 		}
 		if WebUIConfig.Configuration.Mongodb.AuthKeysDbName == "" {
-			WebUIConfig.Configuration.Mongodb.AuthKeysDbName = "auth"
+			WebUIConfig.Configuration.Mongodb.AuthKeysDbName = "authentication"
 		}
 
 		if WebUIConfig.Configuration.EnableAuthentication {

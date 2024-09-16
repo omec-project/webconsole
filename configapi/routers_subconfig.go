@@ -12,8 +12,25 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AddSubconfigService(engine *gin.Engine) *gin.RouterGroup {
-	return AddService(engine, "api", routesL)
+func AddServiceSub(engine *gin.Engine) *gin.RouterGroup {
+	group := engine.Group("/api")
+
+	for _, route := range routesL {
+		switch route.Method {
+		case http.MethodGet:
+			group.GET(route.Pattern, route.HandlerFunc)
+		case http.MethodPost:
+			group.POST(route.Pattern, route.HandlerFunc)
+		case http.MethodPut:
+			group.PUT(route.Pattern, route.HandlerFunc)
+		case http.MethodDelete:
+			group.DELETE(route.Pattern, route.HandlerFunc)
+		case http.MethodPatch:
+			group.PATCH(route.Pattern, route.HandlerFunc)
+		}
+	}
+
+	return group
 }
 
 var routesL = Routes{

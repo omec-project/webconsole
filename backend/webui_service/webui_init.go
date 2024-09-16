@@ -175,13 +175,13 @@ func (webui *WEBUI) Start() {
 		} else {
 			dbadapter.ConnectMongo(mongodb.WebuiDBUrl, mongodb.WebuiDBName, &dbadapter.WebuiDBClient)
 			subconfig_router.Use(auth.AuthMiddleware(jwtSecret))
-			configapi.AddAuthService(subconfig_router, jwtSecret)
+			auth.AddService(subconfig_router, jwtSecret)
 		}
 	}
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
-	configapi.AddSubconfigService(subconfig_router)
-	configapi.AddConfigService(subconfig_router)
+	configapi.AddServiceSub(subconfig_router)
+	configapi.AddService(subconfig_router)
 
 	go metrics.InitMetrics()
 

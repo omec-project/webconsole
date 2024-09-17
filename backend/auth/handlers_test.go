@@ -38,7 +38,10 @@ type MockMongoClientRegularUser struct {
 }
 
 func hashPassword(password string) string {
-	hashed, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return ""
+	}
 	return string(hashed)
 }
 
@@ -75,24 +78,25 @@ func (m *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bs
 	}
 	return rawUser, nil
 }
+
 func (m *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	rawUsers := []map[string]interface{}{
 		{"username": "johndoe", "password": 1234, "permissions": 0},
-		{"username": "janedoe", "password": hashPassword("password123"), "permissions": 1},
+		{"username": "janedoe", "password": hashPassword("Password123"), "permissions": 1},
 	}
 	return rawUsers, nil
 }
 
 func (m *MockMongoClientSuccess) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	rawUser := map[string]interface{}{
-		"username": "janedoe", "password": hashPassword("password123"), "permissions": 1,
+		"username": "janedoe", "password": hashPassword("password123!"), "permissions": 1,
 	}
 	return rawUser, nil
 }
 
 func (m *MockMongoClientSuccess) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	rawUsers := []map[string]interface{}{
-		{"username": "johndoe", "password": hashPassword("password123"), "permissions": 0},
+		{"username": "johndoe", "password": hashPassword(".password123"), "permissions": 0},
 		{"username": "janedoe", "password": hashPassword("password123"), "permissions": 1},
 	}
 	return rawUsers, nil
@@ -104,7 +108,7 @@ func (m *MockMongoClientSuccess) RestfulAPIPost(collName string, filter bson.M, 
 
 func (m *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	rawUser := map[string]interface{}{
-		"username": "janedoe", "password": hashPassword("password123"), "permissions": 0,
+		"username": "janedoe", "password": hashPassword("password-123"), "permissions": 0,
 	}
 	return rawUser, nil
 }
@@ -165,7 +169,10 @@ func TestGetUserAccounts(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, _ := http.NewRequest(http.MethodGet, "/config/v1/account", nil)
+			req, err := http.NewRequest(http.MethodGet, "/config/v1/account", nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -222,7 +229,10 @@ func TestGetUserAccount(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, _ := http.NewRequest(http.MethodGet, "/config/v1/account/janedoe", nil)
+			req, err := http.NewRequest(http.MethodGet, "/config/v1/account/janedoe", nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -320,7 +330,10 @@ func TestPostUserAccount(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			generatePassword = tc.generatePasswordMock
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, _ := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(tc.inputData))
+			req, err := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(tc.inputData))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
@@ -382,7 +395,10 @@ func TestDeleteUserAccount(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, _ := http.NewRequest(http.MethodDelete, "/config/v1/account/janedoe", nil)
+			req, err := http.NewRequest(http.MethodDelete, "/config/v1/account/janedoe", nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
@@ -455,7 +471,10 @@ func TestChangePassword(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, _ := http.NewRequest(http.MethodPost, "/config/v1/account/janedoe/change_password", strings.NewReader(tc.inputData))
+			req, err := http.NewRequest(http.MethodPost, "/config/v1/account/janedoe/change_password", strings.NewReader(tc.inputData))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -491,7 +510,7 @@ func TestLogin(t *testing.T) {
 		{
 			name:         "Success",
 			dbAdapter:    &MockMongoClientSuccess{},
-			inputData:    `{"username":"testuser", "password":"password123"}`,
+			inputData:    `{"username":"testuser", "password":"password123!"}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"token":"mocked.jwt.token"}`,
 		},
@@ -548,7 +567,10 @@ func TestLogin(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, _ := http.NewRequest(http.MethodPost, "/login", strings.NewReader(tc.inputData))
+			req, err := http.NewRequest(http.MethodPost, "/login", strings.NewReader(tc.inputData))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)

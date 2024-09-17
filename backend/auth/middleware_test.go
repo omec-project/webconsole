@@ -14,175 +14,180 @@ import (
 	"github.com/omec-project/webconsole/dbadapter"
 )
 
-const SUCESS_BODY = `{"Result":"Operation Executed"}`
+const (
+	SUCCESS_BODY = `{"Result":"Operation Executed"}`
+	BEARER       = "Bearer "
+)
 
-var mockJWTSecret = []byte("mockSecret")
-var protectedPaths = []struct {
-	name   string
-	method string
-	url    string
-}{
-	{
-		name:   "GetUserAccount",
-		method: http.MethodGet,
-		url:    "/config/v1/account/janedoe",
-	},
-	{
-		name:   "GetUserAccounts",
-		method: http.MethodGet,
-		url:    "/config/v1/account",
-	},
-	{
-		name:   "PostSecondUserAccount",
-		method: http.MethodPost,
-		url:    "/config/v1/account",
-	},
-	{
-		name:   "DeleteUserAccount",
-		method: http.MethodDelete,
-		url:    "/config/v1/account/janedoe",
-	},
-	{
-		name:   "ChangePassword",
-		method: http.MethodPost,
-		url:    "/config/v1/account/janedoe/change_password",
-	},
-	{
-		name:   "ConfigV1",
-		method: http.MethodGet,
-		url:    "/config/v1/",
-	},
-	{
-		name:   "GetDeviceGroups",
-		method: http.MethodGet,
-		url:    "/config/v1/device-group",
-	},
-	{
-		name:   "GetDeviceGroupByName",
-		method: http.MethodGet,
-		url:    "/config/v1/device-group/some-name",
-	},
-	{
-		name:   "DeviceGroupGroupNameDelete",
-		method: http.MethodDelete,
-		url:    "/config/v1/device-group/some-name",
-	},
-	{
-		name:   "DeviceGroupGroupNamePatch",
-		method: http.MethodPatch,
-		url:    "/config/v1/device-group/some-name",
-	},
-	{
-		name:   "DeviceGroupGroupNamePut",
-		method: http.MethodPut,
-		url:    "/config/v1/device-group/some-name",
-	},
-	{
-		name:   "DeviceGroupGroupNamePost",
-		method: http.MethodPost,
-		url:    "/config/v1/device-group/some-name",
-	},
-	{
-		name:   "GetNetworkSlices",
-		method: http.MethodGet,
-		url:    "/config/v1/network-slice",
-	},
-	{
-		name:   "GetNetworkSliceByName",
-		method: http.MethodGet,
-		url:    "/config/v1/network-slice/some-slice",
-	},
-	{
-		name:   "NetworkSliceSliceNameDelete",
-		method: http.MethodDelete,
-		url:    "/config/v1/network-slice/some-slice",
-	},
-	{
-		name:   "NetworkSliceSliceNamePost",
-		method: http.MethodPost,
-		url:    "/config/v1/network-slice/some-slice",
-	},
-	{
-		name:   "NetworkSliceSliceNamePut",
-		method: http.MethodPut,
-		url:    "/config/v1/network-slice/some-slice",
-	},
-	{
-		name:   "GetGnbs",
-		method: http.MethodGet,
-		url:    "/config/v1/inventory/gnb",
-	},
-	{
-		name:   "PostGnb",
-		method: http.MethodPost,
-		url:    "/config/v1/inventory/gnb/gnb-name",
-	},
-	{
-		name:   "DeleteGnb",
-		method: http.MethodDelete,
-		url:    "/config/v1/inventory/gnb/gnb-name",
-	},
-	{
-		name:   "GetUpfs",
-		method: http.MethodGet,
-		url:    "/config/v1/inventory/upf",
-	},
-	{
-		name:   "PostUpf",
-		method: http.MethodPost,
-		url:    "/config/v1/inventory/upf/upf-name",
-	},
-	{
-		name:   "DeleteUpf",
-		method: http.MethodDelete,
-		url:    "/config/v1/inventory/upf/upf-name",
-	},
-	{
-		name:   "ApiSample",
-		method: http.MethodGet,
-		url:    "/api/sample",
-	},
-	{
-		name:   "GetSubscribers",
-		method: http.MethodGet,
-		url:    "/api/subscriber",
-	},
-	{
-		name:   "GetSubscriberByID",
-		method: http.MethodGet,
-		url:    "/api/subscriber/some-subs",
-	},
-	{
-		name:   "PostSubscriberByID",
-		method: http.MethodPost,
-		url:    "/api/subscriber/some-subs",
-	},
-	{
-		name:   "PutSubscriberByID",
-		method: http.MethodPut,
-		url:    "/api/subscriber/some-subs/plmnid",
-	},
-	{
-		name:   "DeleteSubscriberByID",
-		method: http.MethodDelete,
-		url:    "/api/subscriber/some-subs",
-	},
-	{
-		name:   "RegisteredUEContext",
-		method: http.MethodGet,
-		url:    "/api/registered-ue-context",
-	},
-	{
-		name:   "IndividualRegisteredUEContext",
-		method: http.MethodGet,
-		url:    "/api/registered-ue-context/mysupi",
-	},
-	{
-		name:   "UEPDUSessionInfo",
-		method: http.MethodGet,
-		url:    "/api/ue-pdu-session-info/smContextRef",
-	},
-}
+var (
+	mockJWTSecret  = []byte("mockSecret")
+	protectedPaths = []struct {
+		name   string
+		method string
+		url    string
+	}{
+		{
+			name:   "GetUserAccount",
+			method: http.MethodGet,
+			url:    "/config/v1/account/janedoe",
+		},
+		{
+			name:   "GetUserAccounts",
+			method: http.MethodGet,
+			url:    "/config/v1/account",
+		},
+		{
+			name:   "PostSecondUserAccount",
+			method: http.MethodPost,
+			url:    "/config/v1/account",
+		},
+		{
+			name:   "DeleteUserAccount",
+			method: http.MethodDelete,
+			url:    "/config/v1/account/janedoe",
+		},
+		{
+			name:   "ChangePassword",
+			method: http.MethodPost,
+			url:    "/config/v1/account/janedoe/change_password",
+		},
+		{
+			name:   "ConfigV1",
+			method: http.MethodGet,
+			url:    "/config/v1/",
+		},
+		{
+			name:   "GetDeviceGroups",
+			method: http.MethodGet,
+			url:    "/config/v1/device-group",
+		},
+		{
+			name:   "GetDeviceGroupByName",
+			method: http.MethodGet,
+			url:    "/config/v1/device-group/some-name",
+		},
+		{
+			name:   "DeviceGroupGroupNameDelete",
+			method: http.MethodDelete,
+			url:    "/config/v1/device-group/some-name",
+		},
+		{
+			name:   "DeviceGroupGroupNamePatch",
+			method: http.MethodPatch,
+			url:    "/config/v1/device-group/some-name",
+		},
+		{
+			name:   "DeviceGroupGroupNamePut",
+			method: http.MethodPut,
+			url:    "/config/v1/device-group/some-name",
+		},
+		{
+			name:   "DeviceGroupGroupNamePost",
+			method: http.MethodPost,
+			url:    "/config/v1/device-group/some-name",
+		},
+		{
+			name:   "GetNetworkSlices",
+			method: http.MethodGet,
+			url:    "/config/v1/network-slice",
+		},
+		{
+			name:   "GetNetworkSliceByName",
+			method: http.MethodGet,
+			url:    "/config/v1/network-slice/some-slice",
+		},
+		{
+			name:   "NetworkSliceSliceNameDelete",
+			method: http.MethodDelete,
+			url:    "/config/v1/network-slice/some-slice",
+		},
+		{
+			name:   "NetworkSliceSliceNamePost",
+			method: http.MethodPost,
+			url:    "/config/v1/network-slice/some-slice",
+		},
+		{
+			name:   "NetworkSliceSliceNamePut",
+			method: http.MethodPut,
+			url:    "/config/v1/network-slice/some-slice",
+		},
+		{
+			name:   "GetGnbs",
+			method: http.MethodGet,
+			url:    "/config/v1/inventory/gnb",
+		},
+		{
+			name:   "PostGnb",
+			method: http.MethodPost,
+			url:    "/config/v1/inventory/gnb/gnb-name",
+		},
+		{
+			name:   "DeleteGnb",
+			method: http.MethodDelete,
+			url:    "/config/v1/inventory/gnb/gnb-name",
+		},
+		{
+			name:   "GetUpfs",
+			method: http.MethodGet,
+			url:    "/config/v1/inventory/upf",
+		},
+		{
+			name:   "PostUpf",
+			method: http.MethodPost,
+			url:    "/config/v1/inventory/upf/upf-name",
+		},
+		{
+			name:   "DeleteUpf",
+			method: http.MethodDelete,
+			url:    "/config/v1/inventory/upf/upf-name",
+		},
+		{
+			name:   "ApiSample",
+			method: http.MethodGet,
+			url:    "/api/sample",
+		},
+		{
+			name:   "GetSubscribers",
+			method: http.MethodGet,
+			url:    "/api/subscriber",
+		},
+		{
+			name:   "GetSubscriberByID",
+			method: http.MethodGet,
+			url:    "/api/subscriber/some-subs",
+		},
+		{
+			name:   "PostSubscriberByID",
+			method: http.MethodPost,
+			url:    "/api/subscriber/some-subs",
+		},
+		{
+			name:   "PutSubscriberByID",
+			method: http.MethodPut,
+			url:    "/api/subscriber/some-subs/plmnid",
+		},
+		{
+			name:   "DeleteSubscriberByID",
+			method: http.MethodDelete,
+			url:    "/api/subscriber/some-subs",
+		},
+		{
+			name:   "RegisteredUEContext",
+			method: http.MethodGet,
+			url:    "/api/registered-ue-context",
+		},
+		{
+			name:   "IndividualRegisteredUEContext",
+			method: http.MethodGet,
+			url:    "/api/registered-ue-context/mysupi",
+		},
+		{
+			name:   "UEPDUSessionInfo",
+			method: http.MethodGet,
+			url:    "/api/ue-pdu-session-info/smContextRef",
+		},
+	}
+)
 
 func MockOperation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"Result": "Operation Executed"})
@@ -192,7 +197,6 @@ func setUpRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	dbadapter.WebuiDBClient = &MockMongoClientSuccess{}
-	mockJWTSecret := []byte("mockSecret")
 	router.Use(AuthMiddleware(mockJWTSecret))
 	AddService(router, mockJWTSecret)
 	configapi.AddServiceSub(router)
@@ -204,7 +208,6 @@ func setUpMockedRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	dbadapter.WebuiDBClient = &MockMongoClientSuccess{}
-	mockJWTSecret := []byte("mockSecret")
 	router.Use(AuthMiddleware(mockJWTSecret))
 	router.GET("/config/v1/account", MockOperation)
 	router.GET("/config/v1/account/:username", MockOperation)
@@ -219,7 +222,10 @@ func TestMiddleware_NoHeaderRequest(t *testing.T) {
 
 	for _, tc := range protectedPaths {
 		t.Run(tc.name, func(t *testing.T) {
-			req, _ := http.NewRequest(tc.method, tc.url, nil)
+			req, err := http.NewRequest(tc.method, tc.url, nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -241,7 +247,10 @@ func TestMiddleware_InvalidHeaderRequest(t *testing.T) {
 
 	for _, tc := range protectedPaths {
 		t.Run(tc.name, func(t *testing.T) {
-			req, _ := http.NewRequest(tc.method, tc.url, nil)
+			req, err := http.NewRequest(tc.method, tc.url, nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
 			invalidHeader := "Bearer"
 			req.Header.Set("Authorization", invalidHeader)
 			w := httptest.NewRecorder()
@@ -264,7 +273,10 @@ func TestMiddleware_InvalidTokenRequest(t *testing.T) {
 
 	for _, tc := range protectedPaths {
 		t.Run(tc.name, func(t *testing.T) {
-			req, _ := http.NewRequest(tc.method, tc.url, nil)
+			req, err := http.NewRequest(tc.method, tc.url, nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
 			invalidHeader := "Bearer mytoken"
 			req.Header.Set("Authorization", invalidHeader)
 			w := httptest.NewRecorder()
@@ -283,19 +295,18 @@ func TestMiddleware_InvalidTokenRequest(t *testing.T) {
 }
 
 func TestPostUserAccount_CreateFirstUserWithoutHeader(t *testing.T) {
-	gin.SetMode(gin.TestMode)
+	router := setUpMockedRouter()
 	dbadapter.WebuiDBClient = &MockMongoClientEmptyDB{}
-	router := gin.Default()
-	mockJWTSecret := []byte("mockSecret")
-	router.Use(AuthMiddleware(mockJWTSecret))
-	router.POST("/config/v1/account", MockOperation)
-	req, _ := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
+	req, err := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
 
 	expectedCode := http.StatusOK
-	expectedBody := SUCESS_BODY
+	expectedBody := SUCCESS_BODY
 	if expectedCode != w.Code {
 		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
 	}
@@ -319,7 +330,7 @@ func TestGetUserAccounts_Authorization(t *testing.T) {
 			username:     "janedoe",
 			permissions:  ADMIN_ACCOUNT,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCESS_BODY,
+			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_GetUserAccounts",
@@ -331,9 +342,15 @@ func TestGetUserAccounts_Authorization(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodGet, "/config/v1/account", nil)
-			jwtToken, _ := generateJWT(tc.username, tc.permissions, mockJWTSecret)
-			validToken := "Bearer " + jwtToken
+			req, err := http.NewRequest(http.MethodGet, "/config/v1/account", nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			jwtToken, err := generateJWT(tc.username, tc.permissions, mockJWTSecret)
+			if err != nil {
+				t.Fatalf("failed to generate token: %v", err)
+			}
+			validToken := BEARER + jwtToken
 			req.Header.Set("Authorization", validToken)
 			w := httptest.NewRecorder()
 
@@ -348,6 +365,7 @@ func TestGetUserAccounts_Authorization(t *testing.T) {
 		})
 	}
 }
+
 func TestGetUserAccount_Authorization(t *testing.T) {
 	router := setUpMockedRouter()
 
@@ -363,14 +381,14 @@ func TestGetUserAccount_Authorization(t *testing.T) {
 			username:     "janedoe",
 			permissions:  USER_ACCOUNT,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCESS_BODY,
+			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "AdminUser_GetOwnUserAccount",
 			username:     "janedoe",
 			permissions:  ADMIN_ACCOUNT,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCESS_BODY,
+			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_GetOtherUserAccount",
@@ -384,14 +402,20 @@ func TestGetUserAccount_Authorization(t *testing.T) {
 			username:     "someuser",
 			permissions:  ADMIN_ACCOUNT,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCESS_BODY,
+			expectedBody: SUCCESS_BODY,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodGet, "/config/v1/account/janedoe", nil)
-			jwtToken, _ := generateJWT(tc.username, tc.permissions, mockJWTSecret)
-			validToken := "Bearer " + jwtToken
+			req, err := http.NewRequest(http.MethodGet, "/config/v1/account/janedoe", nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			jwtToken, err := generateJWT(tc.username, tc.permissions, mockJWTSecret)
+			if err != nil {
+				t.Fatalf("failed to generate token: %v", err)
+			}
+			validToken := BEARER + jwtToken
 			req.Header.Set("Authorization", validToken)
 			w := httptest.NewRecorder()
 
@@ -422,7 +446,7 @@ func TestPostUserAccount_Authorization(t *testing.T) {
 			username:     "janedoe",
 			permissions:  ADMIN_ACCOUNT,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCESS_BODY,
+			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_GetUserAccounts",
@@ -434,9 +458,15 @@ func TestPostUserAccount_Authorization(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
-			jwtToken, _ := generateJWT(tc.username, tc.permissions, mockJWTSecret)
-			validToken := "Bearer " + jwtToken
+			req, err := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			jwtToken, err := generateJWT(tc.username, tc.permissions, mockJWTSecret)
+			if err != nil {
+				t.Fatalf("failed to generate token: %v", err)
+			}
+			validToken := BEARER + jwtToken
 			req.Header.Set("Authorization", validToken)
 			w := httptest.NewRecorder()
 
@@ -474,7 +504,7 @@ func TestDeleteUserAccount_Authorization(t *testing.T) {
 			username:     "janedoe",
 			permissions:  ADMIN_ACCOUNT,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCESS_BODY,
+			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_DeleteOtherUserAccount",
@@ -488,14 +518,20 @@ func TestDeleteUserAccount_Authorization(t *testing.T) {
 			username:     "someuser",
 			permissions:  ADMIN_ACCOUNT,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCESS_BODY,
+			expectedBody: SUCCESS_BODY,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodDelete, "/config/v1/account/janedoe", nil)
-			jwtToken, _ := generateJWT(tc.username, tc.permissions, mockJWTSecret)
-			validToken := "Bearer " + jwtToken
+			req, err := http.NewRequest(http.MethodDelete, "/config/v1/account/janedoe", nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			jwtToken, err := generateJWT(tc.username, tc.permissions, mockJWTSecret)
+			if err != nil {
+				t.Fatalf("failed to generate token: %v", err)
+			}
+			validToken := BEARER + jwtToken
 			req.Header.Set("Authorization", validToken)
 			w := httptest.NewRecorder()
 
@@ -526,14 +562,14 @@ func TestChangePassword_Authorization(t *testing.T) {
 			username:     "janedoe",
 			permissions:  USER_ACCOUNT,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCESS_BODY,
+			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "AdminUser_OwnUserAccount",
 			username:     "janedoe",
 			permissions:  ADMIN_ACCOUNT,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCESS_BODY,
+			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_OtherUserAccount",
@@ -547,14 +583,20 @@ func TestChangePassword_Authorization(t *testing.T) {
 			username:     "someuser",
 			permissions:  ADMIN_ACCOUNT,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCESS_BODY,
+			expectedBody: SUCCESS_BODY,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodPost, "/config/v1/account/janedoe/change_password", nil)
-			jwtToken, _ := generateJWT(tc.username, tc.permissions, mockJWTSecret)
-			validToken := "Bearer " + jwtToken
+			req, err := http.NewRequest(http.MethodPost, "/config/v1/account/janedoe/change_password", nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			jwtToken, err := generateJWT(tc.username, tc.permissions, mockJWTSecret)
+			if err != nil {
+				t.Fatalf("failed to generate token: %v", err)
+			}
+			validToken := BEARER + jwtToken
 			req.Header.Set("Authorization", validToken)
 			w := httptest.NewRecorder()
 

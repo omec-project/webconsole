@@ -47,7 +47,7 @@ func setDBClient(url, dbname string) (DBInterface, error) {
 	return nil, errConnect
 }
 
-func ConnectMongo(url string, dbname string, client *DBInterface) error {
+func ConnectMongo(url string, dbname string, client *DBInterface) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer func() { ticker.Stop() }()
 	timer := time.After(180 * time.Second)
@@ -63,11 +63,10 @@ ConnectMongo:
 			continue
 		case <-timer:
 			logger.DbLog.Errorln("Timed out while connecting to MongoDB in 3 minutes.")
-			return err
+			return
 		}
 	}
 	logger.DbLog.Infoln("Connected to MongoDB.")
-	return nil
 }
 
 func (db *MongoDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {

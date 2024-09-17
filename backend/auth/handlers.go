@@ -116,11 +116,11 @@ func PostUserAccount(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingUsername})
 		return
 	}
-	var shouldGeneratePassword = user.Password == ""
+	shouldGeneratePassword := user.Password == ""
 	if shouldGeneratePassword {
-		generatedPassword, err := generatePassword()
-		if err != nil {
-			logger.AuthLog.Errorln(err.Error())
+		generatedPassword, passwordErr := generatePassword()
+		if passwordErr != nil {
+			logger.AuthLog.Errorln(passwordErr.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{"error": errorCreateUserAccount})
 			return
 		}
@@ -268,7 +268,7 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
 			return
 		}
-		if err := bcrypt.CompareHashAndPassword([]byte(dbUser.Password), []byte(inputUser.Password)); err != nil {
+		if err = bcrypt.CompareHashAndPassword([]byte(dbUser.Password), []byte(inputUser.Password)); err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
 			return
 		}

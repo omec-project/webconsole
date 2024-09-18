@@ -174,6 +174,10 @@ func (webui *WEBUI) Start() {
 			initLog.Error(err)
 		} else {
 			dbadapter.ConnectMongo(mongodb.WebuiDBUrl, mongodb.WebuiDBName, &dbadapter.WebuiDBClient)
+			resp, err := dbadapter.WebuiDBClient.CreateIndex(auth.UserAccountDataColl, "username")
+			if !resp || err != nil {
+				initLog.Errorf("Error initializing webuiDB %v", err)
+			}
 			subconfig_router.Use(auth.AuthMiddleware(jwtSecret))
 			auth.AddService(subconfig_router, jwtSecret)
 		}

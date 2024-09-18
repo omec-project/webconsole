@@ -27,6 +27,7 @@ type DBInterface interface {
 	RestfulAPIJSONPatchExtend(collName string, filter bson.M, patchJSON []byte, dataName string) error
 	RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error)
 	RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error
+	CreateIndex(collName string, keyField string) (bool, error)
 }
 
 var (
@@ -119,4 +120,8 @@ func (db *MongoDBClient) RestfulAPIPost(collName string, filter bson.M, postData
 
 func (db *MongoDBClient) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
 	return db.MongoClient.RestfulAPIPostMany(collName, filter, postDataArray)
+}
+
+func (db *MongoDBClient) CreateIndex(collName string, keyField string) (bool, error) {
+	return db.MongoClient.CreateIndex(collName, keyField)
 }

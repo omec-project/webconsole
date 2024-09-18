@@ -11,6 +11,7 @@ import (
 	mrand "math/rand"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -35,7 +36,7 @@ const (
 	errorUpdateUserAccount    = "failed to update user"
 	errorUsernameNotFound     = "username not found"
 
-	userAccountDataColl = "webconsoleData.snapshots.userAccountData"
+	UserAccountDataColl = "webconsoleData.snapshots.userAccountData"
 )
 
 func GetUserAccounts(c *gin.Context) {
@@ -48,7 +49,7 @@ func GetUserAccounts(c *gin.Context) {
 }
 
 func fetchUsers() ([]*configmodels.User, error) {
-	rawUsers, err := dbadapter.WebuiDBClient.RestfulAPIGetMany(userAccountDataColl, bson.M{})
+	rawUsers, err := dbadapter.WebuiDBClient.RestfulAPIGetMany(UserAccountDataColl, bson.M{})
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
 		return nil, errors.New(errorRetrieveUserAccounts)
@@ -86,7 +87,7 @@ func GetUserAccount(c *gin.Context) {
 
 func fetchUser(username string) (*configmodels.User, error) {
 	filter := bson.M{"username": username}
-	rawUser, err := dbadapter.WebuiDBClient.RestfulAPIGetOne(userAccountDataColl, filter)
+	rawUser, err := dbadapter.WebuiDBClient.RestfulAPIGetOne(UserAccountDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
 		return nil, err
@@ -131,15 +132,6 @@ func PostUserAccount(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidPassword})
 		return
 	}
-	dbUser, err := fetchUser(user.Username)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
-		return
-	}
-	if dbUser != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user account already exists"})
-		return
-	}
 	user.Permissions = USER_ACCOUNT
 	isFirstAccountIssued, err := IsFirstAccountIssued()
 	if err != nil {
@@ -158,8 +150,13 @@ func PostUserAccount(c *gin.Context) {
 	}
 	user.Password = string(hashedPassword)
 	filter := bson.M{"username": user.Username}
-	_, err = dbadapter.WebuiDBClient.RestfulAPIPost(userAccountDataColl, filter, configmodels.ToBsonM(user))
+	err = dbadapter.WebuiDBClient.RestfulAPIPostMany(UserAccountDataColl, filter, []interface{}{configmodels.ToBsonM(user)})
 	if err != nil {
+		if strings.Contains(err.Error(), "E11000") {
+			logger.DbLog.Errorln("Duplicate username found:", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "user account already exists"})
+			return
+		}
 		logger.DbLog.Errorln(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorCreateUserAccount})
 		return
@@ -189,7 +186,7 @@ func DeleteUserAccount(c *gin.Context) {
 		return
 	}
 	filter := bson.M{"username": username}
-	err = dbadapter.WebuiDBClient.RestfulAPIDeleteOne(userAccountDataColl, filter)
+	err = dbadapter.WebuiDBClient.RestfulAPIDeleteOne(UserAccountDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorDeleteUserAccount})
@@ -233,7 +230,7 @@ func ChangeUserAccountPasssword(c *gin.Context) {
 	}
 	dbUser.Password = string(hashedPassword)
 	filter := bson.M{"username": dbUser.Username}
-	_, err = dbadapter.WebuiDBClient.RestfulAPIPost(userAccountDataColl, filter, configmodels.ToBsonM(dbUser))
+	_, err = dbadapter.WebuiDBClient.RestfulAPIPost(UserAccountDataColl, filter, configmodels.ToBsonM(dbUser))
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorUpdateUserAccount})

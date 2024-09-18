@@ -37,6 +37,10 @@ type MockMongoClientRegularUser struct {
 	dbadapter.DBInterface
 }
 
+type MockMongoClientDuplicateCreation struct {
+	dbadapter.DBInterface
+}
+
 func hashPassword(password string) string {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -56,6 +60,10 @@ func (m *MockMongoClientEmptyDB) RestfulAPIGetMany(coll string, filter bson.M) (
 
 func (m *MockMongoClientEmptyDB) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
 	return true, nil
+}
+
+func (db *MockMongoClientEmptyDB) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
+	return nil
 }
 
 func (m *MockMongoClientDBError) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
@@ -115,6 +123,15 @@ func (m *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M
 
 func (m *MockMongoClientRegularUser) RestfulAPIDeleteOne(collName string, filter bson.M) error {
 	return nil
+}
+
+func (m *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	return results, nil
+}
+
+func (db *MockMongoClientDuplicateCreation) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
+	return errors.New("E11000")
 }
 
 func mockGeneratePassword() (string, error) {
@@ -271,7 +288,7 @@ func TestPostUserAccount(t *testing.T) {
 		},
 		{
 			name:                 "UserThatAlreadyExists",
-			dbAdapter:            &MockMongoClientSuccess{},
+			dbAdapter:            &MockMongoClientDuplicateCreation{},
 			generatePasswordMock: mockGeneratePassword,
 			inputData:            `{"username": "janedoe"}`,
 			expectedCode:         http.StatusBadRequest,
@@ -299,7 +316,7 @@ func TestPostUserAccount(t *testing.T) {
 			generatePasswordMock: mockGeneratePassword,
 			inputData:            `{"username": "adminadmin", "password" : "Admin1234"}`,
 			expectedCode:         http.StatusInternalServerError,
-			expectedBody:         fmt.Sprintf(`{"error":"%s"}`, errorRetrieveUserAccount),
+			expectedBody:         fmt.Sprintf(`{"error":"%s"}`, errorRetrieveUserAccounts),
 		},
 		{
 			name:                 "InvalidPassword",

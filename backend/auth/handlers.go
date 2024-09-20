@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	errorCreateUserAccount    = "failed to create user"
+	errorCreateUserAccount    = "failed to create user account"
 	errorDeleteAdminAccount   = "deleting an Admin account is not allowed"
 	errorDeleteUserAccount    = "failed to delete user account"
 	errorIncorrectCredentials = "incorrect username or password. Try again"
@@ -33,10 +33,9 @@ const (
 	errorMissingUsername      = "username is required"
 	errorRetrieveUserAccount  = "failed to retrieve user account from DB"
 	errorRetrieveUserAccounts = "failed to retrieve user accounts from DB"
-	errorUpdateUserAccount    = "failed to update user"
+	errorUpdateUserAccount    = "failed to update user account"
 	errorUsernameNotFound     = "username not found"
-
-	UserAccountDataColl = "webconsoleData.snapshots.userAccountData"
+	UserAccountDataColl       = "webconsoleData.snapshots.userAccountData"
 )
 
 func GetUserAccounts(c *gin.Context) {

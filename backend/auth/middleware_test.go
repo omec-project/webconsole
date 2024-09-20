@@ -20,8 +20,40 @@ const (
 )
 
 var (
-	mockJWTSecret  = []byte("mockSecret")
-	protectedPaths = []struct {
+	mockJWTSecret = []byte("mockSecret")
+)
+
+func MockOperation(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"Result": "Operation Executed"})
+}
+
+func setUpRouter() *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	dbadapter.WebuiDBClient = &MockMongoClientSuccess{}
+	router.Use(AuthMiddleware(mockJWTSecret))
+	AddService(router, mockJWTSecret)
+	configapi.AddServiceSub(router)
+	configapi.AddService(router)
+	return router
+}
+
+func setUpMockedRouter() *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	dbadapter.WebuiDBClient = &MockMongoClientSuccess{}
+	router.Use(AuthMiddleware(mockJWTSecret))
+	router.GET("/config/v1/account", MockOperation)
+	router.GET("/config/v1/account/:username", MockOperation)
+	router.DELETE("/config/v1/account/:username", MockOperation)
+	router.POST("/config/v1/account/:username/change_password", MockOperation)
+	router.POST("/config/v1/account", MockOperation)
+	return router
+}
+
+func TestMiddleware_NoHeaderRequest(t *testing.T) {
+	router := setUpRouter()
+	protectedPaths := []struct {
 		name   string
 		method string
 		url    string
@@ -187,38 +219,6 @@ var (
 			url:    "/api/ue-pdu-session-info/smContextRef",
 		},
 	}
-)
-
-func MockOperation(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"Result": "Operation Executed"})
-}
-
-func setUpRouter() *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-	dbadapter.WebuiDBClient = &MockMongoClientSuccess{}
-	router.Use(AuthMiddleware(mockJWTSecret))
-	AddService(router, mockJWTSecret)
-	configapi.AddServiceSub(router)
-	configapi.AddService(router)
-	return router
-}
-
-func setUpMockedRouter() *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-	dbadapter.WebuiDBClient = &MockMongoClientSuccess{}
-	router.Use(AuthMiddleware(mockJWTSecret))
-	router.GET("/config/v1/account", MockOperation)
-	router.GET("/config/v1/account/:username", MockOperation)
-	router.DELETE("/config/v1/account/:username", MockOperation)
-	router.POST("/config/v1/account/:username/change_password", MockOperation)
-	router.POST("/config/v1/account", MockOperation)
-	return router
-}
-
-func TestMiddleware_NoHeaderRequest(t *testing.T) {
-	router := setUpRouter()
 
 	for _, tc := range protectedPaths {
 		t.Run(tc.name, func(t *testing.T) {
@@ -232,58 +232,6 @@ func TestMiddleware_NoHeaderRequest(t *testing.T) {
 
 			expectedCode := http.StatusUnauthorized
 			expectedBody := `{"error":"auth failed: authorization header not found"}`
-			if expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
-			}
-			if w.Body.String() != expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-			}
-		})
-	}
-}
-
-func TestMiddleware_InvalidHeaderRequest(t *testing.T) {
-	router := setUpRouter()
-
-	for _, tc := range protectedPaths {
-		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(tc.method, tc.url, nil)
-			if err != nil {
-				t.Fatalf("failed to create request: %v", err)
-			}
-			invalidHeader := "Bearer"
-			req.Header.Set("Authorization", invalidHeader)
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-
-			expectedCode := http.StatusUnauthorized
-			expectedBody := `{"error":"auth failed: authorization header couldn't be processed. The expected format is 'Bearer token'"}`
-			if expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
-			}
-			if w.Body.String() != expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-			}
-		})
-	}
-}
-
-func TestMiddleware_InvalidTokenRequest(t *testing.T) {
-	router := setUpRouter()
-
-	for _, tc := range protectedPaths {
-		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(tc.method, tc.url, nil)
-			if err != nil {
-				t.Fatalf("failed to create request: %v", err)
-			}
-			invalidHeader := "Bearer mytoken"
-			req.Header.Set("Authorization", invalidHeader)
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-
-			expectedCode := http.StatusUnauthorized
-			expectedBody := `{"error":"auth failed: token is not valid"}`
 			if expectedCode != w.Code {
 				t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
 			}
@@ -312,6 +260,57 @@ func TestPostUserAccount_CreateFirstUserWithoutHeader(t *testing.T) {
 	}
 	if w.Body.String() != expectedBody {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+	}
+}
+
+func TestMiddleware_TokenValidation(t *testing.T) {
+	router := setUpRouter()
+
+	tests := []struct {
+		name         string
+		header       string
+		expectedBody string
+	}{
+		{
+			name:         "MissingToken",
+			header:       "Bearer",
+			expectedBody: `{"error":"auth failed: authorization header couldn't be processed. The expected format is 'Bearer token'"}`,
+		},
+		{
+			name:         "InvalidToken",
+			header:       "Bearer mytoken",
+			expectedBody: `{"error":"auth failed: token is not valid"}`,
+		},
+		{
+			name:         "MissingBearerKeyword",
+			header:       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Im5ld1VzZXIiLCJwZXJtaXNzaW9ucyI6MCwiZXhwIjoxNzI1OTYxOTUyfQ.r4U4RMaXZdDUYpL2tpNU1LNeN_Srzws0BzOW9coa7sg",
+			expectedBody: `{"error":"auth failed: authorization header couldn't be processed. The expected format is 'Bearer token'"}`,
+		},
+		{
+			name:         "MissingBearerAndToken",
+			header:       "",
+			expectedBody: `{"error":"auth failed: authorization header not found"}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, "/config/v1/", nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Authorization", tc.header)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			expectedCode := http.StatusUnauthorized
+			if expectedCode != w.Code {
+				t.Errorf("Expected status code `%v`, got `%v`", expectedCode, w.Code)
+			}
+			if w.Body.String() != tc.expectedBody {
+				t.Errorf("Expected body `%v`, got `%v`", tc.expectedBody, w.Body.String())
+			}
+		})
 	}
 }
 

@@ -79,7 +79,7 @@ func AuthMiddleware(jwtSecret []byte) gin.HandlerFunc {
 			return
 		}
 		if claims.Permissions == USER_ACCOUNT && strings.HasPrefix(c.Request.URL.Path, "/config/v1/account") {
-			requestAllowed, err := isRequestAllowForRegularUser(claims, c.Request.Method, c.Request.URL.Path)
+			requestAllowed, err := requestAllowedForRegularUser(claims, c.Request.Method, c.Request.URL.Path)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to authorize operation"})
 				c.Abort()
@@ -124,7 +124,7 @@ func getClaimsFromJWT(bearerToken string, JwtSecret []byte) (*jwtGocertClaims, e
 	return &claims, nil
 }
 
-func isRequestAllowForRegularUser(claims *jwtGocertClaims, method, path string) (bool, error) {
+func requestAllowedForRegularUser(claims *jwtGocertClaims, method, path string) (bool, error) {
 	allowedPaths := []struct {
 		method, pathRegex string
 	}{

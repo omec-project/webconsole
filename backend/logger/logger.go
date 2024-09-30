@@ -26,6 +26,7 @@ var (
 	GrpcLog    *logrus.Entry
 	ConfigLog  *logrus.Entry
 	DbLog      *logrus.Entry
+	AuthLog    *logrus.Entry
 )
 
 func init() {
@@ -59,6 +60,7 @@ func init() {
 	GrpcLog = log.WithFields(logrus.Fields{"component": "WebUI", "category": "GRPC"})
 	ConfigLog = log.WithFields(logrus.Fields{"component": "WebUI", "category": "CONFIG"})
 	DbLog = log.WithFields(logrus.Fields{"component": "WebUI", "category": "DB"})
+	AuthLog = log.WithFields(logrus.Fields{"component": "WebUI", "category": "Auth"})
 }
 
 func SetLogLevel(level logrus.Level) {

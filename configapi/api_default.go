@@ -31,6 +31,7 @@ const (
 )
 
 // GetDeviceGroups godoc
+//
 //	@Description	Return the list of device groups
 //	@Tags			Device Groups
 //	@Produce		json
@@ -54,6 +55,7 @@ func GetDeviceGroups(c *gin.Context) {
 }
 
 // GetDeviceGroupByName godoc
+//
 //	@Description	Return the device group
 //	@Tags			Device Groups
 //	@Param			deviceGroupName	path	string	true	" "
@@ -72,7 +74,7 @@ func GetDeviceGroupByName(c *gin.Context) {
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)
 	}
-	json.Unmarshal(mapToByte(rawDeviceGroup), &deviceGroup)
+	json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup)
 
 	if deviceGroup.DeviceGroupName == "" {
 		c.JSON(http.StatusNotFound, nil)
@@ -82,6 +84,7 @@ func GetDeviceGroupByName(c *gin.Context) {
 }
 
 // DeviceGroupGroupNameDelete godoc
+//
 //	@Description	Delete an existing device group
 //	@Tags			Device Groups
 //	@Param			deviceGroupName	path		string	true	" "
@@ -115,6 +118,7 @@ func DeviceGroupGroupNamePatch(c *gin.Context) {
 }
 
 // DeviceGroupGroupNamePost godoc
+//
 //	@Description	Create a new device group
 //	@Tags			Device Groups
 //	@Param			deviceGroupName	path		string						true	" "
@@ -133,6 +137,7 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 }
 
 // GetNetworkSlices godoc
+//
 //	@Description	Return the list of network slices
 //	@Tags			Network Slices
 //	@Produce		json
@@ -156,6 +161,7 @@ func GetNetworkSlices(c *gin.Context) {
 }
 
 // GetNetworkSliceByName godoc
+//
 //	@Description	Return the network slice
 //	@Tags			Network Slices
 //	@Produce		json
@@ -174,7 +180,7 @@ func GetNetworkSliceByName(c *gin.Context) {
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)
 	}
-	json.Unmarshal(mapToByte(rawNetworkSlice), &networkSlice)
+	json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice)
 
 	if networkSlice.SliceName == "" {
 		c.JSON(http.StatusNotFound, nil)
@@ -184,6 +190,7 @@ func GetNetworkSliceByName(c *gin.Context) {
 }
 
 // NetworkSliceSliceNameDelete godoc
+//
 //	@Description	Delete an existing network slice
 //	@Tags			Network Slices
 //	@Produce		json
@@ -202,6 +209,7 @@ func NetworkSliceSliceNameDelete(c *gin.Context) {
 }
 
 // NetworkSliceSliceNamePost godoc
+//
 //	@Description	Create a new network slice
 //	@Tags			Network Slices
 //	@Param			sliceName	path		string				true	" "

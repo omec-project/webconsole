@@ -41,11 +41,6 @@ func init() {
 	}
 }
 
-func mapToByte(data map[string]interface{}) (ret []byte) {
-	ret, _ = json.Marshal(data)
-	return
-}
-
 func sliceToByte(data []map[string]interface{}) (ret []byte) {
 	ret, _ = json.Marshal(data)
 	return
@@ -256,6 +251,7 @@ func GetSampleJSON(c *gin.Context) {
 }
 
 // GetSubscribers godoc
+//
 //	@Description	Return the list of subscribers
 //	@Tags			Subscribers
 //	@Produce		json
@@ -289,6 +285,7 @@ func GetSubscribers(c *gin.Context) {
 }
 
 // GetSubscriberByID godoc
+//
 //	@Description	Get subscriber by IMSI (UE ID)
 //	@Tags			Subscribers
 //	@Param			imsi	path	string	true	"IMSI (UE ID)"	example(imsi-208930100007487)
@@ -333,17 +330,17 @@ func GetSubscriberByID(c *gin.Context) {
 		logger.DbLog.Warnln(errGetManySmPol)
 	}
 	var authSubsData models.AuthenticationSubscription
-	json.Unmarshal(mapToByte(authSubsDataInterface), &authSubsData)
+	json.Unmarshal(configmodels.MapToByte(authSubsDataInterface), &authSubsData)
 	var amDataData models.AccessAndMobilitySubscriptionData
-	json.Unmarshal(mapToByte(amDataDataInterface), &amDataData)
+	json.Unmarshal(configmodels.MapToByte(amDataDataInterface), &amDataData)
 	var smDataData []models.SessionManagementSubscriptionData
 	json.Unmarshal(sliceToByte(smDataDataInterface), &smDataData)
 	var smfSelData models.SmfSelectionSubscriptionData
-	json.Unmarshal(mapToByte(smfSelDataInterface), &smfSelData)
+	json.Unmarshal(configmodels.MapToByte(smfSelDataInterface), &smfSelData)
 	var amPolicyData models.AmPolicyData
-	json.Unmarshal(mapToByte(amPolicyDataInterface), &amPolicyData)
+	json.Unmarshal(configmodels.MapToByte(amPolicyDataInterface), &amPolicyData)
 	var smPolicyData models.SmPolicyData
-	json.Unmarshal(mapToByte(smPolicyDataInterface), &smPolicyData)
+	json.Unmarshal(configmodels.MapToByte(smPolicyDataInterface), &smPolicyData)
 
 	subsData = configmodels.SubsData{
 		UeId:                              ueId,
@@ -359,6 +356,7 @@ func GetSubscriberByID(c *gin.Context) {
 }
 
 // PostSubscriberByID godoc
+//
 //	@Description	Create subscriber by IMSI (UE ID)
 //	@Tags			Subscribers
 //	@Param			imsi	path		string							true	"IMSI (UE ID)"
@@ -459,6 +457,7 @@ func PatchSubscriberByID(c *gin.Context) {
 }
 
 // DeleteSubscriberByID godoc
+//
 //	@Description	Delete an existing subscriber
 //	@Tags			Subscribers
 //	@Param			imsi	path		string	true	"IMSI (UE ID)"

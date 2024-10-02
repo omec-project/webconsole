@@ -14,7 +14,7 @@ import (
 	"github.com/omec-project/util/httpwrapper"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 
 var configChannel chan *configmodels.ConfigMessage
 
-var configLog *logrus.Entry
+var configLog *zap.SugaredLogger
 
 func init() {
 	configLog = logger.ConfigLog

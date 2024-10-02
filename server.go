@@ -11,13 +11,13 @@ import (
 
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_service"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"go.uber.org/zap"
 )
 
 var WEBUI = &webui_service.WEBUI{}
 
-var appLog *logrus.Entry
+var appLog *zap.SugaredLogger
 
 func init() {
 	appLog = logger.AppLog
@@ -31,7 +31,7 @@ func main() {
 	app.Action = action
 	app.Flags = WEBUI.GetCliCmd()
 	if err := app.Run(os.Args); err != nil {
-		logger.AppLog.Warnf("Error args: %v", err)
+		logger.AppLog.Warnf("error args: %v", err)
 	}
 }
 

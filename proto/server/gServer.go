@@ -15,12 +15,12 @@ import (
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )
 
-var grpcLog *logrus.Entry
+var grpcLog *zap.SugaredLogger
 
 func init() {
 	grpcLog = logger.GrpcLog
@@ -65,7 +65,7 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 
 	time.Sleep(2 * time.Second)
 
-	grpcLog.Println("Start grpc config server ", ready)
+	grpcLog.Infoln("start grpc config server", ready)
 	lis, err := net.Listen("tcp", host)
 	if err != nil {
 		grpcLog.Fatalf("failed to listen: %v", err)

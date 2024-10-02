@@ -19,9 +19,8 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/omec-project/util/http2_util"
-	loggerUtil "github.com/omec-project/util/logger"
+	utilLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/util/path_util"
-	pathUtilLogger "github.com/omec-project/util/path_util/logger"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/metrics"
@@ -30,8 +29,9 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	gServ "github.com/omec-project/webconsole/proto/server"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type WEBUI struct{}
@@ -56,7 +56,7 @@ var webuiCLi = []cli.Flag{
 	},
 }
 
-var initLog *logrus.Entry
+var initLog *zap.SugaredLogger
 
 func init() {
 	initLog = logger.InitLog
@@ -93,51 +93,33 @@ func (webui *WEBUI) setLogLevel() {
 
 	if factory.WebUIConfig.Logger.WEBUI != nil {
 		if factory.WebUIConfig.Logger.WEBUI.DebugLevel != "" {
-			if level, err := logrus.ParseLevel(factory.WebUIConfig.Logger.WEBUI.DebugLevel); err != nil {
+			if level, err := zapcore.ParseLevel(factory.WebUIConfig.Logger.WEBUI.DebugLevel); err != nil {
 				initLog.Warnf("WebUI Log level [%s] is invalid, set to [info] level",
 					factory.WebUIConfig.Logger.WEBUI.DebugLevel)
-				logger.SetLogLevel(logrus.InfoLevel)
+				logger.SetLogLevel(zap.InfoLevel)
 			} else {
 				initLog.Infof("WebUI Log level is set to [%s] level", level)
 				logger.SetLogLevel(level)
 			}
 		} else {
 			initLog.Warnln("WebUI Log level not set. Default set to [info] level")
-			logger.SetLogLevel(logrus.InfoLevel)
+			logger.SetLogLevel(zap.InfoLevel)
 		}
-		logger.SetReportCaller(factory.WebUIConfig.Logger.WEBUI.ReportCaller)
-	}
-
-	if factory.WebUIConfig.Logger.PathUtil != nil {
-		if factory.WebUIConfig.Logger.PathUtil.DebugLevel != "" {
-			if level, err := logrus.ParseLevel(factory.WebUIConfig.Logger.PathUtil.DebugLevel); err != nil {
-				pathUtilLogger.PathLog.Warnf("PathUtil Log level [%s] is invalid, set to [info] level",
-					factory.WebUIConfig.Logger.PathUtil.DebugLevel)
-				pathUtilLogger.SetLogLevel(logrus.InfoLevel)
-			} else {
-				pathUtilLogger.SetLogLevel(level)
-			}
-		} else {
-			pathUtilLogger.PathLog.Warnln("PathUtil Log level not set. Default set to [info] level")
-			pathUtilLogger.SetLogLevel(logrus.InfoLevel)
-		}
-		pathUtilLogger.SetReportCaller(factory.WebUIConfig.Logger.PathUtil.ReportCaller)
 	}
 
 	if factory.WebUIConfig.Logger.MongoDBLibrary != nil {
 		if factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel != "" {
-			if level, err := logrus.ParseLevel(factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel); err != nil {
-				loggerUtil.AppLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level",
+			if level, err := zapcore.ParseLevel(factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel); err != nil {
+				utilLogger.AppLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level",
 					factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel)
-				loggerUtil.SetLogLevel(logrus.InfoLevel)
+				utilLogger.SetLogLevel(zap.InfoLevel)
 			} else {
-				loggerUtil.SetLogLevel(level)
+				utilLogger.SetLogLevel(level)
 			}
 		} else {
-			loggerUtil.AppLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
-			loggerUtil.SetLogLevel(logrus.InfoLevel)
+			utilLogger.AppLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
+			utilLogger.SetLogLevel(zap.InfoLevel)
 		}
-		loggerUtil.SetReportCaller(factory.WebUIConfig.Logger.MongoDBLibrary.ReportCaller)
 	}
 }
 
@@ -166,7 +148,7 @@ func (webui *WEBUI) Start() {
 	initLog.Infoln("WebUI Server started")
 
 	/* First HTTP Server running at port to receive Config from ROC */
-	subconfig_router := loggerUtil.NewGinWithLogrus(logger.GinLog)
+	subconfig_router := utilLogger.NewGinWithZap(logger.GinLog)
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
 	configapi.AddServiceSub(subconfig_router)
@@ -237,11 +219,9 @@ func (webui *WEBUI) Start() {
 }
 
 func (webui *WEBUI) Exec(c *cli.Context) error {
-	// WEBUI.Initialize(cfgPath, c)
-
-	initLog.Traceln("args:", c.String("webuicfg"))
+	initLog.Debugln("args:", c.String("webuicfg"))
 	args := webui.FilterCli(c)
-	initLog.Traceln("filter: ", args)
+	initLog.Debugln("filter:", args)
 	command := exec.Command("./webui", args...)
 
 	webui.Initialize(c)
@@ -255,7 +235,7 @@ func (webui *WEBUI) Exec(c *cli.Context) error {
 	go func() {
 		in := bufio.NewScanner(stdout)
 		for in.Scan() {
-			fmt.Println(in.Text())
+			initLog.Infoln(in.Text())
 		}
 		wg.Done()
 	}()
@@ -267,14 +247,14 @@ func (webui *WEBUI) Exec(c *cli.Context) error {
 	go func() {
 		in := bufio.NewScanner(stderr)
 		for in.Scan() {
-			fmt.Println(in.Text())
+			initLog.Infoln(in.Text())
 		}
 		wg.Done()
 	}()
 
 	go func() {
 		if errCmd := command.Start(); errCmd != nil {
-			fmt.Println("command.Start Fails!")
+			initLog.Errorln("command.Start Failed")
 		}
 		wg.Done()
 	}()
@@ -291,7 +271,6 @@ func fetchConfigAdapater() {
 			(!factory.WebUIConfig.Configuration.RocEnd.Enabled) ||
 			(factory.WebUIConfig.Configuration.RocEnd.SyncUrl == "") {
 			time.Sleep(1 * time.Second)
-			// fmt.Printf("Continue polling config change %v ", factory.WebUIConfig.Configuration)
 			continue
 		}
 
@@ -300,7 +279,7 @@ func fetchConfigAdapater() {
 		req, err := http.NewRequest(http.MethodPost, httpend, nil)
 		// Handle Error
 		if err != nil {
-			fmt.Printf("An Error Occurred %v\n", err)
+			initLog.Errorf("an error occurred %v", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
@@ -308,15 +287,15 @@ func fetchConfigAdapater() {
 		req.Header.Set("Content-Type", "application/json; charset=utf-8")
 		resp, err := client.Do(req)
 		if err != nil {
-			fmt.Printf("An Error Occurred %v\n", err)
+			initLog.Errorf("an error occurred %v", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
 		err = resp.Body.Close()
 		if err != nil {
-			fmt.Printf("An Error Occurred %v\n", err)
+			initLog.Errorf("an error occurred %v", err)
 		}
-		fmt.Printf("Fetching config from simapp/roc. Response code = %d \n", resp.StatusCode)
+		initLog.Infof("fetching config from simapp/roc. Response code = %d", resp.StatusCode)
 		break
 	}
 }

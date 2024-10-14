@@ -320,21 +320,21 @@ func TestGetUserAccounts_Authorization(t *testing.T) {
 	testCases := []struct {
 		name         string
 		username     string
-		permissions  int
+		role         int
 		expectedCode int
 		expectedBody string
 	}{
 		{
 			name:         "AdminUser_GetUserAccounts",
 			username:     "janedoe",
-			permissions:  ADMIN_ACCOUNT,
+			role:         AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_GetUserAccounts",
 			username:     "someuser",
-			permissions:  USER_ACCOUNT,
+			role:         UserRole,
 			expectedCode: http.StatusForbidden,
 			expectedBody: `{"error":"forbidden"}`,
 		},
@@ -345,7 +345,7 @@ func TestGetUserAccounts_Authorization(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			jwtToken, err := generateJWT(tc.username, tc.permissions, mockJWTSecret)
+			jwtToken, err := generateJWT(tc.username, tc.role, mockJWTSecret)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
@@ -371,35 +371,35 @@ func TestGetUserAccount_Authorization(t *testing.T) {
 	testCases := []struct {
 		name         string
 		username     string
-		permissions  int
+		role         int
 		expectedCode int
 		expectedBody string
 	}{
 		{
 			name:         "RegularUser_GetOwnUserAccount",
 			username:     "janedoe",
-			permissions:  USER_ACCOUNT,
+			role:         UserRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "AdminUser_GetOwnUserAccount",
 			username:     "janedoe",
-			permissions:  ADMIN_ACCOUNT,
+			role:         AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_GetOtherUserAccount",
 			username:     "someuser",
-			permissions:  USER_ACCOUNT,
+			role:         UserRole,
 			expectedCode: http.StatusForbidden,
 			expectedBody: `{"error":"forbidden"}`,
 		},
 		{
 			name:         "AdminUser_GetOtherUserAccount",
 			username:     "someuser",
-			permissions:  ADMIN_ACCOUNT,
+			role:         AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
@@ -410,7 +410,7 @@ func TestGetUserAccount_Authorization(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			jwtToken, err := generateJWT(tc.username, tc.permissions, mockJWTSecret)
+			jwtToken, err := generateJWT(tc.username, tc.role, mockJWTSecret)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
@@ -436,21 +436,21 @@ func TestPostUserAccount_Authorization(t *testing.T) {
 	testCases := []struct {
 		name         string
 		username     string
-		permissions  int
+		role         int
 		expectedCode int
 		expectedBody string
 	}{
 		{
 			name:         "AdminUser_GetUserAccounts",
 			username:     "janedoe",
-			permissions:  ADMIN_ACCOUNT,
+			role:         AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_GetUserAccounts",
 			username:     "someuser",
-			permissions:  USER_ACCOUNT,
+			role:         UserRole,
 			expectedCode: http.StatusForbidden,
 			expectedBody: `{"error":"forbidden"}`,
 		},
@@ -461,7 +461,7 @@ func TestPostUserAccount_Authorization(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			jwtToken, err := generateJWT(tc.username, tc.permissions, mockJWTSecret)
+			jwtToken, err := generateJWT(tc.username, tc.role, mockJWTSecret)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
@@ -487,35 +487,35 @@ func TestDeleteUserAccount_Authorization(t *testing.T) {
 	testCases := []struct {
 		name         string
 		username     string
-		permissions  int
+		role         int
 		expectedCode int
 		expectedBody string
 	}{
 		{
 			name:         "RegularUser_DeleteOwnUserAccount",
 			username:     "janedoe",
-			permissions:  USER_ACCOUNT,
+			role:         UserRole,
 			expectedCode: http.StatusForbidden,
 			expectedBody: `{"error":"forbidden"}`,
 		},
 		{
 			name:         "AdminUser_DeleteOwnUserAccount",
 			username:     "janedoe",
-			permissions:  ADMIN_ACCOUNT,
+			role:         AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_DeleteOtherUserAccount",
 			username:     "someuser",
-			permissions:  USER_ACCOUNT,
+			role:         UserRole,
 			expectedCode: http.StatusForbidden,
 			expectedBody: `{"error":"forbidden"}`,
 		},
 		{
 			name:         "AdminUser_DeleteOtherUserAccount",
 			username:     "someuser",
-			permissions:  ADMIN_ACCOUNT,
+			role:         AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
@@ -526,7 +526,7 @@ func TestDeleteUserAccount_Authorization(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			jwtToken, err := generateJWT(tc.username, tc.permissions, mockJWTSecret)
+			jwtToken, err := generateJWT(tc.username, tc.role, mockJWTSecret)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
@@ -552,35 +552,35 @@ func TestChangePassword_Authorization(t *testing.T) {
 	testCases := []struct {
 		name         string
 		username     string
-		permissions  int
+		role         int
 		expectedCode int
 		expectedBody string
 	}{
 		{
 			name:         "RegularUser_OwnUserAccount",
 			username:     "janedoe",
-			permissions:  USER_ACCOUNT,
+			role:         UserRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "AdminUser_OwnUserAccount",
 			username:     "janedoe",
-			permissions:  ADMIN_ACCOUNT,
+			role:         AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_OtherUserAccount",
 			username:     "someuser",
-			permissions:  USER_ACCOUNT,
+			role:         UserRole,
 			expectedCode: http.StatusForbidden,
 			expectedBody: `{"error":"forbidden"}`,
 		},
 		{
 			name:         "AdminUser_OtherUserAccount",
 			username:     "someuser",
-			permissions:  ADMIN_ACCOUNT,
+			role:         AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
@@ -591,7 +591,7 @@ func TestChangePassword_Authorization(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			jwtToken, err := generateJWT(tc.username, tc.permissions, mockJWTSecret)
+			jwtToken, err := generateJWT(tc.username, tc.role, mockJWTSecret)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}

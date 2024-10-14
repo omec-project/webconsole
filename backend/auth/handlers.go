@@ -131,14 +131,14 @@ func PostUserAccount(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidPassword})
 		return
 	}
-	user.Permissions = USER_ACCOUNT
+	user.Role = UserRole
 	isFirstAccountIssued, err := IsFirstAccountIssued()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccounts})
 		return
 	}
 	if !isFirstAccountIssued {
-		user.Permissions = ADMIN_ACCOUNT
+		user.Role = AdminRole
 	}
 	password := user.Password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
@@ -179,7 +179,7 @@ func DeleteUserAccount(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": errorUsernameNotFound})
 		return
 	}
-	if dbUser.Permissions == 1 {
+	if dbUser.Role == AdminRole {
 		logger.AuthLog.Errorln(errorDeleteAdminAccount)
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorDeleteAdminAccount})
 		return
@@ -268,7 +268,7 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
 			return
 		}
-		jwt, err := generateJWT(dbUser.Username, dbUser.Permissions, jwtSecret)
+		jwt, err := generateJWT(dbUser.Username, dbUser.Role, jwtSecret)
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{"error": errorLogin})

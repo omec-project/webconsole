@@ -17,13 +17,13 @@ import (
 )
 
 const (
-	USER_ACCOUNT  = 0
-	ADMIN_ACCOUNT = 1
+	UserRole  = 0
+	AdminRole = 1
 )
 
 type jwtGocertClaims struct {
-	Username    string `json:"username"`
-	Permissions int    `json:"permissions"`
+	Username string `json:"username"`
+	Role     int    `json:"role"`
 	jwt.StandardClaims
 }
 
@@ -35,10 +35,10 @@ func GenerateJWTSecret() ([]byte, error) {
 	return bytes, nil
 }
 
-var generateJWT = func(username string, permissions int, jwtSecret []byte) (string, error) {
+var generateJWT = func(username string, role int, jwtSecret []byte) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtGocertClaims{
-		Username:    username,
-		Permissions: permissions,
+		Username: username,
+		Role:     role,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(time.Hour * 1).Unix(),
 		},
@@ -78,7 +78,7 @@ func AuthMiddleware(jwtSecret []byte) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if claims.Permissions == USER_ACCOUNT && strings.HasPrefix(c.Request.URL.Path, "/config/v1/account") {
+		if claims.Role == UserRole && strings.HasPrefix(c.Request.URL.Path, "/config/v1/account") {
 			requestAllowed, err := requestAllowedForRegularUser(claims, c.Request.Method, c.Request.URL.Path)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to authorize operation"})

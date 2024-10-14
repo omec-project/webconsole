@@ -82,32 +82,32 @@ func (m *MockMongoClientDBError) RestfulAPIPost(collName string, filter bson.M, 
 
 func (m *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
 	rawUser := map[string]interface{}{
-		"username":    "johndoe",
-		"password":    1234,
-		"permissions": 0,
+		"username": "johndoe",
+		"password": 1234,
+		"role":     0,
 	}
 	return rawUser, nil
 }
 
 func (m *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	rawUsers := []map[string]interface{}{
-		{"username": "johndoe", "password": 1234, "permissions": 0},
-		{"username": "janedoe", "password": hashPassword("Password123"), "permissions": 1},
+		{"username": "johndoe", "password": 1234, "role": 0},
+		{"username": "janedoe", "password": hashPassword("Password123"), "role": 1},
 	}
 	return rawUsers, nil
 }
 
 func (m *MockMongoClientSuccess) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	rawUser := map[string]interface{}{
-		"username": "janedoe", "password": hashPassword("password123!"), "permissions": 1,
+		"username": "janedoe", "password": hashPassword("password123!"), "role": 1,
 	}
 	return rawUser, nil
 }
 
 func (m *MockMongoClientSuccess) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	rawUsers := []map[string]interface{}{
-		{"username": "johndoe", "password": hashPassword(".password123"), "permissions": 0},
-		{"username": "janedoe", "password": hashPassword("password123"), "permissions": 1},
+		{"username": "johndoe", "password": hashPassword(".password123"), "role": 0},
+		{"username": "janedoe", "password": hashPassword("password123"), "role": 1},
 	}
 	return rawUsers, nil
 }
@@ -118,7 +118,7 @@ func (m *MockMongoClientSuccess) RestfulAPIPost(collName string, filter bson.M, 
 
 func (m *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	rawUser := map[string]interface{}{
-		"username": "johndoe", "password": hashPassword("password-123"), "permissions": 0,
+		"username": "johndoe", "password": hashPassword("password-123"), "role": 0,
 	}
 	return rawUser, nil
 }
@@ -166,7 +166,7 @@ func TestGetUserAccounts(t *testing.T) {
 			name:         "DBReturnsOneInvalidUser",
 			dbAdapter:    &MockMongoClientInvalidUser{},
 			expectedCode: http.StatusOK,
-			expectedBody: `[{"username":"janedoe","permissions":1}]`,
+			expectedBody: `[{"username":"janedoe","role":1}]`,
 		},
 		{
 			name:         "NoUsersInDB",
@@ -178,7 +178,7 @@ func TestGetUserAccounts(t *testing.T) {
 			name:         "SuccessManyUsers",
 			dbAdapter:    &MockMongoClientSuccess{},
 			expectedCode: http.StatusOK,
-			expectedBody: `[{"username":"johndoe","permissions":0},{"username":"janedoe","permissions":1}]`,
+			expectedBody: `[{"username":"johndoe","role":0},{"username":"janedoe","role":1}]`,
 		},
 	}
 	for _, tc := range testCases {
@@ -211,7 +211,7 @@ func TestGetUserAccount(t *testing.T) {
 	testCases := []struct {
 		name         string
 		username     string
-		permissions  int
+		role         int
 		dbAdapter    dbadapter.DBInterface
 		expectedCode int
 		expectedBody string
@@ -220,7 +220,7 @@ func TestGetUserAccount(t *testing.T) {
 			name:         "GetUserAccountSuccess",
 			dbAdapter:    &MockMongoClientSuccess{},
 			expectedCode: http.StatusOK,
-			expectedBody: `{"username":"janedoe","permissions":1}`,
+			expectedBody: `{"username":"janedoe","role":1}`,
 		},
 		{
 			name:         "DBError",
@@ -597,28 +597,28 @@ func TestLogin_SuccessCases(t *testing.T) {
 	AddService(router, mockJWTSecret)
 
 	testCases := []struct {
-		name                string
-		dbAdapter           dbadapter.DBInterface
-		inputData           string
-		expectedCode        int
-		expectedUsername    string
-		expectedPermissions int
+		name             string
+		dbAdapter        dbadapter.DBInterface
+		inputData        string
+		expectedCode     int
+		expectedUsername string
+		expectedRole     int
 	}{
 		{
-			name:                "Success_AdminUser",
-			dbAdapter:           &MockMongoClientSuccess{},
-			inputData:           `{"username":"janedoe", "password":"password123!"}`,
-			expectedCode:        http.StatusOK,
-			expectedUsername:    "janedoe",
-			expectedPermissions: ADMIN_ACCOUNT,
+			name:             "Success_AdminUser",
+			dbAdapter:        &MockMongoClientSuccess{},
+			inputData:        `{"username":"janedoe", "password":"password123!"}`,
+			expectedCode:     http.StatusOK,
+			expectedUsername: "janedoe",
+			expectedRole:     AdminRole,
 		},
 		{
-			name:                "Success_RegularUser",
-			dbAdapter:           &MockMongoClientRegularUser{},
-			inputData:           `{"username":"johndoe", "password":"password-123"}`,
-			expectedCode:        http.StatusOK,
-			expectedUsername:    "johndoe",
-			expectedPermissions: USER_ACCOUNT,
+			name:             "Success_RegularUser",
+			dbAdapter:        &MockMongoClientRegularUser{},
+			inputData:        `{"username":"johndoe", "password":"password-123"}`,
+			expectedCode:     http.StatusOK,
+			expectedUsername: "johndoe",
+			expectedRole:     UserRole,
 		},
 	}
 	for _, tc := range testCases {
@@ -659,8 +659,8 @@ func TestLogin_SuccessCases(t *testing.T) {
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 				if claims["username"] != tc.expectedUsername {
 					t.Errorf("Expected `%v` username, got `%v`", tc.expectedUsername, claims["username"])
-				} else if int(claims["permissions"].(float64)) != tc.expectedPermissions {
-					t.Errorf("Expected `%v` permissions, got `%v`", tc.expectedPermissions, claims["permissions"])
+				} else if int(claims["role"].(float64)) != tc.expectedRole {
+					t.Errorf("Expected `%v` role, got `%v`", tc.expectedRole, claims["role"])
 				}
 			} else {
 				t.Errorf("Invalid JWT token or JWT claims are not readable")

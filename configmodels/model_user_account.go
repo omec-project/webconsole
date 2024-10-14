@@ -4,7 +4,7 @@
 package configmodels
 
 type User struct {
-	Username    string `json:"username"`
-	Password    string `json:"password,omitempty"`
-	Permissions int    `json:"permissions"`
+	Username string `json:"username"`
+	Password string `json:"password,omitempty"`
+	Role     int    `json:"role"`
 }

@@ -15,8 +15,8 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.uber.org/zap"
 )
 
 const (
@@ -33,7 +33,7 @@ const (
 	upfDataColl      = "webconsoleData.snapshots.upfData"
 )
 
-var configLog *logrus.Entry
+var configLog *zap.SugaredLogger
 
 func init() {
 	configLog = logger.ConfigLog
@@ -277,7 +277,7 @@ func getDeviceGroups() []*configmodels.DeviceGroups {
 		var devGroupData configmodels.DeviceGroups
 		err := json.Unmarshal(configmodels.MapToByte(rawDevGroup), &devGroupData)
 		if err != nil {
-			logger.DbLog.Errorf("Could not unmarshall device group %v", rawDevGroup)
+			logger.DbLog.Errorf("could not unmarshall device group %v", rawDevGroup)
 		}
 		deviceGroups = append(deviceGroups, &devGroupData)
 	}
@@ -293,7 +293,7 @@ func getDeviceGroupByName(name string) *configmodels.DeviceGroups {
 	var devGroupData configmodels.DeviceGroups
 	err := json.Unmarshal(configmodels.MapToByte(devGroupDataInterface), &devGroupData)
 	if err != nil {
-		logger.DbLog.Errorf("Could not unmarshall device group %v", devGroupDataInterface)
+		logger.DbLog.Errorf("could not unmarshall device group %v", devGroupDataInterface)
 	}
 	return &devGroupData
 }
@@ -308,7 +308,7 @@ func getSlices() []*configmodels.Slice {
 		var sliceData configmodels.Slice
 		err := json.Unmarshal(configmodels.MapToByte(rawSlice), &sliceData)
 		if err != nil {
-			logger.DbLog.Errorf("Could not unmarshall slice %v", rawSlice)
+			logger.DbLog.Errorf("could not unmarshall slice %v", rawSlice)
 		}
 		slices = append(slices, &sliceData)
 	}
@@ -324,7 +324,7 @@ func getSliceByName(name string) *configmodels.Slice {
 	var sliceData configmodels.Slice
 	err := json.Unmarshal(configmodels.MapToByte(sliceDataInterface), &sliceData)
 	if err != nil {
-		logger.DbLog.Errorf("Could not unmarshall slice %v", sliceDataInterface)
+		logger.DbLog.Errorf("could not unmarshall slice %v", sliceDataInterface)
 	}
 	return &sliceData
 }
@@ -512,7 +512,7 @@ func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg) *configmodels.Slice {
 	for name, slice := range getSlices() {
 		for _, dgName := range slice.SiteDeviceGroup {
 			if dgName == msg.Msg.DevGroupName {
-				logger.WebUILog.Infof("Device Group [%v] is part of slice: %v", dgName, name)
+				logger.WebUILog.Infof("device Group [%v] is part of slice: %v", dgName, name)
 				return slice
 			}
 		}
@@ -558,7 +558,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 			// check this Imsi is part of any of the devicegroup
 			imsi := strings.ReplaceAll(confData.Msg.Imsi, "imsi-", "")
 			if confData.Msg.MsgMethod != configmodels.Delete_op {
-				logger.WebUILog.Debugln("Insert/Update AuthenticationSubscription ", imsi)
+				logger.WebUILog.Debugln("insert/update AuthenticationSubscription ", imsi)
 				filter := bson.M{"ueId": confData.Msg.Imsi}
 				authDataBsonA := configmodels.ToBsonM(confData.Msg.AuthSubData)
 				authDataBsonA["ueId"] = confData.Msg.Imsi
@@ -567,7 +567,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					logger.DbLog.Warnln(errPost)
 				}
 			} else {
-				logger.WebUILog.Debugln("Delete AuthenticationSubscription", imsi)
+				logger.WebUILog.Debugln("delete AuthenticationSubscription", imsi)
 				filter := bson.M{"ueId": "imsi-" + imsi}
 				errDelOne := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
 				if errDelOne != nil {
@@ -587,7 +587,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 			if slice != nil {
 				sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 				if err != nil {
-					logger.DbLog.Errorf("Could not parse SST %v", slice.SliceId.Sst)
+					logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
 				}
 				snssai := &models.Snssai{
 					Sd:  slice.SliceId.Sd,
@@ -636,15 +636,15 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 
 		case configmodels.Network_slice:
 			rwLock.RLock()
-			logger.WebUILog.Debugln("Insert/Update Network Slice")
+			logger.WebUILog.Debugln("insert/update Network Slice")
 			slice := confData.Msg.Slice
 			if slice == nil && confData.PrevSlice != nil {
-				logger.WebUILog.Debugln("Deleted Slice: ", confData.PrevSlice)
+				logger.WebUILog.Debugln("deleted Slice:", confData.PrevSlice)
 			}
 			if slice != nil {
 				sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 				if err != nil {
-					logger.DbLog.Errorf("Could not parse SST %v", slice.SliceId.Sst)
+					logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
 				}
 				snssai := &models.Snssai{
 					Sd:  slice.SliceId.Sd,
@@ -722,6 +722,30 @@ func convertToString(val uint64) string {
 	}
 
 	return retStr
+}
+
+// seems something which we should move to mongolib
+func toBsonM(data interface{}) (ret bson.M) {
+	tmp, err := json.Marshal(data)
+	if err != nil {
+		logger.DbLog.Errorln("could not marshall data")
+		return nil
+	}
+	err = json.Unmarshal(tmp, &ret)
+	if err != nil {
+		logger.DbLog.Errorln("could not unmarshall data")
+		return nil
+	}
+	return ret
+}
+
+func mapToByte(data map[string]interface{}) (ret []byte) {
+	ret, err := json.Marshal(data)
+	if err != nil {
+		logger.DbLog.Errorln("could not marshall data")
+		return nil
+	}
+	return ret
 }
 
 func SnssaiModelsToHex(snssai models.Snssai) string {

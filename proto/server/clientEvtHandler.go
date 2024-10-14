@@ -18,7 +18,7 @@ import (
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 type clientNF struct {
@@ -28,7 +28,7 @@ type clientNF struct {
 	tempGrpcReq           chan *clientReqMsg
 	resStream             protos.ConfigService_NetworkSliceSubscribeServer
 	resChannel            chan bool
-	clientLog             *logrus.Entry
+	clientLog             *zap.SugaredLogger
 	id                    string
 	ConfigPushUrl         string
 	ConfigCheckUrl        string
@@ -204,13 +204,12 @@ func setClientConfigCheckUrl(client *clientNF, url string) {
 func getClient(id string) (*clientNF, bool) {
 	client := clientNFPool[id]
 	if client != nil {
-		client.clientLog.Infof("Found client %v ", id)
+		client.clientLog.Infof("Found client %v", id)
 		return client, false
 	}
-	logger.GrpcLog.Printf("Created client %v ", id)
+	logger.GrpcLog.Infof("created client %v", id)
 	client = &clientNF{}
-	subField := logrus.Fields{"NF": id}
-	client.clientLog = grpcLog.WithFields(subField)
+	client.clientLog = grpcLog.With("NF", id)
 	client.id = id
 	client.outStandingPushConfig = make(chan *configmodels.ConfigMessage, 10)
 	client.tempGrpcReq = make(chan *clientReqMsg, 10)

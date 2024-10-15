@@ -42,12 +42,12 @@ func setUpMockedRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	dbadapter.WebuiDBClient = &MockMongoClientSuccess{}
-	router.Use(AuthMiddleware(mockJWTSecret))
-	router.GET("/config/v1/account", MockOperation)
-	router.GET("/config/v1/account/:username", MockOperation)
-	router.DELETE("/config/v1/account/:username", MockOperation)
-	router.POST("/config/v1/account/:username/change_password", MockOperation)
-	router.POST("/config/v1/account", MockOperation)
+	//router.Use(AuthMiddleware(mockJWTSecret))
+	router.GET("/config/v1/account", adminOnly(mockJWTSecret, MockOperation))
+	router.GET("/config/v1/account/:username", adminOrMe(mockJWTSecret, MockOperation))
+	router.DELETE("/config/v1/account/:username", adminOnly(mockJWTSecret, MockOperation))
+	router.POST("/config/v1/account/:username/change_password", adminOrMe(mockJWTSecret, MockOperation))
+	router.POST("/config/v1/account", adminOrFirstUser(mockJWTSecret, MockOperation))
 	return router
 }
 
@@ -242,27 +242,6 @@ func TestMiddleware_NoHeaderRequest(t *testing.T) {
 	}
 }
 
-func TestPostUserAccount_CreateFirstUserWithoutHeader(t *testing.T) {
-	router := setUpMockedRouter()
-	dbadapter.WebuiDBClient = &MockMongoClientEmptyDB{}
-	req, err := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	expectedCode := http.StatusOK
-	expectedBody := SUCCESS_BODY
-	if expectedCode != w.Code {
-		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
-	}
-	if w.Body.String() != expectedBody {
-		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-	}
-}
-
 func TestMiddleware_TokenValidation(t *testing.T) {
 	router := setUpRouter()
 
@@ -314,6 +293,33 @@ func TestMiddleware_TokenValidation(t *testing.T) {
 	}
 }
 
+func TestPostUserAccount_CreateFirstUserWithoutHeader(t *testing.T) {
+	router := setUpMockedRouter()
+
+	originalIsFirstAccountIssued := IsFirstAccountIssued
+	defer func() { IsFirstAccountIssued = originalIsFirstAccountIssued }()
+	IsFirstAccountIssued = func() (bool, error) {
+		return false, nil
+	}
+	dbadapter.WebuiDBClient = &MockMongoClientEmptyDB{}
+	req, err := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	expectedCode := http.StatusOK
+	expectedBody := SUCCESS_BODY
+	if expectedCode != w.Code {
+		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+	}
+	if w.Body.String() != expectedBody {
+		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+	}
+}
+
 func TestGetUserAccounts_Authorization(t *testing.T) {
 	router := setUpMockedRouter()
 
@@ -335,8 +341,8 @@ func TestGetUserAccounts_Authorization(t *testing.T) {
 			name:         "RegularUser_GetUserAccounts",
 			username:     "someuser",
 			role:         UserRole,
-			expectedCode: http.StatusForbidden,
-			expectedBody: `{"error":"forbidden"}`,
+			expectedCode: http.StatusUnauthorized,
+			expectedBody: `{"error":"unauthorized: admin access required"}`,
 		},
 	}
 	for _, tc := range testCases {
@@ -393,8 +399,8 @@ func TestGetUserAccount_Authorization(t *testing.T) {
 			name:         "RegularUser_GetOtherUserAccount",
 			username:     "someuser",
 			role:         UserRole,
-			expectedCode: http.StatusForbidden,
-			expectedBody: `{"error":"forbidden"}`,
+			expectedCode: http.StatusUnauthorized,
+			expectedBody: `{"error":"unauthorized: admin or me access required"}`,
 		},
 		{
 			name:         "AdminUser_GetOtherUserAccount",
@@ -430,7 +436,7 @@ func TestGetUserAccount_Authorization(t *testing.T) {
 	}
 }
 
-func TestPostUserAccount_Authorization(t *testing.T) {
+func TestCreateUserAccount_Authorization(t *testing.T) {
 	router := setUpMockedRouter()
 
 	testCases := []struct {
@@ -441,18 +447,18 @@ func TestPostUserAccount_Authorization(t *testing.T) {
 		expectedBody string
 	}{
 		{
-			name:         "AdminUser_GetUserAccounts",
+			name:         "AdminUser_CreateUserAccount",
 			username:     "janedoe",
 			role:         AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
-			name:         "RegularUser_GetUserAccounts",
+			name:         "RegularUser_CreateUserAccoun",
 			username:     "someuser",
 			role:         UserRole,
-			expectedCode: http.StatusForbidden,
-			expectedBody: `{"error":"forbidden"}`,
+			expectedCode: http.StatusUnauthorized,
+			expectedBody: `{"error":"unauthorized: admin access required"}`,
 		},
 	}
 	for _, tc := range testCases {
@@ -495,8 +501,8 @@ func TestDeleteUserAccount_Authorization(t *testing.T) {
 			name:         "RegularUser_DeleteOwnUserAccount",
 			username:     "janedoe",
 			role:         UserRole,
-			expectedCode: http.StatusForbidden,
-			expectedBody: `{"error":"forbidden"}`,
+			expectedCode: http.StatusUnauthorized,
+			expectedBody: `{"error":"unauthorized: admin access required"}`,
 		},
 		{
 			name:         "AdminUser_DeleteOwnUserAccount",
@@ -509,8 +515,8 @@ func TestDeleteUserAccount_Authorization(t *testing.T) {
 			name:         "RegularUser_DeleteOtherUserAccount",
 			username:     "someuser",
 			role:         UserRole,
-			expectedCode: http.StatusForbidden,
-			expectedBody: `{"error":"forbidden"}`,
+			expectedCode: http.StatusUnauthorized,
+			expectedBody: `{"error":"unauthorized: admin access required"}`,
 		},
 		{
 			name:         "AdminUser_DeleteOtherUserAccount",
@@ -574,8 +580,8 @@ func TestChangePassword_Authorization(t *testing.T) {
 			name:         "RegularUser_OtherUserAccount",
 			username:     "someuser",
 			role:         UserRole,
-			expectedCode: http.StatusForbidden,
-			expectedBody: `{"error":"forbidden"}`,
+			expectedCode: http.StatusUnauthorized,
+			expectedBody: `{"error":"unauthorized: admin or me access required"}`,
 		},
 		{
 			name:         "AdminUser_OtherUserAccount",

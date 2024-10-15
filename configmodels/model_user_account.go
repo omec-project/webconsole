@@ -7,59 +7,36 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type User struct {
-	Username string `json:"username"`
-	Password string `json:"password,omitempty"`
-	Role     int    `json:"role"`
-}
-
-type DBUser struct {
+type DBUserAccount struct {
 	Username       string `json:"username"`
 	HashedPassword string `json:"password,omitempty"`
 	Role           int    `json:"role"`
 }
 
-type CreateUserParams struct {
+type CreateUserAccountParams struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
-	Role     int    `json:"role"`
 }
 
-type UserResponse struct {
+type ChangePasswordParams struct {
+	Password string `json:"password"`
+}
+
+type GetUserAccountResponse struct {
 	Username string `json:"username"`
 	Role     int    `json:"role"`
 }
 
-func TransformDBUserToUserResponse(dbUser DBUser) UserResponse {
-	return UserResponse{
-		Username: dbUser.Username,
-		Role:     dbUser.Role,
-	}
-}
-
-func TransformDBUsersToUserResponses(dbUsers []*DBUser) []*UserResponse {
-	userResponses := make([]*UserResponse, len(dbUsers))
-
-	for i, dbUser := range dbUsers {
-		userResponses[i] = &UserResponse{
-			Username: dbUser.Username,
-			Role:     dbUser.Role,
-		}
-	}
-
-	return userResponses
-}
-
-func TransformCreateUserParamsToDBUser(params CreateUserParams) (*DBUser, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(params.Password), bcrypt.DefaultCost)
+func CreateNewDBUserAccount(username string, password string, role int) (*DBUserAccount, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 
-	dbUser := &DBUser{
-		Username:       params.Username,
+	dbUser := &DBUserAccount{
+		Username:       username,
 		HashedPassword: string(hashedPassword),
-		Role:           params.Role,
+		Role:           role,
 	}
 	return dbUser, nil
 }

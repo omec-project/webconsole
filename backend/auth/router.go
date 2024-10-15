@@ -25,7 +25,7 @@ func AddService(engine *gin.Engine, jwtSecret []byte) {
 	addRoutes(group, rootRoutesWithSecret(jwtSecret))
 
 	group = engine.Group("/config/v1")
-	addRoutes(group, userRoutes)
+	addRoutes(group, rootRoutesWithAuthorization(jwtSecret))
 }
 
 // addRoutes adds routes to a Gin RouterGroup.
@@ -56,35 +56,37 @@ func rootRoutesWithSecret(jwtSecret []byte) Routes {
 	}
 }
 
-var userRoutes = Routes{
-	{
-		"GetUserAccounts",
-		http.MethodGet,
-		"/account",
-		GetUserAccounts,
-	},
-	{
-		"GetUserAccount",
-		http.MethodGet,
-		"/account/:username",
-		GetUserAccount,
-	},
-	{
-		"PostUserAccount",
-		http.MethodPost,
-		"/account",
-		PostUserAccount,
-	},
-	{
-		"DeleteUserAccount",
-		http.MethodDelete,
-		"/account/:username",
-		DeleteUserAccount,
-	},
-	{
-		"ChangeUserAccountPasssword",
-		http.MethodPost,
-		"/account/:username/change_password",
-		ChangeUserAccountPasssword,
-	},
+func rootRoutesWithAuthorization(jwtSecret []byte) Routes {
+	return Routes{
+		{
+			"GetUserAccounts",
+			http.MethodGet,
+			"/account",
+			adminOnly(jwtSecret, GetUserAccounts),
+		},
+		{
+			"GetUserAccount",
+			http.MethodGet,
+			"/account/:username",
+			adminOrMe(jwtSecret, GetUserAccount),
+		},
+		{
+			"CreateUserAccount",
+			http.MethodPost,
+			"/account",
+			adminOrFirstUser(jwtSecret, CreateUserAccount),
+		},
+		{
+			"DeleteUserAccount",
+			http.MethodDelete,
+			"/account/:username",
+			adminOnly(jwtSecret, DeleteUserAccount),
+		},
+		{
+			"ChangeUserAccountPasssword",
+			http.MethodPost,
+			"/account/:username/change_password",
+			adminOrMe(jwtSecret, ChangeUserAccountPasssword),
+		},
+	}
 }

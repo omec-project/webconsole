@@ -15,17 +15,15 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
-	"golang.org/x/crypto/bcrypt"
 )
 
 const (
 	errorCreateUserAccount    = "failed to create user account"
-	errorDeleteAdminAccount   = "deleting an Admin account is not allowed"
+	errorDeleteAdminAccount   = "deleting an admin user account is not allowed"
 	errorDeleteUserAccount    = "failed to delete user account"
 	errorIncorrectCredentials = "incorrect username or password. Try again"
 	errorInvalidDataProvided  = "invalid data provided"
 	errorInvalidPassword      = "Password must have 8 or more characters, must include at least one capital letter, one lowercase letter, and either a number or a symbol."
-	errorLogin                = "failed to log in"
 	errorMissingPassword      = "password is required"
 	errorMissingUsername      = "username is required"
 	errorRetrieveUserAccount  = "failed to retrieve user account from DB"
@@ -36,8 +34,15 @@ const (
 )
 
 func GetUserAccounts(c *gin.Context) {
-	dbUsers, err := fetchDBUsers()
-	userResponses := configmodels.TransformDBUsersToUserResponses(dbUsers)
+	dbUsersAccounts, err := fetchDBUsers()
+	userResponses := make([]*configmodels.GetUserAccountResponse, len(dbUsersAccounts))
+
+	for i, dbUserAccount := range dbUsersAccounts {
+		userResponses[i] = &configmodels.GetUserAccountResponse{
+			Username: dbUserAccount.Username,
+			Role:     dbUserAccount.Role,
+		}
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -45,16 +50,16 @@ func GetUserAccounts(c *gin.Context) {
 	c.JSON(http.StatusOK, userResponses)
 }
 
-func fetchDBUsers() ([]*configmodels.DBUser, error) {
+func fetchDBUsers() ([]*configmodels.DBUserAccount, error) {
 	rawUsers, err := dbadapter.WebuiDBClient.RestfulAPIGetMany(UserAccountDataColl, bson.M{})
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
 		return nil, errors.New(errorRetrieveUserAccounts)
 	}
-	var users []*configmodels.DBUser
-	users = make([]*configmodels.DBUser, 0)
+	var users []*configmodels.DBUserAccount
+	users = make([]*configmodels.DBUserAccount, 0)
 	for _, rawUser := range rawUsers {
-		var user configmodels.DBUser
+		var user configmodels.DBUserAccount
 		err := json.Unmarshal(configmodels.MapToByte(rawUser), &user)
 		if err != nil {
 			logger.DbLog.Errorf(errorRetrieveUserAccount)
@@ -68,70 +73,72 @@ func fetchDBUsers() ([]*configmodels.DBUser, error) {
 func GetUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("get user account")
 	username := c.Param("username")
-	dbUser, err := fetchDBUser(username)
+	dbUserAccount, err := fetchDBUserAccount(username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
 		return
 	}
-	if dbUser == nil {
+	if dbUserAccount == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": errorUsernameNotFound})
 		return
 	}
-	userResponse := configmodels.TransformDBUserToUserResponse(*dbUser)
+	userResponse := configmodels.GetUserAccountResponse{
+		Username: dbUserAccount.Username,
+		Role:     dbUserAccount.Role,
+	}
 	c.JSON(http.StatusOK, userResponse)
 }
 
-func fetchDBUser(username string) (*configmodels.DBUser, error) {
+func fetchDBUserAccount(username string) (*configmodels.DBUserAccount, error) {
 	filter := bson.M{"username": username}
-	rawUser, err := dbadapter.WebuiDBClient.RestfulAPIGetOne(UserAccountDataColl, filter)
+	rawUserAccount, err := dbadapter.WebuiDBClient.RestfulAPIGetOne(UserAccountDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
 		return nil, err
 	}
-	if len(rawUser) == 0 {
+	if len(rawUserAccount) == 0 {
 		return nil, nil
 	}
-	var user configmodels.DBUser
-	err = json.Unmarshal(configmodels.MapToByte(rawUser), &user)
+	var userAccount configmodels.DBUserAccount
+	err = json.Unmarshal(configmodels.MapToByte(rawUserAccount), &userAccount)
 	if err != nil {
 		logger.AuthLog.Errorln(err.Error())
 		return nil, err
 	}
-	return &user, nil
+	return &userAccount, nil
 }
 
-func PostUserAccount(c *gin.Context) {
+func CreateUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("create user account")
-	var createUserParam configmodels.CreateUserParams
-	err := c.ShouldBindJSON(&createUserParam)
+	var createUserParams configmodels.CreateUserAccountParams
+	err := c.ShouldBindJSON(&createUserParams)
 	if err != nil {
 		logger.AuthLog.Errorln(err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidDataProvided})
 		return
 	}
-	if createUserParam.Username == "" {
+	if createUserParams.Username == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingUsername})
 		return
 	}
-	if createUserParam.Password == "" {
+	if createUserParams.Password == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingPassword})
 		return
 	}
-	if !validatePassword(createUserParam.Password) {
-		logger.AuthLog.Errorln("invalid password provided")
+	if !validatePassword(createUserParams.Password) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidPassword})
 		return
 	}
-	createUserParam.Role = UserRole
+	newUserRole := UserRole
 	isFirstAccountIssued, err := IsFirstAccountIssued()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccounts})
 		return
 	}
 	if !isFirstAccountIssued {
-		createUserParam.Role = AdminRole
+		newUserRole = AdminRole
 	}
-	dbUser, err := configmodels.TransformCreateUserParamsToDBUser(createUserParam)
+	dbUser, err := configmodels.CreateNewDBUserAccount(createUserParams.Username, createUserParams.Password, newUserRole)
 	if err != nil {
 		logger.AuthLog.Errorln(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorCreateUserAccount})
@@ -155,17 +162,16 @@ func PostUserAccount(c *gin.Context) {
 func DeleteUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("delete user account")
 	username := c.Param("username")
-	dbUser, err := fetchDBUser(username)
+	dbUserAccount, err := fetchDBUserAccount(username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
 		return
 	}
-	if dbUser == nil {
+	if dbUserAccount == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": errorUsernameNotFound})
 		return
 	}
-	if dbUser.Role == AdminRole {
-		logger.AuthLog.Errorln(errorDeleteAdminAccount)
+	if dbUserAccount.Role == AdminRole {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorDeleteAdminAccount})
 		return
 	}
@@ -182,22 +188,22 @@ func DeleteUserAccount(c *gin.Context) {
 func ChangeUserAccountPasssword(c *gin.Context) {
 	logger.WebUILog.Infoln("change user password")
 	username := c.Param("username")
-	var userParams configmodels.CreateUserParams
-	err := c.ShouldBindJSON(&userParams)
+	var changePasswordParams configmodels.ChangePasswordParams
+	err := c.ShouldBindJSON(&changePasswordParams)
 	if err != nil {
 		logger.AuthLog.Errorln(err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidDataProvided})
 		return
 	}
-	if userParams.Password == "" {
+	if changePasswordParams.Password == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingPassword})
 		return
 	}
-	if !validatePassword(userParams.Password) {
+	if !validatePassword(changePasswordParams.Password) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidPassword})
 		return
 	}
-	dbUser, err := fetchDBUser(username)
+	dbUser, err := fetchDBUserAccount(username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
 		return
@@ -206,15 +212,14 @@ func ChangeUserAccountPasssword(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": errorUsernameNotFound})
 		return
 	}
-	newPasswordDbUser, err := configmodels.TransformCreateUserParamsToDBUser(userParams)
+	newPasswordDbUser, err := configmodels.CreateNewDBUserAccount(dbUser.Username, changePasswordParams.Password, dbUser.Role)
 	if err != nil {
 		logger.AuthLog.Errorln(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorUpdateUserAccount})
 		return
 	}
-	dbUser.HashedPassword = newPasswordDbUser.HashedPassword
-	filter := bson.M{"username": dbUser.Username}
-	_, err = dbadapter.WebuiDBClient.RestfulAPIPost(UserAccountDataColl, filter, configmodels.ToBsonM(dbUser))
+	filter := bson.M{"username": newPasswordDbUser.Username}
+	_, err = dbadapter.WebuiDBClient.RestfulAPIPost(UserAccountDataColl, filter, configmodels.ToBsonM(newPasswordDbUser))
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorUpdateUserAccount})
@@ -223,48 +228,7 @@ func ChangeUserAccountPasssword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func Login(jwtSecret []byte) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var inputUser configmodels.CreateUserParams
-		err := c.ShouldBindJSON(&inputUser)
-		if err != nil {
-			logger.AuthLog.Errorln(err.Error())
-			c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidDataProvided})
-			return
-		}
-		if inputUser.Username == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingUsername})
-			return
-		}
-		if inputUser.Password == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingPassword})
-			return
-		}
-		dbUser, err := fetchDBUser(inputUser.Username)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
-			return
-		}
-		if dbUser == nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
-			return
-		}
-		if err = bcrypt.CompareHashAndPassword([]byte(dbUser.HashedPassword), []byte(inputUser.Password)); err != nil {
-			logger.AuthLog.Errorln(err.Error())
-			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
-			return
-		}
-		jwt, err := generateJWT(dbUser.Username, dbUser.Role, jwtSecret)
-		if err != nil {
-			logger.AuthLog.Errorln(err.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{"error": errorLogin})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"token": jwt})
-	}
-}
-
-func IsFirstAccountIssued() (bool, error) {
+var IsFirstAccountIssued = func() (bool, error) {
 	users, err := fetchDBUsers()
 	if err != nil {
 		return false, err

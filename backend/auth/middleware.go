@@ -7,9 +7,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
@@ -35,21 +33,6 @@ func GenerateJWTSecret() ([]byte, error) {
 	return bytes, nil
 }
 
-var generateJWT = func(username string, role int, jwtSecret []byte) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtGocertClaims{
-		Username: username,
-		Role:     role,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Hour * 1).Unix(),
-		},
-	})
-	tokenString, err := token.SignedString(jwtSecret)
-	if err != nil {
-		return "", err
-	}
-	return tokenString, nil
-}
-
 // authMiddleware intercepts requests that need authorization to check if the user's token exists and is
 // permitted to use the endpoint
 func AuthMiddleware(jwtSecret []byte) gin.HandlerFunc {
@@ -58,19 +41,19 @@ func AuthMiddleware(jwtSecret []byte) gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		if c.Request.Method == "POST" && strings.HasSuffix(c.Request.URL.Path, "account") {
-			firstAccountIssued, err := IsFirstAccountIssued()
-			if err != nil {
-				logger.AuthLog.Errorln(err.Error())
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to authorize user account creation"})
-				c.Abort()
-				return
-			}
-			if !firstAccountIssued {
-				c.Next()
-				return
-			}
+		_, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
+		if err != nil {
+			logger.AuthLog.Errorln(err.Error())
+			c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("auth failed: %s", err.Error())})
+			c.Abort()
+			return
 		}
+		c.Next()
+	}
+}
+
+func adminOnly(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Context) {
+	return func(c *gin.Context) {
 		claims, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())
@@ -78,20 +61,76 @@ func AuthMiddleware(jwtSecret []byte) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if claims.Role == UserRole && strings.HasPrefix(c.Request.URL.Path, "/config/v1/account") {
-			requestAllowed, err := requestAllowedForRegularUser(claims, c.Request.Method, c.Request.URL.Path)
+		if claims.Role != AdminRole {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized: admin access required"})
+			c.Abort()
+			return
+		}
+		handler(c)
+	}
+}
+
+func adminOrMe(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		claims, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
+		if err != nil {
+			logger.AuthLog.Errorln(err.Error())
+			c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("auth failed: %s", err.Error())})
+			c.Abort()
+			return
+		}
+		if claims.Role == AdminRole || (claims.Role == UserRole && claims.Username == c.Param("username")) {
+			handler(c)
+			return
+		}
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized: admin or me access required"})
+		c.Abort()
+	}
+}
+
+func adminOrUser(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		claims, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
+		if err != nil {
+			logger.AuthLog.Errorln(err.Error())
+			c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("auth failed: %s", err.Error())})
+			c.Abort()
+			return
+		}
+		if claims.Role == AdminRole || claims.Role == UserRole {
+			handler(c)
+			return
+		}
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "forbidden: admin or user access required"})
+		c.Abort()
+	}
+}
+
+func adminOrFirstUser(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Context) {
+	return func(c *gin.Context) {
+
+		firstAccountIssued, err := IsFirstAccountIssued()
+		if err != nil {
+			logger.AuthLog.Errorln(err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to authorize"})
+			c.Abort()
+			return
+		}
+		if firstAccountIssued {
+			claims, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to authorize operation"})
+				logger.AuthLog.Errorln(firstAccountIssued)
+				c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("auth failed: %s", err.Error())})
 				c.Abort()
 				return
 			}
-			if !requestAllowed {
-				c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			if claims.Role != AdminRole {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized: admin access required"})
 				c.Abort()
 				return
 			}
 		}
-		c.Next()
+		handler(c)
 	}
 }
 
@@ -122,27 +161,4 @@ func getClaimsFromJWT(bearerToken string, JwtSecret []byte) (*jwtGocertClaims, e
 		return nil, err
 	}
 	return &claims, nil
-}
-
-func requestAllowedForRegularUser(claims *jwtGocertClaims, method, path string) (bool, error) {
-	allowedPaths := []struct {
-		method, pathRegex string
-	}{
-		{"GET", `/config/v1/account\/(\w+)$`},
-		{"POST", `/config/v1/account\/(\w+)\/change_password$`},
-	}
-	for _, pr := range allowedPaths {
-		regex, err := regexp.Compile(pr.pathRegex)
-		if err != nil {
-			return false, fmt.Errorf("regex couldn't compile: %s", err)
-		}
-		matches := regex.FindStringSubmatch(path)
-		if len(matches) > 0 && method == pr.method {
-			if matches[1] == claims.Username {
-				return true, nil
-			}
-			return false, nil
-		}
-	}
-	return false, nil
 }

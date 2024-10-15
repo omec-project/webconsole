@@ -84,14 +84,14 @@ func (m *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bs
 	rawUser := map[string]interface{}{
 		"username": "johndoe",
 		"password": 1234,
-		"role":     0,
+		"role":     "a",
 	}
 	return rawUser, nil
 }
 
 func (m *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	rawUsers := []map[string]interface{}{
-		{"username": "johndoe", "password": 1234, "role": 0},
+		{"username": "johndoe", "password": 1234, "role": "a"},
 		{"username": "janedoe", "password": hashPassword("Password123"), "role": 1},
 	}
 	return rawUsers, nil
@@ -134,14 +134,6 @@ func (m *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filter
 
 func (db *MockMongoClientDuplicateCreation) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
 	return errors.New("E11000")
-}
-
-func mockGeneratePassword() (string, error) {
-	return "ValidPass123!", nil
-}
-
-func mockGeneratePasswordFailure() (string, error) {
-	return "", errors.New("password generation failed")
 }
 
 func TestGetUserAccounts(t *testing.T) {
@@ -269,81 +261,64 @@ func TestPostUserAccount(t *testing.T) {
 	AddService(router, mockJWTSecret)
 
 	testCases := []struct {
-		name                 string
-		dbAdapter            dbadapter.DBInterface
-		generatePasswordMock func() (string, error)
-		inputData            string
-		expectedCode         int
-		expectedBody         string
+		name         string
+		dbAdapter    dbadapter.DBInterface
+		inputData    string
+		expectedCode int
+		expectedBody string
 	}{
 		{
-			name:                 "RequestWithoutUsername",
-			dbAdapter:            &MockMongoClientSuccess{},
-			generatePasswordMock: mockGeneratePassword,
-			inputData:            "{}",
-			expectedCode:         http.StatusBadRequest,
-			expectedBody:         fmt.Sprintf(`{"error":"%s"}`, errorMissingUsername),
+			name:         "RequestWithoutUsername",
+			dbAdapter:    &MockMongoClientSuccess{},
+			inputData:    `{"password" : "Admin1234"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorMissingUsername),
 		},
 		{
-			name:                 "UserThatAlreadyExists",
-			dbAdapter:            &MockMongoClientDuplicateCreation{},
-			generatePasswordMock: mockGeneratePassword,
-			inputData:            `{"username": "janedoe"}`,
-			expectedCode:         http.StatusBadRequest,
-			expectedBody:         `{"error":"user account already exists"}`,
+			name:         "UserThatAlreadyExists",
+			dbAdapter:    &MockMongoClientDuplicateCreation{},
+			inputData:    `{"username": "janedoe", "password" : "Admin1234"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"user account already exists"}`,
 		},
 		{
-			name:                 "RequestWithoutPassword",
-			dbAdapter:            &MockMongoClientEmptyDB{},
-			generatePasswordMock: mockGeneratePassword,
-			inputData:            `{"username": "adminadmin"}`,
-			expectedCode:         http.StatusCreated,
-			expectedBody:         `{"password":"ValidPass123!"}`,
+			name:         "RequestWithoutPassword",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"username": "adminadmin"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorMissingPassword),
 		},
 		{
-			name:                 "RequestWithPassword",
-			dbAdapter:            &MockMongoClientEmptyDB{},
-			generatePasswordMock: mockGeneratePassword,
-			inputData:            `{"username": "adminadmin", "password" : "Admin1234"}`,
-			expectedCode:         http.StatusCreated,
-			expectedBody:         `{}`,
+			name:         "SuccessfulRequest",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"username": "adminadmin", "password" : "Admin1234"}`,
+			expectedCode: http.StatusCreated,
+			expectedBody: `{}`,
 		},
 		{
-			name:                 "DBError",
-			dbAdapter:            &MockMongoClientDBError{},
-			generatePasswordMock: mockGeneratePassword,
-			inputData:            `{"username": "adminadmin", "password" : "Admin1234"}`,
-			expectedCode:         http.StatusInternalServerError,
-			expectedBody:         fmt.Sprintf(`{"error":"%s"}`, errorRetrieveUserAccounts),
+			name:         "DBError",
+			dbAdapter:    &MockMongoClientDBError{},
+			inputData:    `{"username": "adminadmin", "password" : "Admin1234"}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorRetrieveUserAccounts),
 		},
 		{
-			name:                 "InvalidPassword",
-			dbAdapter:            &MockMongoClientSuccess{},
-			generatePasswordMock: mockGeneratePassword,
-			inputData:            `{"username": "adminadmin", "password" : "1234"}`,
-			expectedCode:         http.StatusBadRequest,
-			expectedBody:         fmt.Sprintf(`{"error":"%s"}`, errorInvalidPassword),
+			name:         "InvalidPassword",
+			dbAdapter:    &MockMongoClientSuccess{},
+			inputData:    `{"username": "adminadmin", "password" : "1234"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorInvalidPassword),
 		},
 		{
-			name:                 "ErrorGeneratingPassword",
-			dbAdapter:            &MockMongoClientSuccess{},
-			generatePasswordMock: mockGeneratePasswordFailure,
-			inputData:            `{"username": "adminadmin"}`,
-			expectedCode:         http.StatusInternalServerError,
-			expectedBody:         fmt.Sprintf(`{"error":"%s"}`, errorCreateUserAccount),
-		},
-		{
-			name:                 "InvalidJsonProvided",
-			dbAdapter:            &MockMongoClientSuccess{},
-			generatePasswordMock: mockGeneratePassword,
-			inputData:            `{"username": "adminadmin", "password": 1234}`,
-			expectedCode:         http.StatusBadRequest,
-			expectedBody:         fmt.Sprintf(`{"error":"%s"}`, errorInvalidDataProvided),
+			name:         "InvalidJsonProvided",
+			dbAdapter:    &MockMongoClientSuccess{},
+			inputData:    `{"username": "adminadmin", "password": 1234}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorInvalidDataProvided),
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			generatePassword = tc.generatePasswordMock
 			dbadapter.WebuiDBClient = tc.dbAdapter
 			req, err := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(tc.inputData))
 			if err != nil {

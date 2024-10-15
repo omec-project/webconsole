@@ -4,11 +4,8 @@
 package auth
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"math/big"
-	mrand "math/rand"
 	"net/http"
 	"regexp"
 	"strings"
@@ -39,30 +36,30 @@ const (
 )
 
 func GetUserAccounts(c *gin.Context) {
-	users, err := fetchUsers()
+	dbUsers, err := fetchDBUsers()
+	userResponses := configmodels.TransformDBUsersToUserResponses(dbUsers)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, users)
+	c.JSON(http.StatusOK, userResponses)
 }
 
-func fetchUsers() ([]*configmodels.User, error) {
+func fetchDBUsers() ([]*configmodels.DBUser, error) {
 	rawUsers, err := dbadapter.WebuiDBClient.RestfulAPIGetMany(UserAccountDataColl, bson.M{})
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
 		return nil, errors.New(errorRetrieveUserAccounts)
 	}
-	var users []*configmodels.User
-	users = make([]*configmodels.User, 0)
+	var users []*configmodels.DBUser
+	users = make([]*configmodels.DBUser, 0)
 	for _, rawUser := range rawUsers {
-		var user configmodels.User
+		var user configmodels.DBUser
 		err := json.Unmarshal(configmodels.MapToByte(rawUser), &user)
 		if err != nil {
 			logger.DbLog.Errorf(errorRetrieveUserAccount)
 			continue
 		}
-		user.Password = ""
 		users = append(users, &user)
 	}
 	return users, nil
@@ -71,20 +68,20 @@ func fetchUsers() ([]*configmodels.User, error) {
 func GetUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("get user account")
 	username := c.Param("username")
-	user, err := fetchUser(username)
+	dbUser, err := fetchDBUser(username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
 		return
 	}
-	if user == nil {
+	if dbUser == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": errorUsernameNotFound})
 		return
 	}
-	user.Password = ""
-	c.JSON(http.StatusOK, user)
+	userResponse := configmodels.TransformDBUserToUserResponse(*dbUser)
+	c.JSON(http.StatusOK, userResponse)
 }
 
-func fetchUser(username string) (*configmodels.User, error) {
+func fetchDBUser(username string) (*configmodels.DBUser, error) {
 	filter := bson.M{"username": username}
 	rawUser, err := dbadapter.WebuiDBClient.RestfulAPIGetOne(UserAccountDataColl, filter)
 	if err != nil {
@@ -94,7 +91,7 @@ func fetchUser(username string) (*configmodels.User, error) {
 	if len(rawUser) == 0 {
 		return nil, nil
 	}
-	var user configmodels.User
+	var user configmodels.DBUser
 	err = json.Unmarshal(configmodels.MapToByte(rawUser), &user)
 	if err != nil {
 		logger.AuthLog.Errorln(err.Error())
@@ -105,51 +102,43 @@ func fetchUser(username string) (*configmodels.User, error) {
 
 func PostUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("create user account")
-	var user configmodels.User
-	err := c.ShouldBindJSON(&user)
+	var createUserParam configmodels.CreateUserParams
+	err := c.ShouldBindJSON(&createUserParam)
 	if err != nil {
 		logger.AuthLog.Errorln(err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidDataProvided})
 		return
 	}
-	if user.Username == "" {
+	if createUserParam.Username == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingUsername})
 		return
 	}
-	shouldGeneratePassword := user.Password == ""
-	if shouldGeneratePassword {
-		generatedPassword, passwordErr := generatePassword()
-		if passwordErr != nil {
-			logger.AuthLog.Errorln(passwordErr.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{"error": errorCreateUserAccount})
-			return
-		}
-		user.Password = generatedPassword
+	if createUserParam.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingPassword})
+		return
 	}
-	if !validatePassword(user.Password) {
+	if !validatePassword(createUserParam.Password) {
 		logger.AuthLog.Errorln("invalid password provided")
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidPassword})
 		return
 	}
-	user.Role = UserRole
+	createUserParam.Role = UserRole
 	isFirstAccountIssued, err := IsFirstAccountIssued()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccounts})
 		return
 	}
 	if !isFirstAccountIssued {
-		user.Role = AdminRole
+		createUserParam.Role = AdminRole
 	}
-	password := user.Password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	dbUser, err := configmodels.TransformCreateUserParamsToDBUser(createUserParam)
 	if err != nil {
 		logger.AuthLog.Errorln(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorCreateUserAccount})
-		return
 	}
-	user.Password = string(hashedPassword)
-	filter := bson.M{"username": user.Username}
-	err = dbadapter.WebuiDBClient.RestfulAPIPostMany(UserAccountDataColl, filter, []interface{}{configmodels.ToBsonM(user)})
+
+	filter := bson.M{"username": dbUser.Username}
+	err = dbadapter.WebuiDBClient.RestfulAPIPostMany(UserAccountDataColl, filter, []interface{}{configmodels.ToBsonM(dbUser)})
 	if err != nil {
 		if strings.Contains(err.Error(), "E11000") {
 			logger.DbLog.Errorln("Duplicate username found:", err)
@@ -160,17 +149,13 @@ func PostUserAccount(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorCreateUserAccount})
 		return
 	}
-	if shouldGeneratePassword {
-		c.JSON(http.StatusCreated, gin.H{"password": password})
-		return
-	}
 	c.JSON(http.StatusCreated, gin.H{})
 }
 
 func DeleteUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("delete user account")
 	username := c.Param("username")
-	dbUser, err := fetchUser(username)
+	dbUser, err := fetchDBUser(username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
 		return
@@ -197,22 +182,22 @@ func DeleteUserAccount(c *gin.Context) {
 func ChangeUserAccountPasssword(c *gin.Context) {
 	logger.WebUILog.Infoln("change user password")
 	username := c.Param("username")
-	var user configmodels.User
-	err := c.ShouldBindJSON(&user)
+	var userParams configmodels.CreateUserParams
+	err := c.ShouldBindJSON(&userParams)
 	if err != nil {
 		logger.AuthLog.Errorln(err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidDataProvided})
 		return
 	}
-	if user.Password == "" {
+	if userParams.Password == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingPassword})
 		return
 	}
-	if !validatePassword(user.Password) {
+	if !validatePassword(userParams.Password) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidPassword})
 		return
 	}
-	dbUser, err := fetchUser(username)
+	dbUser, err := fetchDBUser(username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
 		return
@@ -221,13 +206,13 @@ func ChangeUserAccountPasssword(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": errorUsernameNotFound})
 		return
 	}
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	newPasswordDbUser, err := configmodels.TransformCreateUserParamsToDBUser(userParams)
 	if err != nil {
 		logger.AuthLog.Errorln(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorUpdateUserAccount})
 		return
 	}
-	dbUser.Password = string(hashedPassword)
+	dbUser.HashedPassword = newPasswordDbUser.HashedPassword
 	filter := bson.M{"username": dbUser.Username}
 	_, err = dbadapter.WebuiDBClient.RestfulAPIPost(UserAccountDataColl, filter, configmodels.ToBsonM(dbUser))
 	if err != nil {
@@ -240,7 +225,7 @@ func ChangeUserAccountPasssword(c *gin.Context) {
 
 func Login(jwtSecret []byte) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var inputUser configmodels.User
+		var inputUser configmodels.CreateUserParams
 		err := c.ShouldBindJSON(&inputUser)
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())
@@ -255,7 +240,7 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingPassword})
 			return
 		}
-		dbUser, err := fetchUser(inputUser.Username)
+		dbUser, err := fetchDBUser(inputUser.Username)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
 			return
@@ -264,7 +249,8 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
 			return
 		}
-		if err = bcrypt.CompareHashAndPassword([]byte(dbUser.Password), []byte(inputUser.Password)); err != nil {
+		if err = bcrypt.CompareHashAndPassword([]byte(dbUser.HashedPassword), []byte(inputUser.Password)); err != nil {
+			logger.AuthLog.Errorln(err.Error())
 			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
 			return
 		}
@@ -279,54 +265,11 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 }
 
 func IsFirstAccountIssued() (bool, error) {
-	users, err := fetchUsers()
+	users, err := fetchDBUsers()
 	if err != nil {
 		return false, err
 	}
 	return len(users) > 0, nil
-}
-
-// Generates a random 16 chars long password that contains uppercase and lowercase characters and numbers or symbols.
-var generatePassword = func() (string, error) {
-	const (
-		uppercaseSet         = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		lowercaseSet         = "abcdefghijklmnopqrstuvwxyz"
-		numbersAndSymbolsSet = "0123456789*?@"
-		allCharsSet          = uppercaseSet + lowercaseSet + numbersAndSymbolsSet
-	)
-	uppercase, err := getRandomChars(uppercaseSet, 2)
-	if err != nil {
-		return "", err
-	}
-	lowercase, err := getRandomChars(lowercaseSet, 2)
-	if err != nil {
-		return "", err
-	}
-	numbersOrSymbols, err := getRandomChars(numbersAndSymbolsSet, 2)
-	if err != nil {
-		return "", err
-	}
-	allChars, err := getRandomChars(allCharsSet, 10)
-	if err != nil {
-		return "", err
-	}
-	res := []rune(uppercase + lowercase + numbersOrSymbols + allChars)
-	mrand.Shuffle(len(res), func(i, j int) {
-		res[i], res[j] = res[j], res[i]
-	})
-	return string(res), nil
-}
-
-func getRandomChars(charset string, length int) (string, error) {
-	result := make([]byte, length)
-	for i := range result {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-		if err != nil {
-			return "", err
-		}
-		result[i] = charset[n.Int64()]
-	}
-	return string(result), nil
 }
 
 func validatePassword(password string) bool {

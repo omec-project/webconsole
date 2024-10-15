@@ -42,7 +42,7 @@ func setUpMockedRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	dbadapter.WebuiDBClient = &MockMongoClientSuccess{}
-	//router.Use(AuthMiddleware(mockJWTSecret))
+	router.Use(AuthMiddleware(mockJWTSecret))
 	router.GET("/config/v1/account", adminOnly(mockJWTSecret, MockOperation))
 	router.GET("/config/v1/account/:username", adminOrMe(mockJWTSecret, MockOperation))
 	router.DELETE("/config/v1/account/:username", adminOnly(mockJWTSecret, MockOperation))

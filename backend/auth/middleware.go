@@ -41,6 +41,10 @@ func AuthMiddleware(jwtSecret []byte) gin.HandlerFunc {
 			c.Next()
 			return
 		}
+		if strings.HasPrefix(c.Request.URL.Path, "/config/v1/account") {
+			c.Next()
+			return
+		}
 		_, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())

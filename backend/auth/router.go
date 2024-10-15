@@ -53,6 +53,12 @@ func rootRoutesWithSecret(jwtSecret []byte) Routes {
 			"/login",
 			Login(jwtSecret),
 		},
+		{
+			"Status",
+			http.MethodGet,
+			"/status",
+			GetStatus(jwtSecret),
+		},
 	}
 }
 

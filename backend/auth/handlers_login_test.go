@@ -20,7 +20,7 @@ func TestLogin_FailureCases(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	mockJWTSecret := []byte("mockSecret")
-	//router.Use(AuthMiddleware(mockJWTSecret))
+	router.Use(AuthMiddleware(mockJWTSecret))
 	AddService(router, mockJWTSecret)
 
 	testCases := []struct {
@@ -105,7 +105,7 @@ func TestLogin_SuccessCases(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	mockJWTSecret := []byte("mockSecret")
-	//router.Use(AuthMiddleware(mockJWTSecret))
+	router.Use(AuthMiddleware(mockJWTSecret))
 	AddService(router, mockJWTSecret)
 
 	testCases := []struct {

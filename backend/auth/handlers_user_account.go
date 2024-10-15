@@ -229,11 +229,11 @@ func ChangeUserAccountPasssword(c *gin.Context) {
 }
 
 var IsFirstAccountIssued = func() (bool, error) {
-	users, err := fetchDBUsers()
+	numOfUserAccounts, err := dbadapter.WebuiDBClient.RestfulAPICount(UserAccountDataColl, bson.M{})
 	if err != nil {
 		return false, err
 	}
-	return len(users) > 0, nil
+	return numOfUserAccounts > 0, nil
 }
 
 func validatePassword(password string) bool {

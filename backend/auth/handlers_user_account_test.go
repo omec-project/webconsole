@@ -66,6 +66,10 @@ func (db *MockMongoClientEmptyDB) RestfulAPIPostMany(collName string, filter bso
 	return nil
 }
 
+func (db *MockMongoClientEmptyDB) RestfulAPICount(collName string, filter bson.M) (int64, error) {
+	return 0, nil
+}
+
 func (m *MockMongoClientDBError) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	return nil, errors.New("DB error")
 }
@@ -76,6 +80,10 @@ func (m *MockMongoClientDBError) RestfulAPIGetMany(coll string, filter bson.M) (
 
 func (m *MockMongoClientDBError) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
 	return false, errors.New("DB error")
+}
+
+func (db *MockMongoClientDBError) RestfulAPICount(collName string, filter bson.M) (int64, error) {
+	return 0, errors.New("DB error")
 }
 
 func (m *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
@@ -114,6 +122,10 @@ func (m *MockMongoClientSuccess) RestfulAPIPost(collName string, filter bson.M, 
 	return true, nil
 }
 
+func (db *MockMongoClientSuccess) RestfulAPICount(collName string, filter bson.M) (int64, error) {
+	return 5, nil
+}
+
 func (m *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	rawUser := map[string]interface{}{
 		"username": "johndoe", "password": hashPassword("password-123"), "role": 0,
@@ -132,6 +144,10 @@ func (m *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filter
 
 func (db *MockMongoClientDuplicateCreation) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
 	return errors.New("E11000")
+}
+
+func (db *MockMongoClientDuplicateCreation) RestfulAPICount(collName string, filter bson.M) (int64, error) {
+	return 1, nil
 }
 
 func TestGetUserAccountsHandler(t *testing.T) {
@@ -250,7 +266,7 @@ func TestGetUserAccountHandler(t *testing.T) {
 	}
 }
 
-func TestPostUserAccountHandler(t *testing.T) {
+func TestCreateUserAccountHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	router.POST("/config/v1/account", CreateUserAccount)

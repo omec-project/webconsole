@@ -17,7 +17,7 @@ features Configuration Service provides APIs for subscriber management.
 4. 5G clients can connect & get complete configuration copy through grpc interface.
 5. 4G clients communicate with Webconsole through REST interface
 
-# UI
+## UI
 
 Webconsole can optionally serve static files, which constitute the frontend part of the application.
 
@@ -34,6 +34,12 @@ http://<webconsole-ip>:5000/
 ```
 
 An example static file has been placed in the `webconsole/ui/frontend_files` directory.
+
+## Authentication and Authorization
+
+The authentication and authorization feature ensures that only verified and authorized users can access the webui resources and interect with the system.
+
+This an optional feature that is disabled by default. For more details, refer to this [file](backend/auth/README.md).
 
 ## Webconsole Architecture diagram
 

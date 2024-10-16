@@ -74,14 +74,14 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
 			return
 		}
-		jwt, err := GenerateJWT(dbUser.Username, dbUser.Role, jwtSecret)
+		token, err := GenerateJWT(dbUser.Username, dbUser.Role, jwtSecret)
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{"error": errorLogin})
 			return
 		}
 		loginResponse := LoginResponse{
-			Token: jwt,
+			Token: token,
 		}
 		c.JSON(http.StatusOK, loginResponse)
 	}
@@ -92,7 +92,7 @@ func expireAfter() int64 {
 }
 
 func GenerateJWT(username string, role int, jwtSecret []byte) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtGocertClaims{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtWebconsoleClaims{
 		Username: username,
 		Role:     role,
 		StandardClaims: jwt.StandardClaims{

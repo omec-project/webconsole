@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	SUCCESS_BODY = `{"Result":"Operation Executed"}`
-	BEARER       = "Bearer "
+	successBody = `{"Result":"Operation Executed"}`
+	bearer      = "Bearer "
 )
 
 var (
@@ -283,7 +283,7 @@ func TestGetUserAccounts_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			username:     "janedoe",
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCCESS_BODY,
+			expectedBody: successBody,
 		},
 		{
 			name:         "RegularUser_GetUserAccounts",
@@ -303,7 +303,7 @@ func TestGetUserAccounts_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
-			validToken := BEARER + jwtToken
+			validToken := bearer + jwtToken
 			req.Header.Set("Authorization", validToken)
 			w := httptest.NewRecorder()
 
@@ -334,14 +334,14 @@ func TestGetUserAccount_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			username:     "janedoe",
 			role:         configmodels.UserRole,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCCESS_BODY,
+			expectedBody: successBody,
 		},
 		{
 			name:         "AdminUser_GetOwnUserAccount",
 			username:     "janedoe",
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCCESS_BODY,
+			expectedBody: successBody,
 		},
 		{
 			name:         "RegularUser_GetOtherUserAccount",
@@ -355,7 +355,7 @@ func TestGetUserAccount_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			username:     "someuser",
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCCESS_BODY,
+			expectedBody: successBody,
 		},
 	}
 	for _, tc := range testCases {
@@ -368,7 +368,7 @@ func TestGetUserAccount_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
-			validToken := BEARER + jwtToken
+			validToken := bearer + jwtToken
 			req.Header.Set("Authorization", validToken)
 			w := httptest.NewRecorder()
 
@@ -396,7 +396,7 @@ func TestCreateUserAccount_CreateFirstUserWithoutHeaderAuthorization(t *testing.
 	router.ServeHTTP(w, req)
 
 	expectedCode := http.StatusOK
-	expectedBody := SUCCESS_BODY
+	expectedBody := successBody
 	if expectedCode != w.Code {
 		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
 	}
@@ -420,7 +420,7 @@ func TestCreateUserAccount_AdminAuthorizationMiddleware(t *testing.T) {
 			username:     "janedoe",
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCCESS_BODY,
+			expectedBody: successBody,
 		},
 		{
 			name:         "RegularUser_CreateUserAccoun",
@@ -440,7 +440,7 @@ func TestCreateUserAccount_AdminAuthorizationMiddleware(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
-			validToken := BEARER + jwtToken
+			validToken := bearer + jwtToken
 			req.Header.Set("Authorization", validToken)
 			w := httptest.NewRecorder()
 
@@ -478,7 +478,7 @@ func TestDeleteUserAccount_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			username:     "janedoe",
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCCESS_BODY,
+			expectedBody: successBody,
 		},
 		{
 			name:         "RegularUser_DeleteOtherUserAccount",
@@ -492,7 +492,7 @@ func TestDeleteUserAccount_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			username:     "someuser",
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCCESS_BODY,
+			expectedBody: successBody,
 		},
 	}
 	for _, tc := range testCases {
@@ -505,7 +505,7 @@ func TestDeleteUserAccount_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
-			validToken := BEARER + jwtToken
+			validToken := bearer + jwtToken
 			req.Header.Set("Authorization", validToken)
 			w := httptest.NewRecorder()
 
@@ -536,14 +536,14 @@ func TestChangePassword_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			username:     "janedoe",
 			role:         configmodels.UserRole,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCCESS_BODY,
+			expectedBody: successBody,
 		},
 		{
 			name:         "AdminUser_OwnUserAccount",
 			username:     "janedoe",
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCCESS_BODY,
+			expectedBody: successBody,
 		},
 		{
 			name:         "RegularUser_OtherUserAccount",
@@ -557,7 +557,7 @@ func TestChangePassword_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			username:     "someuser",
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
-			expectedBody: SUCCESS_BODY,
+			expectedBody: successBody,
 		},
 	}
 	for _, tc := range testCases {
@@ -570,7 +570,7 @@ func TestChangePassword_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
-			validToken := BEARER + jwtToken
+			validToken := bearer + jwtToken
 			req.Header.Set("Authorization", validToken)
 			w := httptest.NewRecorder()
 

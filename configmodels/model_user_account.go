@@ -8,10 +8,11 @@ import (
 )
 
 const (
-	UserRole            = 0
-	AdminRole           = 1
-	UserAccountDataColl = "webconsoleData.snapshots.userAccountData"
+	UserRole = iota
+	AdminRole
 )
+
+const UserAccountDataColl = "webconsoleData.snapshots.userAccountData"
 
 type DBUserAccount struct {
 	Username       string `json:"username"`

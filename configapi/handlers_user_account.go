@@ -128,6 +128,7 @@ func CreateUserAccount(c *gin.Context) {
 	if err != nil {
 		logger.WebUILog.Errorln(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorCreateUserAccount})
+		return
 	}
 
 	filter := bson.M{"username": dbUser.Username}

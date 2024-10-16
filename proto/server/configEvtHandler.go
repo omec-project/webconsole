@@ -724,30 +724,6 @@ func convertToString(val uint64) string {
 	return retStr
 }
 
-// seems something which we should move to mongolib
-func toBsonM(data interface{}) (ret bson.M) {
-	tmp, err := json.Marshal(data)
-	if err != nil {
-		logger.DbLog.Errorln("could not marshall data")
-		return nil
-	}
-	err = json.Unmarshal(tmp, &ret)
-	if err != nil {
-		logger.DbLog.Errorln("could not unmarshall data")
-		return nil
-	}
-	return ret
-}
-
-func mapToByte(data map[string]interface{}) (ret []byte) {
-	ret, err := json.Marshal(data)
-	if err != nil {
-		logger.DbLog.Errorln("could not marshall data")
-		return nil
-	}
-	return ret
-}
-
 func SnssaiModelsToHex(snssai models.Snssai) string {
 	sst := fmt.Sprintf("%02x", snssai.Sst)
 	return sst + snssai.Sd

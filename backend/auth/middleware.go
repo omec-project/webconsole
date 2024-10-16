@@ -17,7 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-type jwtGocertClaims struct {
+type jwtWebconsoleClaims struct {
 	Username string `json:"username"`
 	Role     int    `json:"role"`
 	jwt.StandardClaims
@@ -119,7 +119,7 @@ func AdminOrFirstUser(jwtSecret []byte, handler func(c *gin.Context)) func(c *gi
 	}
 }
 
-func getClaimsFromAuthorizationHeader(header string, JwtSecret []byte) (*jwtGocertClaims, error) {
+func getClaimsFromAuthorizationHeader(header string, JwtSecret []byte) (*jwtWebconsoleClaims, error) {
 	if header == "" {
 		return nil, fmt.Errorf("authorization header not found")
 	}
@@ -134,8 +134,8 @@ func getClaimsFromAuthorizationHeader(header string, JwtSecret []byte) (*jwtGoce
 	return claims, nil
 }
 
-func getClaimsFromJWT(bearerToken string, JwtSecret []byte) (*jwtGocertClaims, error) {
-	claims := jwtGocertClaims{}
+func getClaimsFromJWT(bearerToken string, JwtSecret []byte) (*jwtWebconsoleClaims, error) {
+	claims := jwtWebconsoleClaims{}
 	token, err := jwt.ParseWithClaims(bearerToken, &claims, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])

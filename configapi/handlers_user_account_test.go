@@ -49,16 +49,16 @@ func hashPassword(password string) string {
 	return string(hashed)
 }
 
-func (m *MockMongoClientEmptyDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
+func (db *MockMongoClientEmptyDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
 	return map[string]interface{}{}, nil
 }
 
-func (m *MockMongoClientEmptyDB) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+func (db *MockMongoClientEmptyDB) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	return results, nil
 }
 
-func (m *MockMongoClientEmptyDB) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
+func (db *MockMongoClientEmptyDB) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
 	return true, nil
 }
 
@@ -70,15 +70,15 @@ func (db *MockMongoClientEmptyDB) RestfulAPICount(collName string, filter bson.M
 	return 0, nil
 }
 
-func (m *MockMongoClientDBError) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (db *MockMongoClientDBError) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	return nil, errors.New("DB error")
 }
 
-func (m *MockMongoClientDBError) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+func (db *MockMongoClientDBError) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	return nil, errors.New("DB error")
 }
 
-func (m *MockMongoClientDBError) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
+func (db *MockMongoClientDBError) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
 	return false, errors.New("DB error")
 }
 
@@ -86,7 +86,7 @@ func (db *MockMongoClientDBError) RestfulAPICount(collName string, filter bson.M
 	return 0, errors.New("DB error")
 }
 
-func (m *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
+func (db *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
 	rawUser := map[string]interface{}{
 		"username": "johndoe",
 		"password": 1234,
@@ -95,7 +95,7 @@ func (m *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bs
 	return rawUser, nil
 }
 
-func (m *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+func (db *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	rawUsers := []map[string]interface{}{
 		{"username": "johndoe", "password": 1234, "role": "a"},
 		{"username": "janedoe", "password": hashPassword("Password123"), "role": 1},
@@ -103,14 +103,14 @@ func (m *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.
 	return rawUsers, nil
 }
 
-func (m *MockMongoClientSuccess) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (db *MockMongoClientSuccess) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	rawUser := map[string]interface{}{
 		"username": "janedoe", "password": hashPassword("password123!"), "role": 1,
 	}
 	return rawUser, nil
 }
 
-func (m *MockMongoClientSuccess) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+func (db *MockMongoClientSuccess) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	rawUsers := []map[string]interface{}{
 		{"username": "johndoe", "password": hashPassword(".password123"), "role": 0},
 		{"username": "janedoe", "password": hashPassword("password123"), "role": 1},
@@ -118,7 +118,7 @@ func (m *MockMongoClientSuccess) RestfulAPIGetMany(coll string, filter bson.M) (
 	return rawUsers, nil
 }
 
-func (m *MockMongoClientSuccess) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
+func (db *MockMongoClientSuccess) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
 	return true, nil
 }
 
@@ -126,18 +126,18 @@ func (db *MockMongoClientSuccess) RestfulAPICount(collName string, filter bson.M
 	return 5, nil
 }
 
-func (m *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (db *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	rawUser := map[string]interface{}{
 		"username": "johndoe", "password": hashPassword("password-123"), "role": 0,
 	}
 	return rawUser, nil
 }
 
-func (m *MockMongoClientRegularUser) RestfulAPIDeleteOne(collName string, filter bson.M) error {
+func (db *MockMongoClientRegularUser) RestfulAPIDeleteOne(collName string, filter bson.M) error {
 	return nil
 }
 
-func (m *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+func (db *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	return results, nil
 }

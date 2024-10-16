@@ -1,20 +1,30 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024 Canonical Ltd.
 
-package configapi
+package auth
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
-	"github.com/omec-project/webconsole/backend/auth"
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
+	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/crypto/bcrypt"
 )
 
-const errorLogin = "failed to log in"
+const (
+	errorIncorrectCredentials = "incorrect username or password. Try again"
+	errorInvalidDataProvided  = "invalid data provided"
+	errorLogin                = "failed to log in"
+	errorMissingPassword      = "password is required"
+	errorMissingUsername      = "username is required"
+	errorRetrieveUserAccount  = "failed to retrieve user account"
+)
 
 type LoginParams struct {
 	Username string `json:"username"`
@@ -42,13 +52,21 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingPassword})
 			return
 		}
-		dbUser, err := fetchDBUserAccount(loginParams.Username)
+
+		filter := bson.M{"username": loginParams.Username}
+		rawUserAccount, err := dbadapter.WebuiDBClient.RestfulAPIGetOne(configmodels.UserAccountDataColl, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
 			return
 		}
-		if dbUser == nil {
+		if len(rawUserAccount) == 0 {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
+			return
+		}
+		var dbUser configmodels.DBUserAccount
+		err = json.Unmarshal(configmodels.MapToByte(rawUserAccount), &dbUser)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
 			return
 		}
 		if err = bcrypt.CompareHashAndPassword([]byte(dbUser.HashedPassword), []byte(loginParams.Password)); err != nil {
@@ -56,7 +74,7 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
 			return
 		}
-		jwt, err := generateJWT(dbUser.Username, dbUser.Role, jwtSecret)
+		jwt, err := GenerateJWT(dbUser.Username, dbUser.Role, jwtSecret)
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{"error": errorLogin})
@@ -73,8 +91,8 @@ func expireAfter() int64 {
 	return time.Now().Add(time.Hour * 1).Unix()
 }
 
-func generateJWT(username string, role int, jwtSecret []byte) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, auth.JwtGocertClaims{
+func GenerateJWT(username string, role int, jwtSecret []byte) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtGocertClaims{
 		Username: username,
 		Role:     role,
 		StandardClaims: jwt.StandardClaims{

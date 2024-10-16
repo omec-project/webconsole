@@ -299,7 +299,7 @@ func TestGetUserAccounts_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			jwtToken, err := generateJWT(tc.username, tc.role, mockJWTSecret)
+			jwtToken, err := auth.GenerateJWT(tc.username, tc.role, mockJWTSecret)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
@@ -364,7 +364,7 @@ func TestGetUserAccount_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			jwtToken, err := generateJWT(tc.username, tc.role, mockJWTSecret)
+			jwtToken, err := auth.GenerateJWT(tc.username, tc.role, mockJWTSecret)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
@@ -436,7 +436,7 @@ func TestCreateUserAccount_AdminAuthorizationMiddleware(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			jwtToken, err := generateJWT(tc.username, tc.role, mockJWTSecret)
+			jwtToken, err := auth.GenerateJWT(tc.username, tc.role, mockJWTSecret)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
@@ -501,7 +501,7 @@ func TestDeleteUserAccount_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			jwtToken, err := generateJWT(tc.username, tc.role, mockJWTSecret)
+			jwtToken, err := auth.GenerateJWT(tc.username, tc.role, mockJWTSecret)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
@@ -566,7 +566,7 @@ func TestChangePassword_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			jwtToken, err := generateJWT(tc.username, tc.role, mockJWTSecret)
+			jwtToken, err := auth.GenerateJWT(tc.username, tc.role, mockJWTSecret)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}

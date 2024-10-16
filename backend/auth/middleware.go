@@ -17,7 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-type JwtGocertClaims struct {
+type jwtGocertClaims struct {
 	Username string `json:"username"`
 	Role     int    `json:"role"`
 	jwt.StandardClaims
@@ -50,6 +50,8 @@ func AdminOrUserAuthMiddleware(jwtSecret []byte) gin.HandlerFunc {
 	}
 }
 
+// AdminOnly check if the authorization token is valid for this endpoint.
+// Only tokens with AdminRole will be allowed.
 func AdminOnly(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		claims, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
@@ -68,6 +70,9 @@ func AdminOnly(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Conte
 	}
 }
 
+// AdminOrMe check if the authorization token is valid for this endpoint.
+// Admin role is allowed. UserRole is allowed with the condition of performing the action
+// over their own account
 func AdminOrMe(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		claims, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
@@ -86,24 +91,8 @@ func AdminOrMe(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Conte
 	}
 }
 
-func AdminOrUser(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Context) {
-	return func(c *gin.Context) {
-		claims, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
-		if err != nil {
-			logger.AuthLog.Errorln(err.Error())
-			c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("auth failed: %s", err.Error())})
-			c.Abort()
-			return
-		}
-		if claims.Role == configmodels.AdminRole || claims.Role == configmodels.UserRole {
-			handler(c)
-			return
-		}
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "forbidden: admin or user access required"})
-		c.Abort()
-	}
-}
-
+// AdminOrFirstUser check if the authorization token is valid for this endpoint.
+// check if the user has admin role or if the user is the first user before allowing access to the handler.
 func AdminOrFirstUser(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		numOfUserAccounts, err := dbadapter.WebuiDBClient.RestfulAPICount(configmodels.UserAccountDataColl, bson.M{})
@@ -130,7 +119,7 @@ func AdminOrFirstUser(jwtSecret []byte, handler func(c *gin.Context)) func(c *gi
 	}
 }
 
-func getClaimsFromAuthorizationHeader(header string, JwtSecret []byte) (*JwtGocertClaims, error) {
+func getClaimsFromAuthorizationHeader(header string, JwtSecret []byte) (*jwtGocertClaims, error) {
 	if header == "" {
 		return nil, fmt.Errorf("authorization header not found")
 	}
@@ -145,8 +134,8 @@ func getClaimsFromAuthorizationHeader(header string, JwtSecret []byte) (*JwtGoce
 	return claims, nil
 }
 
-func getClaimsFromJWT(bearerToken string, JwtSecret []byte) (*JwtGocertClaims, error) {
-	claims := JwtGocertClaims{}
+func getClaimsFromJWT(bearerToken string, JwtSecret []byte) (*jwtGocertClaims, error) {
+	claims := jwtGocertClaims{}
 	token, err := jwt.ParseWithClaims(bearerToken, &claims, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])

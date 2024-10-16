@@ -88,7 +88,7 @@ func fetchDBUserAccount(username string) (*configmodels.DBUserAccount, error) {
 	var userAccount configmodels.DBUserAccount
 	err = json.Unmarshal(configmodels.MapToByte(rawUserAccount), &userAccount)
 	if err != nil {
-		logger.AuthLog.Errorln(err.Error())
+		logger.WebUILog.Errorln(err.Error())
 		return nil, err
 	}
 	return &userAccount, nil
@@ -99,7 +99,7 @@ func CreateUserAccount(c *gin.Context) {
 	var createUserParams configmodels.CreateUserAccountParams
 	err := c.ShouldBindJSON(&createUserParams)
 	if err != nil {
-		logger.AuthLog.Errorln(err.Error())
+		logger.WebUILog.Errorln(err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidDataProvided})
 		return
 	}
@@ -126,7 +126,7 @@ func CreateUserAccount(c *gin.Context) {
 	}
 	dbUser, err := configmodels.CreateNewDBUserAccount(createUserParams.Username, createUserParams.Password, newUserRole)
 	if err != nil {
-		logger.AuthLog.Errorln(err.Error())
+		logger.WebUILog.Errorln(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorCreateUserAccount})
 	}
 
@@ -177,7 +177,7 @@ func ChangeUserAccountPasssword(c *gin.Context) {
 	var changePasswordParams configmodels.ChangePasswordParams
 	err := c.ShouldBindJSON(&changePasswordParams)
 	if err != nil {
-		logger.AuthLog.Errorln(err.Error())
+		logger.WebUILog.Errorln(err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidDataProvided})
 		return
 	}
@@ -200,7 +200,7 @@ func ChangeUserAccountPasssword(c *gin.Context) {
 	}
 	newPasswordDbUser, err := configmodels.CreateNewDBUserAccount(dbUser.Username, changePasswordParams.Password, dbUser.Role)
 	if err != nil {
-		logger.AuthLog.Errorln(err.Error())
+		logger.WebUILog.Errorln(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorUpdateUserAccount})
 		return
 	}

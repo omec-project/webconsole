@@ -150,7 +150,7 @@ func setupAuthenticationFeature(subconfig_router *gin.Engine) {
 			initLog.Errorf("Error initializing webuiDB %v", err)
 		}
 		configapi.AddUserAccountService(subconfig_router, jwtSecret)
-		configapi.AddAuthenticationService(subconfig_router, jwtSecret)
+		auth.AddAuthenticationService(subconfig_router, jwtSecret)
 		configapi.AddApiServiceWithAuthorization(subconfig_router, jwtSecret)
 		configapi.AddConfigV1ServiceWithAuthorization(subconfig_router, jwtSecret)
 	}

@@ -266,7 +266,7 @@ func TestLogin_SuccessCases(t *testing.T) {
 				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			var respondeData map[string]string
-			err = json.Unmarshal([]byte(w.Body.Bytes()), &respondeData)
+			err = json.Unmarshal(w.Body.Bytes(), &respondeData)
 			if err != nil {
 				t.Errorf("Unable to unmarshal response`%v`", w.Body.String())
 			}

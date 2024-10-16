@@ -20,9 +20,7 @@ const (
 	bearer      = "Bearer "
 )
 
-var (
-	mockJWTSecret = []byte("mockSecret")
-)
+var mockJWTSecret = []byte("mockSecret")
 
 func MockOperation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"Result": "Operation Executed"})

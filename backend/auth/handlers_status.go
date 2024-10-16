@@ -29,5 +29,4 @@ func GetStatus() gin.HandlerFunc {
 		}
 		c.JSON(http.StatusOK, statusResponse)
 	}
-
 }

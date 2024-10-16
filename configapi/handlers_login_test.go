@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024 Canonical Ltd.
 
-package auth
+package configapi
 
 import (
 	"encoding/json"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
+	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 )
 
@@ -20,8 +21,7 @@ func TestLogin_FailureCases(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	mockJWTSecret := []byte("mockSecret")
-	router.Use(AuthMiddleware(mockJWTSecret))
-	AddService(router, mockJWTSecret)
+	AddAuthenticationService(router, mockJWTSecret)
 
 	testCases := []struct {
 		name         string
@@ -105,8 +105,7 @@ func TestLogin_SuccessCases(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	mockJWTSecret := []byte("mockSecret")
-	router.Use(AuthMiddleware(mockJWTSecret))
-	AddService(router, mockJWTSecret)
+	AddAuthenticationService(router, mockJWTSecret)
 
 	testCases := []struct {
 		name             string
@@ -122,7 +121,7 @@ func TestLogin_SuccessCases(t *testing.T) {
 			inputData:        `{"username":"janedoe", "password":"password123!"}`,
 			expectedCode:     http.StatusOK,
 			expectedUsername: "janedoe",
-			expectedRole:     AdminRole,
+			expectedRole:     configmodels.AdminRole,
 		},
 		{
 			name:             "Success_RegularUser",
@@ -130,7 +129,7 @@ func TestLogin_SuccessCases(t *testing.T) {
 			inputData:        `{"username":"johndoe", "password":"password-123"}`,
 			expectedCode:     http.StatusOK,
 			expectedUsername: "johndoe",
-			expectedRole:     UserRole,
+			expectedRole:     configmodels.UserRole,
 		},
 	}
 	for _, tc := range testCases {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024 Canonical Ltd.
 
-package auth
+package configapi
 
 import (
 	"net/http"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
+	"github.com/omec-project/webconsole/backend/auth"
 	"github.com/omec-project/webconsole/backend/logger"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -73,7 +74,7 @@ func expireAfter() int64 {
 }
 
 func generateJWT(username string, role int, jwtSecret []byte) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtGocertClaims{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, auth.JwtGocertClaims{
 		Username: username,
 		Role:     role,
 		StandardClaims: jwt.StandardClaims{

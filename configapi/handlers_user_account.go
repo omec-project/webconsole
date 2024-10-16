@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024 Canonical Ltd.
 
-package auth
+package configapi
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"regexp"
 	"strings"
@@ -23,51 +22,38 @@ const (
 	errorDeleteUserAccount    = "failed to delete user account"
 	errorIncorrectCredentials = "incorrect username or password. Try again"
 	errorInvalidDataProvided  = "invalid data provided"
-	errorInvalidPassword      = "Password must have 8 or more characters, must include at least one capital letter, one lowercase letter, and either a number or a symbol."
+	errorInvalidPassword      = "password must have 8 or more characters, must include at least one capital letter, one lowercase letter, and either a number or a symbol."
 	errorMissingPassword      = "password is required"
 	errorMissingUsername      = "username is required"
-	errorRetrieveUserAccount  = "failed to retrieve user account from DB"
-	errorRetrieveUserAccounts = "failed to retrieve user accounts from DB"
+	errorRetrieveUserAccount  = "failed to retrieve user account"
+	errorRetrieveUserAccounts = "failed to retrieve user accounts"
 	errorUpdateUserAccount    = "failed to update user account"
 	errorUsernameNotFound     = "username not found"
-	UserAccountDataColl       = "webconsoleData.snapshots.userAccountData"
 )
 
 func GetUserAccounts(c *gin.Context) {
-	dbUsersAccounts, err := fetchDBUsers()
-	userResponses := make([]*configmodels.GetUserAccountResponse, len(dbUsersAccounts))
-
-	for i, dbUserAccount := range dbUsersAccounts {
-		userResponses[i] = &configmodels.GetUserAccountResponse{
-			Username: dbUserAccount.Username,
-			Role:     dbUserAccount.Role,
-		}
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, userResponses)
-}
-
-func fetchDBUsers() ([]*configmodels.DBUserAccount, error) {
-	rawUsers, err := dbadapter.WebuiDBClient.RestfulAPIGetMany(UserAccountDataColl, bson.M{})
+	logger.WebUILog.Infoln("get user accounts")
+	rawUsers, err := dbadapter.WebuiDBClient.RestfulAPIGetMany(configmodels.UserAccountDataColl, bson.M{})
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
-		return nil, errors.New(errorRetrieveUserAccounts)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccounts})
+		return
 	}
-	var users []*configmodels.DBUserAccount
-	users = make([]*configmodels.DBUserAccount, 0)
+	userResponses := make([]*configmodels.GetUserAccountResponse, 0, len(rawUsers))
 	for _, rawUser := range rawUsers {
-		var user configmodels.DBUserAccount
-		err := json.Unmarshal(configmodels.MapToByte(rawUser), &user)
+		var dbUserAccount configmodels.DBUserAccount
+		err := json.Unmarshal(configmodels.MapToByte(rawUser), &dbUserAccount)
 		if err != nil {
 			logger.DbLog.Errorf(errorRetrieveUserAccount)
 			continue
 		}
-		users = append(users, &user)
+		userResponse := &configmodels.GetUserAccountResponse{
+			Username: dbUserAccount.Username,
+			Role:     dbUserAccount.Role,
+		}
+		userResponses = append(userResponses, userResponse)
 	}
-	return users, nil
+	c.JSON(http.StatusOK, userResponses)
 }
 
 func GetUserAccount(c *gin.Context) {
@@ -91,7 +77,7 @@ func GetUserAccount(c *gin.Context) {
 
 func fetchDBUserAccount(username string) (*configmodels.DBUserAccount, error) {
 	filter := bson.M{"username": username}
-	rawUserAccount, err := dbadapter.WebuiDBClient.RestfulAPIGetOne(UserAccountDataColl, filter)
+	rawUserAccount, err := dbadapter.WebuiDBClient.RestfulAPIGetOne(configmodels.UserAccountDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
 		return nil, err
@@ -129,14 +115,14 @@ func CreateUserAccount(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidPassword})
 		return
 	}
-	newUserRole := UserRole
-	isFirstAccountIssued, err := IsFirstAccountIssued()
+	newUserRole := configmodels.UserRole
+	isFirstAccountIssued, err := isFirstAccountIssued()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccounts})
 		return
 	}
 	if !isFirstAccountIssued {
-		newUserRole = AdminRole
+		newUserRole = configmodels.AdminRole
 	}
 	dbUser, err := configmodels.CreateNewDBUserAccount(createUserParams.Username, createUserParams.Password, newUserRole)
 	if err != nil {
@@ -145,7 +131,7 @@ func CreateUserAccount(c *gin.Context) {
 	}
 
 	filter := bson.M{"username": dbUser.Username}
-	err = dbadapter.WebuiDBClient.RestfulAPIPostMany(UserAccountDataColl, filter, []interface{}{configmodels.ToBsonM(dbUser)})
+	err = dbadapter.WebuiDBClient.RestfulAPIPostMany(configmodels.UserAccountDataColl, filter, []interface{}{configmodels.ToBsonM(dbUser)})
 	if err != nil {
 		if strings.Contains(err.Error(), "E11000") {
 			logger.DbLog.Errorln("Duplicate username found:", err)
@@ -171,12 +157,12 @@ func DeleteUserAccount(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": errorUsernameNotFound})
 		return
 	}
-	if dbUserAccount.Role == AdminRole {
+	if dbUserAccount.Role == configmodels.AdminRole {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorDeleteAdminAccount})
 		return
 	}
 	filter := bson.M{"username": username}
-	err = dbadapter.WebuiDBClient.RestfulAPIDeleteOne(UserAccountDataColl, filter)
+	err = dbadapter.WebuiDBClient.RestfulAPIDeleteOne(configmodels.UserAccountDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorDeleteUserAccount})
@@ -219,7 +205,7 @@ func ChangeUserAccountPasssword(c *gin.Context) {
 		return
 	}
 	filter := bson.M{"username": newPasswordDbUser.Username}
-	_, err = dbadapter.WebuiDBClient.RestfulAPIPost(UserAccountDataColl, filter, configmodels.ToBsonM(newPasswordDbUser))
+	_, err = dbadapter.WebuiDBClient.RestfulAPIPost(configmodels.UserAccountDataColl, filter, configmodels.ToBsonM(newPasswordDbUser))
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errorUpdateUserAccount})
@@ -228,8 +214,8 @@ func ChangeUserAccountPasssword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-var IsFirstAccountIssued = func() (bool, error) {
-	numOfUserAccounts, err := dbadapter.WebuiDBClient.RestfulAPICount(UserAccountDataColl, bson.M{})
+var isFirstAccountIssued = func() (bool, error) {
+	numOfUserAccounts, err := dbadapter.WebuiDBClient.RestfulAPICount(configmodels.UserAccountDataColl, bson.M{})
 	if err != nil {
 		return false, err
 	}

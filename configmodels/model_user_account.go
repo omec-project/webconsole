@@ -7,6 +7,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	UserRole            = 0
+	AdminRole           = 1
+	UserAccountDataColl = "webconsoleData.snapshots.userAccountData"
+)
+
 type DBUserAccount struct {
 	Username       string `json:"username"`
 	HashedPassword string `json:"password,omitempty"`

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024 Canonical Ltd.
 
-package auth
+package configapi
 
 import (
 	"net/http"
@@ -10,7 +10,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omec-project/webconsole/configapi"
+	"github.com/omec-project/webconsole/backend/auth"
+	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 )
 
@@ -31,10 +32,10 @@ func setUpRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	dbadapter.WebuiDBClient = &MockMongoClientSuccess{}
-	router.Use(AuthMiddleware(mockJWTSecret))
-	AddService(router, mockJWTSecret)
-	configapi.AddServiceSub(router)
-	configapi.AddService(router)
+	router.Use(auth.AdminOrUserAuthMiddleware(mockJWTSecret))
+	AddUserAccountService(router, mockJWTSecret)
+	AddApiServiceWithAuthorization(router, mockJWTSecret)
+	AddConfigV1ServiceWithAuthorization(router, mockJWTSecret)
 	return router
 }
 
@@ -42,47 +43,21 @@ func setUpMockedRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	dbadapter.WebuiDBClient = &MockMongoClientSuccess{}
-	router.Use(AuthMiddleware(mockJWTSecret))
-	router.GET("/config/v1/account", adminOnly(mockJWTSecret, MockOperation))
-	router.GET("/config/v1/account/:username", adminOrMe(mockJWTSecret, MockOperation))
-	router.DELETE("/config/v1/account/:username", adminOnly(mockJWTSecret, MockOperation))
-	router.POST("/config/v1/account/:username/change_password", adminOrMe(mockJWTSecret, MockOperation))
-	router.POST("/config/v1/account", adminOrFirstUser(mockJWTSecret, MockOperation))
+	router.GET("/config/v1/account", auth.AdminOnly(mockJWTSecret, MockOperation))
+	router.GET("/config/v1/account/:username", auth.AdminOrMe(mockJWTSecret, MockOperation))
+	router.DELETE("/config/v1/account/:username", auth.AdminOnly(mockJWTSecret, MockOperation))
+	router.POST("/config/v1/account/:username/change_password", auth.AdminOrMe(mockJWTSecret, MockOperation))
+	router.POST("/config/v1/account", auth.AdminOrFirstUser(mockJWTSecret, MockOperation))
 	return router
 }
 
-func TestMiddleware_NoHeaderRequest(t *testing.T) {
+func TestAdminOrUserAuthorizationMiddleware_NoHeaderRequest(t *testing.T) {
 	router := setUpRouter()
 	protectedPaths := []struct {
 		name   string
 		method string
 		url    string
 	}{
-		{
-			name:   "GetUserAccount",
-			method: http.MethodGet,
-			url:    "/config/v1/account/janedoe",
-		},
-		{
-			name:   "GetUserAccounts",
-			method: http.MethodGet,
-			url:    "/config/v1/account",
-		},
-		{
-			name:   "PostSecondUserAccount",
-			method: http.MethodPost,
-			url:    "/config/v1/account",
-		},
-		{
-			name:   "DeleteUserAccount",
-			method: http.MethodDelete,
-			url:    "/config/v1/account/janedoe",
-		},
-		{
-			name:   "ChangePassword",
-			method: http.MethodPost,
-			url:    "/config/v1/account/janedoe/change_password",
-		},
 		{
 			name:   "ConfigV1",
 			method: http.MethodGet,
@@ -242,7 +217,7 @@ func TestMiddleware_NoHeaderRequest(t *testing.T) {
 	}
 }
 
-func TestMiddleware_TokenValidation(t *testing.T) {
+func TestAdminOrUserAuthorizationMiddleware_TokenValidation(t *testing.T) {
 	router := setUpRouter()
 
 	tests := []struct {
@@ -293,34 +268,7 @@ func TestMiddleware_TokenValidation(t *testing.T) {
 	}
 }
 
-func TestPostUserAccount_CreateFirstUserWithoutHeader(t *testing.T) {
-	router := setUpMockedRouter()
-
-	originalIsFirstAccountIssued := IsFirstAccountIssued
-	defer func() { IsFirstAccountIssued = originalIsFirstAccountIssued }()
-	IsFirstAccountIssued = func() (bool, error) {
-		return false, nil
-	}
-	dbadapter.WebuiDBClient = &MockMongoClientEmptyDB{}
-	req, err := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	expectedCode := http.StatusOK
-	expectedBody := SUCCESS_BODY
-	if expectedCode != w.Code {
-		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
-	}
-	if w.Body.String() != expectedBody {
-		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-	}
-}
-
-func TestGetUserAccounts_Authorization(t *testing.T) {
+func TestGetUserAccounts_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 	router := setUpMockedRouter()
 
 	testCases := []struct {
@@ -333,14 +281,14 @@ func TestGetUserAccounts_Authorization(t *testing.T) {
 		{
 			name:         "AdminUser_GetUserAccounts",
 			username:     "janedoe",
-			role:         AdminRole,
+			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_GetUserAccounts",
 			username:     "someuser",
-			role:         UserRole,
+			role:         configmodels.UserRole,
 			expectedCode: http.StatusUnauthorized,
 			expectedBody: `{"error":"unauthorized: admin access required"}`,
 		},
@@ -371,7 +319,7 @@ func TestGetUserAccounts_Authorization(t *testing.T) {
 	}
 }
 
-func TestGetUserAccount_Authorization(t *testing.T) {
+func TestGetUserAccount_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 	router := setUpMockedRouter()
 
 	testCases := []struct {
@@ -384,28 +332,28 @@ func TestGetUserAccount_Authorization(t *testing.T) {
 		{
 			name:         "RegularUser_GetOwnUserAccount",
 			username:     "janedoe",
-			role:         UserRole,
+			role:         configmodels.UserRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "AdminUser_GetOwnUserAccount",
 			username:     "janedoe",
-			role:         AdminRole,
+			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_GetOtherUserAccount",
 			username:     "someuser",
-			role:         UserRole,
+			role:         configmodels.UserRole,
 			expectedCode: http.StatusUnauthorized,
 			expectedBody: `{"error":"unauthorized: admin or me access required"}`,
 		},
 		{
 			name:         "AdminUser_GetOtherUserAccount",
 			username:     "someuser",
-			role:         AdminRole,
+			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
@@ -436,7 +384,28 @@ func TestGetUserAccount_Authorization(t *testing.T) {
 	}
 }
 
-func TestCreateUserAccount_Authorization(t *testing.T) {
+func TestCreateUserAccount_CreateFirstUserWithoutHeaderAuthorization(t *testing.T) {
+	router := setUpMockedRouter()
+	dbadapter.WebuiDBClient = &MockMongoClientEmptyDB{}
+	req, err := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	expectedCode := http.StatusOK
+	expectedBody := SUCCESS_BODY
+	if expectedCode != w.Code {
+		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+	}
+	if w.Body.String() != expectedBody {
+		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+	}
+}
+
+func TestCreateUserAccount_AdminAuthorizationMiddleware(t *testing.T) {
 	router := setUpMockedRouter()
 
 	testCases := []struct {
@@ -449,14 +418,14 @@ func TestCreateUserAccount_Authorization(t *testing.T) {
 		{
 			name:         "AdminUser_CreateUserAccount",
 			username:     "janedoe",
-			role:         AdminRole,
+			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_CreateUserAccoun",
 			username:     "someuser",
-			role:         UserRole,
+			role:         configmodels.UserRole,
 			expectedCode: http.StatusUnauthorized,
 			expectedBody: `{"error":"unauthorized: admin access required"}`,
 		},
@@ -487,7 +456,7 @@ func TestCreateUserAccount_Authorization(t *testing.T) {
 	}
 }
 
-func TestDeleteUserAccount_Authorization(t *testing.T) {
+func TestDeleteUserAccount_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 	router := setUpMockedRouter()
 
 	testCases := []struct {
@@ -500,28 +469,28 @@ func TestDeleteUserAccount_Authorization(t *testing.T) {
 		{
 			name:         "RegularUser_DeleteOwnUserAccount",
 			username:     "janedoe",
-			role:         UserRole,
+			role:         configmodels.UserRole,
 			expectedCode: http.StatusUnauthorized,
 			expectedBody: `{"error":"unauthorized: admin access required"}`,
 		},
 		{
 			name:         "AdminUser_DeleteOwnUserAccount",
 			username:     "janedoe",
-			role:         AdminRole,
+			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_DeleteOtherUserAccount",
 			username:     "someuser",
-			role:         UserRole,
+			role:         configmodels.UserRole,
 			expectedCode: http.StatusUnauthorized,
 			expectedBody: `{"error":"unauthorized: admin access required"}`,
 		},
 		{
 			name:         "AdminUser_DeleteOtherUserAccount",
 			username:     "someuser",
-			role:         AdminRole,
+			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
@@ -552,7 +521,7 @@ func TestDeleteUserAccount_Authorization(t *testing.T) {
 	}
 }
 
-func TestChangePassword_Authorization(t *testing.T) {
+func TestChangePassword_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 	router := setUpMockedRouter()
 
 	testCases := []struct {
@@ -565,28 +534,28 @@ func TestChangePassword_Authorization(t *testing.T) {
 		{
 			name:         "RegularUser_OwnUserAccount",
 			username:     "janedoe",
-			role:         UserRole,
+			role:         configmodels.UserRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "AdminUser_OwnUserAccount",
 			username:     "janedoe",
-			role:         AdminRole,
+			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},
 		{
 			name:         "RegularUser_OtherUserAccount",
 			username:     "someuser",
-			role:         UserRole,
+			role:         configmodels.UserRole,
 			expectedCode: http.StatusUnauthorized,
 			expectedBody: `{"error":"unauthorized: admin or me access required"}`,
 		},
 		{
 			name:         "AdminUser_OtherUserAccount",
 			username:     "someuser",
-			role:         AdminRole,
+			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: SUCCESS_BODY,
 		},

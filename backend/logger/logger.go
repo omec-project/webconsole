@@ -21,6 +21,7 @@ var (
 	GrpcLog     *zap.SugaredLogger
 	ConfigLog   *zap.SugaredLogger
 	DbLog       *zap.SugaredLogger
+	AuthLog     *zap.SugaredLogger
 	atomicLevel zap.AtomicLevel
 )
 
@@ -58,6 +59,7 @@ func init() {
 	GrpcLog = log.Sugar().With("component", "WebUI", "category", "GRPC")
 	ConfigLog = log.Sugar().With("component", "WebUI", "category", "CONFIG")
 	DbLog = log.Sugar().With("component", "WebUI", "category", "DB")
+	AuthLog = log.Sugar().With("component", "WebUI", "category", "Auth")
 }
 
 func GetLogger() *zap.Logger {

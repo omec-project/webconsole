@@ -10,30 +10,23 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/webconsole/backend/auth"
 )
 
-func AddServiceSub(engine *gin.Engine) *gin.RouterGroup {
+func AddApiService(engine *gin.Engine) *gin.RouterGroup {
 	group := engine.Group("/api")
-
-	for _, route := range routesL {
-		switch route.Method {
-		case http.MethodGet:
-			group.GET(route.Pattern, route.HandlerFunc)
-		case http.MethodPost:
-			group.POST(route.Pattern, route.HandlerFunc)
-		case http.MethodPut:
-			group.PUT(route.Pattern, route.HandlerFunc)
-		case http.MethodDelete:
-			group.DELETE(route.Pattern, route.HandlerFunc)
-		case http.MethodPatch:
-			group.PATCH(route.Pattern, route.HandlerFunc)
-		}
-	}
-
+	addRoutes(group, apiRoutes)
 	return group
 }
 
-var routesL = Routes{
+func AddApiServiceWithAuthorization(engine *gin.Engine, jwtSecret []byte) *gin.RouterGroup {
+	group := engine.Group("/api")
+	group.Use(auth.AdminOrUserAuthMiddleware(jwtSecret))
+	addRoutes(group, apiRoutes)
+	return group
+}
+
+var apiRoutes = Routes{
 	{
 		"GetExample",
 		http.MethodGet,

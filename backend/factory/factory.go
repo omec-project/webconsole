@@ -44,6 +44,13 @@ func InitConfigFactory(f string) error {
 		if WebUIConfig.Configuration.Mongodb.AuthKeysDbName == "" {
 			WebUIConfig.Configuration.Mongodb.AuthKeysDbName = "authentication"
 		}
+
+		if WebUIConfig.Configuration.EnableAuthentication {
+			if WebUIConfig.Configuration.Mongodb.WebuiDBName == "" ||
+				WebUIConfig.Configuration.Mongodb.WebuiDBUrl == "" {
+				return fmt.Errorf("[Configuration] if EnableAuthentication is set, WebuiDB must be set")
+			}
+		}
 		// we dont want Mode5G coming from the helm chart, since
 		// there is chance of misconfiguration
 		if os.Getenv("CONFIGPOD_DEPLOYMENT") == "4G" {

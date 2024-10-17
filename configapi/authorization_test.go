@@ -287,8 +287,8 @@ func TestGetUserAccounts_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			name:         "RegularUser_GetUserAccounts",
 			username:     "someuser",
 			role:         configmodels.UserRole,
-			expectedCode: http.StatusUnauthorized,
-			expectedBody: `{"error":"unauthorized: admin access required"}`,
+			expectedCode: http.StatusForbidden,
+			expectedBody: `{"error":"forbidden: admin access required"}`,
 		},
 	}
 	for _, tc := range testCases {
@@ -345,8 +345,8 @@ func TestGetUserAccount_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			name:         "RegularUser_GetOtherUserAccount",
 			username:     "someuser",
 			role:         configmodels.UserRole,
-			expectedCode: http.StatusUnauthorized,
-			expectedBody: `{"error":"unauthorized: admin or me access required"}`,
+			expectedCode: http.StatusForbidden,
+			expectedBody: `{"error":"forbidden: admin or me access required"}`,
 		},
 		{
 			name:         "AdminUser_GetOtherUserAccount",
@@ -424,8 +424,8 @@ func TestCreateUserAccount_AdminAuthorizationMiddleware(t *testing.T) {
 			name:         "RegularUser_CreateUserAccoun",
 			username:     "someuser",
 			role:         configmodels.UserRole,
-			expectedCode: http.StatusUnauthorized,
-			expectedBody: `{"error":"unauthorized: admin access required"}`,
+			expectedCode: http.StatusForbidden,
+			expectedBody: `{"error":"forbidden: admin access required"}`,
 		},
 	}
 	for _, tc := range testCases {
@@ -468,8 +468,8 @@ func TestDeleteUserAccount_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			name:         "RegularUser_DeleteOwnUserAccount",
 			username:     "janedoe",
 			role:         configmodels.UserRole,
-			expectedCode: http.StatusUnauthorized,
-			expectedBody: `{"error":"unauthorized: admin access required"}`,
+			expectedCode: http.StatusForbidden,
+			expectedBody: `{"error":"forbidden: admin access required"}`,
 		},
 		{
 			name:         "AdminUser_DeleteOwnUserAccount",
@@ -482,8 +482,8 @@ func TestDeleteUserAccount_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			name:         "RegularUser_DeleteOtherUserAccount",
 			username:     "someuser",
 			role:         configmodels.UserRole,
-			expectedCode: http.StatusUnauthorized,
-			expectedBody: `{"error":"unauthorized: admin access required"}`,
+			expectedCode: http.StatusForbidden,
+			expectedBody: `{"error":"forbidden: admin access required"}`,
 		},
 		{
 			name:         "AdminUser_DeleteOtherUserAccount",
@@ -547,8 +547,8 @@ func TestChangePassword_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			name:         "RegularUser_OtherUserAccount",
 			username:     "someuser",
 			role:         configmodels.UserRole,
-			expectedCode: http.StatusUnauthorized,
-			expectedBody: `{"error":"unauthorized: admin or me access required"}`,
+			expectedCode: http.StatusForbidden,
+			expectedBody: `{"error":"forbidden: admin or me access required"}`,
 		},
 		{
 			name:         "AdminUser_OtherUserAccount",

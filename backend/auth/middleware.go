@@ -43,7 +43,7 @@ func AdminOrUserAuthMiddleware(jwtSecret []byte) gin.HandlerFunc {
 			return
 		}
 		if claims.Role != configmodels.AdminRole && claims.Role != configmodels.UserRole {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "forbidden: admin or user access required"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: admin or user access required"})
 			c.Abort()
 		}
 		c.Next()
@@ -62,7 +62,7 @@ func AdminOnly(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Conte
 			return
 		}
 		if claims.Role != configmodels.AdminRole {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized: admin access required"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: admin access required"})
 			c.Abort()
 			return
 		}
@@ -86,7 +86,7 @@ func AdminOrMe(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Conte
 			handler(c)
 			return
 		}
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized: admin or me access required"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: admin or me access required"})
 		c.Abort()
 	}
 }
@@ -110,7 +110,7 @@ func AdminOrFirstUser(jwtSecret []byte, handler func(c *gin.Context)) func(c *gi
 				return
 			}
 			if claims.Role != configmodels.AdminRole {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized: admin access required"})
+				c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: admin access required"})
 				c.Abort()
 				return
 			}

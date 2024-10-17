@@ -23,7 +23,7 @@ func AddUiService(engine *gin.Engine) {
 	}
 
 	engine.Use(func(c *gin.Context) {
-		if !isApiUrlPath(c.Request.URL.Path) {
+		if !isApiUrlPath(c.Request.URL.Path, c.Request.Method) {
 			htmlPath := strings.TrimPrefix(c.Request.URL.Path, "/") + ".html"
 			if _, err := staticFilesSystem.Open(htmlPath); err == nil {
 				c.Request.URL.Path = htmlPath

@@ -9,7 +9,7 @@ require (
 	github.com/omec-project/config5g v1.5.1
 	github.com/omec-project/openapi v1.3.1
 	github.com/omec-project/util v1.2.3
-	github.com/prometheus/client_golang v1.20.4
+	github.com/prometheus/client_golang v1.20.5
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.3

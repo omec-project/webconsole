@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2022-present Intel Corporation
-//SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+// SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
 // Copyright 2019 free5GC.org
+// Copyright 2024 Canonical Ltd
 //
 // SPDX-License-Identifier: Apache-2.0
 //

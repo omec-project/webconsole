@@ -1,8 +1,7 @@
 <!--
-# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
-# Copyright 2019 free5GC.org
-# Copyright 2024 Canonical Ltd.
-
+SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+SPDX-FileCopyrightText: 2019 free5GC.org
+SPDX-FileCopyrightText: 2024 Canonical Ltd.
 SPDX-License-Identifier: Apache-2.0
 -->
 [![Go Report Card](https://goreportcard.com/badge/github.com/omec-project/webconsole)](https://goreportcard.com/report/github.com/omec-project/webconsole)

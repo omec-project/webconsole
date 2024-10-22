@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
-//
+// SPDX-FileCopyrightText: 2024 Canonical Ltd
 // SPDX-License-Identifier: Apache-2.0
-//
-// Copyright 2024 Canonical Ltd.
 
 package server
 

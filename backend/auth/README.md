@@ -141,7 +141,7 @@ curl -v -H "Authorization: Bearer <token>" "localhost:5000/config/v1/account/<us
 ### Delete User
 Delete a specific user by their username.
 ```
-curl -v -H "Authorization: Bearer <token>" -X DELETE  "localhost:5000/v1/config/account/<username>" 
+curl -v -H "Authorization: Bearer <token>" -X DELETE  "localhost:5000/v1/config/account/<username>"
 ```
 
 ## Othe Endpoints

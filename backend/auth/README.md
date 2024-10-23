@@ -122,7 +122,7 @@ Response:
 ### Get User
 Retrieve details for a specific user by their username.
 ```
-curl -v -H "Authorization: Bearer <token>" "localhost:5000/config/v1/account/<username>" 
+curl -v -H "Authorization: Bearer <token>" "localhost:5000/config/v1/account/<username>"
 ```
 Response:
 ```

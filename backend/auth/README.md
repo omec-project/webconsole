@@ -33,7 +33,7 @@ To enable this feature, add the following parameters to the config file.
 configuration:
   enableAuthentication: true
   mongodb:
-    . . . 
+    . . .
     webuiDbName: <name>
     webuiDbUrl: <url>
 ```

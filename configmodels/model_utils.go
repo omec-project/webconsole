@@ -15,12 +15,12 @@ import (
 func ToBsonM(data interface{}) (ret bson.M) {
 	tmp, err := json.Marshal(data)
 	if err != nil {
-		logger.DbLog.Errorln("Could not marshall data")
+		logger.DbLog.Errorln("could not marshal data")
 		return nil
 	}
 	err = json.Unmarshal(tmp, &ret)
 	if err != nil {
-		logger.DbLog.Errorln("Could not unmarshall data")
+		logger.DbLog.Errorln("could not unmarshal data")
 		return nil
 	}
 	return ret
@@ -29,7 +29,7 @@ func ToBsonM(data interface{}) (ret bson.M) {
 func MapToByte(data map[string]interface{}) (ret []byte) {
 	ret, err := json.Marshal(data)
 	if err != nil {
-		logger.DbLog.Errorln("Could not marshall data")
+		logger.DbLog.Errorln("could not marshal data")
 		return nil
 	}
 	return ret

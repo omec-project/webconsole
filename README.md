@@ -37,9 +37,9 @@ An example static file has been placed in the `webconsole/ui/frontend_files` dir
 
 ## Authentication and Authorization
 
-The authentication and authorization feature ensures that only verified and authorized users can access the webui resources and interect with the system.
+The authentication and authorization feature ensures that only verified and authorized users can access the webui resources and interact with the system.
 
-This an optional feature that is disabled by default. For more details, refer to this [file](backend/auth/README.md).
+This is an optional feature, disabled by default. For more details, refer to this [file](backend/auth/README.md).
 
 ## Webconsole Architecture diagram
 

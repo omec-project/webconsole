@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2024 Canonical Ltd
 
 # Authentication and Authorization Feature
 
-Webui is the upstream component that offers an API to configure the 5G core network in SD-Core. With the implementation of the Authentication and Authorization feature, security risks have been reduced, ensuring that access is restricted to authorized users only.
+Webui is the upstream component that offers an API to configure the 5G core network in Aether SD-Core. With the implementation of the Authentication and Authorization feature, security risks have been reduced, ensuring that access is restricted to authorized users only.
 
 This is an optional feature that is disabled by default.
 
@@ -13,7 +13,7 @@ This is an optional feature that is disabled by default.
 
 JWT is used to authenticate users, ensuring secure access to the system. For protected endpoints, users must include a `token`, which Webui uses to verify their identity and grant access.
 
-Authorization is implemented based on these 2 roles:`AdminRole` and `UserRole`. The webui uses the `token` to determine the role of the user performing the action.
+Authorization is implemented based on these 2 roles: `AdminRole` and `UserRole`. The webui uses the `token` to determine the role of the user performing the action.
 
 Depending on their role, users have different levels of access to Webui operations:
 
@@ -56,7 +56,7 @@ For all subsequent user creations, authentication is required by logging in.
 
 ## Endpoints that does not require authorization
 
-There are two endpoints that can be accessed without providing a JWT token in the request header.
+There are three endpoints that can be accessed without providing a JWT token in the request header: [Log in](#log-in), [Get Status](#get-status), [First User Creation](#first-user-creation)
 
 ### Log in
 
@@ -76,7 +76,7 @@ Response:
 ```
 
 ### Get Status
-This endpoint allows any user to check the status of the Webui without a `token`. The status indicates whether the system's initialization has occurred, specifically whether the first `AdminRole` user has been created, and if the system is ready for use.
+This endpoint allows any user to check the status of the Webui without a `token`. The status indicates whether the system's initialization has occurred, specifically whether the first `AdminRole` user has been created, and if the system is ready to use.
 
 ```
 curl -v "localhost:5000/status"
@@ -144,10 +144,10 @@ Delete a specific user by their username.
 curl -v -H "Authorization: Bearer <token>" -X DELETE  "localhost:5000/v1/config/account/<username>"
 ```
 
-## Othe Endpoints
+## Other Endpoints
 
 Configuration endpoints now require the inclusion of a JWT token in the request header for authorization.
-``` 
+```
 curl -v -H "Authorization: Bearer <token>" "localhost:5000/api/subscriber/<imsi>" \
 --header 'Content-Type: text/plain' \
 --data '{

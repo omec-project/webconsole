@@ -50,7 +50,7 @@ func AdminOrUserAuthMiddleware(jwtSecret []byte) gin.HandlerFunc {
 	}
 }
 
-// AdminOnly check if the authorization token is valid for this endpoint.
+// AdminOnly checks if the authorization token is valid for this endpoint.
 // Only tokens with AdminRole will be allowed.
 func AdminOnly(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Context) {
 	return func(c *gin.Context) {
@@ -70,7 +70,7 @@ func AdminOnly(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Conte
 	}
 }
 
-// AdminOrMe check if the authorization token is valid for this endpoint.
+// AdminOrMe checks if the authorization token is valid for this endpoint.
 // Admin role is allowed. UserRole is allowed with the condition of performing the action
 // over their own account
 func AdminOrMe(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Context) {
@@ -91,7 +91,7 @@ func AdminOrMe(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Conte
 	}
 }
 
-// AdminOrFirstUser check if the authorization token is valid for this endpoint.
+// AdminOrFirstUser checks if the authorization token is valid for this endpoint.
 // check if the user has admin role or if the user is the first user before allowing access to the handler.
 func AdminOrFirstUser(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Context) {
 	return func(c *gin.Context) {

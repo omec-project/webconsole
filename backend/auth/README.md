@@ -112,7 +112,7 @@ curl -v -H "Authorization: Bearer <token>" "localhost:5000/config/v1/account" \
 ### Get Users
 Retrieve a list of all users.
 ```
-curl -v -H "Authorization: Bearer <token>" "localhost:5000/config/v1/account" 
+curl -v -H "Authorization: Bearer <token>" "localhost:5000/config/v1/account"
 ```
 Response:
 ```

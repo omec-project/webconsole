@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024 Canonical Ltd.
 
-// +build ui
+//go:build ui
 
 package webui_service
 
@@ -15,22 +15,23 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-//	@title		Webconsole API Documentation
-//	@version	1.0
-
-//	@contact.name	OMEC Project - Webconsole
-//	@contact.url	https://github.com/omec-project/webconsole
-
-//	@license.name	Apache 2.0
-//	@license.url	http://www.apache.org/licenses/LICENSE-2.0.html
-
-// @host		localhost:5000
-// @BasePath	/
+// @title			Webconsole API Documentation
+// @version			1.0
+// @contact.name	OMEC Project - Webconsole
+// @contact.url		https://github.com/omec-project/webconsole
+// @license.name	Apache 2.0
+// @license.url		http://www.apache.org/licenses/LICENSE-2.0.html
+// @securityDefinitions.apikey BearerAuth
+// @in				header
+// @name			Authorization
+// @description		Enter the token in the format `Bearer <token>`
+// @host			localhost:5000
+// @BasePath		/
 func AddSwaggerUiService(engine *gin.Engine) {
-    logger.WebUILog.Infoln("Adding Swagger UI service")
-    endpoint := os.Getenv("WEBUI_ENDPOINT")
-    if endpoint != "" {
-        docs.SwaggerInfo.Host = endpoint
-    }
-    engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	logger.WebUILog.Infoln("Adding Swagger UI service")
+	endpoint := os.Getenv("WEBUI_ENDPOINT")
+	if endpoint != "" {
+		docs.SwaggerInfo.Host = endpoint
+	}
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }

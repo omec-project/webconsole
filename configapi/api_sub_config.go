@@ -256,9 +256,12 @@ func GetSampleJSON(c *gin.Context) {
 //	@Description	Return the list of subscribers
 //	@Tags			Subscribers
 //	@Produce		json
+//	@Security		BearerAuth
 //	@Success		200	{object}	configmodels.SubsListIE	"List of subscribers. Null if there are no subscribers"
+//	@Failure		401	{object}	nil						"Authorization failed"
+//	@Failure		403	{object}	nil						"Forbidden"
 //	@Failure		500	{object}	nil						"Error retrieving subscribers"
-//	@Router			/api/subscriber/ [get]
+//	@Router			/api/subscriber/	[get]
 func GetSubscribers(c *gin.Context) {
 	setCorsHeader(c)
 
@@ -291,10 +294,13 @@ func GetSubscribers(c *gin.Context) {
 //	@Tags			Subscribers
 //	@Param			imsi	path	string	true	"IMSI (UE ID)"	example(imsi-208930100007487)
 //	@Produce		json
+//	@Security		BearerAuth
 //	@Success		200	{object}	nil	"Subscriber"
+//	@Failure		401	{object}	nil	"Authorization failed"
+//	@Failure		403	{object}	nil	"Forbidden"
 //	@Failure		404	{object}	nil	"Subscriber not found"
 //	@Failure		500	{object}	nil	"Error retrieving subscriber"
-//	@Router			/api/subscriber/{imsi} [get]
+//	@Router			/api/subscriber/{imsi}	[get]
 func GetSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 
@@ -360,12 +366,15 @@ func GetSubscriberByID(c *gin.Context) {
 //
 //	@Description	Create subscriber by IMSI (UE ID)
 //	@Tags			Subscribers
-//	@Param			imsi	path		string							true	"IMSI (UE ID)"
-//	@Param			content	body		configmodels.SubsOverrideData	true	" "
-//	@Success		201		{object}	nil								"Subscriber created"
-//	@Failure		400		{object}	nil								"Invalid subscriber content"
-//	@Failure		500		{object}	nil								"Error creating subscriber"
-//	@Router			/api/subscriber/{imsi} [post]
+//	@Param			imsi	path	string							true	"IMSI (UE ID)"
+//	@Param			content	body	configmodels.SubsOverrideData	true	" "
+//	@Security		BearerAuth
+//	@Success		201	{object}	nil	"Subscriber created"
+//	@Failure		400	{object}	nil	"Invalid subscriber content"
+//	@Failure		401	{object}	nil	"Authorization failed"
+//	@Failure		403	{object}	nil	"Forbidden"
+//	@Failure		500	{object}	nil	"Error creating subscriber"
+//	@Router			/api/subscriber/{imsi}	[post]
 func PostSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 
@@ -461,10 +470,13 @@ func PatchSubscriberByID(c *gin.Context) {
 //
 //	@Description	Delete an existing subscriber
 //	@Tags			Subscribers
-//	@Param			imsi	path		string	true	"IMSI (UE ID)"
-//	@Success		204		{object}	nil		"Subscriber deleted successfully"
-//	@Failure		500		{object}	nil		"Error deleting subscriber"
-//	@Router			/api/subscriber/{imsi} [delete]
+//	@Param			imsi	path	string	true	"IMSI (UE ID)"
+//	@Security		BearerAuth
+//	@Success		204	{object}	nil	"Subscriber deleted successfully"
+//	@Failure		401	{object}	nil	"Authorization failed"
+//	@Failure		403	{object}	nil	"Forbidden"
+//	@Failure		500	{object}	nil	"Error deleting subscriber"
+//	@Router			/api/subscriber/{imsi}	[delete]
 func DeleteSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Delete One Subscriber Data")

@@ -15,16 +15,9 @@ import (
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
-	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )
-
-var grpcLog *zap.SugaredLogger
-
-func init() {
-	grpcLog = logger.GrpcLog
-}
 
 type ServerConfig struct{}
 
@@ -50,7 +43,7 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 		config := factory.GetConfig()
 		if config != nil && config.Configuration != nil && config.Configuration.LteEnd != nil {
 			for _, end := range config.Configuration.LteEnd {
-				grpcLog.Infoln("Adding Client endpoint ", end.NodeType, end.ConfigPushUrl)
+				logger.GrpcLog.Infoln("adding client endpoint", end.NodeType, end.ConfigPushUrl)
 				c, _ := getClient(end.NodeType)
 				setClientConfigPushUrl(c, end.ConfigPushUrl)
 				setClientConfigCheckUrl(c, end.ConfigCheckUrl)
@@ -65,22 +58,22 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 
 	time.Sleep(2 * time.Second)
 
-	grpcLog.Infoln("start grpc config server", ready)
+	logger.GrpcLog.Infoln("start grpc config server", ready)
 	lis, err := net.Listen("tcp", host)
 	if err != nil {
-		grpcLog.Fatalf("failed to listen: %v", err)
+		logger.GrpcLog.Fatalf("failed to listen: %v", err)
 	}
 
 	grpcServer := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
 	protos.RegisterConfigServiceServer(grpcServer, confServ)
 	if err = grpcServer.Serve(lis); err != nil {
-		grpcLog.Fatalf("failed to serve: %v", err)
+		logger.GrpcLog.Fatalf("failed to serve: %v", err)
 	}
-	grpcLog.Infoln("Completed grpc server goroutine")
+	logger.GrpcLog.Infoln("completed grpc server goroutine")
 }
 
 func (c *ConfigServer) GetNetworkSlice(ctx context.Context, rReq *protos.NetworkSliceRequest) (*protos.NetworkSliceResponse, error) {
-	grpcLog.Infof("Network Slice config req:Client %v, rst counter %v\n", rReq.ClientId, rReq.RestartCounter)
+	logger.GrpcLog.Infof("Network Slice config req: client %v, rst counter %v", rReq.ClientId, rReq.RestartCounter)
 	client, created := getClient(rReq.ClientId)
 	var reqMsg clientReqMsg
 	reqMsg.networkSliceReqMsg = rReq
@@ -91,12 +84,12 @@ func (c *ConfigServer) GetNetworkSlice(ctx context.Context, rReq *protos.Network
 	}
 	client.tempGrpcReq <- &reqMsg
 	rResp := <-reqMsg.grpcRspMsg
-	client.clientLog.Infoln("Received response message from client FSM")
+	client.clientLog.Infoln("received response message from client FSM")
 	return rResp.networkSliceRspMsg, nil
 }
 
 func (c *ConfigServer) NetworkSliceSubscribe(req *protos.NetworkSliceRequest, stream protos.ConfigService_NetworkSliceSubscribeServer) error {
-	grpcLog.Infoln("NetworkSliceSubscribe call from client ID ", req.ClientId)
+	logger.GrpcLog.Infoln("NetworkSliceSubscribe call from client ID", req.ClientId)
 	fin := make(chan bool)
 	// Save the subscriber stream according to the given client ID
 	client, created := getClient(req.ClientId)
@@ -116,11 +109,11 @@ func (c *ConfigServer) NetworkSliceSubscribe(req *protos.NetworkSliceRequest, st
 	for {
 		select {
 		case <-fin:
-			client.clientLog.Infoln("Closing stream for client ID: ", req.ClientId)
+			client.clientLog.Infoln("closing stream for client ID:", req.ClientId)
 			delete(clientNFPool, req.ClientId)
 			return nil
 		case <-ctx.Done():
-			client.clientLog.Infof("Client ID %s has disconnected", req.ClientId)
+			client.clientLog.Infof("client ID %s has disconnected", req.ClientId)
 			delete(clientNFPool, req.ClientId)
 			return nil
 		}

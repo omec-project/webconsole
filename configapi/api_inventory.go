@@ -46,7 +46,7 @@ func GetGnbs(c *gin.Context) {
 		var gnbData configmodels.Gnb
 		err := json.Unmarshal(configmodels.MapToByte(rawGnb), &gnbData)
 		if err != nil {
-			logger.DbLog.Errorf("Could not unmarshall gNB %v", rawGnb)
+			logger.DbLog.Errorf("could not unmarshal gNB %v", rawGnb)
 		}
 		gnbs = append(gnbs, &gnbData)
 	}
@@ -107,7 +107,7 @@ func handlePostGnb(c *gin.Context) error {
 		Gnb:       &procReq,
 	}
 	configChannel <- &msg
-	configLog.Infof("successfully added gNB [%v] to config channel.", gnbName)
+	configLog.Infof("successfully added gNB [%v] to config channel", gnbName)
 	return nil
 }
 
@@ -126,7 +126,7 @@ func handleDeleteGnb(c *gin.Context) error {
 		GnbName:   gnbName,
 	}
 	configChannel <- &msg
-	configLog.Infof("successfully added gNB [%v] with delete_op to config channel.", gnbName)
+	configLog.Infof("successfully added gNB [%v] with delete_op to config channel", gnbName)
 	return nil
 }
 
@@ -179,7 +179,7 @@ func handlePostUpf(c *gin.Context) error {
 		configLog.Errorf(errorMessage)
 		return errors.New(errorMessage)
 	}
-	configLog.Infof("Received UPF %v", upfHostname)
+	configLog.Infof("received UPF %v", upfHostname)
 	var err error
 	var newUpf configmodels.Upf
 
@@ -207,7 +207,7 @@ func handlePostUpf(c *gin.Context) error {
 		Upf:         &procReq,
 	}
 	configChannel <- &msg
-	configLog.Infof("successfully added UPF [%v] to config channel.", upfHostname)
+	configLog.Infof("successfully added UPF [%v] to config channel", upfHostname)
 	return nil
 }
 
@@ -226,6 +226,6 @@ func handleDeleteUpf(c *gin.Context) error {
 		UpfHostname: upfHostname,
 	}
 	configChannel <- &msg
-	configLog.Infof("successfully added UPF [%v] with delete_op to config channel.", upfHostname)
+	configLog.Infof("successfully added UPF [%v] with delete_op to config channel", upfHostname)
 	return nil
 }

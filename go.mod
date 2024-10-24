@@ -7,7 +7,7 @@ require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/omec-project/config5g v1.5.1
+	github.com/omec-project/config5g v1.5.3
 	github.com/omec-project/openapi v1.3.1
 	github.com/omec-project/util v1.2.3
 	github.com/prometheus/client_golang v1.20.5

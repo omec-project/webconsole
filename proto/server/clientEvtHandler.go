@@ -209,7 +209,7 @@ func getClient(id string) (*clientNF, bool) {
 	}
 	logger.GrpcLog.Infof("created client %v", id)
 	client = &clientNF{}
-	client.clientLog = grpcLog.With("NF", id)
+	client.clientLog = logger.GrpcLog.With("NF", id)
 	client.id = id
 	client.outStandingPushConfig = make(chan *configmodels.ConfigMessage, 10)
 	client.tempGrpcReq = make(chan *clientReqMsg, 10)

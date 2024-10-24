@@ -17,7 +17,6 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.uber.org/zap"
 )
 
 const (
@@ -33,12 +32,6 @@ const (
 	gnbDataColl      = "webconsoleData.snapshots.gnbData"
 	upfDataColl      = "webconsoleData.snapshots.upfData"
 )
-
-var configLog *zap.SugaredLogger
-
-func init() {
-	configLog = logger.ConfigLog
-}
 
 type Update5GSubscriberMsg struct {
 	Msg          *configmodels.ConfigMessage
@@ -66,16 +59,15 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		configReceived <- true
 	}
 	for {
-		configLog.Infoln("Waiting for configuration event ")
+		logger.ConfigLog.Infoln("waiting for configuration event")
 		configMsg := <-configMsgChan
-		// configLog.Infof("Received configuration event %v ", configMsg)
 		if configMsg.MsgType == configmodels.Sub_data {
 			imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
-			configLog.Infoln("Received imsi from config channel: ", imsiVal)
+			logger.ConfigLog.Infoln("received imsi from config channel:", imsiVal)
 			rwLock.Lock()
 			imsiData[imsiVal] = configMsg.AuthSubData
 			rwLock.Unlock()
-			configLog.Infof("Received Imsi [%v] configuration from config channel", configMsg.Imsi)
+			logger.ConfigLog.Infof("received Imsi [%v] configuration from config channel", configMsg.Imsi)
 			handleSubscriberPost(configMsg)
 			if factory.WebUIConfig.Configuration.Mode5G {
 				var configUMsg Update5GSubscriberMsg
@@ -86,57 +78,56 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 
 		if configMsg.MsgMethod == configmodels.Post_op || configMsg.MsgMethod == configmodels.Put_op {
 			if !firstConfigRcvd && (configMsg.MsgType == configmodels.Device_group || configMsg.MsgType == configmodels.Network_slice) {
-				configLog.Debugln("First config received from ROC")
+				logger.ConfigLog.Debugln("first config received from ROC")
 				firstConfigRcvd = true
 				configReceived <- true
 			}
 
-			// configLog.Infoln("Received msg from configApi package ", configMsg)
 			// update config snapshot
 			if configMsg.DevGroup != nil {
-				configLog.Infof("Received Device Group [%v] configuration from config channel", configMsg.DevGroupName)
+				logger.ConfigLog.Infof("received Device Group [%v] configuration from config channel", configMsg.DevGroupName)
 				handleDeviceGroupPost(configMsg, subsUpdateChan)
 			}
 
 			if configMsg.Slice != nil {
-				configLog.Infof("Received Slice [%v] configuration from config channel", configMsg.SliceName)
+				logger.ConfigLog.Infof("received Slice [%v] configuration from config channel", configMsg.SliceName)
 				handleNetworkSlicePost(configMsg, subsUpdateChan)
 			}
 
 			if configMsg.Gnb != nil {
-				configLog.Infof("Received gNB [%v] configuration from config channel", configMsg.GnbName)
+				logger.ConfigLog.Infof("received gNB [%v] configuration from config channel", configMsg.GnbName)
 				handleGnbPost(configMsg)
 			}
 
 			if configMsg.Upf != nil {
-				configLog.Infof("Received UPF [%v] configuration from config channel", configMsg.UpfHostname)
+				logger.ConfigLog.Infof("received UPF [%v] configuration from config channel", configMsg.UpfHostname)
 				handleUpfPost(configMsg)
 			}
 
 			// loop through all clients and send this message to all clients
 			if len(clientNFPool) == 0 {
-				configLog.Infoln("No client available. No need to send config")
+				logger.ConfigLog.Infoln("no client available. No need to send config")
 			}
 			for _, client := range clientNFPool {
-				configLog.Infoln("Push config for client : ", client.id)
+				logger.ConfigLog.Infoln("push config for client:", client.id)
 				client.outStandingPushConfig <- configMsg
 			}
 		} else {
 			var config5gMsg Update5GSubscriberMsg
 			if configMsg.MsgType == configmodels.Inventory {
 				if configMsg.GnbName != "" {
-					configLog.Infof("Received delete gNB [%v] from config channel", configMsg.GnbName)
+					logger.ConfigLog.Infof("received delete gNB [%v] from config channel", configMsg.GnbName)
 					handleGnbDelete(configMsg)
 				}
 				if configMsg.UpfHostname != "" {
-					configLog.Infof("Received delete UPF [%v] from config channel", configMsg.UpfHostname)
+					logger.ConfigLog.Infof("received delete UPF [%v] from config channel", configMsg.UpfHostname)
 					handleUpfDelete(configMsg)
 				}
 			} else if configMsg.MsgType != configmodels.Sub_data {
 				rwLock.Lock()
 				// update config snapshot
 				if configMsg.DevGroup == nil {
-					configLog.Infof("Received delete Device Group [%v] from config channel", configMsg.DevGroupName)
+					logger.ConfigLog.Infof("received delete Device Group [%v] from config channel", configMsg.DevGroupName)
 					config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
 					filter := bson.M{"group-name": configMsg.DevGroupName}
 					errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
@@ -146,7 +137,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				}
 
 				if configMsg.Slice == nil {
-					configLog.Infof("Received delete Slice [%v] from config channel", configMsg.SliceName)
+					logger.ConfigLog.Infof("received delete Slice [%v] from config channel", configMsg.SliceName)
 					config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
 					filter := bson.M{"SliceName": configMsg.SliceName}
 					errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
@@ -156,7 +147,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				}
 				rwLock.Unlock()
 			} else {
-				configLog.Infof("Received delete Subscriber [%v] from config channel", configMsg.Imsi)
+				logger.ConfigLog.Infof("received delete Subscriber [%v] from config channel", configMsg.Imsi)
 			}
 			if factory.WebUIConfig.Configuration.Mode5G {
 				config5gMsg.Msg = configMsg
@@ -164,10 +155,10 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			}
 			// loop through all clients and send this message to all clients
 			if len(clientNFPool) == 0 {
-				configLog.Infoln("No client available. No need to send config")
+				logger.ConfigLog.Infoln("no client available. No need to send config")
 			}
 			for _, client := range clientNFPool {
-				configLog.Infoln("Push config for client : ", client.id)
+				logger.ConfigLog.Infoln("push config for client:", client.id)
 				client.outStandingPushConfig <- configMsg
 			}
 		}
@@ -652,7 +643,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					Sst: int32(sVal),
 				}
 				for _, dgName := range slice.SiteDeviceGroup {
-					configLog.Infoln("dgName : ", dgName)
+					logger.ConfigLog.Infoln("dgName:", dgName)
 					devGroupConfig := getDeviceGroupByName(dgName)
 					if devGroupConfig != nil {
 						for _, imsi := range devGroupConfig.Imsis {

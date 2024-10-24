@@ -76,10 +76,10 @@ func handlePostGnb(c *gin.Context) error {
 	var exists bool
 	if gnbName, exists = c.Params.Get("gnb-name"); !exists {
 		errorMessage := "post gNB request is missing gnb-name"
-		configLog.Errorf(errorMessage)
+		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
 	}
-	configLog.Infof("received gNB %v", gnbName)
+	logger.ConfigLog.Infof("received gNB %v", gnbName)
 	var err error
 	var newGnb configmodels.Gnb
 
@@ -89,12 +89,12 @@ func handlePostGnb(c *gin.Context) error {
 		err = c.ShouldBindJSON(&newGnb)
 	}
 	if err != nil {
-		configLog.Errorf("err %v", err)
+		logger.ConfigLog.Errorf("err %v", err)
 		return fmt.Errorf("failed to create gNB %v: %w", gnbName, err)
 	}
 	if newGnb.Tac == "" {
 		errorMessage := "post gNB request body is missing tac"
-		configLog.Errorf(errorMessage)
+		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
 	}
 	req := httpwrapper.NewRequest(c.Request, newGnb)
@@ -107,7 +107,7 @@ func handlePostGnb(c *gin.Context) error {
 		Gnb:       &procReq,
 	}
 	configChannel <- &msg
-	configLog.Infof("successfully added gNB [%v] to config channel", gnbName)
+	logger.ConfigLog.Infof("successfully added gNB [%v] to config channel", gnbName)
 	return nil
 }
 
@@ -116,17 +116,17 @@ func handleDeleteGnb(c *gin.Context) error {
 	var exists bool
 	if gnbName, exists = c.Params.Get("gnb-name"); !exists {
 		errorMessage := "delete gNB request is missing gnb-name"
-		configLog.Errorf(errorMessage)
+		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
 	}
-	configLog.Infof("received delete gNB %v request", gnbName)
+	logger.ConfigLog.Infof("received delete gNB %v request", gnbName)
 	msg := configmodels.ConfigMessage{
 		MsgType:   configmodels.Inventory,
 		MsgMethod: configmodels.Delete_op,
 		GnbName:   gnbName,
 	}
 	configChannel <- &msg
-	configLog.Infof("successfully added gNB [%v] with delete_op to config channel", gnbName)
+	logger.ConfigLog.Infof("successfully added gNB [%v] with delete_op to config channel", gnbName)
 	return nil
 }
 
@@ -146,7 +146,7 @@ func GetUpfs(c *gin.Context) {
 		var upfData configmodels.Upf
 		err := json.Unmarshal(configmodels.MapToByte(rawUpf), &upfData)
 		if err != nil {
-			logger.DbLog.Errorf("could not unmarshall UPF %v", rawUpf)
+			logger.DbLog.Errorf("could not unmarshal UPF %v", rawUpf)
 		}
 		upfs = append(upfs, &upfData)
 	}
@@ -176,10 +176,10 @@ func handlePostUpf(c *gin.Context) error {
 	var exists bool
 	if upfHostname, exists = c.Params.Get("upf-hostname"); !exists {
 		errorMessage := "post UPF request is missing upf-hostname"
-		configLog.Errorf(errorMessage)
+		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
 	}
-	configLog.Infof("received UPF %v", upfHostname)
+	logger.ConfigLog.Infof("received UPF %v", upfHostname)
 	var err error
 	var newUpf configmodels.Upf
 
@@ -189,12 +189,12 @@ func handlePostUpf(c *gin.Context) error {
 		err = c.ShouldBindJSON(&newUpf)
 	}
 	if err != nil {
-		configLog.Errorf("err %v", err)
+		logger.ConfigLog.Errorf("err %v", err)
 		return fmt.Errorf("failed to create UPF %v: %w", upfHostname, err)
 	}
 	if newUpf.Port == "" {
 		errorMessage := "post UPF request body is missing port"
-		configLog.Errorf(errorMessage)
+		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
 	}
 	req := httpwrapper.NewRequest(c.Request, newUpf)
@@ -207,7 +207,7 @@ func handlePostUpf(c *gin.Context) error {
 		Upf:         &procReq,
 	}
 	configChannel <- &msg
-	configLog.Infof("successfully added UPF [%v] to config channel", upfHostname)
+	logger.ConfigLog.Infof("successfully added UPF [%v] to config channel", upfHostname)
 	return nil
 }
 
@@ -216,16 +216,16 @@ func handleDeleteUpf(c *gin.Context) error {
 	var exists bool
 	if upfHostname, exists = c.Params.Get("upf-hostname"); !exists {
 		errorMessage := "delete UPF request is missing upf-hostname"
-		configLog.Errorf(errorMessage)
+		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
 	}
-	configLog.Infof("received Delete UPF %v", upfHostname)
+	logger.ConfigLog.Infof("received Delete UPF %v", upfHostname)
 	msg := configmodels.ConfigMessage{
 		MsgType:     configmodels.Inventory,
 		MsgMethod:   configmodels.Delete_op,
 		UpfHostname: upfHostname,
 	}
 	configChannel <- &msg
-	configLog.Infof("successfully added UPF [%v] with delete_op to config channel", upfHostname)
+	logger.ConfigLog.Infof("successfully added UPF [%v] with delete_op to config channel", upfHostname)
 	return nil
 }

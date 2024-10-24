@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
-	github.com/swaggo/swag v1.16.3
+	github.com/swaggo/swag v1.16.4
 	github.com/urfave/cli v1.22.16
 	go.mongodb.org/mongo-driver v1.17.1
 	go.uber.org/zap v1.27.0

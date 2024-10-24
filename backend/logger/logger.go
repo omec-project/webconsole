@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
-// Copyright 2019 free5GC.org
+// SPDX-FileCopyrightText: 2019 free5GC.org
+// SPDX-FileCopyrightText: 2024 Canonical Ltd
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -21,6 +22,7 @@ var (
 	GrpcLog     *zap.SugaredLogger
 	ConfigLog   *zap.SugaredLogger
 	DbLog       *zap.SugaredLogger
+	AuthLog     *zap.SugaredLogger
 	atomicLevel zap.AtomicLevel
 )
 
@@ -58,6 +60,7 @@ func init() {
 	GrpcLog = log.Sugar().With("component", "WebUI", "category", "GRPC")
 	ConfigLog = log.Sugar().With("component", "WebUI", "category", "CONFIG")
 	DbLog = log.Sugar().With("component", "WebUI", "category", "DB")
+	AuthLog = log.Sugar().With("component", "WebUI", "category", "Auth")
 }
 
 func GetLogger() *zap.Logger {

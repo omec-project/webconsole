@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2024 Open Networking Foundation <info@opennetworking.org>
-// Copyright 2019 free5GC.org
+// SPDX-FileCopyrightText: 2019 free5GC.org
+// SPDX-FileCopyrightText: 2024 Canonical Ltd
 //
 // SPDX-License-Identifier: Apache-2.0
 package dbadapter
@@ -27,47 +28,37 @@ type DBInterface interface {
 	RestfulAPIJSONPatchExtend(collName string, filter bson.M, patchJSON []byte, dataName string) error
 	RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error)
 	RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error
+	RestfulAPICount(collName string, filter bson.M) (int64, error)
+	CreateIndex(collName string, keyField string) (bool, error)
 }
 
 var (
 	CommonDBClient DBInterface
 	AuthDBClient   DBInterface
+	WebuiDBClient  DBInterface
 )
 
 type MongoDBClient struct {
 	mongoapi.MongoClient
 }
 
-// Set CommonDBClient
-func setCommonDBClient(url string, dbname string) error {
+func setDBClient(url, dbname string) (DBInterface, error) {
 	mClient, errConnect := mongoapi.NewMongoClient(url, dbname)
 	if mClient.Client != nil {
-		CommonDBClient = mClient
-		CommonDBClient.(*mongoapi.MongoClient).Client.Database(dbname)
+		return mClient, nil
 	}
-	return errConnect
+	return nil, errConnect
 }
 
-// Set AuthDBClient
-func setAuthDBClient(authurl string, authkeysdbname string) error {
-	mClient, errConnect := mongoapi.NewMongoClient(authurl, authkeysdbname)
-	if mClient.Client != nil {
-		AuthDBClient = mClient
-		AuthDBClient.(*mongoapi.MongoClient).Client.Database(authkeysdbname)
-	}
-	return errConnect
-}
-
-func ConnectMongo(url string, dbname string, authurl string, authkeysdbname string) {
-	// Connect to MongoDB
+func ConnectMongo(url string, dbname string, client *DBInterface) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer func() { ticker.Stop() }()
 	timer := time.After(180 * time.Second)
 ConnectMongo:
 	for {
-		commonDbErr := setCommonDBClient(url, dbname)
-		authDbErr := setAuthDBClient(authurl, authkeysdbname)
-		if commonDbErr == nil && authDbErr == nil {
+		var err error
+		*client, err = setDBClient(url, dbname)
+		if err == nil {
 			break ConnectMongo
 		}
 		select {
@@ -78,7 +69,6 @@ ConnectMongo:
 			return
 		}
 	}
-
 	logger.DbLog.Infoln("Connected to MongoDB.")
 }
 
@@ -132,4 +122,12 @@ func (db *MongoDBClient) RestfulAPIPost(collName string, filter bson.M, postData
 
 func (db *MongoDBClient) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
 	return db.MongoClient.RestfulAPIPostMany(collName, filter, postDataArray)
+}
+
+func (db *MongoDBClient) RestfulAPICount(collName string, filter bson.M) (int64, error) {
+	return db.MongoClient.RestfulAPICount(collName, filter)
+}
+
+func (db *MongoDBClient) CreateIndex(collName string, keyField string) (bool, error) {
+	return db.MongoClient.CreateIndex(collName, keyField)
 }

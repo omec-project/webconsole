@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2022-present Intel Corporation
 // SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
-// Copyright 2019 free5GC.org
+// SPDX-FileCopyrightText: 2019 free5GC.org
+// SPDX-FileCopyrightText: 2024 Canonical Ltd
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -18,9 +19,11 @@ import (
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 	"github.com/omec-project/util/http2_util"
 	utilLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/util/path_util"
+	"github.com/omec-project/webconsole/backend/auth"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/metrics"
@@ -136,23 +139,45 @@ func (webui *WEBUI) FilterCli(c *cli.Context) (args []string) {
 	return args
 }
 
-func (webui *WEBUI) Start() {
-	if factory.WebUIConfig.Configuration.Mode5G {
-		// get config file info from WebUIConfig
-		mongodb := factory.WebUIConfig.Configuration.Mongodb
+func setupAuthenticationFeature(subconfig_router *gin.Engine) {
+	mongodb := factory.WebUIConfig.Configuration.Mongodb
+	jwtSecret, err := auth.GenerateJWTSecret()
+	if err != nil {
+		initLog.Error(err)
+	} else {
+		dbadapter.ConnectMongo(mongodb.WebuiDBUrl, mongodb.WebuiDBName, &dbadapter.WebuiDBClient)
+		resp, err := dbadapter.WebuiDBClient.CreateIndex(configmodels.UserAccountDataColl, "username")
+		if !resp || err != nil {
+			initLog.Errorf("Error initializing webuiDB %v", err)
+		}
+		configapi.AddUserAccountService(subconfig_router, jwtSecret)
+		auth.AddAuthenticationService(subconfig_router, jwtSecret)
+		configapi.AddApiServiceWithAuthorization(subconfig_router, jwtSecret)
+		configapi.AddConfigV1ServiceWithAuthorization(subconfig_router, jwtSecret)
+	}
+}
 
+func (webui *WEBUI) Start() {
+	// get config file info from WebUIConfig
+	mongodb := factory.WebUIConfig.Configuration.Mongodb
+	if factory.WebUIConfig.Configuration.Mode5G {
 		// Connect to MongoDB
-		dbadapter.ConnectMongo(mongodb.Url, mongodb.Name, mongodb.AuthUrl, mongodb.AuthKeysDbName)
+		dbadapter.ConnectMongo(mongodb.Url, mongodb.Name, &dbadapter.CommonDBClient)
+		dbadapter.ConnectMongo(mongodb.AuthUrl, mongodb.AuthKeysDbName, &dbadapter.AuthDBClient)
 	}
 
 	initLog.Infoln("WebUI Server started")
 
 	/* First HTTP Server running at port to receive Config from ROC */
 	subconfig_router := utilLogger.NewGinWithZap(logger.GinLog)
+	if factory.WebUIConfig.Configuration.EnableAuthentication {
+		setupAuthenticationFeature(subconfig_router)
+	} else {
+		configapi.AddApiService(subconfig_router)
+		configapi.AddConfigV1Service(subconfig_router)
+	}
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
-	configapi.AddServiceSub(subconfig_router)
-	configapi.AddService(subconfig_router)
 
 	go metrics.InitMetrics()
 

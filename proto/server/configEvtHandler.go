@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
-//
+// SPDX-FileCopyrightText: 2024 Canonical Ltd
 // SPDX-License-Identifier: Apache-2.0
+
 package server
 
 import (
@@ -179,7 +180,7 @@ func handleSubscriberPost(configMsg *configmodels.ConfigMessage) {
 		"ueId": configMsg.Imsi,
 	}
 	filter := bson.M{"ueId": configMsg.Imsi}
-	basicDataBson := toBsonM(basicAmData)
+	basicDataBson := configmodels.ToBsonM(basicAmData)
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
 	if errPost != nil {
 		logger.DbLog.Warnln(errPost)
@@ -196,7 +197,7 @@ func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan
 		subsUpdateChan <- &config5gMsg
 	}
 	filter := bson.M{"group-name": configMsg.DevGroupName}
-	devGroupDataBsonA := toBsonM(configMsg.DevGroup)
+	devGroupDataBsonA := configmodels.ToBsonM(configMsg.DevGroup)
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
 	if errPost != nil {
 		logger.DbLog.Warnln(errPost)
@@ -213,7 +214,7 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 		subsUpdateChan <- &config5gMsg
 	}
 	filter := bson.M{"SliceName": configMsg.SliceName}
-	sliceDataBsonA := toBsonM(configMsg.Slice)
+	sliceDataBsonA := configmodels.ToBsonM(configMsg.Slice)
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
 	if errPost != nil {
 		logger.DbLog.Warnln(errPost)
@@ -224,7 +225,7 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 func handleGnbPost(configMsg *configmodels.ConfigMessage) {
 	rwLock.Lock()
 	filter := bson.M{"name": configMsg.GnbName}
-	gnbDataBson := toBsonM(configMsg.Gnb)
+	gnbDataBson := configmodels.ToBsonM(configMsg.Gnb)
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(gnbDataColl, filter, gnbDataBson)
 	if errPost != nil {
 		logger.DbLog.Warnln(errPost)
@@ -245,7 +246,7 @@ func handleGnbDelete(configMsg *configmodels.ConfigMessage) {
 func handleUpfPost(configMsg *configmodels.ConfigMessage) {
 	rwLock.Lock()
 	filter := bson.M{"hostname": configMsg.UpfHostname}
-	upfDataBson := toBsonM(configMsg.Upf)
+	upfDataBson := configmodels.ToBsonM(configMsg.Upf)
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(upfDataColl, filter, upfDataBson)
 	if errPost != nil {
 		logger.DbLog.Warnln(errPost)
@@ -275,7 +276,7 @@ func getDeviceGroups() []*configmodels.DeviceGroups {
 	var deviceGroups []*configmodels.DeviceGroups
 	for _, rawDevGroup := range rawDeviceGroups {
 		var devGroupData configmodels.DeviceGroups
-		err := json.Unmarshal(mapToByte(rawDevGroup), &devGroupData)
+		err := json.Unmarshal(configmodels.MapToByte(rawDevGroup), &devGroupData)
 		if err != nil {
 			logger.DbLog.Errorf("could not unmarshall device group %v", rawDevGroup)
 		}
@@ -291,7 +292,7 @@ func getDeviceGroupByName(name string) *configmodels.DeviceGroups {
 		logger.DbLog.Warnln(errGetOne)
 	}
 	var devGroupData configmodels.DeviceGroups
-	err := json.Unmarshal(mapToByte(devGroupDataInterface), &devGroupData)
+	err := json.Unmarshal(configmodels.MapToByte(devGroupDataInterface), &devGroupData)
 	if err != nil {
 		logger.DbLog.Errorf("could not unmarshall device group %v", devGroupDataInterface)
 	}
@@ -306,7 +307,7 @@ func getSlices() []*configmodels.Slice {
 	var slices []*configmodels.Slice
 	for _, rawSlice := range rawSlices {
 		var sliceData configmodels.Slice
-		err := json.Unmarshal(mapToByte(rawSlice), &sliceData)
+		err := json.Unmarshal(configmodels.MapToByte(rawSlice), &sliceData)
 		if err != nil {
 			logger.DbLog.Errorf("could not unmarshall slice %v", rawSlice)
 		}
@@ -322,7 +323,7 @@ func getSliceByName(name string) *configmodels.Slice {
 		logger.DbLog.Warnln(errGetOne)
 	}
 	var sliceData configmodels.Slice
-	err := json.Unmarshal(mapToByte(sliceDataInterface), &sliceData)
+	err := json.Unmarshal(configmodels.MapToByte(sliceDataInterface), &sliceData)
 	if err != nil {
 		logger.DbLog.Errorf("could not unmarshall slice %v", sliceDataInterface)
 	}
@@ -384,7 +385,7 @@ func updateAmPolicyData(imsi string) {
 	// ampolicydata
 	var amPolicy models.AmPolicyData
 	amPolicy.SubscCats = append(amPolicy.SubscCats, "free5gc")
-	amPolicyDatBsonA := toBsonM(amPolicy)
+	amPolicyDatBsonA := configmodels.ToBsonM(amPolicy)
 	amPolicyDatBsonA["ueId"] = "imsi-" + imsi
 	filter := bson.M{"ueId": "imsi-" + imsi}
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(amPolicyDataColl, filter, amPolicyDatBsonA)
@@ -406,7 +407,7 @@ func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
 	smPolicySnssaiData.SmPolicyDnnData = dnnData
 	smPolicyData.SmPolicySnssaiData = make(map[string]models.SmPolicySnssaiData)
 	smPolicyData.SmPolicySnssaiData[SnssaiModelsToHex(*snssai)] = smPolicySnssaiData
-	smPolicyDatBsonA := toBsonM(smPolicyData)
+	smPolicyDatBsonA := configmodels.ToBsonM(smPolicyData)
 	smPolicyDatBsonA["ueId"] = "imsi-" + imsi
 	filter := bson.M{"ueId": "imsi-" + imsi}
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(smPolicyDataColl, filter, smPolicyDatBsonA)
@@ -429,7 +430,7 @@ func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 			Uplink:   convertToString(uint64(qos.DnnMbrUplink)),
 		},
 	}
-	amDataBsonA := toBsonM(amData)
+	amDataBsonA := configmodels.ToBsonM(amData)
 	amDataBsonA["ueId"] = "imsi-" + imsi
 	amDataBsonA["servingPlmnId"] = mcc + mnc
 	filter := bson.M{
@@ -476,7 +477,7 @@ func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 			},
 		},
 	}
-	smDataBsonA := toBsonM(smData)
+	smDataBsonA := configmodels.ToBsonM(smData)
 	smDataBsonA["ueId"] = "imsi-" + imsi
 	smDataBsonA["servingPlmnId"] = mcc + mnc
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
@@ -498,7 +499,7 @@ func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, im
 			},
 		},
 	}
-	smfSelecDataBsonA := toBsonM(smfSelData)
+	smfSelecDataBsonA := configmodels.ToBsonM(smfSelData)
 	smfSelecDataBsonA["ueId"] = "imsi-" + imsi
 	smfSelecDataBsonA["servingPlmnId"] = mcc + mnc
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
@@ -560,7 +561,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 			if confData.Msg.MsgMethod != configmodels.Delete_op {
 				logger.WebUILog.Debugln("insert/update AuthenticationSubscription ", imsi)
 				filter := bson.M{"ueId": confData.Msg.Imsi}
-				authDataBsonA := toBsonM(confData.Msg.AuthSubData)
+				authDataBsonA := configmodels.ToBsonM(confData.Msg.AuthSubData)
 				authDataBsonA["ueId"] = confData.Msg.Imsi
 				_, errPost := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
 				if errPost != nil {
@@ -722,30 +723,6 @@ func convertToString(val uint64) string {
 	}
 
 	return retStr
-}
-
-// seems something which we should move to mongolib
-func toBsonM(data interface{}) (ret bson.M) {
-	tmp, err := json.Marshal(data)
-	if err != nil {
-		logger.DbLog.Errorln("could not marshall data")
-		return nil
-	}
-	err = json.Unmarshal(tmp, &ret)
-	if err != nil {
-		logger.DbLog.Errorln("could not unmarshall data")
-		return nil
-	}
-	return ret
-}
-
-func mapToByte(data map[string]interface{}) (ret []byte) {
-	ret, err := json.Marshal(data)
-	if err != nil {
-		logger.DbLog.Errorln("could not marshall data")
-		return nil
-	}
-	return ret
 }
 
 func SnssaiModelsToHex(snssai models.Snssai) string {

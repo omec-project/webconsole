@@ -8,7 +8,15 @@ type Gnb struct {
 	Tac  string `json:"tac"`
 }
 
+type PostGnbRequest struct {
+	Tac string `json:"tac"`
+}
+
 type Upf struct {
 	Hostname string `json:"hostname"`
 	Port     string `json:"port"`
+}
+
+type PostUpfRequest struct {
+	Port string `json:"port"`
 }

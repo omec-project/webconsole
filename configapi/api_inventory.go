@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omec-project/util/httpwrapper"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
@@ -30,16 +29,28 @@ func setInventoryCorsHeader(c *gin.Context) {
 	c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, DELETE")
 }
 
+// GetGnbs godoc
+//
+//	@Description	Return the list of gNBs
+//	@Tags			gNBs
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{array}		configmodels.Gnb	"List of gNBs"
+//	@Failure		401	{object}	nil					"Authorization failed"
+//	@Failure		403	{object}	nil					"Forbidden"
+//	@Failure		500	{object}	nil					"Error retrieving gNBs"
+//	@Router			/config/v1/inventory/gnb	[get]
 func GetGnbs(c *gin.Context) {
 	setInventoryCorsHeader(c)
-	logger.WebUILog.Infoln("Get all gNBs")
+	logger.WebUILog.Infoln("get all gNBs")
 
 	var gnbs []*configmodels.Gnb
 	gnbs = make([]*configmodels.Gnb, 0)
 	rawGnbs, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(gnbDataColl, bson.M{})
 	if errGetMany != nil {
 		logger.DbLog.Errorln(errGetMany)
-		c.JSON(http.StatusInternalServerError, gnbs)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve gNBs"})
+		return
 	}
 
 	for _, rawGnb := range rawGnbs {
@@ -53,6 +64,19 @@ func GetGnbs(c *gin.Context) {
 	c.JSON(http.StatusOK, gnbs)
 }
 
+// PostGnb godoc
+//
+//	@Description	Create a new gNB
+//	@Tags			gNBs
+//	@Produce		json
+//	@Param			gnb-name	path	string						true	"Name of the gNB"
+//	@Param			tac			body	configmodels.PostGnbRequest	true	"TAC of the gNB"
+//	@Security		BearerAuth
+//	@Success		200	{object}	nil	"gNB created"
+//	@Failure		400	{object}	nil	"Failed to create the gNB"
+//	@Failure		401 {object}	nil	"Authorization failed"
+//	@Failure		403 {object}	nil	"Forbidden"
+//	@Router			/config/v1/inventory/gnb/{gnb-name}	[post]
 func PostGnb(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	if err := handlePostGnb(c); err == nil {
@@ -62,6 +86,18 @@ func PostGnb(c *gin.Context) {
 	}
 }
 
+// DeleteGnb godoc
+//
+//	@Description	Delete an existing gNB
+//	@Tags			gNBs
+//	@Produce		json
+//	@Param			gnb-name	path	string	true	"Name of the gNB"
+//	@Security		BearerAuth
+//	@Success		200	{object}	nil	"gNB deleted"
+//	@Failure		400	{object}	nil	"Failed to delete the gNB"
+//	@Failure		401	{object}	nil	"Authorization failed"
+//	@Failure		403	{object}	nil	"Forbidden"
+//	@Router			/config/v1/inventory/gnb/{gnb-name}	[delete]
 func DeleteGnb(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	if err := handleDeleteGnb(c); err == nil {
@@ -72,39 +108,35 @@ func DeleteGnb(c *gin.Context) {
 }
 
 func handlePostGnb(c *gin.Context) error {
-	var gnbName string
-	var exists bool
-	if gnbName, exists = c.Params.Get("gnb-name"); !exists {
+	gnbName, exists := c.Params.Get("gnb-name")
+	if !exists {
 		errorMessage := "post gNB request is missing gnb-name"
 		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
 	}
 	logger.ConfigLog.Infof("received gNB %v", gnbName)
-	var err error
-	var newGnb configmodels.Gnb
-
-	allowHeader := strings.Split(c.GetHeader("Content-Type"), ";")
-	switch allowHeader[0] {
-	case "application/json":
-		err = c.ShouldBindJSON(&newGnb)
+	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
+		return fmt.Errorf("invalid header")
 	}
+	var postGnbRequest configmodels.PostGnbRequest
+	err := c.ShouldBindJSON(&postGnbRequest)
 	if err != nil {
 		logger.ConfigLog.Errorf("err %v", err)
-		return fmt.Errorf("failed to create gNB %v: %w", gnbName, err)
+		return fmt.Errorf("invalid JSON format")
 	}
-	if newGnb.Tac == "" {
+	if postGnbRequest.Tac == "" {
 		errorMessage := "post gNB request body is missing tac"
 		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
 	}
-	req := httpwrapper.NewRequest(c.Request, newGnb)
-	procReq := req.Body.(configmodels.Gnb)
-	procReq.Name = gnbName
+	postGnb := configmodels.Gnb{
+		Name: gnbName,
+		Tac:  postGnbRequest.Tac,
+	}
 	msg := configmodels.ConfigMessage{
 		MsgType:   configmodels.Inventory,
 		MsgMethod: configmodels.Post_op,
-		GnbName:   gnbName,
-		Gnb:       &procReq,
+		Gnb:       &postGnb,
 	}
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully added gNB [%v] to config channel", gnbName)
@@ -112,9 +144,8 @@ func handlePostGnb(c *gin.Context) error {
 }
 
 func handleDeleteGnb(c *gin.Context) error {
-	var gnbName string
-	var exists bool
-	if gnbName, exists = c.Params.Get("gnb-name"); !exists {
+	gnbName, exists := c.Params.Get("gnb-name")
+	if !exists {
 		errorMessage := "delete gNB request is missing gnb-name"
 		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
@@ -130,6 +161,17 @@ func handleDeleteGnb(c *gin.Context) error {
 	return nil
 }
 
+// GetUpfs godoc
+//
+//	@Description	Return the list of UPFs
+//	@Tags			UPFs
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{array}		configmodels.Upf	"List of UPFs"
+//	@Failure		401	{object}	nil					"Authorization failed"
+//	@Failure		403	{object}	nil					"Forbidden"
+//	@Failure		500	{object}	nil					"Error retrieving UPFs"
+//	@Router			/config/v1/inventory/upf	[get]
 func GetUpfs(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	logger.WebUILog.Infoln("get all UPFs")
@@ -139,7 +181,8 @@ func GetUpfs(c *gin.Context) {
 	rawUpfs, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(upfDataColl, bson.M{})
 	if errGetMany != nil {
 		logger.DbLog.Errorln(errGetMany)
-		c.JSON(http.StatusInternalServerError, upfs)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve UPFs"})
+		return
 	}
 
 	for _, rawUpf := range rawUpfs {
@@ -153,6 +196,19 @@ func GetUpfs(c *gin.Context) {
 	c.JSON(http.StatusOK, upfs)
 }
 
+// PostUpf godoc
+//
+//	@Description	Create a new UPF
+//	@Tags			UPFs
+//	@Produce		json
+//	@Param			upf-hostname	path	string						true	"Name of the UPF"
+//	@Param			port			body	configmodels.PostUpfRequest	true	"Port of the UPF"
+//	@Security		BearerAuth
+//	@Success		200	{object}	nil	"UPF created"
+//	@Failure		400	{object}	nil	"Failed to create the UPF"
+//	@Failure		401	{object}	nil	"Authorization failed"
+//	@Failure		403	{object}	nil	"Forbidden"
+//	@Router			/config/v1/inventory/upf/{upf-hostname}	[post]
 func PostUpf(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	if err := handlePostUpf(c); err == nil {
@@ -162,6 +218,18 @@ func PostUpf(c *gin.Context) {
 	}
 }
 
+// DeleteUpf godoc
+//
+//	@Description	Delete an existing UPF
+//	@Tags			UPFs
+//	@Produce		json
+//	@Param			upf-hostname	path	string	true	"Name of the UPF"
+//	@Security		BearerAuth
+//	@Success		200	{object}	nil	"UPF deleted"
+//	@Failure		400	{object}	nil	"Failed to delete the UPF"
+//	@Failure		401	{object}	nil	"Authorization failed"
+//	@Failure		403	{object}	nil	"Forbidden"
+//	@Router			/config/v1/inventory/upf/{upf-hostname}	[delete]
 func DeleteUpf(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	if err := handleDeleteUpf(c); err == nil {
@@ -172,39 +240,35 @@ func DeleteUpf(c *gin.Context) {
 }
 
 func handlePostUpf(c *gin.Context) error {
-	var upfHostname string
-	var exists bool
-	if upfHostname, exists = c.Params.Get("upf-hostname"); !exists {
+	upfHostname, exists := c.Params.Get("upf-hostname")
+	if !exists {
 		errorMessage := "post UPF request is missing upf-hostname"
 		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
 	}
 	logger.ConfigLog.Infof("received UPF %v", upfHostname)
-	var err error
-	var newUpf configmodels.Upf
-
-	allowHeader := strings.Split(c.GetHeader("Content-Type"), ";")
-	switch allowHeader[0] {
-	case "application/json":
-		err = c.ShouldBindJSON(&newUpf)
+	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
+		return fmt.Errorf("invalid header")
 	}
+	var postUpfRequest configmodels.PostUpfRequest
+	err := c.ShouldBindJSON(&postUpfRequest)
 	if err != nil {
 		logger.ConfigLog.Errorf("err %v", err)
-		return fmt.Errorf("failed to create UPF %v: %w", upfHostname, err)
+		return fmt.Errorf("invalid JSON format")
 	}
-	if newUpf.Port == "" {
+	if postUpfRequest.Port == "" {
 		errorMessage := "post UPF request body is missing port"
 		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
 	}
-	req := httpwrapper.NewRequest(c.Request, newUpf)
-	procReq := req.Body.(configmodels.Upf)
-	procReq.Hostname = upfHostname
+	postUpf := configmodels.Upf{
+		Hostname: upfHostname,
+		Port:     postUpfRequest.Port,
+	}
 	msg := configmodels.ConfigMessage{
-		MsgType:     configmodels.Inventory,
-		MsgMethod:   configmodels.Post_op,
-		UpfHostname: upfHostname,
-		Upf:         &procReq,
+		MsgType:   configmodels.Inventory,
+		MsgMethod: configmodels.Post_op,
+		Upf:       &postUpf,
 	}
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully added UPF [%v] to config channel", upfHostname)
@@ -212,14 +276,13 @@ func handlePostUpf(c *gin.Context) error {
 }
 
 func handleDeleteUpf(c *gin.Context) error {
-	var upfHostname string
-	var exists bool
-	if upfHostname, exists = c.Params.Get("upf-hostname"); !exists {
+	upfHostname, exists := c.Params.Get("upf-hostname")
+	if !exists {
 		errorMessage := "delete UPF request is missing upf-hostname"
 		logger.ConfigLog.Errorln(errorMessage)
 		return errors.New(errorMessage)
 	}
-	logger.ConfigLog.Infof("received Delete UPF %v", upfHostname)
+	logger.ConfigLog.Infof("received delete UPF %v", upfHostname)
 	msg := configmodels.ConfigMessage{
 		MsgType:     configmodels.Inventory,
 		MsgMethod:   configmodels.Delete_op,

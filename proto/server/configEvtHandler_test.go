@@ -431,17 +431,9 @@ func TestPostGnb(t *testing.T) {
 		Name: gnbName,
 		Tac:  "1233",
 	}
-
-	configMsg := configmodels.ConfigMessage{
-		MsgType:   configmodels.Inventory,
-		MsgMethod: configmodels.Post_op,
-		GnbName:   gnbName,
-		Gnb:       &newGnb,
-	}
-
 	postData = make([]map[string]interface{}, 0)
 	dbadapter.CommonDBClient = &MockMongoPost{}
-	handleGnbPost(&configMsg)
+	handleGnbPost(&newGnb)
 
 	expected_collection := "webconsoleData.snapshots.gnbData"
 	if postData[0]["coll"] != expected_collection {
@@ -465,17 +457,9 @@ func TestPostUpf(t *testing.T) {
 		Hostname: upfHostname,
 		Port:     "1233",
 	}
-
-	configMsg := configmodels.ConfigMessage{
-		MsgType:     configmodels.Inventory,
-		MsgMethod:   configmodels.Post_op,
-		UpfHostname: upfHostname,
-		Upf:         &newUpf,
-	}
-
 	postData = make([]map[string]interface{}, 0)
 	dbadapter.CommonDBClient = &MockMongoPost{}
-	handleUpfPost(&configMsg)
+	handleUpfPost(&newUpf)
 
 	expected_collection := "webconsoleData.snapshots.upfData"
 	if postData[0]["coll"] != expected_collection {

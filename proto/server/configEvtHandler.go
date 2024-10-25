@@ -95,12 +95,12 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			}
 
 			if configMsg.Gnb != nil {
-				logger.ConfigLog.Infof("Received gNB [%v] configuration from config channel", configMsg.GnbName)
+				logger.ConfigLog.Infof("received gNB [%v] configuration from config channel", configMsg.GnbName)
 				handleGnbPost(configMsg.Gnb)
 			}
 
 			if configMsg.Upf != nil {
-				logger.ConfigLog.Infof("Received UPF [%v] configuration from config channel", configMsg.UpfHostname)
+				logger.ConfigLog.Infof("received UPF [%v] configuration from config channel", configMsg.UpfHostname)
 				handleUpfPost(configMsg.Upf)
 			}
 
@@ -116,11 +116,11 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			var config5gMsg Update5GSubscriberMsg
 			if configMsg.MsgType == configmodels.Inventory {
 				if configMsg.GnbName != "" {
-					logger.ConfigLog.Infof("Received delete gNB [%v] from config channel", configMsg.GnbName)
+					logger.ConfigLog.Infof("received delete gNB [%v] from config channel", configMsg.GnbName)
 					handleGnbDelete(configMsg.GnbName)
 				}
 				if configMsg.UpfHostname != "" {
-					logger.ConfigLog.Infof("Received delete UPF [%v] from config channel", configMsg.UpfHostname)
+					logger.ConfigLog.Infof("received delete UPF [%v] from config channel", configMsg.UpfHostname)
 					handleUpfDelete(configMsg.UpfHostname)
 				}
 			} else if configMsg.MsgType != configmodels.Sub_data {

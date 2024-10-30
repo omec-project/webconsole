@@ -111,7 +111,7 @@ func handlePostGnb(c *gin.Context) error {
 	if !exists {
 		errorMessage := "post gNB request is missing gnb-name"
 		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf(errorMessage)
+		return fmt.Errorf("%s", errorMessage)
 	}
 	logger.ConfigLog.Infof("received gNB %v", gnbName)
 	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
@@ -126,7 +126,7 @@ func handlePostGnb(c *gin.Context) error {
 	if postGnbRequest.Tac == "" {
 		errorMessage := "post gNB request body is missing tac"
 		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf(errorMessage)
+		return fmt.Errorf("%s", errorMessage)
 	}
 	postGnb := configmodels.Gnb{
 		Name: gnbName,
@@ -147,7 +147,7 @@ func handleDeleteGnb(c *gin.Context) error {
 	if !exists {
 		errorMessage := "delete gNB request is missing gnb-name"
 		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf(errorMessage)
+		return fmt.Errorf("%s", errorMessage)
 	}
 	logger.ConfigLog.Infof("received delete gNB %v request", gnbName)
 	msg := configmodels.ConfigMessage{
@@ -243,7 +243,7 @@ func handlePostUpf(c *gin.Context) error {
 	if !exists {
 		errorMessage := "post UPF request is missing upf-hostname"
 		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf(errorMessage)
+		return fmt.Errorf("%s", errorMessage)
 	}
 	logger.ConfigLog.Infof("received UPF %v", upfHostname)
 	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
@@ -258,7 +258,7 @@ func handlePostUpf(c *gin.Context) error {
 	if postUpfRequest.Port == "" {
 		errorMessage := "post UPF request body is missing port"
 		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf(errorMessage)
+		return fmt.Errorf("%s", errorMessage)
 	}
 	postUpf := configmodels.Upf{
 		Hostname: upfHostname,
@@ -279,7 +279,7 @@ func handleDeleteUpf(c *gin.Context) error {
 	if !exists {
 		errorMessage := "delete UPF request is missing upf-hostname"
 		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf(errorMessage)
+		return fmt.Errorf("%s", errorMessage)
 	}
 	logger.ConfigLog.Infof("received delete UPF %v", upfHostname)
 	msg := configmodels.ConfigMessage{

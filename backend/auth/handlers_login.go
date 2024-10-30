@@ -37,15 +37,15 @@ type LoginResponse struct {
 
 // LoginPost godoc
 //
-//	@Description	Log in. Only available if enableAuthentication is enabled.
-//	@Tags			Auth
-//	@Param			loginParams	 	body	LoginParams	true	" "
-//	@Success		200				{object}	LoginResponse	"Authorization token"
-//	@Failure		400				{object}	nil				"Bad request"
-//	@Failure		401				{object}	nil				"Authentication failed"
-//	@Failure		404				{object}	nil				"Page not found if enableAuthentication is disabled"
-//	@Failure		500				{object}	nil				"Internal server error"
-//	@Router			/login [post]
+// @Description  Log in. Only available if enableAuthentication is enabled.
+// @Tags         Auth
+// @Param        loginParams    body    LoginParams    true    " "
+// @Success      200  {object}  LoginResponse  "Authorization token"
+// @Failure      400  {object}  nil            "Bad request"
+// @Failure      401  {object}  nil            "Authentication failed"
+// @Failure      404  {object}  nil            "Page not found if enableAuthentication is disabled"
+// @Failure      500  {object}  nil            "Internal server error"
+// @Router       /login  [post]
 func Login(jwtSecret []byte) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var loginParams LoginParams

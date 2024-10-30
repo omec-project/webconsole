@@ -5,7 +5,6 @@ package configapi
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -31,15 +30,15 @@ func setInventoryCorsHeader(c *gin.Context) {
 
 // GetGnbs godoc
 //
-//	@Description	Return the list of gNBs
-//	@Tags			gNBs
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Success		200	{array}		configmodels.Gnb	"List of gNBs"
-//	@Failure		401	{object}	nil					"Authorization failed"
-//	@Failure		403	{object}	nil					"Forbidden"
-//	@Failure		500	{object}	nil					"Error retrieving gNBs"
-//	@Router			/config/v1/inventory/gnb	[get]
+// @Description Return the list of gNBs
+// @Tags        gNBs
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200  {array}   configmodels.Gnb  "List of gNBs"
+// @Failure     401  {object}  nil               "Authorization failed"
+// @Failure     403  {object}  nil               "Forbidden"
+// @Failure     500  {object}  nil               "Error retrieving gNBs"
+// @Router      /config/v1/inventory/gnb  [get]
 func GetGnbs(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	logger.WebUILog.Infoln("get all gNBs")
@@ -66,17 +65,17 @@ func GetGnbs(c *gin.Context) {
 
 // PostGnb godoc
 //
-//	@Description	Create a new gNB
-//	@Tags			gNBs
-//	@Produce		json
-//	@Param			gnb-name	path	string						true	"Name of the gNB"
-//	@Param			tac			body	configmodels.PostGnbRequest	true	"TAC of the gNB"
-//	@Security		BearerAuth
-//	@Success		200	{object}	nil	"gNB created"
-//	@Failure		400	{object}	nil	"Failed to create the gNB"
-//	@Failure		401 {object}	nil	"Authorization failed"
-//	@Failure		403 {object}	nil	"Forbidden"
-//	@Router			/config/v1/inventory/gnb/{gnb-name}	[post]
+// @Description Create a new gNB
+// @Tags        gNBs
+// @Produce     json
+// @Param       gnb-name    path    string                         true    "Name of the gNB"
+// @Param       tac         body    configmodels.PostGnbRequest    true    "TAC of the gNB"
+// @Security    BearerAuth
+// @Success     200  {object}  nil  "gNB created"
+// @Failure     400  {object}  nil  "Failed to create the gNB"
+// @Failure     401  {object}  nil  "Authorization failed"
+// @Failure     403  {object}  nil  "Forbidden"
+// @Router      /config/v1/inventory/gnb/{gnb-name}  [post]
 func PostGnb(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	if err := handlePostGnb(c); err == nil {
@@ -88,16 +87,16 @@ func PostGnb(c *gin.Context) {
 
 // DeleteGnb godoc
 //
-//	@Description	Delete an existing gNB
-//	@Tags			gNBs
-//	@Produce		json
-//	@Param			gnb-name	path	string	true	"Name of the gNB"
-//	@Security		BearerAuth
-//	@Success		200	{object}	nil	"gNB deleted"
-//	@Failure		400	{object}	nil	"Failed to delete the gNB"
-//	@Failure		401	{object}	nil	"Authorization failed"
-//	@Failure		403	{object}	nil	"Forbidden"
-//	@Router			/config/v1/inventory/gnb/{gnb-name}	[delete]
+//	@Description  Delete an existing gNB
+//	@Tags         gNBs
+//	@Produce      json
+//	@Param        gnb-name    path    string    true    "Name of the gNB"
+//	@Security     BearerAuth
+//	@Success      200  {object}  nil  "gNB deleted"
+//	@Failure      400  {object}  nil  "Failed to delete the gNB"
+//	@Failure      401  {object}  nil  "Authorization failed"
+//	@Failure      403  {object}  nil  "Forbidden"
+//	@Router       /config/v1/inventory/gnb/{gnb-name}  [delete]
 func DeleteGnb(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	if err := handleDeleteGnb(c); err == nil {
@@ -112,7 +111,7 @@ func handlePostGnb(c *gin.Context) error {
 	if !exists {
 		errorMessage := "post gNB request is missing gnb-name"
 		logger.ConfigLog.Errorln(errorMessage)
-		return errors.New(errorMessage)
+		return fmt.Errorf(errorMessage)
 	}
 	logger.ConfigLog.Infof("received gNB %v", gnbName)
 	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
@@ -127,7 +126,7 @@ func handlePostGnb(c *gin.Context) error {
 	if postGnbRequest.Tac == "" {
 		errorMessage := "post gNB request body is missing tac"
 		logger.ConfigLog.Errorln(errorMessage)
-		return errors.New(errorMessage)
+		return fmt.Errorf(errorMessage)
 	}
 	postGnb := configmodels.Gnb{
 		Name: gnbName,
@@ -148,7 +147,7 @@ func handleDeleteGnb(c *gin.Context) error {
 	if !exists {
 		errorMessage := "delete gNB request is missing gnb-name"
 		logger.ConfigLog.Errorln(errorMessage)
-		return errors.New(errorMessage)
+		return fmt.Errorf(errorMessage)
 	}
 	logger.ConfigLog.Infof("received delete gNB %v request", gnbName)
 	msg := configmodels.ConfigMessage{
@@ -163,15 +162,15 @@ func handleDeleteGnb(c *gin.Context) error {
 
 // GetUpfs godoc
 //
-//	@Description	Return the list of UPFs
-//	@Tags			UPFs
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Success		200	{array}		configmodels.Upf	"List of UPFs"
-//	@Failure		401	{object}	nil					"Authorization failed"
-//	@Failure		403	{object}	nil					"Forbidden"
-//	@Failure		500	{object}	nil					"Error retrieving UPFs"
-//	@Router			/config/v1/inventory/upf	[get]
+// @Description  Return the list of UPFs
+// @Tags         UPFs
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}   configmodels.Upf  "List of UPFs"
+// @Failure      401  {object}  nil               "Authorization failed"
+// @Failure      403  {object}  nil               "Forbidden"
+// @Failure      500  {object}  nil               "Error retrieving UPFs"
+// @Router       /config/v1/inventory/upf  [get]
 func GetUpfs(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	logger.WebUILog.Infoln("get all UPFs")
@@ -198,17 +197,17 @@ func GetUpfs(c *gin.Context) {
 
 // PostUpf godoc
 //
-//	@Description	Create a new UPF
-//	@Tags			UPFs
-//	@Produce		json
-//	@Param			upf-hostname	path	string						true	"Name of the UPF"
-//	@Param			port			body	configmodels.PostUpfRequest	true	"Port of the UPF"
-//	@Security		BearerAuth
-//	@Success		200	{object}	nil	"UPF created"
-//	@Failure		400	{object}	nil	"Failed to create the UPF"
-//	@Failure		401	{object}	nil	"Authorization failed"
-//	@Failure		403	{object}	nil	"Forbidden"
-//	@Router			/config/v1/inventory/upf/{upf-hostname}	[post]
+// @Description  Create a new UPF
+// @Tags         UPFs
+// @Produce      json
+// @Param        upf-hostname   path    string                         true    "Name of the UPF"
+// @Param        port           body    configmodels.PostUpfRequest    true    "Port of the UPF"
+// @Security     BearerAuth
+// @Success      200  {object}  nil  "UPF created"
+// @Failure      400  {object}  nil  "Failed to create the UPF"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Router       /config/v1/inventory/upf/{upf-hostname}  [post]
 func PostUpf(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	if err := handlePostUpf(c); err == nil {
@@ -220,16 +219,16 @@ func PostUpf(c *gin.Context) {
 
 // DeleteUpf godoc
 //
-//	@Description	Delete an existing UPF
-//	@Tags			UPFs
-//	@Produce		json
-//	@Param			upf-hostname	path	string	true	"Name of the UPF"
-//	@Security		BearerAuth
-//	@Success		200	{object}	nil	"UPF deleted"
-//	@Failure		400	{object}	nil	"Failed to delete the UPF"
-//	@Failure		401	{object}	nil	"Authorization failed"
-//	@Failure		403	{object}	nil	"Forbidden"
-//	@Router			/config/v1/inventory/upf/{upf-hostname}	[delete]
+// @Description  Delete an existing UPF
+// @Tags         UPFs
+// @Produce      json
+// @Param        upf-hostname    path    string    true    "Name of the UPF"
+// @Security     BearerAuth
+// @Success      200  {object}  nil  "UPF deleted"
+// @Failure      400  {object}  nil  "Failed to delete the UPF"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Router       /config/v1/inventory/upf/{upf-hostname}  [delete]
 func DeleteUpf(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	if err := handleDeleteUpf(c); err == nil {
@@ -244,7 +243,7 @@ func handlePostUpf(c *gin.Context) error {
 	if !exists {
 		errorMessage := "post UPF request is missing upf-hostname"
 		logger.ConfigLog.Errorln(errorMessage)
-		return errors.New(errorMessage)
+		return fmt.Errorf(errorMessage)
 	}
 	logger.ConfigLog.Infof("received UPF %v", upfHostname)
 	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
@@ -259,7 +258,7 @@ func handlePostUpf(c *gin.Context) error {
 	if postUpfRequest.Port == "" {
 		errorMessage := "post UPF request body is missing port"
 		logger.ConfigLog.Errorln(errorMessage)
-		return errors.New(errorMessage)
+		return fmt.Errorf(errorMessage)
 	}
 	postUpf := configmodels.Upf{
 		Hostname: upfHostname,
@@ -280,7 +279,7 @@ func handleDeleteUpf(c *gin.Context) error {
 	if !exists {
 		errorMessage := "delete UPF request is missing upf-hostname"
 		logger.ConfigLog.Errorln(errorMessage)
-		return errors.New(errorMessage)
+		return fmt.Errorf(errorMessage)
 	}
 	logger.ConfigLog.Infof("received delete UPF %v", upfHostname)
 	msg := configmodels.ConfigMessage{

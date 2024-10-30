@@ -571,6 +571,248 @@ const docTemplate = `{
                 }
             }
         },
+        "/config/v1/inventory/gnb": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Return the list of gNBs",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gNBs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of gNBs",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/configmodels.Gnb"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Error retrieving gNBs"
+                    }
+                }
+            }
+        },
+        "/config/v1/inventory/gnb/{gnb-name}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new gNB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gNBs"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the gNB",
+                        "name": "gnb-name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "TAC of the gNB",
+                        "name": "tac",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/configmodels.PostGnbRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "gNB created"
+                    },
+                    "400": {
+                        "description": "Failed to create the gNB"
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete an existing gNB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gNBs"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the gNB",
+                        "name": "gnb-name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "gNB deleted"
+                    },
+                    "400": {
+                        "description": "Failed to delete the gNB"
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    }
+                }
+            }
+        },
+        "/config/v1/inventory/upf": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Return the list of UPFs",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "UPFs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of UPFs",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/configmodels.Upf"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Error retrieving UPFs"
+                    }
+                }
+            }
+        },
+        "/config/v1/inventory/upf/{upf-hostname}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new UPF",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "UPFs"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the UPF",
+                        "name": "upf-hostname",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Port of the UPF",
+                        "name": "port",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/configmodels.PostUpfRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UPF created"
+                    },
+                    "400": {
+                        "description": "Failed to create the UPF"
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete an existing UPF",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "UPFs"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the UPF",
+                        "name": "upf-hostname",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UPF deleted"
+                    },
+                    "400": {
+                        "description": "Failed to delete the UPF"
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    }
+                }
+            }
+        },
         "/config/v1/network-slice/": {
             "get": {
                 "security": [
@@ -929,6 +1171,33 @@ const docTemplate = `{
                 }
             }
         },
+        "configmodels.Gnb": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "tac": {
+                    "type": "string"
+                }
+            }
+        },
+        "configmodels.PostGnbRequest": {
+            "type": "object",
+            "properties": {
+                "tac": {
+                    "type": "string"
+                }
+            }
+        },
+        "configmodels.PostUpfRequest": {
+            "type": "object",
+            "properties": {
+                "port": {
+                    "type": "string"
+                }
+            }
+        },
         "configmodels.Slice": {
             "type": "object",
             "properties": {
@@ -1113,6 +1382,17 @@ const docTemplate = `{
                 "qci": {
                     "description": "QCI/5QI/QFI",
                     "type": "integer"
+                }
+            }
+        },
+        "configmodels.Upf": {
+            "type": "object",
+            "properties": {
+                "hostname": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "string"
                 }
             }
         }

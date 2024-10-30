@@ -19,12 +19,12 @@ type StatusResponse struct {
 
 // GetStatus godoc
 //
-//	@Description	Get Status. Only available if enableAuthentication is enabled.
-//	@Tags			Auth
-//	@Success		200	{object}	StatusResponse	"Webui status"
-//	@Failure		404	{object}	nil				"Page not found if enableAuthentication is disabled"
-//	@Failure		500	{object}	nil				"Internal server error"
-//	@Router			/status	[get]
+// @Description  Get Status. Only available if enableAuthentication is enabled.
+// @Tags         Auth
+// @Success      200  {object}  StatusResponse  "Webui status"
+// @Failure      404  {object}  nil             "Page not found if enableAuthentication is disabled"
+// @Failure      500  {object}  nil             "Internal server error"
+// @Router       /status  [get]
 func GetStatus() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		numOfUserAccounts, err := dbadapter.WebuiDBClient.RestfulAPICount(configmodels.UserAccountDataColl, bson.M{})

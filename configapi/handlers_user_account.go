@@ -33,16 +33,16 @@ const (
 
 // GetUserAccounts godoc
 //
-//	@Description	Return the list of user accounts
-//	@Tags			User Accounts
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Success		200	{array}		configmodels.GetUserAccountResponse	"List of user accounts"
-//	@Failure		401	{object}	nil									"Authorization failed"
-//	@Failure		403	{object}	nil									"Forbidden"
-//	@Failure		404	{object}	nil									"Page not found if enableAuthentication is disabled"
-//	@Failure		500	{object}	nil									"Error retrieving user accounts"
-//	@Router			/config/v1/account/	[get]
+// @Description  Return the list of user accounts
+// @Tags         User Accounts
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}   configmodels.GetUserAccountResponse  "List of user accounts"
+// @Failure      401  {object}  nil                                  "Authorization failed"
+// @Failure      403  {object}  nil                                  "Forbidden"
+// @Failure      404  {object}  nil                                  "Page not found if enableAuthentication is disabled"
+// @Failure      500  {object}  nil                                  "Error retrieving user accounts"
+// @Router       /config/v1/account/  [get]
 func GetUserAccounts(c *gin.Context) {
 	logger.WebUILog.Infoln("get user accounts")
 	rawUsers, err := dbadapter.WebuiDBClient.RestfulAPIGetMany(configmodels.UserAccountDataColl, bson.M{})
@@ -70,17 +70,17 @@ func GetUserAccounts(c *gin.Context) {
 
 // GetUserAccount godoc
 //
-//	@Description	Return the user account
-//	@Tags			User Accounts
-//	@Produce		json
-//	@Param			username	path	string	true	"Username of the user account"
-//	@Security		BearerAuth
-//	@Success		200	{object}	configmodels.GetUserAccountResponse	"User account"
-//	@Failure		401	{object}	nil									"Authorization failed"
-//	@Failure		403	{object}	nil									"Forbidden"
-//	@Failure		404	{object}	nil									"User account not found. Or Page not found if enableAuthentication is disabled"
-//	@Failure		500	{object}	nil									"Error retrieving user account"
-//	@Router			/config/v1/account/{username}	[get]
+// @Description  Return the user account
+// @Tags         User Accounts
+// @Produce      json
+// @Param        username    path    string    true    "Username of the user account"
+// @Security     BearerAuth
+// @Success      200  {object}  configmodels.GetUserAccountResponse  "User account"
+// @Failure      401  {object}  nil                                  "Authorization failed"
+// @Failure      403  {object}  nil                                  "Forbidden"
+// @Failure      404  {object}  nil                                  "User account not found. Or Page not found if enableAuthentication is disabled"
+// @Failure      500  {object}  nil                                  "Error retrieving user account"
+// @Router      /config/v1/account/{username}  [get]
 func GetUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("get user account")
 	username := c.Param("username")
@@ -121,18 +121,18 @@ func fetchDBUserAccount(username string) (*configmodels.DBUserAccount, error) {
 
 // CreateUserAccount godoc
 //
-//	@Description	Create a new user account
-//	@Tags			User Accounts
-//	@Produce		json
-//	@Param			params	body	configmodels.CreateUserAccountParams	true	"Username and password"
-//	@Security		BearerAuth
-//	@Success		200	{object}	nil	"User account created"
-//	@Failure		400	{object}	nil	"Bad request"
-//	@Failure		401	{object}	nil	"Authorization failed"
-//	@Failure		403	{object}	nil	"Forbidden"
-//	@Failure		404	{object}	nil	"Page not found if enableAuthentication is disabled"
-//	@Failure		500	{object}	nil	"Failed to create the user account"
-//	@Router			/config/v1/account/{username}	[post]
+// @Description  Create a new user account
+// @Tags         User Accounts
+// @Produce      json
+// @Param        params    body    configmodels.CreateUserAccountParams    true    "Username and password"
+// @Security     BearerAuth
+// @Success      200  {object}  nil  "User account created"
+// @Failure      400  {object}  nil  "Bad request"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Failure      404  {object}  nil  "Page not found if enableAuthentication is disabled"
+// @Failure      500  {object}  nil  "Failed to create the user account"
+// @Router      /config/v1/account/{username}  [post]
 func CreateUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("create user account")
 	var createUserParams configmodels.CreateUserAccountParams
@@ -187,18 +187,18 @@ func CreateUserAccount(c *gin.Context) {
 
 // DeleteUserAccount godoc
 //
-//	@Description	Delete an existing user account
-//	@Tags			User Accounts
-//	@Produce		json
-//	@Param			username	path	string	true	"Username of the user account"
-//	@Security		BearerAuth
-//	@Success		200	{object}	nil	"User account deleted"
-//	@Failure		400	{object}	nil	"Failed to delete the user account"
-//	@Failure		401	{object}	nil	"Authorization failed"
-//	@Failure		403	{object}	nil	"Forbidden"
-//	@Failure		404	{object}	nil	"User account not found. Or Page not found if enableAuthentication is disabled"
-//	@Failure		500	{object}	nil	"Failed to delete the user account"
-//	@Router			/config/v1/account/{username}	[delete]
+// @Description  Delete an existing user account
+// @Tags         User Accounts
+// @Produce      json
+// @Param        username    path    string    true    "Username of the user account"
+// @Security     BearerAuth
+// @Success      200  {object}  nil  "User account deleted"
+// @Failure      400  {object}  nil  "Failed to delete the user account"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Failure      404  {object}  nil  "User account not found. Or Page not found if enableAuthentication is disabled"
+// @Failure      500  {object}  nil  "Failed to delete the user account"
+// @Router      /config/v1/account/{username}  [delete]
 func DeleteUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("delete user account")
 	username := c.Param("username")
@@ -227,19 +227,19 @@ func DeleteUserAccount(c *gin.Context) {
 
 // ChangeUserAccountPasssword godoc
 //
-//	@Description	Create a new user account
-//	@Tags			User Accounts
-//	@Produce		json
-//	@Param			username	path	string								true	"Username"
-//	@Param			params		body	configmodels.ChangePasswordParams	true	"Username and password"
-//	@Security		BearerAuth
-//	@Success		200	{object}	nil	"Password changed"
-//	@Failure		400	{object}	nil	"Bad request"
-//	@Failure		401	{object}	nil	"Authorization failed"
-//	@Failure		403	{object}	nil	"Forbidden"
-//	@Failure		404	{object}	nil	"Page not found if enableAuthentication is disabled"
-//	@Failure		500	{object}	nil	"Failed to update the user account"
-//	@Router /config/v1/account/{username}/change_password	[post]
+// @Description  Create a new user account
+// @Tags         User Accounts
+// @Produce      json
+// @Param        username    path    string                               true    "Username"
+// @Param        params      body    configmodels.ChangePasswordParams    true    "Username and password"
+// @Security     BearerAuth
+// @Success      200  {object}  nil  "Password changed"
+// @Failure      400  {object}  nil  "Bad request"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Failure      404  {object}  nil  "Page not found if enableAuthentication is disabled"
+// @Failure      500  {object}  nil  "Failed to update the user account"
+// @Router      /config/v1/account/{username}/change_password  [post]
 func ChangeUserAccountPasssword(c *gin.Context) {
 	logger.WebUILog.Infoln("change user password")
 	username := c.Param("username")

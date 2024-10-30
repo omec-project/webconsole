@@ -87,16 +87,16 @@ func PostGnb(c *gin.Context) {
 
 // DeleteGnb godoc
 //
-//	@Description  Delete an existing gNB
-//	@Tags         gNBs
-//	@Produce      json
-//	@Param        gnb-name    path    string    true    "Name of the gNB"
-//	@Security     BearerAuth
-//	@Success      200  {object}  nil  "gNB deleted"
-//	@Failure      400  {object}  nil  "Failed to delete the gNB"
-//	@Failure      401  {object}  nil  "Authorization failed"
-//	@Failure      403  {object}  nil  "Forbidden"
-//	@Router       /config/v1/inventory/gnb/{gnb-name}  [delete]
+// @Description  Delete an existing gNB
+// @Tags         gNBs
+// @Produce      json
+// @Param        gnb-name    path    string    true    "Name of the gNB"
+// @Security     BearerAuth
+// @Success      200  {object}  nil  "gNB deleted"
+// @Failure      400  {object}  nil  "Failed to delete the gNB"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Router       /config/v1/inventory/gnb/{gnb-name}  [delete]
 func DeleteGnb(c *gin.Context) {
 	setInventoryCorsHeader(c)
 	if err := handleDeleteGnb(c); err == nil {

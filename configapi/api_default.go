@@ -235,12 +235,12 @@ func NetworkSliceSliceNameDelete(c *gin.Context) {
 // @Param        sliceName    path    string                true    " "
 // @Param        content      body    configmodels.Slice    true    " "
 // @Security     BearerAuth
-// @Success	     200  {object}  nil  "Network slice created"
-// @Failure	     400  {object}  nil  "Invalid network slice content"
-// @Failure	     401  {object}  nil  "Authorization failed"
-// @Failure	     403  {object}  nil  "Forbidden"
-// @Failure	     500  {object}  nil  "Error creating network slice"
-// @Router	     /config/v1/network-slice/{sliceName  [post]
+// @Success      200  {object}  nil  "Network slice created"
+// @Failure      400  {object}  nil  "Invalid network slice content"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Failure      500  {object}  nil  "Error creating network slice"
+// @Router       /config/v1/network-slice/{sliceName  [post]
 func NetworkSliceSliceNamePost(c *gin.Context) {
 	logger.ConfigLog.Debugf("Received NetworkSliceSliceNamePost ")
 	if ret := NetworkSlicePostHandler(c, configmodels.Post_op); ret {

@@ -14,6 +14,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -22,7 +23,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/util/http2_util"
 	utilLogger "github.com/omec-project/util/logger"
-	"github.com/omec-project/util/path_util"
 	"github.com/omec-project/webconsole/backend/auth"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -42,7 +42,7 @@ type WEBUI struct{}
 type (
 	// Config information.
 	Config struct {
-		webuicfg string
+		cfg string
 	}
 )
 
@@ -50,12 +50,9 @@ var config Config
 
 var webuiCLi = []cli.Flag{
 	cli.StringFlag{
-		Name:  "free5gccfg",
-		Usage: "common config file",
-	},
-	cli.StringFlag{
-		Name:  "webuicfg",
-		Usage: "config file",
+		Name:     "cfg",
+		Usage:    "webconsole config file",
+		Required: true,
 	},
 }
 
@@ -65,18 +62,18 @@ func (*WEBUI) GetCliCmd() (flags []cli.Flag) {
 
 func (webui *WEBUI) Initialize(c *cli.Context) {
 	config = Config{
-		webuicfg: c.String("webuicfg"),
+		cfg: c.String("cfg"),
 	}
 
-	if config.webuicfg != "" {
-		if err := factory.InitConfigFactory(config.webuicfg); err != nil {
-			panic(err)
-		}
-	} else {
-		DefaultWebUIConfigPath := path_util.Free5gcPath("free5gc/config/webuicfg.yaml")
-		if err := factory.InitConfigFactory(DefaultWebUIConfigPath); err != nil {
-			panic(err)
-		}
+	absPath, err := filepath.Abs(config.cfg)
+	if err != nil {
+		logger.ConfigLog.Errorln(err)
+		return
+	}
+
+	if err := factory.InitConfigFactory(absPath); err != nil {
+		logger.ConfigLog.Errorln(err)
+		return
 	}
 
 	webui.setLogLevel()

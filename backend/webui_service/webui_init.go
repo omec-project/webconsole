@@ -235,10 +235,10 @@ func (webui *WEBUI) Start() {
 }
 
 func (webui *WEBUI) Exec(c *cli.Context) error {
-	logger.InitLog.Debugln("args:", c.String("webuicfg"))
+	logger.InitLog.Debugln("args:", c.String("cfg"))
 	args := webui.FilterCli(c)
 	logger.InitLog.Debugln("filter:", args)
-	command := exec.Command("./webui", args...)
+	command := exec.Command("webui", args...)
 
 	webui.Initialize(c)
 

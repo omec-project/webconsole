@@ -386,7 +386,7 @@ func TestGetNetworkSliceByNameDoesExists(t *testing.T) {
 	}
 	body_bytes, _ := io.ReadAll(resp.Body)
 	body := string(body_bytes)
-	expected := `{"SliceName":"slice1","slice-id":{"sst":"1","sd":"010203"},"site-device-group":["group1","group2"],"site-info":{"site-name":"demo","plmn":{"mcc":"208","mnc":"93"},"gNodeBs":[{"name":"demo-gnb1","tac":1}],"upf":{"upf-name":"upf","upf-port":"8805"}}}`
+	expected := `{"slice-name":"slice1","slice-id":{"sst":"1","sd":"010203"},"site-device-group":["group1","group2"],"site-info":{"site-name":"demo","plmn":{"mcc":"208","mnc":"93"},"gNodeBs":[{"name":"demo-gnb1","tac":1}],"upf":{"upf-name":"upf","upf-port":"8805"}}}`
 	if body != expected {
 		t.Errorf("Expected %v, got %v", expected, body)
 	}

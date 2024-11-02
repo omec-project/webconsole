@@ -65,11 +65,11 @@ ConnectMongo:
 		case <-ticker.C:
 			continue
 		case <-timer:
-			logger.DbLog.Errorln("Timed out while connecting to MongoDB in 3 minutes.")
+			logger.DbLog.Errorln("timed out while connecting to MongoDB in 3 minutes")
 			return
 		}
 	}
-	logger.DbLog.Infoln("Connected to MongoDB.")
+	logger.DbLog.Infoln("connected to MongoDB")
 }
 
 func (db *MongoDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {

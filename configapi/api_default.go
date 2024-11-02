@@ -168,7 +168,7 @@ func GetNetworkSlices(c *gin.Context) {
 		logger.DbLog.Warnln(errGetMany)
 	}
 	for _, rawNetworkSlice := range rawNetworkSlices {
-		networkSlices = append(networkSlices, rawNetworkSlice["SliceName"].(string))
+		networkSlices = append(networkSlices, rawNetworkSlice["slice-name"].(string))
 	}
 
 	c.JSON(http.StatusOK, networkSlices)

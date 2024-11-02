@@ -11,5 +11,5 @@ import (
 )
 
 func AddSwaggerUiService(engine *gin.Engine) {
-	logger.WebUILog.Infoln("Swagger UI service will not be added")
+	logger.WebUILog.Infoln("swagger UI service will not be added")
 }

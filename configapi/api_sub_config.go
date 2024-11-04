@@ -204,7 +204,7 @@ func GetSampleJSON(c *gin.Context) {
 
 	amPolicyData := models.AmPolicyData{
 		SubscCats: []string{
-			"free5gc",
+			"aether",
 		},
 	}
 

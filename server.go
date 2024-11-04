@@ -20,11 +20,12 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "webui"
 	logger.AppLog.Infoln(app.Name)
-	app.Usage = "-free5gccfg common configuration file -webuicfg webui configuration file"
+	app.Usage = "Web UI"
+	app.UsageText = "webconsole -cfg <webui_config_file.conf>"
 	app.Action = action
 	app.Flags = WEBUI.GetCliCmd()
 	if err := app.Run(os.Args); err != nil {
-		logger.AppLog.Warnf("error args: %v", err)
+		logger.AppLog.Fatalf("error args: %v", err)
 	}
 }
 

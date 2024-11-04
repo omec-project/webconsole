@@ -375,7 +375,7 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 func updateAmPolicyData(imsi string) {
 	// ampolicydata
 	var amPolicy models.AmPolicyData
-	amPolicy.SubscCats = append(amPolicy.SubscCats, "free5gc")
+	amPolicy.SubscCats = append(amPolicy.SubscCats, "aether")
 	amPolicyDatBsonA := configmodels.ToBsonM(amPolicy)
 	amPolicyDatBsonA["ueId"] = "imsi-" + imsi
 	filter := bson.M{"ueId": "imsi-" + imsi}

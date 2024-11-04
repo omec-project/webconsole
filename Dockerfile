@@ -6,8 +6,6 @@
 
 FROM golang:1.23.2-bookworm AS builder
 
-LABEL maintainer="Aether SD-Core <dev@lists.aetherproject.org>"
-
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
     apt-transport-https \
@@ -29,19 +27,16 @@ RUN make all && \
 
 FROM alpine:3.20 AS webui
 
-LABEL description="ONF open source 5G Core Network" \
+LABEL maintainer="Aether SD-Core <dev@lists.aetherproject.org>" \
+    description="ONF open source 5G Core Network" \
     version="Stage 3"
 
 ARG DEBUG_TOOLS
-
 
 # Install debug tools ~85MB (if DEBUG_TOOLS is set to true)
 RUN if [ "$DEBUG_TOOLS" = "true" ]; then \
         apk update && apk add --no-cache -U vim strace net-tools curl netcat-openbsd bind-tools; \
         fi
 
-# Set working dir
-WORKDIR /free5gc/webconsole
-
-# Copy executable and default certs
-COPY --from=builder /go/src/webconsole/webconsole .
+# Copy executable
+COPY --from=builder /go/src/webconsole/webconsole /usr/local/bin/.

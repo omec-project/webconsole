@@ -366,7 +366,6 @@ func TestInventoryPostHandlers_Success(t *testing.T) {
 			default:
 				t.Error("expected message in configChannel, but none received")
 			}
-
 		})
 	}
 }
@@ -446,7 +445,6 @@ func TestInventoryDeleteHandlers_Success(t *testing.T) {
 			default:
 				t.Error("expected message in configChannel, but none received")
 			}
-
 		})
 	}
 }

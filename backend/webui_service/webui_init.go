@@ -190,19 +190,22 @@ func (webui *WEBUI) Start() {
 	go func() {
 		httpAddr := ":" + strconv.Itoa(factory.WebUIConfig.Configuration.CfgPort)
 		logger.InitLog.Infoln("Webui HTTP addr", httpAddr)
-		if factory.WebUIConfig.Info.HttpVersion == 2 {
+		tlsConfig := factory.WebUIConfig.Configuration.TLS
+		if factory.WebUIConfig.Info.HttpVersion == 2 || tlsConfig != nil {
 			server, err := http2_util.NewServer(httpAddr, "", subconfig_router)
 			if server == nil {
 				logger.InitLog.Errorln("initialize HTTP-2 server failed:", err)
 				return
 			}
-
 			if err != nil {
 				logger.InitLog.Warnln("initialize HTTP-2 server:", err)
 				return
 			}
-
-			err = server.ListenAndServe()
+			if tlsConfig != nil {
+				err = server.ListenAndServeTLS(tlsConfig.PEM, tlsConfig.Key)
+			} else {
+				err = server.ListenAndServe()
+			}
 			if err != nil {
 				logger.InitLog.Fatalln("HTTP server setup failed:", err)
 				return

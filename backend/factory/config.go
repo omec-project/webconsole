@@ -31,20 +31,19 @@ type Info struct {
 }
 
 type Configuration struct {
-	WebServer            *WebServer  `yaml:"WebServer,omitempty"`
 	Mongodb              *Mongodb    `yaml:"mongodb"`
 	RocEnd               *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
 	LteEnd               []*LteEndpt `yaml:"endpoints,omitempty"`          // LTE endpoints are configured and not auto-detected
+	TLS                  *TLS        `yaml:"tls"`
 	Mode5G               bool        `yaml:"mode5G,omitempty"`
 	SdfComp              bool        `yaml:"spec-compliant-sdf"`
 	EnableAuthentication bool        `yaml:"enableAuthentication,omitempty"`
 	CfgPort              int         `yaml:"cfgport,omitempty"`
 }
 
-type WebServer struct {
-	Scheme string `yaml:"scheme"`
-	IP     string `yaml:"ipv4Address"`
-	PORT   string `yaml:"port"`
+type TLS struct {
+	PEM string `yaml:"pem,omitempty"`
+	Key string `yaml:"key,omitempty"`
 }
 
 type Mongodb struct {

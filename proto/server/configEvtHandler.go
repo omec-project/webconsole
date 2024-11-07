@@ -7,6 +7,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -124,28 +125,16 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 					handleUpfDelete(configMsg.UpfHostname)
 				}
 			} else if configMsg.MsgType != configmodels.Sub_data {
-				rwLock.Lock()
 				// update config snapshot
-				if configMsg.DevGroup == nil {
+				if configMsg.DevGroup == nil && configMsg.DevGroupName != "" {
 					logger.ConfigLog.Infof("received delete Device Group [%v] from config channel", configMsg.DevGroupName)
-					config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
-					filter := bson.M{"group-name": configMsg.DevGroupName}
-					errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
-					if errDelOne != nil {
-						logger.DbLog.Warnln(errDelOne)
-					}
+					handleDeviceGroupDelete(configMsg, subsUpdateChan)
 				}
 
-				if configMsg.Slice == nil {
+				if configMsg.Slice == nil && configMsg.SliceName != "" {
 					logger.ConfigLog.Infof("received delete Slice [%v] from config channel", configMsg.SliceName)
-					config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
-					filter := bson.M{"slice-name": configMsg.SliceName}
-					errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
-					if errDelOne != nil {
-						logger.DbLog.Warnln(errDelOne)
-					}
+					handleNetworkSliceDelete(configMsg, subsUpdateChan)
 				}
-				rwLock.Unlock()
 			} else {
 				logger.ConfigLog.Infof("received delete Subscriber [%v] from config channel", configMsg.Imsi)
 			}
@@ -196,6 +185,22 @@ func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan
 	rwLock.Unlock()
 }
 
+func handleDeviceGroupDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+	rwLock.Lock()
+	if factory.WebUIConfig.Configuration.Mode5G {
+		var config5gMsg Update5GSubscriberMsg
+		config5gMsg.Msg = configMsg
+		config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
+		subsUpdateChan <- &config5gMsg
+	}
+	filter := bson.M{"group-name": configMsg.DevGroupName}
+	errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
+	if errDelOne != nil {
+		logger.DbLog.Warnln(errDelOne)
+	}
+	rwLock.Unlock()
+}
+
 func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
 	rwLock.Lock()
 	if factory.WebUIConfig.Configuration.Mode5G {
@@ -209,6 +214,28 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
 	if errPost != nil {
 		logger.DbLog.Warnln(errPost)
+	}
+	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
+		sendPebbleNotification("canonical.com/webconsole/networkslice/create")
+	}
+	rwLock.Unlock()
+}
+
+func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+	rwLock.Lock()
+	if factory.WebUIConfig.Configuration.Mode5G {
+		var config5gMsg Update5GSubscriberMsg
+		config5gMsg.Msg = configMsg
+		config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
+		subsUpdateChan <- &config5gMsg
+	}
+	filter := bson.M{"SliceName": configMsg.SliceName}
+	errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
+	if errDelOne != nil {
+		logger.DbLog.Warnln(errDelOne)
+	}
+	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
+		sendPebbleNotification("canonical.com/webconsole/networkslice/delete")
 	}
 	rwLock.Unlock()
 }
@@ -719,4 +746,15 @@ func convertToString(val uint64) string {
 func SnssaiModelsToHex(snssai models.Snssai) string {
 	sst := fmt.Sprintf("%02x", snssai.Sst)
 	return sst + snssai.Sd
+}
+
+var execCommand = exec.Command
+
+func sendPebbleNotification(key string) error {
+	cmd := execCommand("pebble", "notify", key)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("couldn't execute a pebble notify: %w", err)
+	}
+	logger.ConfigLog.Infof("custom Pebble notification sent")
+	return nil
 }

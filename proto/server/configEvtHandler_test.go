@@ -260,7 +260,7 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
 		}
-		expected_filter := bson.M{"SliceName": testSlice.SliceName}
+		expected_filter := bson.M{"slice-name": testSlice.SliceName}
 		if !reflect.DeepEqual(postData[0]["filter"], expected_filter) {
 			t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
 		}
@@ -313,7 +313,7 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
 		}
-		expected_filter := bson.M{"SliceName": testSlice.SliceName}
+		expected_filter := bson.M{"slice-name": testSlice.SliceName}
 		if !reflect.DeepEqual(postData[0]["filter"], expected_filter) {
 			t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
 		}

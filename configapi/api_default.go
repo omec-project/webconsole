@@ -192,7 +192,7 @@ func GetNetworkSliceByName(c *gin.Context) {
 	logger.WebUILog.Infoln("Get Network Slice by name")
 
 	var networkSlice configmodels.Slice
-	filter := bson.M{"SliceName": c.Param("slice-name")}
+	filter := bson.M{"slice-name": c.Param("slice-name")}
 	rawNetworkSlice, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(sliceDataColl, filter)
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)

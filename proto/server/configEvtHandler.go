@@ -216,7 +216,10 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 		logger.DbLog.Warnln(errPost)
 	}
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
-		sendPebbleNotification("canonical.com/webconsole/networkslice/create")
+		err := sendPebbleNotification("canonical.com/webconsole/networkslice/create")
+		if err != nil {
+			logger.ConfigLog.Warnln("sedning Pebble notification failed: %s. continuing silently.", err.Error())
+		}
 	}
 	rwLock.Unlock()
 }
@@ -235,7 +238,10 @@ func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateC
 		logger.DbLog.Warnln(errDelOne)
 	}
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
-		sendPebbleNotification("canonical.com/webconsole/networkslice/delete")
+		err := sendPebbleNotification("canonical.com/webconsole/networkslice/delete")
+		if err != nil {
+			logger.ConfigLog.Warnln("sedning Pebble notification failed: %s. continuing silently.", err.Error())
+		}
 	}
 	rwLock.Unlock()
 }

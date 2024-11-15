@@ -34,6 +34,7 @@ type Configuration struct {
 	Mongodb                 *Mongodb    `yaml:"mongodb"`
 	RocEnd                  *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
 	LteEnd                  []*LteEndpt `yaml:"endpoints,omitempty"`          // LTE endpoints are configured and not auto-detected
+	TLS                     *TLS        `yaml:"tls"`
 	Mode5G                  bool        `yaml:"mode5G,omitempty"`
 	SdfComp                 bool        `yaml:"spec-compliant-sdf"`
 	EnableAuthentication    bool        `yaml:"enableAuthentication,omitempty"`

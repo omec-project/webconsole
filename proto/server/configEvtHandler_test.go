@@ -18,7 +18,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var postData []map[string]interface{}
+var (
+	execCommandTimesCalled = 0
+	postData               []map[string]interface{}
+)
 
 func deviceGroup(name string) configmodels.DeviceGroups {
 	traffic_class := configmodels.TrafficClassInfo{
@@ -122,8 +125,6 @@ func (m *MockMongoSliceGetOne) RestfulAPIGetOne(collName string, filter bson.M) 
 	}
 	return previousSliceBson, nil
 }
-
-var execCommandTimesCalled = 0
 
 func mockExecCommand(command string, args ...string) *exec.Cmd {
 	cs := []string{"-test.run=TestExecCommandHelper", "--", "ENTER YOUR COMMAND HERE"}

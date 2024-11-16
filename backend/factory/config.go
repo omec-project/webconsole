@@ -38,8 +38,8 @@ type Configuration struct {
 	Mode5G                  bool        `yaml:"mode5G,omitempty"`
 	SdfComp                 bool        `yaml:"spec-compliant-sdf"`
 	EnableAuthentication    bool        `yaml:"enableAuthentication,omitempty"`
-	CfgPort                 int         `yaml:"cfgport,omitempty"`
 	SendPebbleNotifications bool        `yaml:"send_pebble_notifications,omitempty"`
+	CfgPort                 int         `yaml:"cfgport,omitempty"`
 }
 
 type TLS struct {

@@ -215,7 +215,7 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
 		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/create")
 		if err != nil {
-			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently.", err.Error())
+			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
 	}
 	rwLock.Unlock()
@@ -237,7 +237,7 @@ func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateC
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
 		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/delete")
 		if err != nil {
-			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently.", err.Error())
+			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
 	}
 	rwLock.Unlock()

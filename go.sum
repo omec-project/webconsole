@@ -105,8 +105,8 @@ github.com/montanaflynn/stats v0.7.1/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
-github.com/omec-project/config5g v1.5.4 h1:5JMw5Fsr5qyLZpQi3IZQaQPj78QJMFQXDVS3QDMOY9Y=
-github.com/omec-project/config5g v1.5.4/go.mod h1:HOvQtmi79f8cw35AiFHWHDoCTuZbXfMjeFJWgtPbwaI=
+github.com/omec-project/config5g v1.5.5 h1:9ouNkogjNBPi4Qa0gz12Ab4pl8gp5XWvELTCDx2nLe4=
+github.com/omec-project/config5g v1.5.5/go.mod h1:r5K7D2jMigypWWcWJDUZlgpcH8gOAvPT6phtKESGzNs=
 github.com/omec-project/openapi v1.3.2 h1:LhUA/vBKCswN0S8fc/dN5/xuUltLgoak6au2MAKwUkk=
 github.com/omec-project/openapi v1.3.2/go.mod h1:JByn0faBQbiWX/q3JA+FHOdQS9m6KdyHDF5VVjCGMms=
 github.com/omec-project/util v1.2.6 h1:PQ9k6eDVV17GKInBz1X2w4hr3KrMtkpXhS3XIT8eSug=

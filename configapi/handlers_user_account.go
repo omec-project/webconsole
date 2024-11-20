@@ -132,7 +132,7 @@ func fetchDBUserAccount(username string) (*configmodels.DBUserAccount, error) {
 // @Failure      403  {object}  nil  "Forbidden"
 // @Failure      404  {object}  nil  "Page not found if enableAuthentication is disabled"
 // @Failure      500  {object}  nil  "Failed to create the user account"
-// @Router      /config/v1/account/{username}  [post]
+// @Router      /config/v1/account/  [post]
 func CreateUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("create user account")
 	var createUserParams configmodels.CreateUserAccountParams

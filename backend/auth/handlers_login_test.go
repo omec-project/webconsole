@@ -143,11 +143,11 @@ func TestLogin_FailureCases(t *testing.T) {
 	AddAuthenticationService(router, mockJWTSecret)
 
 	testCases := []struct {
-		name         string
 		dbAdapter    dbadapter.DBInterface
+		name         string
 		inputData    string
-		expectedCode int
 		expectedBody string
+		expectedCode int
 	}{
 		{
 			name:         "InvalidDataProvided",
@@ -227,11 +227,11 @@ func TestLogin_SuccessCases(t *testing.T) {
 	AddAuthenticationService(router, mockJWTSecret)
 
 	testCases := []struct {
-		name             string
 		dbAdapter        dbadapter.DBInterface
+		name             string
 		inputData        string
-		expectedCode     int
 		expectedUsername string
+		expectedCode     int
 		expectedRole     int
 	}{
 		{

@@ -19,10 +19,10 @@ func TestStatus(t *testing.T) {
 	AddAuthenticationService(router, mockJWTSecret)
 
 	testCases := []struct {
-		name         string
 		dbAdapter    dbadapter.DBInterface
-		expectedCode int
+		name         string
 		expectedBody string
+		expectedCode int
 	}{
 		{
 			name:         "StatusIsInitialized",

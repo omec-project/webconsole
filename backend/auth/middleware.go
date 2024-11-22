@@ -18,9 +18,9 @@ import (
 )
 
 type jwtWebconsoleClaims struct {
+	jwt.StandardClaims
 	Username string `json:"username"`
 	Role     int    `json:"role"`
-	jwt.StandardClaims
 }
 
 func GenerateJWTSecret() ([]byte, error) {

@@ -1401,7 +1401,7 @@ const docTemplate = `{
     },
     "securityDefinitions": {
         "BearerAuth": {
-            "description": "Enter the token in the format ` + "`" + `Bearer \u003ctoken\u003e` + "`" + `",
+            "description": "Run the login endpoint to retrieve a token, then include its value in the format: ` + "`" + `Bearer \u003ctoken\u003e` + "`" + `.",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"

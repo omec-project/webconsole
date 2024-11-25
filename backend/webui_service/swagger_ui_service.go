@@ -26,7 +26,7 @@ import (
 // @securityDefinitions.apikey BearerAuth
 // @in				header
 // @name			Authorization
-// @description		Enter the token in the format `Bearer <token>`
+// @description		Run the login endpoint to retrieve a token, then include its value in the format: `Bearer <token>`.
 func AddSwaggerUiService(engine *gin.Engine) {
 	logger.WebUILog.Infoln("Adding Swagger UI service")
 	endpoint := os.Getenv("WEBUI_ENDPOINT")

@@ -7,6 +7,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,9 +40,11 @@ type Update5GSubscriberMsg struct {
 	PrevSlice    *configmodels.Slice
 }
 
-var rwLock sync.RWMutex
-
-var imsiData map[string]*models.AuthenticationSubscription
+var (
+	execCommand = exec.Command
+	imsiData    map[string]*models.AuthenticationSubscription
+	rwLock      sync.RWMutex
+)
 
 func init() {
 	imsiData = make(map[string]*models.AuthenticationSubscription)
@@ -113,7 +116,6 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				client.outStandingPushConfig <- configMsg
 			}
 		} else {
-			var config5gMsg Update5GSubscriberMsg
 			if configMsg.MsgType == configmodels.Inventory {
 				if configMsg.GnbName != "" {
 					logger.ConfigLog.Infof("received delete gNB [%v] from config channel", configMsg.GnbName)
@@ -124,34 +126,18 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 					handleUpfDelete(configMsg.UpfHostname)
 				}
 			} else if configMsg.MsgType != configmodels.Sub_data {
-				rwLock.Lock()
 				// update config snapshot
-				if configMsg.DevGroup == nil {
+				if configMsg.DevGroup == nil && configMsg.DevGroupName != "" {
 					logger.ConfigLog.Infof("received delete Device Group [%v] from config channel", configMsg.DevGroupName)
-					config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
-					filter := bson.M{"group-name": configMsg.DevGroupName}
-					errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
-					if errDelOne != nil {
-						logger.DbLog.Warnln(errDelOne)
-					}
+					handleDeviceGroupDelete(configMsg, subsUpdateChan)
 				}
 
-				if configMsg.Slice == nil {
+				if configMsg.Slice == nil && configMsg.SliceName != "" {
 					logger.ConfigLog.Infof("received delete Slice [%v] from config channel", configMsg.SliceName)
-					config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
-					filter := bson.M{"slice-name": configMsg.SliceName}
-					errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
-					if errDelOne != nil {
-						logger.DbLog.Warnln(errDelOne)
-					}
+					handleNetworkSliceDelete(configMsg, subsUpdateChan)
 				}
-				rwLock.Unlock()
 			} else {
 				logger.ConfigLog.Infof("received delete Subscriber [%v] from config channel", configMsg.Imsi)
-			}
-			if factory.WebUIConfig.Configuration.Mode5G {
-				config5gMsg.Msg = configMsg
-				subsUpdateChan <- &config5gMsg
 			}
 			// loop through all clients and send this message to all clients
 			if len(clientNFPool) == 0 {
@@ -196,6 +182,22 @@ func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan
 	rwLock.Unlock()
 }
 
+func handleDeviceGroupDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+	rwLock.Lock()
+	if factory.WebUIConfig.Configuration.Mode5G {
+		var config5gMsg Update5GSubscriberMsg
+		config5gMsg.Msg = configMsg
+		config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
+		subsUpdateChan <- &config5gMsg
+	}
+	filter := bson.M{"group-name": configMsg.DevGroupName}
+	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
+	if err != nil {
+		logger.DbLog.Warnln(err)
+	}
+	rwLock.Unlock()
+}
+
 func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
 	rwLock.Lock()
 	if factory.WebUIConfig.Configuration.Mode5G {
@@ -209,6 +211,34 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
 	if errPost != nil {
 		logger.DbLog.Warnln(errPost)
+	}
+	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
+		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/create")
+		if err != nil {
+			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
+		}
+	}
+	rwLock.Unlock()
+}
+
+func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+	rwLock.Lock()
+	if factory.WebUIConfig.Configuration.Mode5G {
+		var config5gMsg Update5GSubscriberMsg
+		config5gMsg.Msg = configMsg
+		config5gMsg.PrevSlice = getSliceByName(configMsg.SliceName)
+		subsUpdateChan <- &config5gMsg
+	}
+	filter := bson.M{"slice-name": configMsg.SliceName}
+	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
+	if err != nil {
+		logger.DbLog.Warnln(err)
+	}
+	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
+		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/delete")
+		if err != nil {
+			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
+		}
 	}
 	rwLock.Unlock()
 }
@@ -719,4 +749,13 @@ func convertToString(val uint64) string {
 func SnssaiModelsToHex(snssai models.Snssai) string {
 	sst := fmt.Sprintf("%02x", snssai.Sst)
 	return sst + snssai.Sd
+}
+
+func sendPebbleNotification(key string) error {
+	cmd := execCommand("pebble", "notify", key)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("couldn't execute a pebble notify: %w", err)
+	}
+	logger.ConfigLog.Infoln("custom Pebble notification sent")
+	return nil
 }

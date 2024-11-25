@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: 2024 Intel Corporation
 # SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
 # Copyright 2019 free5GC.org
+#
 # SPDX-License-Identifier: Apache-2.0
+#
 
 # This file contains all available configuration options
 # with their default values.
@@ -124,6 +126,15 @@ linters-settings:
   golint:
     # minimal confidence for issues, default is 0.8
     min-confidence: 0.8
+  gomnd:
+    # the list of enabled checks, see https://github.com/tommy-muehle/go-mnd/#checks for description.
+    checks:
+      - argument
+      - case
+      - condition
+      - operation
+      - return
+      - assign
   gomodguard:
     allowed:
       modules:                                                        # List of allowed modules
@@ -151,9 +162,6 @@ linters-settings:
           - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
     # enable all analyzers
     enable-all: true
-    disable:
-      - fieldalignment
-    disable-all: false
   depguard:
     list-type: blacklist
     include-go-root: false
@@ -183,12 +191,12 @@ linters-settings:
     # if it's called for subdir of a project it can't find funcs usages. All text editor integrations
     # with golangci-lint call it on a directory with the changed file.
     check-exported: false
+  whitespace:
+    multi-if: false   # Enforces newlines (or comments) after every multi-line if statement
+    multi-func: false # Enforces newlines (or comments) after every multi-line function signature
   misspell:
     #locale: US
     ignore-words:
-  whitespace:
-    multi-if: false # Enforces newlines (or comments) after every multi-line if statement
-    multi-func: false # Enforces newlines (or comments) after every multi-line function signature
   wsl:
     # If true append is only allowed to be cuddled if appending value is
     # matching variables, fields or types on line above. Default is true.
@@ -223,6 +231,7 @@ linters:
     # Additional
     # - lll
     - godox
+    # - mnd
     - goconst
     # - gocognit
     # - nestif
@@ -253,6 +262,9 @@ issues:
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-dirs:
     - "configapi"
+    - "configmodels"
+  exclude-files:
+    - "routers.go"
   exclude-rules:
     # Exclude some linters from running on tests files.
   # Independently from option `exclude` we use default exclude patterns,

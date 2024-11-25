@@ -6,6 +6,8 @@ package server
 
 import (
 	"encoding/json"
+	"os"
+	"os/exec"
 	"reflect"
 	"testing"
 
@@ -16,7 +18,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var postData []map[string]interface{}
+var (
+	execCommandTimesCalled = 0
+	postData               []map[string]interface{}
+)
 
 func deviceGroup(name string) configmodels.DeviceGroups {
 	traffic_class := configmodels.TrafficClassInfo{
@@ -119,6 +124,58 @@ func (m *MockMongoSliceGetOne) RestfulAPIGetOne(collName string, filter bson.M) 
 		return nil, err
 	}
 	return previousSliceBson, nil
+}
+
+func mockExecCommand(command string, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=TestExecCommandHelper", "--", "ENTER YOUR COMMAND HERE"}
+	cs = append(cs, args...)
+	cmd := exec.Command(os.Args[0], cs...)
+	execCommandTimesCalled += 1
+	return cmd
+}
+
+func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
+	execCommand = mockExecCommand
+	defer func() { execCommand = exec.Command }()
+	numPebbleNotificationsSent := execCommandTimesCalled
+	networkSlice := []configmodels.Slice{networkSlice("slice1")}
+	factory.WebUIConfig.Configuration.SendPebbleNotifications = true
+
+	configMsg := configmodels.ConfigMessage{
+		SliceName: networkSlice[0].SliceName,
+		Slice:     &networkSlice[0],
+	}
+	subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
+	dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
+	dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
+	handleNetworkSlicePost(&configMsg, subsUpdateChan)
+
+	if execCommandTimesCalled != numPebbleNotificationsSent+1 {
+		t.Errorf("Unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent+1)
+	}
+}
+
+func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
+	execCommand = mockExecCommand
+	defer func() { execCommand = exec.Command }()
+	numPebbleNotificationsSent := execCommandTimesCalled
+	networkSlices := []configmodels.Slice{networkSlice("slice1")}
+	factory.WebUIConfig.Configuration.SendPebbleNotifications = false
+
+	for _, testSlice := range networkSlices {
+		configMsg := configmodels.ConfigMessage{
+			SliceName: testSlice.SliceName,
+			Slice:     &testSlice,
+		}
+		subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
+		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
+		dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
+		handleNetworkSlicePost(&configMsg, subsUpdateChan)
+	}
+
+	if execCommandTimesCalled != numPebbleNotificationsSent {
+		t.Errorf("Unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent)
+	}
 }
 
 func Test_handleDeviceGroupPost(t *testing.T) {

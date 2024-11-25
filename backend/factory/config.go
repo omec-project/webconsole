@@ -31,14 +31,15 @@ type Info struct {
 }
 
 type Configuration struct {
-	Mongodb              *Mongodb    `yaml:"mongodb"`
-	RocEnd               *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
-	LteEnd               []*LteEndpt `yaml:"endpoints,omitempty"`          // LTE endpoints are configured and not auto-detected
-	TLS                  *TLS        `yaml:"tls"`
-	Mode5G               bool        `yaml:"mode5G,omitempty"`
-	SdfComp              bool        `yaml:"spec-compliant-sdf"`
-	EnableAuthentication bool        `yaml:"enableAuthentication,omitempty"`
-	CfgPort              int         `yaml:"cfgport,omitempty"`
+	Mongodb                 *Mongodb    `yaml:"mongodb"`
+	TLS                     *TLS        `yaml:"tls"`
+	RocEnd                  *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
+	LteEnd                  []*LteEndpt `yaml:"endpoints,omitempty"`          // LTE endpoints are configured and not auto-detected
+	Mode5G                  bool        `yaml:"mode5G,omitempty"`
+	SdfComp                 bool        `yaml:"spec-compliant-sdf"`
+	EnableAuthentication    bool        `yaml:"enableAuthentication,omitempty"`
+	SendPebbleNotifications bool        `yaml:"send_pebble_notifications,omitempty"`
+	CfgPort                 int         `yaml:"cfgport,omitempty"`
 }
 
 type TLS struct {

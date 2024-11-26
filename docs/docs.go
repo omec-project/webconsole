@@ -218,51 +218,6 @@ const docTemplate = `{
                         "description": "Error retrieving user accounts"
                     }
                 }
-            }
-        },
-        "/config/v1/account/{username}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Return the user account",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "User Accounts"
-                ],
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Username of the user account",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "User account",
-                        "schema": {
-                            "$ref": "#/definitions/configmodels.GetUserAccountResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Authorization failed"
-                    },
-                    "403": {
-                        "description": "Forbidden"
-                    },
-                    "404": {
-                        "description": "User account not found. Or Page not found if enableAuthentication is disabled"
-                    },
-                    "500": {
-                        "description": "Error retrieving user account"
-                    }
-                }
             },
             "post": {
                 "security": [
@@ -306,6 +261,51 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to create the user account"
+                    }
+                }
+            }
+        },
+        "/config/v1/account/{username}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Return the user account",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Accounts"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username of the user account",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User account",
+                        "schema": {
+                            "$ref": "#/definitions/configmodels.GetUserAccountResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "User account not found. Or Page not found if enableAuthentication is disabled"
+                    },
+                    "500": {
+                        "description": "Error retrieving user account"
                     }
                 }
             },
@@ -849,50 +849,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/config/v1/network-slice/{sliceName}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Return the network slice",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Network Slices"
-                ],
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": " ",
-                        "name": "sliceName",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Network slice",
-                        "schema": {
-                            "$ref": "#/definitions/configmodels.Slice"
-                        }
-                    },
-                    "401": {
-                        "description": "Authorization failed"
-                    },
-                    "403": {
-                        "description": "Forbidden"
-                    },
-                    "404": {
-                        "description": "Network slices not found"
-                    },
-                    "500": {
-                        "description": "Error retrieving network slice"
-                    }
-                }
-            },
+        "/config/v1/network-slice/{sliceName": {
             "post": {
                 "security": [
                     {
@@ -936,6 +893,51 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Error creating network slice"
+                    }
+                }
+            }
+        },
+        "/config/v1/network-slice/{sliceName}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Return the network slice",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Network Slices"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": " ",
+                        "name": "sliceName",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Network slice",
+                        "schema": {
+                            "$ref": "#/definitions/configmodels.Slice"
+                        }
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Network slices not found"
+                    },
+                    "500": {
+                        "description": "Error retrieving network slice"
                     }
                 }
             },
@@ -1219,7 +1221,7 @@ const docTemplate = `{
                 "slice-id": {
                     "$ref": "#/definitions/configmodels.SliceSliceId"
                 },
-                "sliceName": {
+                "slice-name": {
                     "type": "string"
                 }
             }
@@ -1399,7 +1401,7 @@ const docTemplate = `{
     },
     "securityDefinitions": {
         "BearerAuth": {
-            "description": "Enter the token in the format ` + "`" + `Bearer \u003ctoken\u003e` + "`" + `",
+            "description": "Run the login endpoint to retrieve a token, then include its value in the format: ` + "`" + `Bearer \u003ctoken\u003e` + "`" + `.",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"

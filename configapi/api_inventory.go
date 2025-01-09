@@ -93,17 +93,25 @@ func PostGnb(c *gin.Context) {
 // @Param        gnb-name    path    string    true    "Name of the gNB"
 // @Security     BearerAuth
 // @Success      200  {object}  nil  "gNB deleted"
-// @Failure      400  {object}  nil  "Failed to delete the gNB"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
+// @Failure      500  {object}  nil  "Failed to delete gNB"
 // @Router       /config/v1/inventory/gnb/{gnb-name}  [delete]
 func DeleteGnb(c *gin.Context) {
-	setInventoryCorsHeader(c)
-	if err := handleDeleteGnb(c); err == nil {
-		c.JSON(http.StatusOK, gin.H{})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	gnbName := c.Param("gnb-name")
+	logger.ConfigLog.Infof("received delete gNB %v", gnbName)
+	filter := bson.M{"name": gnbName}
+	errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(gnbDataColl, filter)
+	if errDelOne != nil {
+		logger.DbLog.Errorln(errDelOne)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete gNB"})
+		return
 	}
+	if updateNSErr := updateGnbInNetworkSlices(gnbName); updateNSErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove gNB from Network Slices"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
 }
 
 func handlePostGnb(c *gin.Context) error {
@@ -139,24 +147,6 @@ func handlePostGnb(c *gin.Context) error {
 	}
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully added gNB [%v] to config channel", gnbName)
-	return nil
-}
-
-func handleDeleteGnb(c *gin.Context) error {
-	gnbName, exists := c.Params.Get("gnb-name")
-	if !exists {
-		errorMessage := "delete gNB request is missing gnb-name"
-		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf("%s", errorMessage)
-	}
-	logger.ConfigLog.Infof("received delete gNB %v request", gnbName)
-	msg := configmodels.ConfigMessage{
-		MsgType:   configmodels.Inventory,
-		MsgMethod: configmodels.Delete_op,
-		GnbName:   gnbName,
-	}
-	configChannel <- &msg
-	logger.ConfigLog.Infof("successfully added gNB [%v] with delete_op to config channel", gnbName)
 	return nil
 }
 
@@ -225,17 +215,27 @@ func PostUpf(c *gin.Context) {
 // @Param        upf-hostname    path    string    true    "Name of the UPF"
 // @Security     BearerAuth
 // @Success      200  {object}  nil  "UPF deleted"
-// @Failure      400  {object}  nil  "Failed to delete the UPF"
+// @Failure      400  {object}  nil  "Bad request"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
+// @Failure      500  {object}  nil  "Failed to delete UPF"
 // @Router       /config/v1/inventory/upf/{upf-hostname}  [delete]
 func DeleteUpf(c *gin.Context) {
-	setInventoryCorsHeader(c)
-	if err := handleDeleteUpf(c); err == nil {
-		c.JSON(http.StatusOK, gin.H{})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	upfHostname := c.Param("upf-hostname")
+	logger.ConfigLog.Infof("received delete UPF %v", upfHostname)
+	filter := bson.M{"hostname": upfHostname}
+	errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(upfDataColl, filter)
+	if errDelOne != nil {
+		logger.DbLog.Errorln(errDelOne)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete UPF"})
+		return
 	}
+	patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
+	if updateNSErr := updateUpfInNetworkSlices(upfHostname, patchJSON); updateNSErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove UPF from Network Slices"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
 }
 
 func handlePostUpf(c *gin.Context) error {
@@ -274,20 +274,64 @@ func handlePostUpf(c *gin.Context) error {
 	return nil
 }
 
-func handleDeleteUpf(c *gin.Context) error {
-	upfHostname, exists := c.Params.Get("upf-hostname")
-	if !exists {
-		errorMessage := "delete UPF request is missing upf-hostname"
-		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf("%s", errorMessage)
+func updateGnbInNetworkSlices(gnbName string) error {
+	filterByGnb := bson.M{
+		"site-info.gNodeBs": bson.M{
+			"$elemMatch": bson.M{"name": gnbName},
+		},
 	}
-	logger.ConfigLog.Infof("received delete UPF %v", upfHostname)
-	msg := configmodels.ConfigMessage{
-		MsgType:     configmodels.Inventory,
-		MsgMethod:   configmodels.Delete_op,
-		UpfHostname: upfHostname,
+	rawNetworkSlices, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByGnb)
+	if errGetMany != nil {
+		logger.DbLog.Errorln("failed to fetch network slices:", errGetMany)
+		return errGetMany
 	}
-	configChannel <- &msg
-	logger.ConfigLog.Infof("successfully added UPF [%v] with delete_op to config channel", upfHostname)
+	for _, rawNetworkSlice := range rawNetworkSlices {
+		var networkSlice configmodels.Slice
+		if err := json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
+			return err
+		}
+		filteredGNodeBs := []configmodels.SliceSiteInfoGNodeBs{}
+		for _, gnb := range networkSlice.SiteInfo.GNodeBs {
+			if gnb.Name != gnbName {
+				filteredGNodeBs = append(filteredGNodeBs, gnb)
+			}
+		}
+		filteredGNodeBsJSON, err := json.Marshal(filteredGNodeBs)
+		if err != nil {
+			logger.DbLog.Errorln("error marshaling GNodeBs: %v", err)
+			continue
+		}
+		patchJSON := []byte(
+			fmt.Sprintf(`[{"op": "replace", "path": "/site-info/gNodeBs", "value": %s}]`,
+				string(filteredGNodeBsJSON)),
+		)
+		filterBySliceName := bson.M{"slice-name": networkSlice.SliceName}
+		err = dbadapter.CommonDBClient.RestfulAPIJSONPatch(sliceDataColl, filterBySliceName, patchJSON)
+		if err != nil {
+			logger.DbLog.Warnln("failed to update network slice:", networkSlice.SliceName, "Error:", err)
+		}
+	}
+	return nil
+}
+
+func updateUpfInNetworkSlices(hostname string, patchJSON []byte) error {
+	filterByUpf := bson.M{"site-info.upf.upf-name": hostname}
+	rawNetworkSlices, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByUpf)
+	if errGetMany != nil {
+		logger.DbLog.Errorln("failed to fetch network slices:", errGetMany)
+		return errGetMany
+	}
+	for _, rawNetworkSlice := range rawNetworkSlices {
+		sliceName, ok := rawNetworkSlice["slice-name"].(string)
+		if !ok {
+			logger.ConfigLog.Warnln("invalid slice-name in network slice:", rawNetworkSlice)
+			continue
+		}
+		filterBySliceName := bson.M{"slice-name": sliceName}
+		err := dbadapter.CommonDBClient.RestfulAPIJSONPatch(sliceDataColl, filterBySliceName, patchJSON)
+		if err != nil {
+			logger.DbLog.Warnln("failed to update network slice:", sliceName, "Error:", err)
+		}
+	}
 	return nil
 }

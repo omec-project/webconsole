@@ -215,7 +215,6 @@ func PostUpf(c *gin.Context) {
 // @Param        upf-hostname    path    string    true    "Name of the UPF"
 // @Security     BearerAuth
 // @Success      200  {object}  nil  "UPF deleted"
-// @Failure      400  {object}  nil  "Bad request"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
 // @Failure      500  {object}  nil  "Failed to delete UPF"

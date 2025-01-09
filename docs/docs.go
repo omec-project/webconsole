@@ -798,9 +798,6 @@ const docTemplate = `{
                     "200": {
                         "description": "UPF deleted"
                     },
-                    "400": {
-                        "description": "Bad request"
-                    },
                     "401": {
                         "description": "Authorization failed"
                     },

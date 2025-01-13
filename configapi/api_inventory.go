@@ -102,6 +102,7 @@ func PostGnb(c *gin.Context) {
 // @Router       /config/v1/inventory/gnb/{gnb-name}  [delete]
 func DeleteGnb(c *gin.Context) {
 	logger.WebUILog.Infoln("received a DELETE gNB request")
+	setInventoryCorsHeader(c)
 	gnbName, exists := c.Params.Get("gnb-name")
 	if !exists {
 		errorMessage := "delete gNB request is missing path param `gnb-name`"
@@ -272,6 +273,7 @@ func PostUpf(c *gin.Context) {
 // @Router       /config/v1/inventory/upf/{upf-hostname}  [delete]
 func DeleteUpf(c *gin.Context) {
 	logger.WebUILog.Infoln("received a DELETE UPF request")
+	setInventoryCorsHeader(c)
 	hostname, exists := c.Params.Get("upf-hostname")
 	if !exists {
 		errorMessage := "delete gNB request is missing path param `upf-hostname`"

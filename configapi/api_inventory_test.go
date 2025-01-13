@@ -4,6 +4,7 @@
 package configapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -15,7 +16,27 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+type MockSession struct {
+	mongo.Session
+}
+
+func (m *MockSession) StartTransaction(opts ...*options.TransactionOptions) error {
+	return nil
+}
+
+func (m *MockSession) AbortTransaction(ctx context.Context) error {
+	return nil
+}
+
+func (m *MockSession) CommitTransaction(ctx context.Context) error {
+	return nil
+}
+
+func (m *MockSession) EndSession(ctx context.Context) {}
 
 type MockMongoClientOneGnb struct {
 	dbadapter.DBInterface
@@ -97,11 +118,33 @@ func (m *MockMongoClientManyUpfs) RestfulAPIGetMany(coll string, filter bson.M) 
 	return results, nil
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIDeleteOne(collName string, filter bson.M) error {
+func (db *MockMongoClientEmptyDB) RestfulAPIDeleteOneWithContext(collName string, filter bson.M, context context.Context) error {
 	return nil
 }
-func (db *MockMongoClientDBError) RestfulAPIDeleteOne(collName string, filter bson.M) error {
+func (db *MockMongoClientDBError) RestfulAPIDeleteOneWithContext(collName string, filter bson.M, context context.Context) error {
 	return errors.New("DB error")
+}
+
+func (db *MockMongoClientEmptyDB) RestfulAPIJSONPatchWithContext(collName string, filter bson.M, patchJSON []byte, context context.Context) error {
+	return nil
+}
+func (db *MockMongoClientDBError) RestfulAPIJSONPatchWithContext(collName string, filter bson.M, patchJSON []byte, context context.Context) error {
+	return errors.New("DB error")
+}
+
+func (db *MockMongoClientEmptyDB) IsReplicaSet() (bool, error) {
+	return true, nil
+}
+func (db *MockMongoClientDBError) IsReplicaSet() (bool, error) {
+	return true, nil
+}
+
+func (m *MockMongoClientEmptyDB) StartSession() (mongo.Session, error) {
+	return &MockSession{}, nil
+}
+
+func (m *MockMongoClientDBError) StartSession() (mongo.Session, error) {
+	return &MockSession{}, nil
 }
 
 func TestInventoryGetHandlers(t *testing.T) {

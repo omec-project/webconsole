@@ -4,6 +4,7 @@
 package configapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const (
@@ -108,18 +110,58 @@ func DeleteGnb(c *gin.Context) {
 		return
 	}
 	filter := bson.M{"name": gnbName}
-	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(gnbDataColl, filter)
+
+	isReplicaSet, err := dbadapter.CommonDBClient.IsReplicaSet()
 	if err != nil {
-		logger.DbLog.Errorw("failed to delete gNB", "gnbName", gnbName, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete gNB"})
-		return
+		logger.DbLog.Warnw("could not verify replica set status; proceeding without transactions", "error", err)
+		isReplicaSet = false
 	}
-	if err = updateGnbInNetworkSlices(gnbName); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove gNB from network slices"})
+	if isReplicaSet {
+		err = handleReplicaSetDeleteGnb(filter, gnbName)
+	} else {
+		err = handleStandaloneDeleteGnb(filter, gnbName)
+	}
+	if err != nil {
+		logger.WebUILog.Errorw("failed to delete gNB", "gnbName", gnbName, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete gNB"})
 		return
 	}
 	logger.WebUILog.Infof("successfully executed DELETE gNB %v request", gnbName)
 	c.JSON(http.StatusOK, gin.H{})
+}
+
+func handleReplicaSetDeleteGnb(filter bson.M, gnbName string) error {
+	session, err := dbadapter.CommonDBClient.StartSession()
+	if err != nil {
+		return fmt.Errorf("failed to initialize DB session: %w", err)
+	}
+	ctx := context.TODO()
+	defer session.EndSession(ctx)
+
+	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		if err := session.StartTransaction(); err != nil {
+			return fmt.Errorf("failed to start transaction: %w", err)
+		}
+		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(gnbDataColl, filter, sc); err != nil {
+			session.AbortTransaction(sc)
+			return fmt.Errorf("failed to delete gNB from collection: %w", err)
+		}
+		if err = updateGnbInNetworkSlices(gnbName, sc); err != nil {
+			session.AbortTransaction(sc)
+			return fmt.Errorf("failed to update network slices: %w", err)
+		}
+		return session.CommitTransaction(sc)
+	})
+}
+
+func handleStandaloneDeleteGnb(filter bson.M, gnbName string) error {
+	if err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(upfDataColl, filter); err != nil {
+		return fmt.Errorf("failed to delete gNB from collection: %w", err)
+	}
+	if err := updateGnbInNetworkSlices(gnbName, context.TODO()); err != nil {
+		return fmt.Errorf("failed to update network slices: %w", err)
+	}
+	return nil
 }
 
 func handlePostGnb(c *gin.Context) error {
@@ -237,20 +279,61 @@ func DeleteUpf(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-	filter := bson.M{"hostname": hostname}
-	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(upfDataColl, filter)
+
+	isReplicaSet, err := dbadapter.CommonDBClient.IsReplicaSet()
 	if err != nil {
-		logger.DbLog.Errorw("failed to delete UPF", "hostname", hostname, "error", err)
+		logger.DbLog.Warnw("could not verify replica set status; proceeding without transactions", "error", err)
+		isReplicaSet = false
+	}
+	filter := bson.M{"hostname": hostname}
+	if isReplicaSet {
+		err = handleReplicaSetDeleteUpf(filter, hostname)
+	} else {
+		err = handleStandaloneDeleteUpf(filter, hostname)
+	}
+	if err != nil {
+		logger.WebUILog.Errorw("failed to delete UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete UPF"})
 		return
 	}
-	patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
-	if err = updateUpfInNetworkSlices(hostname, patchJSON); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove UPF from Network Slices"})
-		return
-	}
-	logger.WebUILog.Infof("successfully executed DELETE UPF %v request", hostname)
+	logger.WebUILog.Infof("successfully executed DELETE UPF request for hostname: %v", hostname)
 	c.JSON(http.StatusOK, gin.H{})
+}
+
+func handleReplicaSetDeleteUpf(filter bson.M, hostname string) error {
+	session, err := dbadapter.CommonDBClient.StartSession()
+	if err != nil {
+		return fmt.Errorf("failed to initialize DB session: %w", err)
+	}
+	ctx := context.TODO()
+	defer session.EndSession(ctx)
+
+	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		if err := session.StartTransaction(); err != nil {
+			return fmt.Errorf("failed to start transaction: %w", err)
+		}
+		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(upfDataColl, filter, sc); err != nil {
+			session.AbortTransaction(sc)
+			return fmt.Errorf("failed to delete UPF from collection: %w", err)
+		}
+		patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
+		if err = updateUpfInNetworkSlices(hostname, patchJSON, sc); err != nil {
+			session.AbortTransaction(sc)
+			return fmt.Errorf("failed to update network slices: %w", err)
+		}
+		return session.CommitTransaction(sc)
+	})
+}
+
+func handleStandaloneDeleteUpf(filter bson.M, hostname string) error {
+	if err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(upfDataColl, filter); err != nil {
+		return fmt.Errorf("failed to delete UPF from collection: %w", err)
+	}
+	patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
+	if err := updateUpfInNetworkSlices(hostname, patchJSON, context.TODO()); err != nil {
+		return fmt.Errorf("failed to update network slices: %w", err)
+	}
+	return nil
 }
 
 func handlePostUpf(c *gin.Context) error {
@@ -289,7 +372,7 @@ func handlePostUpf(c *gin.Context) error {
 	return nil
 }
 
-func updateGnbInNetworkSlices(gnbName string) error {
+func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
 	filterByGnb := bson.M{
 		"site-info.gNodeBs": bson.M{
 			"$elemMatch": bson.M{"name": gnbName},
@@ -322,7 +405,7 @@ func updateGnbInNetworkSlices(gnbName string) error {
 				string(filteredGNodeBsJSON)),
 		)
 		filterBySliceName := bson.M{"slice-name": networkSlice.SliceName}
-		err = dbadapter.CommonDBClient.RestfulAPIJSONPatch(sliceDataColl, filterBySliceName, patchJSON)
+		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(sliceDataColl, filterBySliceName, patchJSON, context)
 		if err != nil {
 			logger.DbLog.Warnw("failed to update network slice:", networkSlice.SliceName, "error:", err)
 		}
@@ -330,7 +413,7 @@ func updateGnbInNetworkSlices(gnbName string) error {
 	return nil
 }
 
-func updateUpfInNetworkSlices(hostname string, patchJSON []byte) error {
+func updateUpfInNetworkSlices(hostname string, patchJSON []byte, context context.Context) error {
 	filterByUpf := bson.M{"site-info.upf.upf-name": hostname}
 	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByUpf)
 	if err != nil {
@@ -344,7 +427,7 @@ func updateUpfInNetworkSlices(hostname string, patchJSON []byte) error {
 			continue
 		}
 		filterBySliceName := bson.M{"slice-name": sliceName}
-		err = dbadapter.CommonDBClient.RestfulAPIJSONPatch(sliceDataColl, filterBySliceName, patchJSON)
+		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(sliceDataColl, filterBySliceName, patchJSON, context)
 		if err != nil {
 			logger.DbLog.Warnw("failed to update network slice:", sliceName, "error:", err)
 		}

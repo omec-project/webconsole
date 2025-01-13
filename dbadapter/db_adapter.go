@@ -6,12 +6,14 @@
 package dbadapter
 
 import (
+	"context"
 	"time"
 
 	"github.com/omec-project/util/mongoapi"
 	"github.com/omec-project/webconsole/backend/logger"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type DBInterface interface {
@@ -30,6 +32,10 @@ type DBInterface interface {
 	RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error
 	RestfulAPICount(collName string, filter bson.M) (int64, error)
 	CreateIndex(collName string, keyField string) (bool, error)
+	StartSession() (mongo.Session, error)
+	RestfulAPIDeleteOneWithContext(collName string, filter bson.M, context context.Context) error
+	RestfulAPIJSONPatchWithContext(collName string, filter bson.M, patchJSON []byte, context context.Context) error
+	IsReplicaSet() (bool, error)
 }
 
 var (
@@ -130,4 +136,20 @@ func (db *MongoDBClient) RestfulAPICount(collName string, filter bson.M) (int64,
 
 func (db *MongoDBClient) CreateIndex(collName string, keyField string) (bool, error) {
 	return db.MongoClient.CreateIndex(collName, keyField)
+}
+
+func (db *MongoDBClient) StartSession() (mongo.Session, error) {
+	return db.MongoClient.StartSession()
+}
+
+func (db *MongoDBClient) RestfulAPIDeleteOneWithContext(collName string, filter bson.M, context context.Context) error {
+	return db.MongoClient.RestfulAPIDeleteOneWithContext(collName, filter, context)
+}
+
+func (db *MongoDBClient) RestfulAPIJSONPatchWithContext(collName string, filter bson.M, patchJSON []byte, context context.Context) error {
+	return db.MongoClient.RestfulAPIJSONPatchWithContext(collName, filter, patchJSON, context)
+}
+
+func (db *MongoDBClient) IsReplicaSet() (bool, error) {
+	return db.MongoClient.IsReplicaSet()
 }

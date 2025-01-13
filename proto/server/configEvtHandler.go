@@ -616,8 +616,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					Sst: int32(sVal),
 				}
 
-				aimsis := getAddedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)
-				for _, imsi := range aimsis {
+				for _, imsi := range confData.Msg.DevGroup.Imsis {
 					dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
 					updateAmPolicyData(imsi)
 					updateSmPolicyData(snssai, dnn, imsi)

@@ -118,7 +118,7 @@ func DeleteGnb(c *gin.Context) {
 		supportsTransactions = false
 	}
 	if supportsTransactions {
-		err = handleDeleteGnbAsTransaction(filter, gnbName)
+		err = handleDeleteGnbTransaction(filter, gnbName)
 	} else {
 		err = handleStandaloneDeleteGnb(filter, gnbName)
 	}
@@ -131,7 +131,7 @@ func DeleteGnb(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func handleDeleteGnbAsTransaction(filter bson.M, gnbName string) error {
+func handleDeleteGnbTransaction(filter bson.M, gnbName string) error {
 	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DB session: %w", err)
@@ -283,7 +283,6 @@ func DeleteUpf(c *gin.Context) {
 	}
 
 	supportsTransactions, err := dbadapter.CommonDBClient.SupportsTransactions()
-	logger.WebUILog.Errorw("PATTY", "supportsTransactions", supportsTransactions)
 	if err != nil {
 		logger.DbLog.Warnw("could not verify replica set or sharded status; proceeding without transactions", "error", err)
 		supportsTransactions = false

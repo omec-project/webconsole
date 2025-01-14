@@ -132,10 +132,10 @@ func (db *MockMongoClientDBError) RestfulAPIJSONPatchWithContext(collName string
 	return errors.New("DB error")
 }
 
-func (db *MockMongoClientEmptyDB) IsReplicaSet() (bool, error) {
+func (db *MockMongoClientEmptyDB) SupportsTransactions() (bool, error) {
 	return true, nil
 }
-func (db *MockMongoClientDBError) IsReplicaSet() (bool, error) {
+func (db *MockMongoClientDBError) SupportsTransactions() (bool, error) {
 	return true, nil
 }
 

@@ -111,17 +111,7 @@ func DeleteGnb(c *gin.Context) {
 		return
 	}
 	filter := bson.M{"name": gnbName}
-
-	supportsTransactions, err := dbadapter.CommonDBClient.SupportsTransactions()
-	if err != nil {
-		logger.DbLog.Warnw("could not verify replica set or sharded status; proceeding without transactions", "error", err)
-		supportsTransactions = false
-	}
-	if supportsTransactions {
-		err = handleDeleteGnbTransaction(filter, gnbName)
-	} else {
-		err = handleStandaloneDeleteGnb(filter, gnbName)
-	}
+	err := handleDeleteGnbTransaction(filter, gnbName)
 	if err != nil {
 		logger.WebUILog.Errorw("failed to delete gNB", "gnbName", gnbName, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete gNB"})
@@ -153,16 +143,6 @@ func handleDeleteGnbTransaction(filter bson.M, gnbName string) error {
 		}
 		return session.CommitTransaction(sc)
 	})
-}
-
-func handleStandaloneDeleteGnb(filter bson.M, gnbName string) error {
-	if err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(upfDataColl, filter); err != nil {
-		return fmt.Errorf("failed to delete gNB from collection: %w", err)
-	}
-	if err := updateGnbInNetworkSlices(gnbName, context.TODO()); err != nil {
-		return fmt.Errorf("failed to update network slices: %w", err)
-	}
-	return nil
 }
 
 func handlePostGnb(c *gin.Context) error {
@@ -281,18 +261,8 @@ func DeleteUpf(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-
-	supportsTransactions, err := dbadapter.CommonDBClient.SupportsTransactions()
-	if err != nil {
-		logger.DbLog.Warnw("could not verify replica set or sharded status; proceeding without transactions", "error", err)
-		supportsTransactions = false
-	}
 	filter := bson.M{"hostname": hostname}
-	if supportsTransactions {
-		err = handleDeleteUpfTransaction(filter, hostname)
-	} else {
-		err = handleStandaloneDeleteUpf(filter, hostname)
-	}
+	err := handleDeleteUpfTransaction(filter, hostname)
 	if err != nil {
 		logger.WebUILog.Errorw("failed to delete UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete UPF"})
@@ -325,17 +295,6 @@ func handleDeleteUpfTransaction(filter bson.M, hostname string) error {
 		}
 		return session.CommitTransaction(sc)
 	})
-}
-
-func handleStandaloneDeleteUpf(filter bson.M, hostname string) error {
-	if err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(upfDataColl, filter); err != nil {
-		return fmt.Errorf("failed to delete UPF from collection: %w", err)
-	}
-	patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
-	if err := updateUpfInNetworkSlices(hostname, patchJSON, context.TODO()); err != nil {
-		return fmt.Errorf("failed to update network slices: %w", err)
-	}
-	return nil
 }
 
 func handlePostUpf(c *gin.Context) error {

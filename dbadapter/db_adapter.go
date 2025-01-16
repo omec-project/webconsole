@@ -65,13 +65,20 @@ ConnectMongo:
 		var err error
 		*client, err = setDBClient(url, dbname)
 		if err == nil {
-			break ConnectMongo
+			supportsTransactions, err := (*client).SupportsTransactions()
+			if err != nil {
+				logger.DbLog.Warnw("could not verify replica set or sharded status;", "error", err)
+				continue
+			}
+			if supportsTransactions {
+				break ConnectMongo
+			}
 		}
 		select {
 		case <-ticker.C:
 			continue
 		case <-timer:
-			logger.DbLog.Errorln("timed out while connecting to MongoDB in 3 minutes")
+			logger.DbLog.Errorln("timed out while connecting to a replica set or sharded MongoDB in 3 minutes")
 			return
 		}
 	}

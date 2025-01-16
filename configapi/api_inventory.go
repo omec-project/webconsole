@@ -286,7 +286,7 @@ func handleDeleteUpfTransaction(filter bson.M, hostname string) error {
 		}
 		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(upfDataColl, filter, sc); err != nil {
 			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to delete UPF from collection: %w", err)
+			return err
 		}
 		patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
 		if err = updateUpfInNetworkSlices(hostname, patchJSON, sc); err != nil {
@@ -341,14 +341,12 @@ func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
 	}
 	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByGnb)
 	if err != nil {
-		logger.DbLog.Errorf("failed to fetch network slices: %v", err)
-		return err
+		return fmt.Errorf("failed to fetch network slices: %w", err)
 	}
 	for _, rawNetworkSlice := range rawNetworkSlices {
 		var networkSlice configmodels.Slice
 		if err = json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
-			logger.DbLog.Errorf("error unmarshaling network slice: %v", err)
-			continue
+			return fmt.Errorf("error unmarshaling network slice: %v", err)
 		}
 		filteredGNodeBs := []configmodels.SliceSiteInfoGNodeBs{}
 		for _, gnb := range networkSlice.SiteInfo.GNodeBs {
@@ -358,8 +356,7 @@ func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
 		}
 		filteredGNodeBsJSON, err := json.Marshal(filteredGNodeBs)
 		if err != nil {
-			logger.DbLog.Errorf("error marshaling GNodeBs: %v", err)
-			continue
+			return fmt.Errorf("error marshaling GNodeBs: %v", err)
 		}
 		patchJSON := []byte(
 			fmt.Sprintf(`[{"op": "replace", "path": "/site-info/gNodeBs", "value": %s}]`,
@@ -368,7 +365,7 @@ func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
 		filterBySliceName := bson.M{"slice-name": networkSlice.SliceName}
 		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(sliceDataColl, filterBySliceName, patchJSON, context)
 		if err != nil {
-			logger.DbLog.Warnw("failed to update network slice:", networkSlice.SliceName, "error:", err)
+			return err
 		}
 	}
 	return nil
@@ -378,19 +375,17 @@ func updateUpfInNetworkSlices(hostname string, patchJSON []byte, context context
 	filterByUpf := bson.M{"site-info.upf.upf-name": hostname}
 	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByUpf)
 	if err != nil {
-		logger.DbLog.Errorf("failed to fetch network slices: %v", err)
-		return err
+		return fmt.Errorf("failed to fetch network slices: %w", err)
 	}
 	for _, rawNetworkSlice := range rawNetworkSlices {
 		sliceName, ok := rawNetworkSlice["slice-name"].(string)
 		if !ok {
-			logger.WebUILog.Warnf("invalid slice-name in network slice: %v", rawNetworkSlice)
-			continue
+			return fmt.Errorf("invalid slice-name in network slice: %v", rawNetworkSlice)
 		}
 		filterBySliceName := bson.M{"slice-name": sliceName}
 		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(sliceDataColl, filterBySliceName, patchJSON, context)
 		if err != nil {
-			logger.DbLog.Warnw("failed to update network slice:", sliceName, "error:", err)
+			return err
 		}
 	}
 	return nil

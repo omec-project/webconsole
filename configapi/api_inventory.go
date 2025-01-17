@@ -111,7 +111,7 @@ func DeleteGnb(c *gin.Context) {
 		return
 	}
 	filter := bson.M{"name": gnbName}
-	err := handleDeleteGnbTransaction(filter, gnbName)
+	err := handleDeleteGnbTransaction(c.Request.Context(), filter, gnbName)
 	if err != nil {
 		logger.WebUILog.Errorw("failed to delete gNB", "gnbName", gnbName, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete gNB"})
@@ -121,12 +121,11 @@ func DeleteGnb(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func handleDeleteGnbTransaction(filter bson.M, gnbName string) error {
+func handleDeleteGnbTransaction(ctx context.Context, filter bson.M, gnbName string) error {
 	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DB session: %w", err)
 	}
-	ctx := context.TODO()
 	defer session.EndSession(ctx)
 
 	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
@@ -262,7 +261,7 @@ func DeleteUpf(c *gin.Context) {
 		return
 	}
 	filter := bson.M{"hostname": hostname}
-	err := handleDeleteUpfTransaction(filter, hostname)
+	err := handleDeleteUpfTransaction(c.Request.Context(), filter, hostname)
 	if err != nil {
 		logger.WebUILog.Errorw("failed to delete UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete UPF"})
@@ -272,12 +271,11 @@ func DeleteUpf(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func handleDeleteUpfTransaction(filter bson.M, hostname string) error {
+func handleDeleteUpfTransaction(ctx context.Context, filter bson.M, hostname string) error {
 	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DB session: %w", err)
 	}
-	ctx := context.TODO()
 	defer session.EndSession(ctx)
 
 	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {

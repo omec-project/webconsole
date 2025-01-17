@@ -7,6 +7,7 @@ package dbadapter
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/omec-project/util/mongoapi"
@@ -65,14 +66,7 @@ ConnectMongo:
 		var err error
 		*client, err = setDBClient(url, dbname)
 		if err == nil {
-			supportsTransactions, err := (*client).SupportsTransactions()
-			if err != nil {
-				logger.DbLog.Warnw("could not verify replica set or sharded status;", "error", err)
-				continue
-			}
-			if supportsTransactions {
-				break ConnectMongo
-			}
+			break ConnectMongo
 		}
 		select {
 		case <-ticker.C:
@@ -83,6 +77,34 @@ ConnectMongo:
 		}
 	}
 	logger.DbLog.Infoln("connected to MongoDB")
+}
+
+func CheckTransactionsSupport(client *DBInterface) error {
+	if client == nil || *client == nil {
+		return fmt.Errorf("mongoDB client has not been initialized")
+	}
+	ticker := time.NewTicker(60 * time.Second)
+	defer func() { ticker.Stop() }()
+	timer := time.After(180 * time.Second)
+
+	for {
+		supportsTransactions, err := (*client).SupportsTransactions()
+		if err != nil {
+			logger.DbLog.Warnw("could not verify replica set or sharded status", "error", err)
+		}
+		if supportsTransactions {
+			break
+		}
+		logger.DbLog.Warnw("waiting for replica set or sharded config in MongoDB...")
+		select {
+		case <-ticker.C:
+			continue
+		case <-timer:
+			return fmt.Errorf("%s", "timed out while waiting for Replica Set or sharded config to be set in MongoDB")
+		}
+	}
+	logger.DbLog.Infoln("mongoDB support of transactions verified")
+	return nil
 }
 
 func (db *MongoDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {

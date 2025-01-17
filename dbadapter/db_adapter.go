@@ -72,7 +72,7 @@ ConnectMongo:
 		case <-ticker.C:
 			continue
 		case <-timer:
-			logger.DbLog.Errorln("timed out while connecting to a replica set or sharded MongoDB in 3 minutes")
+			logger.DbLog.Errorln("timed out while connecting to MongoDB in 3 minutes")
 			return
 		}
 	}
@@ -86,7 +86,7 @@ func CheckTransactionsSupport(client *DBInterface) error {
 	ticker := time.NewTicker(60 * time.Second)
 	defer func() { ticker.Stop() }()
 	timer := time.After(180 * time.Second)
-
+	logger.DbLog.Infoln("checking for replica set or sharded config in MongoDB...")
 	for {
 		supportsTransactions, err := (*client).SupportsTransactions()
 		if err != nil {
@@ -95,7 +95,6 @@ func CheckTransactionsSupport(client *DBInterface) error {
 		if supportsTransactions {
 			break
 		}
-		logger.DbLog.Warnw("waiting for replica set or sharded config in MongoDB...")
 		select {
 		case <-ticker.C:
 			continue

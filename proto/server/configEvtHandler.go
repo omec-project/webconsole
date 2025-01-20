@@ -617,12 +617,15 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				}
 
 				for _, imsi := range confData.Msg.DevGroup.Imsis {
-					dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
-					updateAmPolicyData(imsi)
-					updateSmPolicyData(snssai, dnn, imsi)
-					updateAmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
-					updateSmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
-					updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+					/* update only if the imsi is provisioned */
+					if imsiData[imsi] != nil {
+						dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
+						updateAmPolicyData(imsi)
+						updateSmPolicyData(snssai, dnn, imsi)
+						updateAmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
+						updateSmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+						updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+					}
 				}
 
 				dimsis := getDeletedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)

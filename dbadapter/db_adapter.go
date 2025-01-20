@@ -97,7 +97,7 @@ func CheckTransactionsSupport(client *DBInterface) error {
 		}
 		select {
 		case <-ticker.C:
-			continue
+			// Continue to check after each tick
 		case <-timer:
 			return fmt.Errorf("%s", "timed out while waiting for Replica Set or sharded config to be set in MongoDB")
 		}

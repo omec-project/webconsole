@@ -133,11 +133,15 @@ func handleDeleteGnbTransaction(ctx context.Context, filter bson.M, gnbName stri
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
 		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(gnbDataColl, filter, sc); err != nil {
-			session.AbortTransaction(sc)
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
 			return fmt.Errorf("failed to delete gNB from collection: %w", err)
 		}
 		if err = updateGnbInNetworkSlices(gnbName, sc); err != nil {
-			session.AbortTransaction(sc)
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
 			return fmt.Errorf("failed to update network slices: %w", err)
 		}
 		return session.CommitTransaction(sc)
@@ -283,12 +287,16 @@ func handleDeleteUpfTransaction(ctx context.Context, filter bson.M, hostname str
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
 		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(upfDataColl, filter, sc); err != nil {
-			session.AbortTransaction(sc)
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
 			return err
 		}
 		patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
 		if err = updateUpfInNetworkSlices(hostname, patchJSON, sc); err != nil {
-			session.AbortTransaction(sc)
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
 			return fmt.Errorf("failed to update network slices: %w", err)
 		}
 		return session.CommitTransaction(sc)

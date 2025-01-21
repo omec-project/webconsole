@@ -641,15 +641,18 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					Sst: int32(sVal),
 				}
 
-				for _, imsi := range confData.Msg.DevGroup.Imsis {
-					/* update only if the imsi is provisioned */
-					if slices.Contains(provisionedSubscribers, imsi) {
-						dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
-						updateAmPolicyData(imsi)
-						updateSmPolicyData(snssai, dnn, imsi)
-						updateAmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
-						updateSmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
-						updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+				/* skip delete case */
+				if confData.Msg.DevGroup != nil {
+					for _, imsi := range confData.Msg.DevGroup.Imsis {
+						/* update only if the imsi is provisioned */
+						if slices.Contains(provisionedSubscribers, imsi) {
+							dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
+							updateAmPolicyData(imsi)
+							updateSmPolicyData(snssai, dnn, imsi)
+							updateAmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
+							updateSmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+							updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+						}
 					}
 				}
 

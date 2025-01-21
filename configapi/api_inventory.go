@@ -4,9 +4,11 @@
 package configapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -14,11 +16,7 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
-)
-
-const (
-	gnbDataColl = "webconsoleData.snapshots.gnbData"
-	upfDataColl = "webconsoleData.snapshots.upfData"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func setInventoryCorsHeader(c *gin.Context) {
@@ -45,7 +43,7 @@ func GetGnbs(c *gin.Context) {
 
 	var gnbs []*configmodels.Gnb
 	gnbs = make([]*configmodels.Gnb, 0)
-	rawGnbs, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(gnbDataColl, bson.M{})
+	rawGnbs, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(configmodels.GnbDataColl, bson.M{})
 	if errGetMany != nil {
 		logger.DbLog.Errorln(errGetMany)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve gNBs"})
@@ -177,7 +175,7 @@ func GetUpfs(c *gin.Context) {
 
 	var upfs []*configmodels.Upf
 	upfs = make([]*configmodels.Upf, 0)
-	rawUpfs, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(upfDataColl, bson.M{})
+	rawUpfs, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(configmodels.UpfDataColl, bson.M{})
 	if errGetMany != nil {
 		logger.DbLog.Errorln(errGetMany)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve UPFs"})
@@ -200,21 +198,150 @@ func GetUpfs(c *gin.Context) {
 // @Description  Create a new UPF
 // @Tags         UPFs
 // @Produce      json
-// @Param        upf-hostname   path    string                         true    "Name of the UPF"
-// @Param        port           body    configmodels.PostUpfRequest    true    "Port of the UPF"
+// @Param        upf  body  configmodels.PostUpfRequest  true  "Hostname and port of the UPF to create"
 // @Security     BearerAuth
-// @Success      200  {object}  nil  "UPF created"
-// @Failure      400  {object}  nil  "Failed to create the UPF"
+// @Success      201  {object}  nil  "UPF successfully created"
+// @Failure      400  {object}  nil  "Bad request"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
-// @Router       /config/v1/inventory/upf/{upf-hostname}  [post]
+// @Failure      500  {object}  nil  "Error creating UPF"
+// @Router       /config/v1/inventory/upf/  [post]
 func PostUpf(c *gin.Context) {
-	setInventoryCorsHeader(c)
-	if err := handlePostUpf(c); err == nil {
-		c.JSON(http.StatusOK, gin.H{})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	logger.WebUILog.Infoln("received a POST UPF request")
+	var postUpfParams configmodels.PostUpfRequest
+	err := c.ShouldBindJSON(&postUpfParams)
+	if err != nil {
+		logger.ConfigLog.Errorln("invalid UPF POST input parameters. Error:", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
+		return
 	}
+	if postUpfParams.Hostname == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "UPF hostname must be provided"})
+		return
+	}
+	if _, err := strconv.Atoi(postUpfParams.Port); err != nil {
+		errorMessage := "UPF port cannot be converted to integer or it was not provided"
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
+	}
+	filter := bson.M{"hostname": postUpfParams.Hostname}
+	upfDataBson := configmodels.ToBsonM(postUpfParams)
+	err = dbadapter.CommonDBClient.RestfulAPIPostMany(configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
+	if err != nil {
+		if strings.Contains(err.Error(), "E11000") {
+			logger.DbLog.Errorln("Duplicate hostname found:", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "UPF already exists"})
+			return
+		}
+		logger.DbLog.Errorln(err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create UPF"})
+		return
+	}
+	logger.WebUILog.Infof("successfully executed POST UPF %v request", postUpfParams.Hostname)
+	c.JSON(http.StatusCreated, gin.H{})
+}
+
+// PutUpf godoc
+//
+// @Description  Create or update a UPF
+// @Tags         UPFs
+// @Produce      json
+// @Param        upf-hostname   path    string                       true    "Name of the UPF to update"
+// @Param        port           body    configmodels.PutUpfRequest   true    "Port of the UPF to update"
+// @Security     BearerAuth
+// @Success      200  {object}  nil  "UPF successfully updated"
+// @Success      201  {object}  nil  "UPF successfully created"
+// @Failure      400  {object}  nil  "Bad request"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Failure      500  {object}  nil  "Error updating UPF"
+// @Router       /config/v1/inventory/upf/{upf-hostname}  [put]
+func PutUpf(c *gin.Context) {
+	logger.WebUILog.Infoln("received a PUT UPF request")
+	hostname, exists := c.Params.Get("upf-hostname")
+	if !exists {
+		errorMessage := "put UPF request is missing path param `upf-hostname`"
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
+	}
+	var putUpfParams configmodels.PutUpfRequest
+	err := c.ShouldBindJSON(&putUpfParams)
+	if err != nil {
+		logger.WebUILog.Errorw("invalid UPF PUT input parameters", "hostname", hostname, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
+		return
+	}
+	if _, err := strconv.Atoi(putUpfParams.Port); err != nil {
+		errorMessage := "UPF port cannot be converted to integer or it was not provided"
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
+	}
+	filter := bson.M{"hostname": hostname}
+	putUpf := configmodels.Upf{
+		Hostname: hostname,
+		Port:     putUpfParams.Port,
+	}
+	ctx, err := handlePutUpfTransaction(c.Request.Context(), filter, putUpf)
+	if err != nil {
+		logger.WebUILog.Errorw("failed to PUT UPF", "hostname", hostname, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
+		return
+	}
+	c.Request = c.Request.WithContext(ctx)
+	logger.WebUILog.Infof("successfully executed PUT UPF %v request", hostname)
+
+	if existed, ok := ctx.Value("existed").(bool); ok && existed {
+		c.JSON(http.StatusOK, gin.H{})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{})
+}
+
+func handlePutUpfTransaction(ctx context.Context, filter bson.M, upf configmodels.Upf) (context.Context, error) {
+	session, err := dbadapter.CommonDBClient.StartSession()
+	if err != nil {
+		return ctx, fmt.Errorf("failed to initialize DB session: %w", err)
+	}
+	defer session.EndSession(ctx)
+	return ctx, mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		if err := session.StartTransaction(); err != nil {
+			return fmt.Errorf("failed to start transaction: %w", err)
+		}
+		upfDataBson := configmodels.ToBsonM(upf)
+		existed, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(configmodels.UpfDataColl, filter, upfDataBson, sc)
+		if err != nil {
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
+			return err
+		}
+		patchJSON := []byte(fmt.Sprintf(`[
+			{
+				"op": "replace",
+				"path": "/site-info/upf",
+				"value": {
+					"upf-name": "%s",
+					"upf-port": "%s"
+				}
+			}
+		]`, upf.Hostname, upf.Port))
+		err = updateUpfInNetworkSlices(upf.Hostname, patchJSON, sc)
+		if err != nil {
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
+			return fmt.Errorf("failed to update network slices: %w", err)
+		}
+
+		if err = session.CommitTransaction(sc); err != nil {
+			return fmt.Errorf("failed to commit transaction: %w", err)
+		}
+		ctx = context.WithValue(ctx, "existed", existed)
+		return nil
+	})
 }
 
 // DeleteUpf godoc
@@ -238,42 +365,6 @@ func DeleteUpf(c *gin.Context) {
 	}
 }
 
-func handlePostUpf(c *gin.Context) error {
-	upfHostname, exists := c.Params.Get("upf-hostname")
-	if !exists {
-		errorMessage := "post UPF request is missing upf-hostname"
-		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf("%s", errorMessage)
-	}
-	logger.ConfigLog.Infof("received UPF %v", upfHostname)
-	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
-		return fmt.Errorf("invalid header")
-	}
-	var postUpfRequest configmodels.PostUpfRequest
-	err := c.ShouldBindJSON(&postUpfRequest)
-	if err != nil {
-		logger.ConfigLog.Errorf("err %v", err)
-		return fmt.Errorf("invalid JSON format")
-	}
-	if postUpfRequest.Port == "" {
-		errorMessage := "post UPF request body is missing port"
-		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf("%s", errorMessage)
-	}
-	postUpf := configmodels.Upf{
-		Hostname: upfHostname,
-		Port:     postUpfRequest.Port,
-	}
-	msg := configmodels.ConfigMessage{
-		MsgType:   configmodels.Inventory,
-		MsgMethod: configmodels.Post_op,
-		Upf:       &postUpf,
-	}
-	configChannel <- &msg
-	logger.ConfigLog.Infof("successfully added UPF [%v] to config channel", upfHostname)
-	return nil
-}
-
 func handleDeleteUpf(c *gin.Context) error {
 	upfHostname, exists := c.Params.Get("upf-hostname")
 	if !exists {
@@ -289,5 +380,25 @@ func handleDeleteUpf(c *gin.Context) error {
 	}
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully added UPF [%v] with delete_op to config channel", upfHostname)
+	return nil
+}
+
+func updateUpfInNetworkSlices(hostname string, patchJSON []byte, context context.Context) error {
+	filterByUpf := bson.M{"site-info.upf.upf-name": hostname}
+	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByUpf)
+	if err != nil {
+		return fmt.Errorf("failed to fetch network slices: %w", err)
+	}
+	for _, rawNetworkSlice := range rawNetworkSlices {
+		sliceName, ok := rawNetworkSlice["slice-name"].(string)
+		if !ok {
+			return fmt.Errorf("invalid slice-name in network slice: %v", rawNetworkSlice)
+		}
+		filterBySliceName := bson.M{"slice-name": sliceName}
+		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(sliceDataColl, filterBySliceName, patchJSON, context)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

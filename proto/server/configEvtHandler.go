@@ -102,11 +102,6 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				handleGnbPost(configMsg.Gnb)
 			}
 
-			if configMsg.Upf != nil {
-				logger.ConfigLog.Infof("received UPF [%v] configuration from config channel", configMsg.UpfHostname)
-				handleUpfPost(configMsg.Upf)
-			}
-
 			// loop through all clients and send this message to all clients
 			if len(clientNFPool) == 0 {
 				logger.ConfigLog.Infoln("no client available. No need to send config")
@@ -260,17 +255,6 @@ func handleGnbDelete(gnbName string) {
 	errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(gnbDataColl, filter)
 	if errDelOne != nil {
 		logger.DbLog.Warnln(errDelOne)
-	}
-	rwLock.Unlock()
-}
-
-func handleUpfPost(upf *configmodels.Upf) {
-	rwLock.Lock()
-	filter := bson.M{"hostname": upf.Hostname}
-	upfDataBson := configmodels.ToBsonM(upf)
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(upfDataColl, filter, upfDataBson)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
 	}
 	rwLock.Unlock()
 }

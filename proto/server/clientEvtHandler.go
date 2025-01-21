@@ -975,7 +975,7 @@ func postConfigHss(client *clientNF, lastDevGroup *configmodels.DeviceGroups, la
 				}
 				config.StartImsi = uint64(num)
 				config.EndImsi = uint64(num)
-				authSubsData := imsiData[imsi]
+				authSubsData := getSubscriberAuthDataByUeId(imsi)
 				if authSubsData == nil {
 					client.clientLog.Infoln("SIM card details not found for IMSI ", imsi)
 					continue

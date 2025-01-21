@@ -226,6 +226,7 @@ func deleteDeviceGroupAsTransaction(deviceGroupName string) error {
 		return session.CommitTransaction(sc)
 	})
 }
+
 func updateDeviceGroupListInNetworkSlices(deviceGroupName string, context context.Context) error {
 	filterByDeviceGroup := bson.M{
 		"site-device-group": bson.M{

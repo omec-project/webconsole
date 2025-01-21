@@ -805,9 +805,6 @@ const docTemplate = `{
                     "200": {
                         "description": "UPF successfully updated"
                     },
-                    "201": {
-                        "description": "UPF successfully created"
-                    },
                     "400": {
                         "description": "Bad request"
                     },

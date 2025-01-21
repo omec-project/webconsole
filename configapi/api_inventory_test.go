@@ -6,7 +6,6 @@ package configapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,99 +16,10 @@ import (
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-type MockSession struct {
-	mongo.Session
-}
-
-func (m *MockSession) StartTransaction(opts ...*options.TransactionOptions) error {
-	return nil
-}
-
-func (m *MockSession) AbortTransaction(ctx context.Context) error {
-	return nil
-}
-
-func (m *MockSession) CommitTransaction(ctx context.Context) error {
-	return nil
-}
-
-func (m *MockSession) EndSession(ctx context.Context) {}
 
 type MockMongoClientOneGnb struct {
 	dbadapter.DBInterface
-}
-
-type MockMongoClientManyGnbs struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientOneUpf struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientManyUpfs struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientPutOneUpf struct {
-	dbadapter.DBInterface
-}
-
-func (db *MockMongoClientPutOneUpf) RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error) {
-	return []map[string]interface{}{}, nil
-}
-
-func (db *MockMongoClientEmptyDB) RestfulAPIDeleteOneWithContext(collName string, filter bson.M, context context.Context) error {
-	return nil
-}
-func (db *MockMongoClientDBError) RestfulAPIDeleteOneWithContext(collName string, filter bson.M, context context.Context) error {
-	return errors.New("DB error")
-}
-
-func (db *MockMongoClientEmptyDB) RestfulAPIJSONPatchWithContext(collName string, filter bson.M, patchJSON []byte, context context.Context) error {
-	return nil
-}
-func (db *MockMongoClientDBError) RestfulAPIJSONPatchWithContext(collName string, filter bson.M, patchJSON []byte, context context.Context) error {
-	return errors.New("DB error")
-}
-
-func (db *MockMongoClientDBError) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
-	return errors.New("DB error")
-}
-
-func (db *MockMongoClientEmptyDB) RestfulAPIPutOneWithContext(collName string, filter bson.M, putData map[string]interface{}, context context.Context) (bool, error) {
-	return false, nil
-}
-
-func (db *MockMongoClientPutOneUpf) RestfulAPIPutOneWithContext(collName string, filter bson.M, putData map[string]interface{}, context context.Context) (bool, error) {
-	return true, nil
-}
-
-func (db *MockMongoClientDBError) RestfulAPIPutOneWithContext(collName string, filter bson.M, putData map[string]interface{}, context context.Context) (bool, error) {
-	return false, errors.New("DB error")
-}
-
-func (m *MockMongoClientEmptyDB) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
-}
-
-func (m *MockMongoClientOneUpf) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
-}
-
-func (m *MockMongoClientPutOneUpf) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
-}
-
-func (m *MockMongoClientDBError) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
-}
-
-func (m *MockMongoClientDuplicateCreation) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
 }
 
 func (m *MockMongoClientOneGnb) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
@@ -124,6 +34,10 @@ func (m *MockMongoClientOneGnb) RestfulAPIGetMany(coll string, filter bson.M) ([
 
 	results = append(results, gnbBson)
 	return results, nil
+}
+
+type MockMongoClientManyGnbs struct {
+	dbadapter.DBInterface
 }
 
 func (m *MockMongoClientManyGnbs) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
@@ -144,6 +58,10 @@ func (m *MockMongoClientManyGnbs) RestfulAPIGetMany(coll string, filter bson.M) 
 	return results, nil
 }
 
+type MockMongoClientOneUpf struct {
+	dbadapter.DBInterface
+}
+
 func (m *MockMongoClientOneUpf) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	upf := configmodels.Upf{
@@ -156,6 +74,14 @@ func (m *MockMongoClientOneUpf) RestfulAPIGetMany(coll string, filter bson.M) ([
 
 	results = append(results, upfBson)
 	return results, nil
+}
+
+func (m *MockMongoClientOneUpf) StartSession() (mongo.Session, error) {
+	return &MockSession{}, nil
+}
+
+type MockMongoClientManyUpfs struct {
+	dbadapter.DBInterface
 }
 
 func (m *MockMongoClientManyUpfs) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
@@ -174,6 +100,22 @@ func (m *MockMongoClientManyUpfs) RestfulAPIGetMany(coll string, filter bson.M) 
 		results = append(results, upfBson)
 	}
 	return results, nil
+}
+
+type MockMongoClientPutExistingUpf struct {
+	dbadapter.DBInterface
+}
+
+func (db *MockMongoClientPutExistingUpf) RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error) {
+	return []map[string]interface{}{}, nil
+}
+
+func (m *MockMongoClientPutExistingUpf) StartSession() (mongo.Session, error) {
+	return &MockSession{}, nil
+}
+
+func (db *MockMongoClientPutExistingUpf) RestfulAPIPutOneWithContext(collName string, filter bson.M, putData map[string]interface{}, context context.Context) (bool, error) {
+	return true, nil
 }
 
 func TestInventoryGetHandlers(t *testing.T) {
@@ -523,7 +465,7 @@ func TestUpfPutHandler(t *testing.T) {
 		{
 			name:         "Put an existing UPF expects a OK status",
 			route:        "/config/v1/inventory/upf/upf1",
-			dbAdapter:    &MockMongoClientPutOneUpf{},
+			dbAdapter:    &MockMongoClientPutExistingUpf{},
 			inputData:    `{"port": "123"}`,
 			expectedCode: http.StatusOK,
 			expectedBody: "{}",

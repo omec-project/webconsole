@@ -208,7 +208,7 @@ func deleteDeviceGroupAsTransaction(deviceGroupName string) error {
 	defer session.EndSession(ctx)
 	filter := bson.M{"group-name": deviceGroupName}
 	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
-		if err := session.StartTransaction(); err != nil {
+		if err = session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
 		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(devGroupDataColl, filter, sc); err != nil {

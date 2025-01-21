@@ -211,7 +211,7 @@ func PostUpf(c *gin.Context) {
 	var postUpfParams configmodels.PostUpfRequest
 	err := c.ShouldBindJSON(&postUpfParams)
 	if err != nil {
-		logger.ConfigLog.Errorln("invalid UPF POST input parameters. Error:", err)
+		logger.WebUILog.Errorw("invalid UPF POST input parameters", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
 		return
 	}
@@ -225,16 +225,14 @@ func PostUpf(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-	filter := bson.M{"hostname": postUpfParams.Hostname}
-	upfDataBson := configmodels.ToBsonM(postUpfParams)
-	err = dbadapter.CommonDBClient.RestfulAPIPostMany(configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
-	if err != nil {
+	upf := configmodels.Upf(postUpfParams)
+	if err = handleUpfTransaction(c.Request.Context(), upf, postUpfOperation); err != nil {
 		if strings.Contains(err.Error(), "E11000") {
-			logger.DbLog.Errorln("Duplicate hostname found:", err)
+			logger.WebUILog.Errorw("duplicate hostname found:", "error", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "UPF already exists"})
 			return
 		}
-		logger.DbLog.Errorln(err.Error())
+		logger.WebUILog.Errorw("failed to create UPF", "hostname", postUpfParams.Hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create UPF"})
 		return
 	}
@@ -251,7 +249,6 @@ func PostUpf(c *gin.Context) {
 // @Param        port           body    configmodels.PutUpfRequest   true    "Port of the UPF to update"
 // @Security     BearerAuth
 // @Success      200  {object}  nil  "UPF successfully updated"
-// @Success      201  {object}  nil  "UPF successfully created"
 // @Failure      400  {object}  nil  "Bad request"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
@@ -279,40 +276,43 @@ func PutUpf(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-	filter := bson.M{"hostname": hostname}
 	putUpf := configmodels.Upf{
 		Hostname: hostname,
 		Port:     putUpfParams.Port,
 	}
-	ctx, err := handlePutUpfTransaction(c.Request.Context(), filter, putUpf)
-	if err != nil {
+	if err := handleUpfTransaction(c.Request.Context(), putUpf, putUpfOperation); err != nil {
 		logger.WebUILog.Errorw("failed to PUT UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
 		return
 	}
-	c.Request = c.Request.WithContext(ctx)
-	logger.WebUILog.Infof("successfully executed PUT UPF %v request", hostname)
-
-	if existed, ok := ctx.Value("existed").(bool); ok && existed {
-		c.JSON(http.StatusOK, gin.H{})
-		return
-	}
-	c.JSON(http.StatusCreated, gin.H{})
+	c.JSON(http.StatusOK, gin.H{})
 }
 
-func handlePutUpfTransaction(ctx context.Context, filter bson.M, upf configmodels.Upf) (context.Context, error) {
+func postUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
+	filter := bson.M{"hostname": upf.Hostname}
+	upfDataBson := configmodels.ToBsonM(upf)
+	return dbadapter.CommonDBClient.RestfulAPIPostMany(configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
+}
+
+func putUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
+	filter := bson.M{"hostname": upf.Hostname}
+	upfDataBson := configmodels.ToBsonM(upf)
+	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(configmodels.UpfDataColl, filter, upfDataBson, sc)
+	return err
+}
+
+func handleUpfTransaction(ctx context.Context, upf configmodels.Upf, operation func(configmodels.Upf, mongo.SessionContext) error) error {
 	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {
-		return ctx, fmt.Errorf("failed to initialize DB session: %w", err)
+		return fmt.Errorf("failed to initialize DB session: %w", err)
 	}
 	defer session.EndSession(ctx)
-	return ctx, mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+
+	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
 		if err := session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		upfDataBson := configmodels.ToBsonM(upf)
-		existed, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(configmodels.UpfDataColl, filter, upfDataBson, sc)
-		if err != nil {
+		if err := operation(upf, sc); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
@@ -335,12 +335,7 @@ func handlePutUpfTransaction(ctx context.Context, filter bson.M, upf configmodel
 			}
 			return fmt.Errorf("failed to update network slices: %w", err)
 		}
-
-		if err = session.CommitTransaction(sc); err != nil {
-			return fmt.Errorf("failed to commit transaction: %w", err)
-		}
-		ctx = context.WithValue(ctx, "existed", existed)
-		return nil
+		return session.CommitTransaction(sc)
 	})
 }
 

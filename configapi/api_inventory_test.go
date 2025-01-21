@@ -108,6 +108,10 @@ func (m *MockMongoClientDBError) StartSession() (mongo.Session, error) {
 	return &MockSession{}, nil
 }
 
+func (m *MockMongoClientDuplicateCreation) StartSession() (mongo.Session, error) {
+	return &MockSession{}, nil
+}
+
 func (m *MockMongoClientOneGnb) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	gnb := configmodels.Gnb{
@@ -509,11 +513,11 @@ func TestUpfPutHandler(t *testing.T) {
 		expectedBody string
 	}{
 		{
-			name:         "Put a new UPF expects Created status",
+			name:         "Put a new UPF expects OK status",
 			route:        "/config/v1/inventory/upf/upf1",
 			dbAdapter:    &MockMongoClientEmptyDB{},
 			inputData:    `{"port": "123"}`,
-			expectedCode: http.StatusCreated,
+			expectedCode: http.StatusOK,
 			expectedBody: "{}",
 		},
 		{

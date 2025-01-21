@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -42,13 +43,8 @@ type Update5GSubscriberMsg struct {
 
 var (
 	execCommand = exec.Command
-	imsiData    map[string]*models.AuthenticationSubscription
 	rwLock      sync.RWMutex
 )
-
-func init() {
-	imsiData = make(map[string]*models.AuthenticationSubscription)
-}
 
 func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceived chan bool) {
 	// Start Goroutine which will listens for subscriber config updates
@@ -67,9 +63,6 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		if configMsg.MsgType == configmodels.Sub_data {
 			imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
 			logger.ConfigLog.Infoln("received imsi from config channel:", imsiVal)
-			rwLock.Lock()
-			imsiData[imsiVal] = configMsg.AuthSubData
-			rwLock.Unlock()
 			logger.ConfigLog.Infof("received Imsi [%v] configuration from config channel", configMsg.Imsi)
 			handleSubscriberPost(configMsg)
 			if factory.WebUIConfig.Configuration.Mode5G {
@@ -355,9 +348,10 @@ func getAddedImsisList(group, prevGroup *configmodels.DeviceGroups) (aimsis []st
 	if group == nil {
 		return
 	}
+	provisionedSubscribers := getProvisionedSubscribers()
 	for _, imsi := range group.Imsis {
 		if prevGroup == nil {
-			if imsiData[imsi] != nil {
+			if slices.Contains(provisionedSubscribers, imsi) {
 				aimsis = append(aimsis, imsi)
 			}
 		} else {
@@ -400,6 +394,22 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 	}
 
 	return
+}
+
+func getProvisionedSubscribers() []string {
+	rawProvisionedSubscribers, errGetMany := dbadapter.AuthDBClient.RestfulAPIGetMany(authSubsDataColl, nil)
+	if errGetMany != nil {
+		logger.DbLog.Warnln(errGetMany)
+	}
+	var provisionedSubscribers []string
+	for _, rawProvisionedSubscriber := range rawProvisionedSubscribers {
+		ueId, ok := rawProvisionedSubscriber["ueId"].(string)
+		if !ok {
+			logger.DbLog.Warnf("cannot retrieve ueId for subscriber: %v", rawProvisionedSubscriber)
+		}
+		provisionedSubscribers = append(provisionedSubscribers, ueId)
+	}
+	return provisionedSubscribers
 }
 
 func updateAmPolicyData(imsi string) {
@@ -607,6 +617,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 			/* is this devicegroup part of any existing slice */
 			slice := isDeviceGroupExistInSlice(confData)
 			if slice != nil {
+				provisionedSubscribers := getProvisionedSubscribers()
 				sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 				if err != nil {
 					logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
@@ -618,7 +629,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 
 				for _, imsi := range confData.Msg.DevGroup.Imsis {
 					/* update only if the imsi is provisioned */
-					if imsiData[imsi] != nil {
+					if slices.Contains(provisionedSubscribers, imsi) {
 						dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
 						updateAmPolicyData(imsi)
 						updateSmPolicyData(snssai, dnn, imsi)

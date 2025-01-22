@@ -116,8 +116,8 @@ github.com/omec-project/config5g v1.5.5 h1:9ouNkogjNBPi4Qa0gz12Ab4pl8gp5XWvELTCD
 github.com/omec-project/config5g v1.5.5/go.mod h1:r5K7D2jMigypWWcWJDUZlgpcH8gOAvPT6phtKESGzNs=
 github.com/omec-project/openapi v1.3.2 h1:LhUA/vBKCswN0S8fc/dN5/xuUltLgoak6au2MAKwUkk=
 github.com/omec-project/openapi v1.3.2/go.mod h1:JByn0faBQbiWX/q3JA+FHOdQS9m6KdyHDF5VVjCGMms=
-github.com/omec-project/util v1.2.10 h1:FaLz5Msn6wqq8tHREEE0F/GPGbZmz0dRLlWp3E82B5Y=
-github.com/omec-project/util v1.2.10/go.mod h1:P+WFVCtuLfsrfTgWZLaR5S6QCnA94PT7KdV6KSAFbw8=
+github.com/omec-project/util v1.2.11 h1:208SF7mtEIgQbwj1UnDMp3/Z+re8PYPzuJTA7bSDwjw=
+github.com/omec-project/util v1.2.11/go.mod h1:P+WFVCtuLfsrfTgWZLaR5S6QCnA94PT7KdV6KSAFbw8=
 github.com/pelletier/go-toml/v2 v2.2.3 h1:YmeHyLY8mFWbdkNWwpr+qIL2bEqT0o95WSdkNHvL12M=
 github.com/pelletier/go-toml/v2 v2.2.3/go.mod h1:MfCQTFTvCcUyyvvwm1+G6H/jORL20Xlb6rzQu9GuUkc=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=

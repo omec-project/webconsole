@@ -64,7 +64,7 @@ func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
 	if groupName, exists = c.Params.Get("group-name"); exists {
 		logger.ConfigLog.Infof("received group %v", groupName)
 	}
-	if !validateName(groupName) {
+	if !ValidateName(groupName) {
 		logger.ConfigLog.Errorf("invalid Device Group name %s. Name needs to match the following regular expression: %s", groupName, NAME_PATTERN)
 		return false
 	}
@@ -146,7 +146,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	if sliceName, exists = c.Params.Get("slice-name"); exists {
 		logger.ConfigLog.Infof("received slice: %v", sliceName)
 	}
-	if !validateName(sliceName) {
+	if !ValidateName(sliceName) {
 		logger.ConfigLog.Errorf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
 		return false
 	}

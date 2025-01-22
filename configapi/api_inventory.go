@@ -114,7 +114,7 @@ func handlePostGnb(c *gin.Context) error {
 		return fmt.Errorf("%s", errorMessage)
 	}
 	logger.ConfigLog.Infof("received gNB %v", gnbName)
-	if !validateName(gnbName) {
+	if !ValidateName(gnbName) {
 		errorMessage := fmt.Sprintf("invalid gNB name %s. Name needs to match the following regular expression: %s", gnbName, NAME_PATTERN)
 		logger.ConfigLog.Errorln(errorMessage)
 		return fmt.Errorf("%s", errorMessage)
@@ -251,8 +251,8 @@ func handlePostUpf(c *gin.Context) error {
 		return fmt.Errorf("%s", errorMessage)
 	}
 	logger.ConfigLog.Infof("received UPF %v", upfHostname)
-	if !validateDomainName(upfHostname) {
-		errorMessage := fmt.Sprintf("invalid UPF name %s. Name needs to represent a valid domain name", upfHostname)
+	if !ValidateFQDN(upfHostname) {
+		errorMessage := fmt.Sprintf("invalid UPF name %s. Name needs to represent a valid FQDN", upfHostname)
 		logger.ConfigLog.Errorln(errorMessage)
 		return fmt.Errorf("%s", errorMessage)
 	}

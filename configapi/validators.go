@@ -3,15 +3,12 @@
 
 package configapi
 
-import (
-	"regexp"
-
-	"github.com/THREATINT/go-net"
-)
+import "regexp"
 
 const NAME_PATTERN = "^[a-zA-Z0-9-_]+$"
+const FQDN_PATTERN = "^([a-zA-Z0-9-]+\\.){2,}([a-zA-Z]{2,6})$"
 
-func validateName(name string) bool {
+func ValidateName(name string) bool {
 	nameMatch, err := regexp.MatchString(NAME_PATTERN, name)
 	if err != nil || !nameMatch {
 		return false
@@ -19,6 +16,10 @@ func validateName(name string) bool {
 	return true
 }
 
-func validateDomainName(url string) bool {
-	return net.IsDomain(url)
+func ValidateFQDN(fqdn string) bool {
+	fqdnMatch, err := regexp.MatchString(FQDN_PATTERN, fqdn)
+	if err != nil || !fqdnMatch {
+		return false
+	}
+	return true
 }

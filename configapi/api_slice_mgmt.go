@@ -59,15 +59,12 @@ func convertToBps(val int64, unit string) (bitrate int64) {
 }
 
 func DeviceGroupPostHandler(c *gin.Context, msgOp int) bool {
-	var groupName string
-	var exists bool
-	if groupName, exists = c.Params.Get("group-name"); exists {
-		logger.ConfigLog.Infof("received group %v", groupName)
-	}
-	if !ValidateName(groupName) {
+	groupName, _ := c.Params.Get("group-name")
+	if !IsValidName(groupName) {
 		logger.ConfigLog.Errorf("invalid Device Group name %s. Name needs to match the following regular expression: %s", groupName, NAME_PATTERN)
 		return false
 	}
+	logger.ConfigLog.Infof("received device group: %v", groupName)
 
 	var err error
 	var request configmodels.DeviceGroups
@@ -141,15 +138,12 @@ func NetworkSliceDeleteHandler(c *gin.Context) bool {
 }
 
 func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
-	var sliceName string
-	var exists bool
-	if sliceName, exists = c.Params.Get("slice-name"); exists {
-		logger.ConfigLog.Infof("received slice: %v", sliceName)
-	}
-	if !ValidateName(sliceName) {
+	sliceName, _ := c.Params.Get("slice-name")
+	if !IsValidName(sliceName) {
 		logger.ConfigLog.Errorf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
 		return false
 	}
+	logger.ConfigLog.Infof("received slice: %v", sliceName)
 
 	var err error
 	var request configmodels.Slice

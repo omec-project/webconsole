@@ -107,18 +107,13 @@ func DeleteGnb(c *gin.Context) {
 }
 
 func handlePostGnb(c *gin.Context) error {
-	gnbName, exists := c.Params.Get("gnb-name")
-	if !exists {
-		errorMessage := "post gNB request is missing gnb-name"
-		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf("%s", errorMessage)
-	}
-	logger.ConfigLog.Infof("received gNB %v", gnbName)
-	if !ValidateName(gnbName) {
+	gnbName, _ := c.Params.Get("gnb-name")
+	if !IsValidName(gnbName) {
 		errorMessage := fmt.Sprintf("invalid gNB name %s. Name needs to match the following regular expression: %s", gnbName, NAME_PATTERN)
 		logger.ConfigLog.Errorln(errorMessage)
 		return fmt.Errorf("%s", errorMessage)
 	}
+	logger.ConfigLog.Infof("received gNB %v", gnbName)
 	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
 		return fmt.Errorf("invalid header")
 	}
@@ -244,18 +239,13 @@ func DeleteUpf(c *gin.Context) {
 }
 
 func handlePostUpf(c *gin.Context) error {
-	upfHostname, exists := c.Params.Get("upf-hostname")
-	if !exists {
-		errorMessage := "post UPF request is missing upf-hostname"
-		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf("%s", errorMessage)
-	}
-	logger.ConfigLog.Infof("received UPF %v", upfHostname)
-	if !ValidateFQDN(upfHostname) {
+	upfHostname, _ := c.Params.Get("upf-hostname")
+	if !IsValidFQDN(upfHostname) {
 		errorMessage := fmt.Sprintf("invalid UPF name %s. Name needs to represent a valid FQDN", upfHostname)
 		logger.ConfigLog.Errorln(errorMessage)
 		return fmt.Errorf("%s", errorMessage)
 	}
+	logger.ConfigLog.Infof("received UPF %v", upfHostname)
 	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
 		return fmt.Errorf("invalid header")
 	}

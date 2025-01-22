@@ -849,7 +849,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/config/v1/network-slice/{sliceName}": {
+        "/config/v1/network-slice/{sliceName": {
             "post": {
                 "security": [
                     {

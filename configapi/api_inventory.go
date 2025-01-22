@@ -291,7 +291,7 @@ func PutUpf(c *gin.Context) {
 func postUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	upfDataBson := configmodels.ToBsonM(upf)
-	return dbadapter.CommonDBClient.RestfulAPIPostMany(configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
+	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(configmodels.UpfDataColl, filter, []interface{}{upfDataBson}, sc)
 }
 
 func putUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {

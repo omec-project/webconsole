@@ -32,7 +32,9 @@ type DBInterface interface {
 	RestfulAPIJSONPatchWithContext(collName string, filter bson.M, patchJSON []byte, context context.Context) error
 	RestfulAPIJSONPatchExtend(collName string, filter bson.M, patchJSON []byte, dataName string) error
 	RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error)
+	RestfulAPIPostWithContext(collName string, filter bson.M, postData map[string]interface{}, context context.Context) (bool, error)
 	RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error
+	RestfulAPIPostManyWithContext(collName string, filter bson.M, postDataArray []interface{}, context context.Context) error
 	RestfulAPICount(collName string, filter bson.M) (int64, error)
 	CreateIndex(collName string, keyField string) (bool, error)
 	StartSession() (mongo.Session, error)
@@ -139,8 +141,16 @@ func (db *MongoDBClient) RestfulAPIPost(collName string, filter bson.M, postData
 	return db.MongoClient.RestfulAPIPost(collName, filter, postData)
 }
 
+func (db *MongoDBClient) RestfulAPIPostWithContext(collName string, filter bson.M, postData map[string]interface{}, context context.Context) (bool, error) {
+	return db.MongoClient.RestfulAPIPostWithContext(collName, filter, postData, context)
+}
+
 func (db *MongoDBClient) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
 	return db.MongoClient.RestfulAPIPostMany(collName, filter, postDataArray)
+}
+
+func (db *MongoDBClient) RestfulAPIPostManyWithContext(collName string, filter bson.M, postDataArray []interface{}, context context.Context) error {
+	return db.MongoClient.RestfulAPIPostManyWithContext(collName, filter, postDataArray, context)
 }
 
 func (db *MongoDBClient) RestfulAPICount(collName string, filter bson.M) (int64, error) {

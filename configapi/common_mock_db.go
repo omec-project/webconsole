@@ -63,6 +63,10 @@ func (db *MockMongoClientDBError) RestfulAPIPostMany(collName string, filter bso
 	return errors.New("DB error")
 }
 
+func (db *MockMongoClientDBError) RestfulAPIPostManyWithContext(collName string, filter bson.M, postDataArray []interface{}, context context.Context) error {
+	return errors.New("DB error")
+}
+
 func (db *MockMongoClientDBError) RestfulAPICount(collName string, filter bson.M) (int64, error) {
 	return 0, errors.New("DB error")
 }
@@ -96,6 +100,10 @@ func (db *MockMongoClientEmptyDB) RestfulAPIPostMany(collName string, filter bso
 	return nil
 }
 
+func (db *MockMongoClientEmptyDB) RestfulAPIPostManyWithContext(collName string, filter bson.M, postDataArray []interface{}, context context.Context) error {
+	return nil
+}
+
 func (db *MockMongoClientEmptyDB) RestfulAPIDeleteOneWithContext(collName string, filter bson.M, context context.Context) error {
 	return nil
 }
@@ -122,6 +130,10 @@ func (db *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filte
 }
 
 func (db *MockMongoClientDuplicateCreation) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
+	return errors.New("E11000")
+}
+
+func (db *MockMongoClientDuplicateCreation) RestfulAPIPostManyWithContext(collName string, filter bson.M, postDataArray []interface{}, context context.Context) error {
 	return errors.New("E11000")
 }
 

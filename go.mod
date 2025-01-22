@@ -7,9 +7,9 @@ require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/omec-project/config5g v1.5.5
+	github.com/omec-project/config5g v1.5.6
 	github.com/omec-project/openapi v1.3.2
-	github.com/omec-project/util v1.2.10
+	github.com/omec-project/util v1.2.11
 	github.com/prometheus/client_golang v1.20.5
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
@@ -18,8 +18,8 @@ require (
 	go.mongodb.org/mongo-driver v1.17.2
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.32.0
-	google.golang.org/grpc v1.69.2
-	google.golang.org/protobuf v1.36.2
+	google.golang.org/grpc v1.69.4
+	google.golang.org/protobuf v1.36.3
 	gopkg.in/yaml.v2 v2.4.0
 )
 

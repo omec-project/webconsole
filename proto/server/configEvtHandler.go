@@ -192,7 +192,9 @@ func handleDeviceGroupDelete(configMsg *configmodels.ConfigMessage, subsUpdateCh
 		config5gMsg.PrevDevGroup = getDeviceGroupByName(configMsg.DevGroupName)
 		subsUpdateChan <- &config5gMsg
 	}
-	err := deleteDeviceGroupAsTransaction(configMsg.DevGroupName)
+	filter := bson.M{"group-name": configMsg.DevGroupName}
+	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
+	//err := deleteDeviceGroupAsTransaction(configMsg.DevGroupName)
 	if err != nil {
 		logger.DbLog.Errorw("failed to delete Device Group", "error", err)
 	}
@@ -599,6 +601,42 @@ func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, im
 	}
 }
 
+func deleteAmProvisionedData(imsi string) {
+
+	filter := bson.M{"ueId": "imsi-" + imsi}
+	num, err := dbadapter.CommonDBClient.RestfulAPICount(amDataColl, filter)
+	if err != nil {
+		logger.DbLog.Warnln(err)
+		return
+	}
+	if num == 0 {
+		logger.DbLog.Infof("ALREADY DELETED %v", imsi)
+		return
+	}
+	/*update := bson.M{
+		"gpsis":            "",
+		"nssai":            "",
+		"servingPlmnId":    "",
+		"subscribedUeAmbr": "",
+	}
+
+	_, errPost := dbadapter.CommonDBClient.RestfulAPIPutOne(amDataColl, filter, update)
+	*/
+	logger.DbLog.Infof("UPDATing %v", imsi)
+	patchJSON := []byte(`[
+		{"op": "replace", "path": "/servingPlmnId", "value": "1"},
+		{"op": "replace", "path": "/gpsis", "value": "[]"},
+		{"op": "remove", "path": "/nssai/defaultSingleNssais"},
+		{"op": "remove", "path": "/nssai/singleNssais"},
+		{"op": "remove", "path": "/subscribedUeAmbr/uplink"},
+		{"op": "remove", "path": "/subscribedUeAmbr/downlink"}
+	]`)
+	errPost := dbadapter.CommonDBClient.RestfulAPIJSONPatch(amDataColl, filter, patchJSON)
+	if errPost != nil {
+		logger.DbLog.Warnln(errPost)
+	}
+}
+
 func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg) *configmodels.Slice {
 	for name, slice := range getSlices() {
 		for _, dgName := range slice.SiteDeviceGroup {
@@ -709,10 +747,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					if errDelOneSmPol != nil {
 						logger.DbLog.Warnln(errDelOneSmPol)
 					}
-					errDelOneAmData := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
-					if errDelOneAmData != nil {
-						logger.DbLog.Warnln(errDelOneAmData)
-					}
+					deleteAmProvisionedData(imsi)
 					errDelOneSmData := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smDataColl, filter)
 					if errDelOneSmData != nil {
 						logger.DbLog.Warnln(errDelOneSmData)
@@ -720,6 +755,11 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					errDelOneSmfSel := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smfSelDataColl, filter)
 					if errDelOneSmfSel != nil {
 						logger.DbLog.Warnln(errDelOneSmfSel)
+					}
+				}
+				if confData.Msg.MsgMethod == configmodels.Delete_op {
+					if err := updateDeviceGroupListInNetworkSlices(confData.Msg.DevGroupName, context.TODO()); err != nil {
+						logger.DbLog.Warnln(err)
 					}
 				}
 			}

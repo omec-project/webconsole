@@ -645,7 +645,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				if confData.Msg.DevGroup != nil {
 					for _, imsi := range confData.Msg.DevGroup.Imsis {
 						/* update only if the imsi is provisioned */
-						if slices.Contains(provisionedSubscribers, imsi) {
+						if slices.Contains(provisionedSubscribers, "imsi-" + imsi) {
 							dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
 							updateAmPolicyData(imsi)
 							updateSmPolicyData(snssai, dnn, imsi)

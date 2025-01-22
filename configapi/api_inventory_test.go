@@ -311,13 +311,13 @@ func TestInventoryPostHandlers_Success(t *testing.T) {
 		},
 		{
 			name:      "PostUpf",
-			route:     "/config/v1/inventory/upf/upf1",
+			route:     "/config/v1/inventory/upf/upf1.my-domain.com",
 			inputData: `{"port": "123"}`,
 			expectedMessage: configmodels.ConfigMessage{
 				MsgType:   configmodels.Inventory,
 				MsgMethod: configmodels.Post_op,
 				Upf: &configmodels.Upf{
-					Hostname: "upf1",
+					Hostname: "upf1.my-domain.com",
 					Port:     "123",
 				},
 			},

@@ -602,7 +602,6 @@ func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, im
 }
 
 func deleteAmProvisionedData(imsi string) {
-
 	filter := bson.M{"ueId": "imsi-" + imsi}
 	num, err := dbadapter.CommonDBClient.RestfulAPICount(amDataColl, filter)
 	if err != nil {
@@ -610,30 +609,17 @@ func deleteAmProvisionedData(imsi string) {
 		return
 	}
 	if num == 0 {
-		logger.DbLog.Infof("ALREADY DELETED %v", imsi)
+		logger.WebUILog.Infof("imsi-%v is no longer provisioned, no need to remove it", imsi)
 		return
 	}
-	/*update := bson.M{
-		"gpsis":            "",
-		"nssai":            "",
+	update := bson.M{
+		"gpsis":            []string{},
+		"nssai":            nil,
 		"servingPlmnId":    "",
-		"subscribedUeAmbr": "",
+		"subscribedUeAmbr": nil,
 	}
-
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPutOne(amDataColl, filter, update)
-	*/
-	logger.DbLog.Infof("UPDATing %v", imsi)
-	patchJSON := []byte(`[
-		{"op": "replace", "path": "/servingPlmnId", "value": "1"},
-		{"op": "replace", "path": "/gpsis", "value": "[]"},
-		{"op": "remove", "path": "/nssai/defaultSingleNssais"},
-		{"op": "remove", "path": "/nssai/singleNssais"},
-		{"op": "remove", "path": "/subscribedUeAmbr/uplink"},
-		{"op": "remove", "path": "/subscribedUeAmbr/downlink"}
-	]`)
-	errPost := dbadapter.CommonDBClient.RestfulAPIJSONPatch(amDataColl, filter, patchJSON)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	if _, err = dbadapter.CommonDBClient.RestfulAPIPutOne(amDataColl, filter, update); err != nil {
+		logger.DbLog.Warnln(err)
 	}
 }
 
@@ -677,6 +663,27 @@ func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) 
 	}
 
 	return
+}
+
+func deleteSubscribersInfo(imsis []string, mcc, mnc string) {
+	for _, imsi := range imsis {
+		filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
+		filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
+
+		if err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amPolicyDataColl, filterImsiOnly); err != nil {
+			logger.DbLog.Warnln(err)
+		}
+		if err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smPolicyDataColl, filterImsiOnly); err != nil {
+			logger.DbLog.Warnln(err)
+		}
+		if err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smDataColl, filter); err != nil {
+			logger.DbLog.Warnln(err)
+		}
+		if err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smfSelDataColl, filter); err != nil {
+			logger.DbLog.Warnln(err)
+		}
+		deleteAmProvisionedData(imsi)
+	}
 }
 
 func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
@@ -734,29 +741,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				}
 
 				dimsis := getDeletedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)
-				for _, imsi := range dimsis {
-					mcc := slice.SiteInfo.Plmn.Mcc
-					mnc := slice.SiteInfo.Plmn.Mnc
-					filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
-					filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
-					errDelOneAmPol := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amPolicyDataColl, filterImsiOnly)
-					if errDelOneAmPol != nil {
-						logger.DbLog.Warnln(errDelOneAmPol)
-					}
-					errDelOneSmPol := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smPolicyDataColl, filterImsiOnly)
-					if errDelOneSmPol != nil {
-						logger.DbLog.Warnln(errDelOneSmPol)
-					}
-					deleteAmProvisionedData(imsi)
-					errDelOneSmData := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smDataColl, filter)
-					if errDelOneSmData != nil {
-						logger.DbLog.Warnln(errDelOneSmData)
-					}
-					errDelOneSmfSel := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smfSelDataColl, filter)
-					if errDelOneSmfSel != nil {
-						logger.DbLog.Warnln(errDelOneSmfSel)
-					}
-				}
+				deleteSubscribersInfo(dimsis, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc)
 				if confData.Msg.MsgMethod == configmodels.Delete_op {
 					if err := updateDeviceGroupListInNetworkSlices(confData.Msg.DevGroupName, context.TODO()); err != nil {
 						logger.DbLog.Warnln(err)
@@ -803,32 +788,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 			for _, dgname := range dgnames {
 				devGroupConfig := getDeviceGroupByName(dgname)
 				if devGroupConfig != nil {
-					for _, imsi := range devGroupConfig.Imsis {
-						mcc := confData.PrevSlice.SiteInfo.Plmn.Mcc
-						mnc := confData.PrevSlice.SiteInfo.Plmn.Mnc
-						filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
-						filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
-						errDelOneAmPol := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amPolicyDataColl, filterImsiOnly)
-						if errDelOneAmPol != nil {
-							logger.DbLog.Warnln(errDelOneAmPol)
-						}
-						errDelOneSmPol := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smPolicyDataColl, filterImsiOnly)
-						if errDelOneSmPol != nil {
-							logger.DbLog.Warnln(errDelOneSmPol)
-						}
-						errDelOneAmData := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
-						if errDelOneAmData != nil {
-							logger.DbLog.Warnln(errDelOneAmData)
-						}
-						errDelOneSmData := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smDataColl, filter)
-						if errDelOneSmData != nil {
-							logger.DbLog.Warnln(errDelOneSmData)
-						}
-						errDelOneSmfSel := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smfSelDataColl, filter)
-						if errDelOneSmfSel != nil {
-							logger.DbLog.Warnln(errDelOneSmfSel)
-						}
-					}
+					deleteSubscribersInfo(devGroupConfig.Imsis, confData.PrevSlice.SiteInfo.Plmn.Mcc, confData.PrevSlice.SiteInfo.Plmn.Mnc)
 				}
 			}
 			rwLock.RUnlock()

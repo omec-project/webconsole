@@ -5,7 +5,6 @@
 package server
 
 import (
-	context "context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -19,7 +18,6 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const (
@@ -194,79 +192,10 @@ func handleDeviceGroupDelete(configMsg *configmodels.ConfigMessage, subsUpdateCh
 	}
 	filter := bson.M{"group-name": configMsg.DevGroupName}
 	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
-	//err := deleteDeviceGroupAsTransaction(configMsg.DevGroupName)
 	if err != nil {
 		logger.DbLog.Errorw("failed to delete Device Group", "error", err)
 	}
 	rwLock.Unlock()
-}
-
-func deleteDeviceGroupAsTransaction(deviceGroupName string) error {
-	session, err := dbadapter.CommonDBClient.StartSession()
-	if err != nil {
-		return fmt.Errorf("failed to initialize DB session: %w", err)
-	}
-	ctx := context.TODO()
-	defer session.EndSession(ctx)
-	filter := bson.M{"group-name": deviceGroupName}
-	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
-		if err = session.StartTransaction(); err != nil {
-			return fmt.Errorf("failed to start transaction: %w", err)
-		}
-		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(devGroupDataColl, filter, sc); err != nil {
-			if abortErr := session.AbortTransaction(sc); abortErr != nil {
-				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
-			}
-			return fmt.Errorf("failed to delete Device Group from collection: %w", err)
-		}
-		if err = updateDeviceGroupListInNetworkSlices(deviceGroupName, sc); err != nil {
-			if abortErr := session.AbortTransaction(sc); abortErr != nil {
-				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
-			}
-			return fmt.Errorf("failed to update network slices: %w", err)
-		}
-		return session.CommitTransaction(sc)
-	})
-}
-
-func updateDeviceGroupListInNetworkSlices(deviceGroupName string, context context.Context) error {
-	filterByDeviceGroup := bson.M{
-		"site-device-group": bson.M{
-			"$elemMatch": bson.M{
-				"$eq": deviceGroupName,
-			},
-		},
-	}
-	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByDeviceGroup)
-	if err != nil {
-		return fmt.Errorf("failed to fetch network slices: %w", err)
-	}
-	for _, rawNetworkSlice := range rawNetworkSlices {
-		var networkSlice configmodels.Slice
-		if err = json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
-			return fmt.Errorf("error unmarshaling network slice: %v", err)
-		}
-		filteredDeviceGroups := []string{}
-		for _, deviceGroup := range networkSlice.SiteDeviceGroup {
-			if deviceGroup != deviceGroupName {
-				filteredDeviceGroups = append(filteredDeviceGroups, deviceGroup)
-			}
-		}
-		filteredDeviceGroupsJSON, err := json.Marshal(filteredDeviceGroups)
-		if err != nil {
-			return fmt.Errorf("error marshaling device groups: %v", err)
-		}
-		patchJSON := []byte(
-			fmt.Sprintf(`[{"op": "replace", "path": "/site-device-group", "value": %s}]`,
-				string(filteredDeviceGroupsJSON)),
-		)
-		filterBySliceName := bson.M{"slice-name": networkSlice.SliceName}
-		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(sliceDataColl, filterBySliceName, patchJSON, context)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
@@ -686,6 +615,20 @@ func deleteSubscribersInfo(imsis []string, mcc, mnc string) {
 	}
 }
 
+func removeDeviceGroupFromNetworkSlice(deviceGroupName string) {
+	filterByDeviceGroup := bson.M{
+		"site-device-group": bson.M{
+			"$elemMatch": bson.M{
+				"$eq": deviceGroupName,
+			},
+		},
+	}
+	update := bson.M{"site-device-group": deviceGroupName}
+	if err := dbadapter.CommonDBClient.RestfulAPIPullOne(sliceDataColl, filterByDeviceGroup, update); err != nil {
+		logger.DbLog.Errorw("failed to remove device group from network slice", "device group", deviceGroupName, "error", err)
+	}
+}
+
 func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 	for confData := range confChan {
 		switch confData.Msg.MsgType {
@@ -743,9 +686,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				dimsis := getDeletedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)
 				deleteSubscribersInfo(dimsis, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc)
 				if confData.Msg.MsgMethod == configmodels.Delete_op {
-					if err := updateDeviceGroupListInNetworkSlices(confData.Msg.DevGroupName, context.TODO()); err != nil {
-						logger.DbLog.Warnln(err)
-					}
+					removeDeviceGroupFromNetworkSlice(confData.Msg.DevGroupName)
 				}
 			}
 			rwLock.RUnlock()

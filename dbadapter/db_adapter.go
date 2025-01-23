@@ -34,6 +34,7 @@ type DBInterface interface {
 	RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error)
 	RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error
 	RestfulAPICount(collName string, filter bson.M) (int64, error)
+	RestfulAPIPullOne(collName string, filter bson.M, putData map[string]interface{}) error
 	CreateIndex(collName string, keyField string) (bool, error)
 	StartSession() (mongo.Session, error)
 	SupportsTransactions() (bool, error)
@@ -145,6 +146,10 @@ func (db *MongoDBClient) RestfulAPIPostMany(collName string, filter bson.M, post
 
 func (db *MongoDBClient) RestfulAPICount(collName string, filter bson.M) (int64, error) {
 	return db.MongoClient.RestfulAPICount(collName, filter)
+}
+
+func (db *MongoDBClient) RestfulAPIPullOne(collName string, filter bson.M, putData map[string]interface{}) error {
+	return db.MongoClient.RestfulAPIPullOne(collName, filter, putData)
 }
 
 func (db *MongoDBClient) CreateIndex(collName string, keyField string) (bool, error) {

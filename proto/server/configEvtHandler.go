@@ -425,6 +425,7 @@ func getSubscriberAuthDataByUeId(ueId string) *models.AuthenticationSubscription
 	err := json.Unmarshal(configmodels.MapToByte(subscriberAuthDataInterface), &subscriberAuthData)
 	if err != nil {
 		logger.DbLog.Errorf("could not unmarshall subscriber %v", subscriberAuthDataInterface)
+		return nil
 	}
 	return &subscriberAuthData
 }

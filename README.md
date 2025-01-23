@@ -43,7 +43,11 @@ This is an optional feature, disabled by default. For more details, refer to thi
 
 ##  MongoDB Transaction Support
 
-This application requires a MongoDB deployment configured to support transactions, such as a replica set or a sharded cluster. Standalone MongoDB instances do not support transactions and will prevent the application from starting. Please ensure your MongoDB instance is properly set up for transactions. For detailed configuration instructions, see the [MongoDB Replica Set Documentation](https://www.mongodb.com/docs/kubernetes-operator/current/tutorial/deploy-replica-set/).
+This application requires a MongoDB deployment configured to support transactions,
+such as a replica set or a sharded cluster. Standalone MongoDB instances do not
+support transactions and will prevent the application from starting. Please ensure
+your MongoDB instance is properly set up for transactions. For detailed configuration
+instructions, see the [MongoDB Replica Set Documentation](https://www.mongodb.com/docs/kubernetes-operator/current/tutorial/deploy-replica-set/).
 
 ## Webconsole Architecture diagram
 

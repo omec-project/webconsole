@@ -99,7 +99,7 @@ func CheckTransactionsSupport(client *DBInterface) error {
 		case <-ticker.C:
 			// Continue to check after each tick
 		case <-timer:
-			return fmt.Errorf("%s", "timed out while waiting for Replica Set or sharded config to be set in MongoDB")
+			return fmt.Errorf("timed out while waiting for Replica Set or sharded config to be set in MongoDB")
 		}
 	}
 	logger.DbLog.Infoln("mongoDB support of transactions verified")

@@ -397,15 +397,17 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 }
 
 func getProvisionedSubscribers() []string {
+	var provisionedSubscribers []string
 	rawProvisionedSubscribers, errGetMany := dbadapter.AuthDBClient.RestfulAPIGetMany(authSubsDataColl, nil)
 	if errGetMany != nil {
 		logger.DbLog.Warnln(errGetMany)
+		return provisionedSubscribers
 	}
-	var provisionedSubscribers []string
 	for _, rawProvisionedSubscriber := range rawProvisionedSubscribers {
 		ueId, ok := rawProvisionedSubscriber["ueId"].(string)
 		if !ok {
 			logger.DbLog.Warnf("cannot retrieve ueId for subscriber: %v", rawProvisionedSubscriber)
+			continue
 		}
 		provisionedSubscribers = append(provisionedSubscribers, ueId)
 	}
@@ -417,6 +419,7 @@ func getSubscriberAuthDataByUeId(ueId string) *models.AuthenticationSubscription
 	subscriberAuthDataInterface, errGetOne := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)
+		return nil
 	}
 	var subscriberAuthData models.AuthenticationSubscription
 	err := json.Unmarshal(configmodels.MapToByte(subscriberAuthDataInterface), &subscriberAuthData)
@@ -631,10 +634,10 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 			/* is this devicegroup part of any existing slice */
 			slice := isDeviceGroupExistInSlice(confData)
 			if slice != nil {
-				provisionedSubscribers := getProvisionedSubscribers()
 				sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 				if err != nil {
 					logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
+					return
 				}
 				snssai := &models.Snssai{
 					Sd:  slice.SliceId.Sd,
@@ -643,9 +646,10 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 
 				/* skip delete case */
 				if confData.Msg.DevGroup != nil {
+					provisionedSubscribers := getProvisionedSubscribers()
 					for _, imsi := range confData.Msg.DevGroup.Imsis {
 						/* update only if the imsi is provisioned */
-						if slices.Contains(provisionedSubscribers, "imsi-" + imsi) {
+						if slices.Contains(provisionedSubscribers, "imsi-"+imsi) {
 							dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
 							updateAmPolicyData(imsi)
 							updateSmPolicyData(snssai, dnn, imsi)

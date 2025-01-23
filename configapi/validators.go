@@ -10,16 +10,16 @@ const FQDN_PATTERN = "^([a-zA-Z0-9-]+\\.){2,}([a-zA-Z]{2,6})$"
 
 func IsValidName(name string) bool {
 	nameMatch, err := regexp.MatchString(NAME_PATTERN, name)
-	if err != nil || !nameMatch {
+	if err != nil {
 		return false
 	}
-	return true
+	return nameMatch
 }
 
 func IsValidFQDN(fqdn string) bool {
 	fqdnMatch, err := regexp.MatchString(FQDN_PATTERN, fqdn)
-	if err != nil || !fqdnMatch {
+	if err != nil {
 		return false
 	}
-	return true
+	return fqdnMatch
 }

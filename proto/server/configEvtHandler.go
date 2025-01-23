@@ -530,7 +530,7 @@ func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, im
 	}
 }
 
-func deleteAmProvisionedData(imsi string) {
+func removeDeviceGroupInfoFromAmData(imsi string) {
 	filter := bson.M{"ueId": "imsi-" + imsi}
 	num, err := dbadapter.CommonDBClient.RestfulAPICount(amDataColl, filter)
 	if err != nil {
@@ -594,7 +594,7 @@ func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) 
 	return
 }
 
-func deleteSubscribersInfo(imsis []string, mcc, mnc string) {
+func removeSubscriberEntriesAssociatedToDeviceGroups(imsis []string, mcc, mnc string) {
 	for _, imsi := range imsis {
 		filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
 		filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
@@ -611,7 +611,7 @@ func deleteSubscribersInfo(imsis []string, mcc, mnc string) {
 		if err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smfSelDataColl, filter); err != nil {
 			logger.DbLog.Warnln(err)
 		}
-		deleteAmProvisionedData(imsi)
+		removeDeviceGroupInfoFromAmData(imsi)
 	}
 }
 
@@ -684,7 +684,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				}
 
 				dimsis := getDeletedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)
-				deleteSubscribersInfo(dimsis, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc)
+				removeSubscriberEntriesAssociatedToDeviceGroups(dimsis, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc)
 				if confData.Msg.MsgMethod == configmodels.Delete_op {
 					removeDeviceGroupFromNetworkSlice(confData.Msg.DevGroupName)
 				}
@@ -729,7 +729,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 			for _, dgname := range dgnames {
 				devGroupConfig := getDeviceGroupByName(dgname)
 				if devGroupConfig != nil {
-					deleteSubscribersInfo(devGroupConfig.Imsis, confData.PrevSlice.SiteInfo.Plmn.Mcc, confData.PrevSlice.SiteInfo.Plmn.Mnc)
+					removeSubscriberEntriesAssociatedToDeviceGroups(devGroupConfig.Imsis, confData.PrevSlice.SiteInfo.Plmn.Mcc, confData.PrevSlice.SiteInfo.Plmn.Mnc)
 				}
 			}
 			rwLock.RUnlock()

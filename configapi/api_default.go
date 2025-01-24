@@ -240,7 +240,7 @@ func NetworkSliceSliceNameDelete(c *gin.Context) {
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
 // @Failure      500  {object}  nil  "Error creating network slice"
-// @Router       /config/v1/network-slice/{sliceName  [post]
+// @Router       /config/v1/network-slice/{sliceName}  [post]
 func NetworkSliceSliceNamePost(c *gin.Context) {
 	logger.ConfigLog.Debugf("Received NetworkSliceSliceNamePost ")
 	if ret := NetworkSlicePostHandler(c, configmodels.Post_op); ret {

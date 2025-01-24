@@ -678,13 +678,16 @@ const docTemplate = `{
                         "description": "gNB deleted"
                     },
                     "400": {
-                        "description": "Failed to delete the gNB"
+                        "description": "Bad request"
                     },
                     "401": {
                         "description": "Authorization failed"
                     },
                     "403": {
                         "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Failed to delete gNB"
                     }
                 }
             }
@@ -846,13 +849,16 @@ const docTemplate = `{
                         "description": "UPF deleted"
                     },
                     "400": {
-                        "description": "Failed to delete the UPF"
+                        "description": "Bad request"
                     },
                     "401": {
                         "description": "Authorization failed"
                     },
                     "403": {
                         "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Failed to delete UPF"
                     }
                 }
             }

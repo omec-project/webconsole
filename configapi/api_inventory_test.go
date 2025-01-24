@@ -6,6 +6,7 @@ package configapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,7 +17,26 @@ import (
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+type MockSession struct {
+	mongo.Session
+}
+
+func (m *MockSession) StartTransaction(opts ...*options.TransactionOptions) error {
+	return nil
+}
+
+func (m *MockSession) AbortTransaction(ctx context.Context) error {
+	return nil
+}
+
+func (m *MockSession) CommitTransaction(ctx context.Context) error {
+	return nil
+}
+
+func (m *MockSession) EndSession(ctx context.Context) {}
 
 type MockMongoClientOneGnb struct {
 	dbadapter.DBInterface
@@ -114,7 +134,7 @@ func (m *MockMongoClientPutExistingUpf) StartSession() (mongo.Session, error) {
 	return &MockSession{}, nil
 }
 
-func (db *MockMongoClientPutExistingUpf) RestfulAPIPutOneWithContext(collName string, filter bson.M, putData map[string]interface{}, context context.Context) (bool, error) {
+func (db *MockMongoClientPutExistingUpf) RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]interface{}) (bool, error) {
 	return true, nil
 }
 
@@ -329,12 +349,6 @@ func TestGnbPostHandlers_Success(t *testing.T) {
 				if msg.MsgMethod != tc.expectedMessage.MsgMethod {
 					t.Errorf("expected MsgMethod %+v, but got %+v", tc.expectedMessage.MsgMethod, msg.MsgMethod)
 				}
-				if tc.expectedMessage.GnbName != msg.GnbName {
-					t.Errorf("expected GnbName \"\", but got %+v", msg.GnbName)
-				}
-				if tc.expectedMessage.UpfHostname != msg.UpfHostname {
-					t.Errorf("expected UpfHostname \"\", but got %+v", msg.UpfHostname)
-				}
 				if tc.expectedMessage.Gnb != nil {
 					if msg.Gnb == nil {
 						t.Errorf("expected gNB %+v, but got nil", tc.expectedMessage.Gnb)
@@ -524,77 +538,63 @@ func TestUpfPutHandler(t *testing.T) {
 	}
 }
 
-func TestInventoryDeleteHandlers_Success(t *testing.T) {
+func TestInventoryDeleteHandlers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddConfigV1Service(router)
 
 	testCases := []struct {
-		name            string
-		route           string
-		expectedMessage configmodels.ConfigMessage
+		name         string
+		route        string
+		dbAdapter    dbadapter.DBInterface
+		expectedCode int
+		expectedBody string
 	}{
 		{
-			name:  "DeleteGnb",
-			route: "/config/v1/inventory/gnb/gnb1",
-			expectedMessage: configmodels.ConfigMessage{
-				MsgType:   configmodels.Inventory,
-				MsgMethod: configmodels.Delete_op,
-				GnbName:   "gnb1",
-			},
+			name:         "Delete gNB Success",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			expectedCode: http.StatusOK,
+			expectedBody: "{}",
 		},
 		{
-			name:  "DeleteUpf",
-			route: "/config/v1/inventory/upf/upf1",
-			expectedMessage: configmodels.ConfigMessage{
-				MsgType:     configmodels.Inventory,
-				MsgMethod:   configmodels.Delete_op,
-				UpfHostname: "upf1",
-			},
+			name:         "Delete gNB DB Failure",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientDBError{},
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"error":"failed to delete gNB"}`,
+		},
+		{
+			name:         "Delete UPF Success",
+			route:        "/config/v1/inventory/upf/upf1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			expectedCode: http.StatusOK,
+			expectedBody: "{}",
+		},
+		{
+			name:         "Delete UPF DB Failure",
+			route:        "/config/v1/inventory/upf/upf1",
+			dbAdapter:    &MockMongoClientDBError{},
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"error":"failed to delete UPF"}`,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 1)
-			defer func() { configChannel = origChannel }()
+			dbadapter.CommonDBClient = tc.dbAdapter
 			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
 
-			expectedCode := http.StatusOK
-			expectedBody := "{}"
-
-			if expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
-			if w.Body.String() != expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-			}
-			select {
-			case msg := <-configChannel:
-				if msg.MsgType != tc.expectedMessage.MsgType {
-					t.Errorf("expected MsgType %+v, but got %+v", tc.expectedMessage.MsgType, msg.MsgType)
-				}
-				if msg.MsgMethod != tc.expectedMessage.MsgMethod {
-					t.Errorf("expected MsgMethod %+v, but got %+v", tc.expectedMessage.MsgMethod, msg.MsgMethod)
-				}
-				if tc.expectedMessage.GnbName != msg.GnbName {
-					t.Errorf("expected GnbName %+v, but got %+v", tc.expectedMessage.GnbName, msg.GnbName)
-				}
-				if tc.expectedMessage.UpfHostname != msg.UpfHostname {
-					t.Errorf("expected UpfHostname %+v, but got %+v", tc.expectedMessage.UpfHostname, msg.UpfHostname)
-				}
-				if msg.Gnb != nil {
-					t.Errorf("expected gNB nil, but got %+v", msg.Gnb)
-				}
-			default:
-				t.Error("expected message in configChannel, but none received")
+			if tc.expectedBody != w.Body.String() {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}

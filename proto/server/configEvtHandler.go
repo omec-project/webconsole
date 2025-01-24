@@ -98,10 +98,9 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			}
 
 			if configMsg.Gnb != nil {
-				logger.ConfigLog.Infof("received gNB [%v] configuration from config channel", configMsg.GnbName)
+				logger.ConfigLog.Infof("received gNB [%v] configuration from config channel", configMsg.Gnb.Name)
 				handleGnbPost(configMsg.Gnb)
 			}
-
 			// loop through all clients and send this message to all clients
 			if len(clientNFPool) == 0 {
 				logger.ConfigLog.Infoln("no client available. No need to send config")
@@ -111,16 +110,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				client.outStandingPushConfig <- configMsg
 			}
 		} else {
-			if configMsg.MsgType == configmodels.Inventory {
-				if configMsg.GnbName != "" {
-					logger.ConfigLog.Infof("received delete gNB [%v] from config channel", configMsg.GnbName)
-					handleGnbDelete(configMsg.GnbName)
-				}
-				if configMsg.UpfHostname != "" {
-					logger.ConfigLog.Infof("received delete UPF [%v] from config channel", configMsg.UpfHostname)
-					handleUpfDelete(configMsg.UpfHostname)
-				}
-			} else if configMsg.MsgType != configmodels.Sub_data {
+			if configMsg.MsgType != configmodels.Sub_data {
 				// update config snapshot
 				if configMsg.DevGroup == nil && configMsg.DevGroupName != "" {
 					logger.ConfigLog.Infof("received delete Device Group [%v] from config channel", configMsg.DevGroupName)
@@ -245,26 +235,6 @@ func handleGnbPost(gnb *configmodels.Gnb) {
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(gnbDataColl, filter, gnbDataBson)
 	if errPost != nil {
 		logger.DbLog.Warnln(errPost)
-	}
-	rwLock.Unlock()
-}
-
-func handleGnbDelete(gnbName string) {
-	rwLock.Lock()
-	filter := bson.M{"name": gnbName}
-	errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(gnbDataColl, filter)
-	if errDelOne != nil {
-		logger.DbLog.Warnln(errDelOne)
-	}
-	rwLock.Unlock()
-}
-
-func handleUpfDelete(upfHostname string) {
-	rwLock.Lock()
-	filter := bson.M{"hostname": upfHostname}
-	errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(upfDataColl, filter)
-	if errDelOne != nil {
-		logger.DbLog.Warnln(errDelOne)
 	}
 	rwLock.Unlock()
 }

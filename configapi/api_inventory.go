@@ -42,7 +42,7 @@ func GetGnbs(c *gin.Context) {
 	logger.WebUILog.Infoln("received a GET gNBs request")
 	var gnbs []*configmodels.Gnb
 	gnbs = make([]*configmodels.Gnb, 0)
-	rawGnbs, err := dbadapter.CommonDBClient.RestfulAPIGetMany(gnbDataColl, bson.M{})
+	rawGnbs, err := dbadapter.CommonDBClient.RestfulAPIGetMany(configmodels.GnbDataColl, bson.M{})
 	if err != nil {
 		logger.DbLog.Errorw("failed to retrieve gNBs", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve gNBs"})
@@ -128,7 +128,7 @@ func handleDeleteGnbTransaction(ctx context.Context, filter bson.M, gnbName stri
 		if err := session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, gnbDataColl, filter); err != nil {
+		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.GnbDataColl, filter); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
@@ -196,7 +196,7 @@ func GetUpfs(c *gin.Context) {
 	logger.WebUILog.Infoln("received a GET UPFs request")
 	var upfs []*configmodels.Upf
 	upfs = make([]*configmodels.Upf, 0)
-	rawUpfs, err := dbadapter.CommonDBClient.RestfulAPIGetMany(upfDataColl, bson.M{})
+	rawUpfs, err := dbadapter.CommonDBClient.RestfulAPIGetMany(configmodels.UpfDataColl, bson.M{})
 	if err != nil {
 		logger.DbLog.Errorw("failed to retrieve UPFs", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve UPFs"})
@@ -313,13 +313,13 @@ func PutUpf(c *gin.Context) {
 func postUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	upfDataBson := configmodels.ToBsonM(upf)
-	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(configmodels.UpfDataColl, filter, []interface{}{upfDataBson}, sc)
+	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
 }
 
 func putUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	upfDataBson := configmodels.ToBsonM(upf)
-	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(configmodels.UpfDataColl, filter, upfDataBson, sc)
+	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.UpfDataColl, filter, upfDataBson)
 	return err
 }
 
@@ -406,7 +406,7 @@ func handleDeleteUpfTransaction(ctx context.Context, filter bson.M, hostname str
 		if err := session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, upfDataColl, filter); err != nil {
+		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.UpfDataColl, filter); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}

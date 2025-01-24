@@ -6,7 +6,6 @@ package configapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,26 +16,7 @@ import (
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-type MockSession struct {
-	mongo.Session
-}
-
-func (m *MockSession) StartTransaction(opts ...*options.TransactionOptions) error {
-	return nil
-}
-
-func (m *MockSession) AbortTransaction(ctx context.Context) error {
-	return nil
-}
-
-func (m *MockSession) CommitTransaction(ctx context.Context) error {
-	return nil
-}
-
-func (m *MockSession) EndSession(ctx context.Context) {}
 
 type MockMongoClientOneGnb struct {
 	dbadapter.DBInterface

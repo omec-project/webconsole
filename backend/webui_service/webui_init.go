@@ -154,6 +154,10 @@ func (webui *WEBUI) Start() {
 	if factory.WebUIConfig.Configuration.Mode5G {
 		// Connect to MongoDB
 		dbadapter.ConnectMongo(mongodb.Url, mongodb.Name, &dbadapter.CommonDBClient)
+		if err := dbadapter.CheckTransactionsSupport(&dbadapter.CommonDBClient); err != nil {
+			logger.DbLog.Errorw("failed to connect to MongoDB client", mongodb.Name, "error", err)
+			return
+		}
 		dbadapter.ConnectMongo(mongodb.AuthUrl, mongodb.AuthKeysDbName, &dbadapter.AuthDBClient)
 	}
 

@@ -459,6 +459,7 @@ func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 		"$or": []bson.M{
 			{"servingPlmnId": mcc + mnc},
 			{"servingPlmnId": bson.M{"$exists": false}},
+			{"servingPlmnId": ""},
 		},
 	}
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, amDataBsonA)

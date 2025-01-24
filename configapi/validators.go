@@ -8,7 +8,7 @@ import "regexp"
 const NAME_PATTERN = "^[a-zA-Z0-9-_]+$"
 const FQDN_PATTERN = "^([a-zA-Z0-9-]+\\.){2,}([a-zA-Z]{2,6})$"
 
-func IsValidName(name string) bool {
+func isValidName(name string) bool {
 	nameMatch, err := regexp.MatchString(NAME_PATTERN, name)
 	if err != nil {
 		return false
@@ -16,7 +16,7 @@ func IsValidName(name string) bool {
 	return nameMatch
 }
 
-func IsValidFQDN(fqdn string) bool {
+func isValidFQDN(fqdn string) bool {
 	fqdnMatch, err := regexp.MatchString(FQDN_PATTERN, fqdn)
 	if err != nil {
 		return false

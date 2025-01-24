@@ -20,7 +20,7 @@ func TestValidateName(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		r := IsValidName(tc.name)
+		r := isValidName(tc.name)
 		if r != tc.expected {
 			t.Errorf("%s", tc.name)
 		}
@@ -44,7 +44,7 @@ func TestValidateFQDN(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		r := IsValidFQDN(tc.fqdn)
+		r := isValidFQDN(tc.fqdn)
 		if r != tc.expected {
 			t.Errorf("%s", tc.fqdn)
 		}

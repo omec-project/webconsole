@@ -108,7 +108,7 @@ func DeleteGnb(c *gin.Context) {
 
 func handlePostGnb(c *gin.Context) error {
 	gnbName, _ := c.Params.Get("gnb-name")
-	if !IsValidName(gnbName) {
+	if !isValidName(gnbName) {
 		errorMessage := fmt.Sprintf("invalid gNB name %s. Name needs to match the following regular expression: %s", gnbName, NAME_PATTERN)
 		logger.ConfigLog.Errorln(errorMessage)
 		return fmt.Errorf("%s", errorMessage)
@@ -240,7 +240,7 @@ func DeleteUpf(c *gin.Context) {
 
 func handlePostUpf(c *gin.Context) error {
 	upfHostname, _ := c.Params.Get("upf-hostname")
-	if !IsValidFQDN(upfHostname) {
+	if !isValidFQDN(upfHostname) {
 		errorMessage := fmt.Sprintf("invalid UPF name %s. Name needs to represent a valid FQDN", upfHostname)
 		logger.ConfigLog.Errorln(errorMessage)
 		return fmt.Errorf("%s", errorMessage)

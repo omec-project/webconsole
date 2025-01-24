@@ -118,17 +118,17 @@ func (m *MockMongoClientManyUpfs) RestfulAPIGetMany(coll string, filter bson.M) 
 	return results, nil
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIDeleteOneWithContext(collName string, filter bson.M, context context.Context) error {
+func (db *MockMongoClientEmptyDB) RestfulAPIDeleteOneWithContext(context context.Context, collName string, filter bson.M) error {
 	return nil
 }
-func (db *MockMongoClientDBError) RestfulAPIDeleteOneWithContext(collName string, filter bson.M, context context.Context) error {
+func (db *MockMongoClientDBError) RestfulAPIDeleteOneWithContext(context context.Context, collName string, filter bson.M) error {
 	return errors.New("DB error")
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIJSONPatchWithContext(collName string, filter bson.M, patchJSON []byte, context context.Context) error {
+func (db *MockMongoClientEmptyDB) RestfulAPIJSONPatchWithContext(context context.Context, collName string, filter bson.M, patchJSON []byte) error {
 	return nil
 }
-func (db *MockMongoClientDBError) RestfulAPIJSONPatchWithContext(collName string, filter bson.M, patchJSON []byte, context context.Context) error {
+func (db *MockMongoClientDBError) RestfulAPIJSONPatchWithContext(context context.Context, collName string, filter bson.M, patchJSON []byte) error {
 	return errors.New("DB error")
 }
 

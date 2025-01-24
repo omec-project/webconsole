@@ -132,7 +132,7 @@ func handleDeleteGnbTransaction(ctx context.Context, filter bson.M, gnbName stri
 		if err := session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(gnbDataColl, filter, sc); err != nil {
+		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, gnbDataColl, filter); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
@@ -286,7 +286,7 @@ func handleDeleteUpfTransaction(ctx context.Context, filter bson.M, hostname str
 		if err := session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(upfDataColl, filter, sc); err != nil {
+		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, upfDataColl, filter); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
@@ -369,7 +369,7 @@ func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
 				string(filteredGNodeBsJSON)),
 		)
 		filterBySliceName := bson.M{"slice-name": networkSlice.SliceName}
-		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(sliceDataColl, filterBySliceName, patchJSON, context)
+		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(context, sliceDataColl, filterBySliceName, patchJSON)
 		if err != nil {
 			return err
 		}
@@ -389,7 +389,7 @@ func updateUpfInNetworkSlices(hostname string, patchJSON []byte, context context
 			return fmt.Errorf("invalid slice-name in network slice: %v", rawNetworkSlice)
 		}
 		filterBySliceName := bson.M{"slice-name": sliceName}
-		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(sliceDataColl, filterBySliceName, patchJSON, context)
+		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(context, sliceDataColl, filterBySliceName, patchJSON)
 		if err != nil {
 			return err
 		}

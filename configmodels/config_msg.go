@@ -31,8 +31,6 @@ type ConfigMessage struct {
 	DevGroupName string
 	SliceName    string
 	Imsi         string
-	GnbName      string
-	UpfHostname  string
 	MsgType      int
 	MsgMethod    int
 }

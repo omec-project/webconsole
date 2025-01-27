@@ -438,9 +438,7 @@ func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON 
 			}
 			return err
 		}
-
-		filterByUpf := bson.M{"site-info.upf.upf-name": upf.Hostname}
-		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(sc, sliceDataColl, filterByUpf, patchJSON)
+		err = updateUpfInNetworkSlices(sc, upf.Hostname, patchJSON)
 		if err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
@@ -449,4 +447,24 @@ func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON 
 		}
 		return session.CommitTransaction(sc)
 	})
+}
+
+func updateUpfInNetworkSlices(context context.Context, hostname string, patchJSON []byte) error {
+	filterByUpf := bson.M{"site-info.upf.upf-name": hostname}
+	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByUpf)
+	if err != nil {
+		return fmt.Errorf("failed to fetch network slices: %w", err)
+	}
+	for _, rawNetworkSlice := range rawNetworkSlices {
+		sliceName, ok := rawNetworkSlice["slice-name"].(string)
+		if !ok {
+			return fmt.Errorf("invalid slice-name in network slice: %v", rawNetworkSlice)
+		}
+		filterBySliceName := bson.M{"slice-name": sliceName}
+		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(context, sliceDataColl, filterBySliceName, patchJSON)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

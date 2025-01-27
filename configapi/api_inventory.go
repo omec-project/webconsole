@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -229,6 +228,7 @@ func GetUpfs(c *gin.Context) {
 // @Failure      500  {object}  nil  "Error creating UPF"
 // @Router       /config/v1/inventory/upf/  [post]
 func PostUpf(c *gin.Context) {
+	setInventoryCorsHeader(c)
 	logger.WebUILog.Infoln("received a POST UPF request")
 	var postUpfParams configmodels.PostUpfRequest
 	err := c.ShouldBindJSON(&postUpfParams)
@@ -237,19 +237,21 @@ func PostUpf(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
 		return
 	}
-	if postUpfParams.Hostname == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "UPF hostname must be provided"})
+	if !isValidFQDN(postUpfParams.Hostname) {
+		errorMessage := fmt.Sprintf("invalid UPF hostname '%s'. Hostname needs to represent a valid FQDN", postUpfParams.Hostname)
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-	if _, err := strconv.Atoi(postUpfParams.Port); err != nil {
-		errorMessage := "UPF port cannot be converted to integer or it was not provided"
+	if !isValidUpfPort(postUpfParams.Port) {
+		errorMessage := fmt.Sprintf("invalid UPF port '%s'. Port must be a numeric string within the range [0, 65535]", postUpfParams.Port)
 		logger.WebUILog.Errorln(errorMessage)
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
 	upf := configmodels.Upf(postUpfParams)
 	patchJSON := getEditUpfPatchJSON(upf)
-	if err = handleUpfTransaction(c.Request.Context(), upf, patchJSON, postUpfOperation); err != nil {
+	if err = executeUpfTransaction(c.Request.Context(), upf, patchJSON, postUpfOperation); err != nil {
 		if strings.Contains(err.Error(), "E11000") {
 			logger.WebUILog.Errorw("duplicate hostname found:", "error", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "UPF already exists"})
@@ -278,10 +280,11 @@ func PostUpf(c *gin.Context) {
 // @Failure      500  {object}  nil  "Error updating UPF"
 // @Router       /config/v1/inventory/upf/{upf-hostname}  [put]
 func PutUpf(c *gin.Context) {
+	setInventoryCorsHeader(c)
 	logger.WebUILog.Infoln("received a PUT UPF request")
-	hostname, exists := c.Params.Get("upf-hostname")
-	if !exists {
-		errorMessage := "put UPF request is missing path param `upf-hostname`"
+	hostname, _ := c.Params.Get("upf-hostname")
+	if !isValidFQDN(hostname) {
+		errorMessage := fmt.Sprintf("invalid UPF hostname '%s'. Hostname needs to represent a valid FQDN", hostname)
 		logger.WebUILog.Errorln(errorMessage)
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
@@ -293,8 +296,8 @@ func PutUpf(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
 		return
 	}
-	if _, err := strconv.Atoi(putUpfParams.Port); err != nil {
-		errorMessage := "UPF port cannot be converted to integer or it was not provided"
+	if !isValidUpfPort(putUpfParams.Port) {
+		errorMessage := fmt.Sprintf("invalid UPF port '%s'. Port must be a numeric string within the range [0, 65535]", putUpfParams.Port)
 		logger.WebUILog.Errorln(errorMessage)
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
@@ -304,7 +307,7 @@ func PutUpf(c *gin.Context) {
 		Port:     putUpfParams.Port,
 	}
 	patchJSON := getEditUpfPatchJSON(putUpf)
-	if err := handleUpfTransaction(c.Request.Context(), putUpf, patchJSON, putUpfOperation); err != nil {
+	if err := executeUpfTransaction(c.Request.Context(), putUpf, patchJSON, putUpfOperation); err != nil {
 		logger.WebUILog.Errorw("failed to PUT UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
 		return
@@ -353,7 +356,7 @@ func DeleteUpf(c *gin.Context) {
 		Hostname: hostname,
 	}
 	patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
-	if err := handleUpfTransaction(c.Request.Context(), upf, patchJSON, deleteUpfOperation); err != nil {
+	if err := executeUpfTransaction(c.Request.Context(), upf, patchJSON, deleteUpfOperation); err != nil {
 		logger.WebUILog.Errorw("failed to delete UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete UPF"})
 		return
@@ -418,7 +421,7 @@ func deleteUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
 	return dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.UpfDataColl, filter)
 }
 
-func handleUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON []byte, operation func(mongo.SessionContext, configmodels.Upf) error) error {
+func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON []byte, operation func(mongo.SessionContext, configmodels.Upf) error) error {
 	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DB session: %w", err)

@@ -271,25 +271,39 @@ func TestInventoryPostHandlers_Failure(t *testing.T) {
 			expectedBody: `{"error":"invalid header"}`,
 		},
 		{
+			name:         "GnbInvalidName",
+			route:        "/config/v1/inventory/gnb/gnb1&",
+			inputData:    `{"tac": "123"}`,
+			header:       "application",
+			expectedBody: `{"error":"invalid gNB name gnb1\u0026. Name needs to match the following regular expression: ^[a-zA-Z0-9-_]+$"}`,
+		},
+		{
 			name:         "Port is not a string",
-			route:        "/config/v1/inventory/upf/upf1",
+			route:        "/config/v1/inventory/upf/upf1.my-domain.com",
 			inputData:    `{"port": 1234}`,
 			header:       "application/json",
 			expectedBody: `{"error":"invalid JSON format"}`,
 		},
 		{
 			name:         "Missing port",
-			route:        "/config/v1/inventory/upf/upf1",
+			route:        "/config/v1/inventory/upf/upf1.my-domain.com",
 			inputData:    `{"some_param": "123"}`,
 			header:       "application/json",
 			expectedBody: `{"error":"post UPF request body is missing port"}`,
 		},
 		{
 			name:         "UpfInvalidHeader",
-			route:        "/config/v1/inventory/upf/upf1",
+			route:        "/config/v1/inventory/upf/upf1.my-domain.com",
 			inputData:    `{"port": "123"}`,
 			header:       "application",
 			expectedBody: `{"error":"invalid header"}`,
+		},
+		{
+			name:         "UpfInvalidName",
+			route:        "/config/v1/inventory/upf/upf1",
+			inputData:    `{"port": "123"}`,
+			header:       "application",
+			expectedBody: `{"error":"invalid UPF name upf1. Name needs to represent a valid FQDN"}`,
 		},
 	}
 	for _, tc := range testCases {
@@ -348,13 +362,13 @@ func TestInventoryPostHandlers_Success(t *testing.T) {
 		},
 		{
 			name:      "PostUpf",
-			route:     "/config/v1/inventory/upf/upf1",
+			route:     "/config/v1/inventory/upf/upf1.my-domain.com",
 			inputData: `{"port": "123"}`,
 			expectedMessage: configmodels.ConfigMessage{
 				MsgType:   configmodels.Inventory,
 				MsgMethod: configmodels.Post_op,
 				Upf: &configmodels.Upf{
-					Hostname: "upf1",
+					Hostname: "upf1.my-domain.com",
 					Port:     "123",
 				},
 			},

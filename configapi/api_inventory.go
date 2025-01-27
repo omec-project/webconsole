@@ -432,10 +432,10 @@ func handleDeleteUpfTransaction(ctx context.Context, filter bson.M, hostname str
 }
 
 func handlePostUpf(c *gin.Context) error {
-	upfHostname, exists := c.Params.Get("upf-hostname")
-	if !exists {
-		errorMessage := "post UPF request is missing upf-hostname"
-		logger.WebUILog.Errorln(errorMessage)
+	upfHostname, _ := c.Params.Get("upf-hostname")
+	if !isValidFQDN(upfHostname) {
+		errorMessage := fmt.Sprintf("invalid UPF name %s. Name needs to represent a valid FQDN", upfHostname)
+		logger.ConfigLog.Errorln(errorMessage)
 		return fmt.Errorf("%s", errorMessage)
 	}
 	logger.WebUILog.Infof("received a POST UPF %v request", upfHostname)

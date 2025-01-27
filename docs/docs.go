@@ -602,9 +602,7 @@ const docTemplate = `{
                         "description": "Error retrieving gNBs"
                     }
                 }
-            }
-        },
-        "/config/v1/inventory/gnb/{gnb-name}": {
+            },
             "post": {
                 "security": [
                     {
@@ -612,6 +610,50 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Create a new gNB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gNBs"
+                ],
+                "parameters": [
+                    {
+                        "description": "Name and TAC of the gNB",
+                        "name": "gnb",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/configmodels.PostGnbRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "gNB sucessfully created"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Error creating gNB"
+                    }
+                }
+            }
+        },
+        "/config/v1/inventory/gnb/{gnb-name}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create or update a gNB",
                 "produces": [
                     "application/json"
                 ],
@@ -632,22 +674,25 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/configmodels.PostGnbRequest"
+                            "$ref": "#/definitions/configmodels.PutGnbRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "gNB created"
+                    "201": {
+                        "description": "gNB sucessfully created"
                     },
                     "400": {
-                        "description": "Failed to create the gNB"
+                        "description": "Bad request"
                     },
                     "401": {
                         "description": "Authorization failed"
                     },
                     "403": {
                         "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Error updating gNB"
                     }
                 }
             },
@@ -1188,6 +1233,9 @@ const docTemplate = `{
         "configmodels.PostGnbRequest": {
             "type": "object",
             "properties": {
+                "name": {
+                    "type": "string"
+                },
                 "tac": {
                     "type": "string"
                 }
@@ -1197,6 +1245,14 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "port": {
+                    "type": "string"
+                }
+            }
+        },
+        "configmodels.PutGnbRequest": {
+            "type": "object",
+            "properties": {
+                "tac": {
                     "type": "string"
                 }
             }

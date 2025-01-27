@@ -162,8 +162,14 @@ var routes = Routes{
 	{
 		"PostGnb",
 		http.MethodPost,
-		"/inventory/gnb/:gnb-name",
+		"/inventory/gnb",
 		PostGnb,
+	},
+	{
+		"PutGnb",
+		http.MethodPut,
+		"/inventory/gnb/:gnb-name",
+		PutGnb,
 	},
 	{
 		"DeleteGnb",

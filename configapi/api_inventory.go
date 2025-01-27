@@ -248,7 +248,8 @@ func PostUpf(c *gin.Context) {
 		return
 	}
 	upf := configmodels.Upf(postUpfParams)
-	if err = handleUpfTransaction(c.Request.Context(), upf, postUpfOperation); err != nil {
+	patchJSON := getEditUpfPatchJSON(upf)
+	if err = handleUpfTransaction(c.Request.Context(), upf, patchJSON, postUpfOperation); err != nil {
 		if strings.Contains(err.Error(), "E11000") {
 			logger.WebUILog.Errorw("duplicate hostname found:", "error", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "UPF already exists"})
@@ -302,7 +303,8 @@ func PutUpf(c *gin.Context) {
 		Hostname: hostname,
 		Port:     putUpfParams.Port,
 	}
-	if err := handleUpfTransaction(c.Request.Context(), putUpf, putUpfOperation); err != nil {
+	patchJSON := getEditUpfPatchJSON(putUpf)
+	if err := handleUpfTransaction(c.Request.Context(), putUpf, patchJSON, putUpfOperation); err != nil {
 		logger.WebUILog.Errorw("failed to PUT UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
 		return
@@ -310,55 +312,17 @@ func PutUpf(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func postUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
-	filter := bson.M{"hostname": upf.Hostname}
-	upfDataBson := configmodels.ToBsonM(upf)
-	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
-}
-
-func putUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
-	filter := bson.M{"hostname": upf.Hostname}
-	upfDataBson := configmodels.ToBsonM(upf)
-	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.UpfDataColl, filter, upfDataBson)
-	return err
-}
-
-func handleUpfTransaction(ctx context.Context, upf configmodels.Upf, operation func(configmodels.Upf, mongo.SessionContext) error) error {
-	session, err := dbadapter.CommonDBClient.StartSession()
-	if err != nil {
-		return fmt.Errorf("failed to initialize DB session: %w", err)
-	}
-	defer session.EndSession(ctx)
-
-	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
-		if err := session.StartTransaction(); err != nil {
-			return fmt.Errorf("failed to start transaction: %w", err)
-		}
-		if err := operation(upf, sc); err != nil {
-			if abortErr := session.AbortTransaction(sc); abortErr != nil {
-				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+func getEditUpfPatchJSON(upf configmodels.Upf) []byte {
+	return []byte(fmt.Sprintf(`[
+		{
+			"op": "replace",
+			"path": "/site-info/upf",
+			"value": {
+				"upf-name": "%s",
+				"upf-port": "%s"
 			}
-			return err
 		}
-		patchJSON := []byte(fmt.Sprintf(`[
-			{
-				"op": "replace",
-				"path": "/site-info/upf",
-				"value": {
-					"upf-name": "%s",
-					"upf-port": "%s"
-				}
-			}
-		]`, upf.Hostname, upf.Port))
-		err = updateUpfInNetworkSlices(upf.Hostname, patchJSON, sc)
-		if err != nil {
-			if abortErr := session.AbortTransaction(sc); abortErr != nil {
-				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
-			}
-			return fmt.Errorf("failed to update network slices: %w", err)
-		}
-		return session.CommitTransaction(sc)
-	})
+	]`, upf.Hostname, upf.Port))
 }
 
 // DeleteUpf godoc
@@ -384,43 +348,18 @@ func DeleteUpf(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-	filter := bson.M{"hostname": hostname}
-	err := handleDeleteUpfTransaction(c.Request.Context(), filter, hostname)
-	if err != nil {
+
+	upf := configmodels.Upf{
+		Hostname: hostname,
+	}
+	patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
+	if err := handleUpfTransaction(c.Request.Context(), upf, patchJSON, deleteUpfOperation); err != nil {
 		logger.WebUILog.Errorw("failed to delete UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete UPF"})
 		return
 	}
 	logger.WebUILog.Infof("successfully executed DELETE UPF request for hostname: %v", hostname)
 	c.JSON(http.StatusOK, gin.H{})
-}
-
-func handleDeleteUpfTransaction(ctx context.Context, filter bson.M, hostname string) error {
-	session, err := dbadapter.CommonDBClient.StartSession()
-	if err != nil {
-		return fmt.Errorf("failed to initialize DB session: %w", err)
-	}
-	defer session.EndSession(ctx)
-
-	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
-		if err := session.StartTransaction(); err != nil {
-			return fmt.Errorf("failed to start transaction: %w", err)
-		}
-		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.UpfDataColl, filter); err != nil {
-			if abortErr := session.AbortTransaction(sc); abortErr != nil {
-				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
-			}
-			return err
-		}
-		patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
-		if err = updateUpfInNetworkSlices(hostname, patchJSON, sc); err != nil {
-			if abortErr := session.AbortTransaction(sc); abortErr != nil {
-				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
-			}
-			return fmt.Errorf("failed to update network slices: %w", err)
-		}
-		return session.CommitTransaction(sc)
-	})
 }
 
 func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
@@ -461,22 +400,50 @@ func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
 	return nil
 }
 
-func updateUpfInNetworkSlices(hostname string, patchJSON []byte, context context.Context) error {
-	filterByUpf := bson.M{"site-info.upf.upf-name": hostname}
-	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByUpf)
+func postUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
+	filter := bson.M{"hostname": upf.Hostname}
+	upfDataBson := configmodels.ToBsonM(upf)
+	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
+}
+
+func putUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
+	filter := bson.M{"hostname": upf.Hostname}
+	upfDataBson := configmodels.ToBsonM(upf)
+	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.UpfDataColl, filter, upfDataBson)
+	return err
+}
+
+func deleteUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
+	filter := bson.M{"hostname": upf.Hostname}
+	return dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.UpfDataColl, filter)
+}
+
+func handleUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON []byte, operation func(configmodels.Upf, mongo.SessionContext) error) error {
+	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {
-		return fmt.Errorf("failed to fetch network slices: %w", err)
+		return fmt.Errorf("failed to initialize DB session: %w", err)
 	}
-	for _, rawNetworkSlice := range rawNetworkSlices {
-		sliceName, ok := rawNetworkSlice["slice-name"].(string)
-		if !ok {
-			return fmt.Errorf("invalid slice-name in network slice: %v", rawNetworkSlice)
+	defer session.EndSession(ctx)
+
+	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		if err := session.StartTransaction(); err != nil {
+			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		filterBySliceName := bson.M{"slice-name": sliceName}
-		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(context, sliceDataColl, filterBySliceName, patchJSON)
-		if err != nil {
+		if err := operation(upf, sc); err != nil {
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
 			return err
 		}
-	}
-	return nil
+
+		filterByUpf := bson.M{"site-info.upf.upf-name": upf.Hostname}
+		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(sc, sliceDataColl, filterByUpf, patchJSON)
+		if err != nil {
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
+			return fmt.Errorf("failed to update network slices: %w", err)
+		}
+		return session.CommitTransaction(sc)
+	})
 }

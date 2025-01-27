@@ -118,6 +118,10 @@ func (db *MockMongoClientPutExistingUpf) RestfulAPIPutOneWithContext(context con
 	return true, nil
 }
 
+func (db *MockMongoClientPutExistingUpf) RestfulAPIJSONPatchWithContext(context context.Context, collName string, filter bson.M, patchJSON []byte) error {
+	return nil
+}
+
 func TestInventoryGetHandlers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()

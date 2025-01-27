@@ -400,25 +400,25 @@ func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
 	return nil
 }
 
-func postUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
+func postUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	upfDataBson := configmodels.ToBsonM(upf)
 	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
 }
 
-func putUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
+func putUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	upfDataBson := configmodels.ToBsonM(upf)
 	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.UpfDataColl, filter, upfDataBson)
 	return err
 }
 
-func deleteUpfOperation(upf configmodels.Upf, sc mongo.SessionContext) error {
+func deleteUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	return dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.UpfDataColl, filter)
 }
 
-func handleUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON []byte, operation func(configmodels.Upf, mongo.SessionContext) error) error {
+func handleUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON []byte, operation func(mongo.SessionContext, configmodels.Upf) error) error {
 	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DB session: %w", err)
@@ -429,7 +429,7 @@ func handleUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON [
 		if err := session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		if err := operation(upf, sc); err != nil {
+		if err := operation(sc, upf); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}

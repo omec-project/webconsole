@@ -226,7 +226,7 @@ func editGnbInNetworkSlices(context context.Context, gnb configmodels.Gnb) error
 			},
 		},
 	}
-	_, err := dbadapter.CommonDBClient.GetCollection(sliceDataColl).UpdateOne(context, filterByGnb, update)
+	_, err := dbadapter.CommonDBClient.GetCollection(sliceDataColl).UpdateMany(context, filterByGnb, update)
 	if err != nil {
 		return err
 	}
@@ -305,7 +305,7 @@ func deleteGnbFromNetworkSlices(gnbName string, context context.Context) error {
 			"name": gnbName,
 		},
 	}
-	err := dbadapter.CommonDBClient.RestfulAPIPullOneWithContext(context, sliceDataColl, filterByGnb, update)
+	_, err := dbadapter.CommonDBClient.GetCollection(sliceDataColl).UpdateMany(context, filterByGnb, bson.M{"$pull": update})
 	if err != nil {
 		return err
 	}

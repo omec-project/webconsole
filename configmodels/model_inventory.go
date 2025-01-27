@@ -3,12 +3,22 @@
 
 package configmodels
 
+const (
+	GnbDataColl = "webconsoleData.snapshots.gnbData"
+	UpfDataColl = "webconsoleData.snapshots.upfData"
+)
+
 type Gnb struct {
 	Name string `json:"name"`
 	Tac  string `json:"tac"`
 }
 
 type PostGnbRequest struct {
+	Name string `json:"name"`
+	Tac  string `json:"tac"`
+}
+
+type PutGnbRequest struct {
 	Tac string `json:"tac"`
 }
 

@@ -6,7 +6,6 @@ package configapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,40 +16,9 @@ import (
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type MockSession struct {
-	mongo.Session
-}
-
-func (m *MockSession) StartTransaction(opts ...*options.TransactionOptions) error {
-	return nil
-}
-
-func (m *MockSession) AbortTransaction(ctx context.Context) error {
-	return nil
-}
-
-func (m *MockSession) CommitTransaction(ctx context.Context) error {
-	return nil
-}
-
-func (m *MockSession) EndSession(ctx context.Context) {}
-
 type MockMongoClientOneGnb struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientManyGnbs struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientOneUpf struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientManyUpfs struct {
 	dbadapter.DBInterface
 }
 
@@ -66,6 +34,10 @@ func (m *MockMongoClientOneGnb) RestfulAPIGetMany(coll string, filter bson.M) ([
 
 	results = append(results, gnbBson)
 	return results, nil
+}
+
+type MockMongoClientManyGnbs struct {
+	dbadapter.DBInterface
 }
 
 func (m *MockMongoClientManyGnbs) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
@@ -86,6 +58,10 @@ func (m *MockMongoClientManyGnbs) RestfulAPIGetMany(coll string, filter bson.M) 
 	return results, nil
 }
 
+type MockMongoClientOneUpf struct {
+	dbadapter.DBInterface
+}
+
 func (m *MockMongoClientOneUpf) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	upf := configmodels.Upf{
@@ -98,6 +74,14 @@ func (m *MockMongoClientOneUpf) RestfulAPIGetMany(coll string, filter bson.M) ([
 
 	results = append(results, upfBson)
 	return results, nil
+}
+
+func (m *MockMongoClientOneUpf) StartSession() (mongo.Session, error) {
+	return &MockSession{}, nil
+}
+
+type MockMongoClientManyUpfs struct {
+	dbadapter.DBInterface
 }
 
 func (m *MockMongoClientManyUpfs) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
@@ -118,33 +102,24 @@ func (m *MockMongoClientManyUpfs) RestfulAPIGetMany(coll string, filter bson.M) 
 	return results, nil
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIDeleteOneWithContext(context context.Context, collName string, filter bson.M) error {
-	return nil
-}
-func (db *MockMongoClientDBError) RestfulAPIDeleteOneWithContext(context context.Context, collName string, filter bson.M) error {
-	return errors.New("DB error")
+type MockMongoClientPutExistingUpf struct {
+	dbadapter.DBInterface
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIJSONPatchWithContext(context context.Context, collName string, filter bson.M, patchJSON []byte) error {
-	return nil
-}
-func (db *MockMongoClientDBError) RestfulAPIJSONPatchWithContext(context context.Context, collName string, filter bson.M, patchJSON []byte) error {
-	return errors.New("DB error")
+func (db *MockMongoClientPutExistingUpf) RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error) {
+	return []map[string]interface{}{}, nil
 }
 
-func (db *MockMongoClientEmptyDB) SupportsTransactions() (bool, error) {
-	return true, nil
-}
-func (db *MockMongoClientDBError) SupportsTransactions() (bool, error) {
-	return true, nil
-}
-
-func (m *MockMongoClientEmptyDB) StartSession() (mongo.Session, error) {
+func (m *MockMongoClientPutExistingUpf) StartSession() (mongo.Session, error) {
 	return &MockSession{}, nil
 }
 
-func (m *MockMongoClientDBError) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
+func (db *MockMongoClientPutExistingUpf) RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]interface{}) (bool, error) {
+	return true, nil
+}
+
+func (db *MockMongoClientPutExistingUpf) RestfulAPIJSONPatchWithContext(context context.Context, collName string, filter bson.M, patchJSON []byte) error {
+	return nil
 }
 
 func TestInventoryGetHandlers(t *testing.T) {
@@ -237,7 +212,7 @@ func TestInventoryGetHandlers(t *testing.T) {
 	}
 }
 
-func TestInventoryPostHandlers_Failure(t *testing.T) {
+func TestGnbPostHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddConfigV1Service(router)
@@ -245,171 +220,373 @@ func TestInventoryPostHandlers_Failure(t *testing.T) {
 	testCases := []struct {
 		name         string
 		route        string
+		dbAdapter    dbadapter.DBInterface
 		inputData    string
-		header       string
+		expectedCode int
 		expectedBody string
 	}{
 		{
-			name:         "TAC is not a string",
-			route:        "/config/v1/inventory/gnb/gnb1",
-			inputData:    `{"tac": 1234}`,
-			header:       "application/json",
+			name:         "Create a new gNB success",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1", "tac": "123"}`,
+			expectedCode: http.StatusCreated,
+			expectedBody: "{}",
+		},
+		{
+			name:         "Create an existing gNB expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientDuplicateCreation{},
+			inputData:    `{"name": "gnb1", "tac": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"gNB already exists"}`,
+		},
+		{
+			name:         "TAC is not a string expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1", "tac": 123}`,
+			expectedCode: http.StatusBadRequest,
 			expectedBody: `{"error":"invalid JSON format"}`,
 		},
 		{
-			name:         "Missing TAC",
-			route:        "/config/v1/inventory/gnb/gnb1",
-			inputData:    `{"some_param": "123"}`,
-			header:       "application/json",
-			expectedBody: `{"error":"post gNB request body is missing tac"}`,
+			name:         "Missing TAC expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB TAC ''. TAC must be a numeric string within the range [1, 16777215]"}`,
 		},
 		{
-			name:         "GnbInvalidHeader",
-			route:        "/config/v1/inventory/gnb/gnb1",
-			inputData:    `{"tac": "123"}`,
-			header:       "application",
-			expectedBody: `{"error":"invalid header"}`,
+			name:         "DB POST operation fails expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientDBError{},
+			inputData:    `{"name": "gnb1", "tac": "123"}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"error":"failed to create gNB"}`,
 		},
 		{
-			name:         "Port is not a string",
-			route:        "/config/v1/inventory/upf/upf1",
-			inputData:    `{"port": 1234}`,
-			header:       "application/json",
-			expectedBody: `{"error":"invalid JSON format"}`,
+			name:         "TAC cannot be converted to int expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1", "tac": "a"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB TAC 'a'. TAC must be a numeric string within the range [1, 16777215]"}`,
 		},
 		{
-			name:         "Missing port",
-			route:        "/config/v1/inventory/upf/upf1",
-			inputData:    `{"some_param": "123"}`,
-			header:       "application/json",
-			expectedBody: `{"error":"post UPF request body is missing port"}`,
+			name:         "gNB name not provided expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"tac": "12"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB name ''. . Name needs to match the following regular expression:"}`,
 		},
 		{
-			name:         "UpfInvalidHeader",
-			route:        "/config/v1/inventory/upf/upf1",
-			inputData:    `{"port": "123"}`,
-			header:       "application",
-			expectedBody: `{"error":"invalid header"}`,
+			name:         "Invalid gNB name expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gn!b1", "tac": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression:"}`,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 1)
-			defer func() { configChannel = origChannel }()
+			dbadapter.CommonDBClient = tc.dbAdapter
 			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			req.Header.Set("Content-Type", tc.header)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
-			expectedCode := http.StatusBadRequest
-			if expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
-			if w.Body.String() != tc.expectedBody {
+			if tc.expectedBody != w.Body.String() {
 				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
-			}
-			select {
-			case msg := <-configChannel:
-				t.Errorf("unexpected message received: %+v", msg)
-			default:
-				// This is the expected outcome (no message received)
 			}
 		})
 	}
 }
 
-func TestInventoryPostHandlers_Success(t *testing.T) {
+func TestGnbPutHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddConfigV1Service(router)
 
 	testCases := []struct {
-		name            string
-		route           string
-		inputData       string
-		expectedMessage configmodels.ConfigMessage
+		name         string
+		route        string
+		dbAdapter    dbadapter.DBInterface
+		inputData    string
+		expectedCode int
+		expectedBody string
 	}{
 		{
-			name:      "PostGnb",
-			route:     "/config/v1/inventory/gnb/gnb1",
-			inputData: `{"tac": "123"}`,
-			expectedMessage: configmodels.ConfigMessage{
-				MsgType:   configmodels.Inventory,
-				MsgMethod: configmodels.Post_op,
-				Gnb: &configmodels.Gnb{
-					Name: "gnb1",
-					Tac:  "123",
-				},
-			},
+			name:         "Put a new gNB expects OK status",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"tac": "123"}`,
+			expectedCode: http.StatusOK,
+			expectedBody: "{}",
 		},
 		{
-			name:      "PostUpf",
-			route:     "/config/v1/inventory/upf/upf1",
-			inputData: `{"port": "123"}`,
-			expectedMessage: configmodels.ConfigMessage{
-				MsgType:   configmodels.Inventory,
-				MsgMethod: configmodels.Post_op,
-				Upf: &configmodels.Upf{
-					Hostname: "upf1",
-					Port:     "123",
-				},
-			},
+			name:         "Put an existing gNB expects a OK status",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientPutExistingUpf{},
+			inputData:    `{"tac": "123"}`,
+			expectedCode: http.StatusOK,
+			expectedBody: "{}",
+		},
+		{
+			name:         "TAC is not a string expects failure",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"tac": 123}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid JSON format"}`,
+		},
+		{
+			name:         "Missing TAC expects failure",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"some_param": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid TAC port ''. TAC must be a numeric string within the range [1, 16777215]"}`,
+		},
+		{
+			name:         "DB PUT operation fails expects failure",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientDBError{},
+			inputData:    `{"tac": "123"}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"error":"failed to PUT gNB"}`,
+		},
+		{
+			name:         "TAC cannot be converted to int expects failure",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"tac": "a"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB TAC 'a'. TAC must be a numeric string within the range [1, 16777215]"}`,
+		},
+		{
+			name:         "Invalid gNB name expects failure",
+			route:        "/config/v1/inventory/gnb/gn!b1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"tac": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression:"}`,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 1)
-			defer func() { configChannel = origChannel }()
-			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
+			dbadapter.CommonDBClient = tc.dbAdapter
+			req, err := http.NewRequest(http.MethodPut, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
 
-			expectedCode := http.StatusOK
-			expectedBody := "{}"
-
-			if expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
-			if w.Body.String() != expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+			if tc.expectedBody != w.Body.String() {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
-			select {
-			case msg := <-configChannel:
+		})
+	}
+}
 
-				if msg.MsgType != tc.expectedMessage.MsgType {
-					t.Errorf("expected MsgType %+v, but got %+v", tc.expectedMessage.MsgType, msg.MsgType)
-				}
-				if msg.MsgMethod != tc.expectedMessage.MsgMethod {
-					t.Errorf("expected MsgMethod %+v, but got %+v", tc.expectedMessage.MsgMethod, msg.MsgMethod)
-				}
-				if tc.expectedMessage.Gnb != nil {
-					if msg.Gnb == nil {
-						t.Errorf("expected gNB %+v, but got nil", tc.expectedMessage.Gnb)
-					}
-					if tc.expectedMessage.Gnb.Name != msg.Gnb.Name || tc.expectedMessage.Gnb.Tac != msg.Gnb.Tac {
-						t.Errorf("expected gNB %+v, but got %+v", tc.expectedMessage.Gnb, msg.Gnb)
-					}
-				}
-				if tc.expectedMessage.Upf != nil {
-					if msg.Upf == nil {
-						t.Errorf("expected UPF %+v, but got nil", tc.expectedMessage.Upf)
-					}
-					if tc.expectedMessage.Upf.Hostname != msg.Upf.Hostname || tc.expectedMessage.Upf.Port != msg.Upf.Port {
-						t.Errorf("expected UPF %+v, but got %+v", tc.expectedMessage.Upf, msg.Upf)
-					}
-				}
-			default:
-				t.Error("expected message in configChannel, but none received")
+func TestUpfPostHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	testCases := []struct {
+		name         string
+		route        string
+		dbAdapter    dbadapter.DBInterface
+		inputData    string
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "Create a new UPF success",
+			route:        "/config/v1/inventory/upf",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"hostname": "upf1.my-domain.com", "port": "123"}`,
+			expectedCode: http.StatusCreated,
+			expectedBody: "{}",
+		},
+		{
+			name:         "Create an existing UPF expects failure",
+			route:        "/config/v1/inventory/upf",
+			dbAdapter:    &MockMongoClientDuplicateCreation{},
+			inputData:    `{"hostname": "upf1.my-domain.com", "port": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"UPF already exists"}`,
+		},
+		{
+			name:         "Port is not a string expects failure",
+			route:        "/config/v1/inventory/upf",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"hostname": "upf1.my-domain.com", "port": 1234}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid JSON format"}`,
+		},
+		{
+			name:         "Missing port expects failure",
+			route:        "/config/v1/inventory/upf",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"hostname": "upf1.my-domain.com", "some_param": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid UPF port ''. Port must be a numeric string within the range [0, 65535]"}`,
+		},
+		{
+			name:         "DB POST operation fails expects failure",
+			route:        "/config/v1/inventory/upf",
+			dbAdapter:    &MockMongoClientDBError{},
+			inputData:    `{"hostname": "upf1.my-domain.com", "port": "123"}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"error":"failed to create UPF"}`,
+		},
+		{
+			name:         "Port cannot be converted to int expects failure",
+			route:        "/config/v1/inventory/upf",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"hostname": "upf1.my-domain.com", "port": "a"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid UPF port 'a'. Port must be a numeric string within the range [0, 65535]"}`,
+		},
+		{
+			name:         "Hostname not provided expects failure",
+			route:        "/config/v1/inventory/upf",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"port": "a"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid UPF name ''. Name needs to represent a valid FQDN"}`,
+		},
+		{
+			name:         "Invalid UPF hostname expects failure",
+			route:        "/config/v1/inventory/upf",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"hostname": "upf1", "port": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid UPF name 'upf1'. Name needs to represent a valid FQDN"}`,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dbadapter.CommonDBClient = tc.dbAdapter
+			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+			}
+			if tc.expectedBody != w.Body.String() {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestUpfPutHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	testCases := []struct {
+		name         string
+		route        string
+		dbAdapter    dbadapter.DBInterface
+		inputData    string
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "Put a new UPF expects OK status",
+			route:        "/config/v1/inventory/upf/upf1.my-domain.com",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"port": "123"}`,
+			expectedCode: http.StatusOK,
+			expectedBody: "{}",
+		},
+		{
+			name:         "Put an existing UPF expects a OK status",
+			route:        "/config/v1/inventory/upf/upf1.my-domain.com",
+			dbAdapter:    &MockMongoClientPutExistingUpf{},
+			inputData:    `{"port": "123"}`,
+			expectedCode: http.StatusOK,
+			expectedBody: "{}",
+		},
+		{
+			name:         "Port is not a string expects failure",
+			route:        "/config/v1/inventory/upf/upf1.my-domain.com",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"port": 1234}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid JSON format"}`,
+		},
+		{
+			name:         "Missing port expects failure",
+			route:        "/config/v1/inventory/upf/upf1.my-domain.com",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"some_param": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid UPF port ''. Port must be a numeric string within the range [0, 65535]"}`,
+		},
+		{
+			name:         "DB PUT operation fails expects failure",
+			route:        "/config/v1/inventory/upf/upf1.my-domain.com",
+			dbAdapter:    &MockMongoClientDBError{},
+			inputData:    `{"port": "123"}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"error":"failed to PUT UPF"}`,
+		},
+		{
+			name:         "Port cannot be converted to int expects failure",
+			route:        "/config/v1/inventory/upf/upf1.my-domain.com",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"port": "a"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid UPF port 'a'. Port must be a numeric string within the range [0, 65535]"}`,
+		},
+		{
+			name:         "Invalid UPF hostname expects failure",
+			route:        "/config/v1/inventory/upf/upf1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"port": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid UPF name 'upf1'. Name needs to represent a valid FQDN"}`,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dbadapter.CommonDBClient = tc.dbAdapter
+			req, err := http.NewRequest(http.MethodPut, tc.route, strings.NewReader(tc.inputData))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+			}
+			if tc.expectedBody != w.Body.String() {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}

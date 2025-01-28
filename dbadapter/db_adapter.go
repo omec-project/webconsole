@@ -55,9 +55,9 @@ type MongoDBClient struct {
 }
 
 type PatchOperation struct {
+	Value interface{} `json:"value,omitempty"`
 	Op    string      `json:"op"`
 	Path  string      `json:"path"`
-	Value interface{} `json:"value,omitempty"`
 }
 
 func setDBClient(url, dbname string) (DBInterface, error) {

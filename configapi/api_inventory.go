@@ -250,7 +250,12 @@ func PostUpf(c *gin.Context) {
 		return
 	}
 	upf := configmodels.Upf(postUpfParams)
-	patchJSON := getEditUpfPatchJSON(upf)
+	patchJSON, err := getEditUpfPatchJSON(upf)
+	if err != nil {
+		logger.WebUILog.Errorw("failed to serialize UPF", "hostname", upf.Hostname, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
+		return
+	}
 	if err = executeUpfTransaction(c.Request.Context(), upf, patchJSON, postUpfOperation); err != nil {
 		if strings.Contains(err.Error(), "E11000") {
 			logger.WebUILog.Errorw("duplicate hostname found:", "error", err)
@@ -306,7 +311,12 @@ func PutUpf(c *gin.Context) {
 		Hostname: hostname,
 		Port:     putUpfParams.Port,
 	}
-	patchJSON := getEditUpfPatchJSON(putUpf)
+	patchJSON, err := getEditUpfPatchJSON(putUpf)
+	if err != nil {
+		logger.WebUILog.Errorw("failed to serialize UPF", "hostname", hostname, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
+		return
+	}
 	if err := executeUpfTransaction(c.Request.Context(), putUpf, patchJSON, putUpfOperation); err != nil {
 		logger.WebUILog.Errorw("failed to PUT UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
@@ -315,17 +325,18 @@ func PutUpf(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func getEditUpfPatchJSON(upf configmodels.Upf) []byte {
-	return []byte(fmt.Sprintf(`[
+func getEditUpfPatchJSON(upf configmodels.Upf) ([]byte, error) {
+	patch := []dbadapter.PatchOperation{
 		{
-			"op": "replace",
-			"path": "/site-info/upf",
-			"value": {
-				"upf-name": "%s",
-				"upf-port": "%s"
-			}
-		}
-	]`, upf.Hostname, upf.Port))
+			Op:   "replace",
+			Path: "/site-info/upf",
+			Value: map[string]string{
+				"upf-name": upf.Hostname,
+				"upf-port": upf.Port,
+			},
+		},
+	}
+	return json.Marshal(patch)
 }
 
 // DeleteUpf godoc
@@ -351,11 +362,16 @@ func DeleteUpf(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-
 	upf := configmodels.Upf{
 		Hostname: hostname,
 	}
-	patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
+	patch := []dbadapter.PatchOperation{
+		{
+			Op:   "remove",
+			Path: "/site-info/upf",
+		},
+	}
+	patchJSON, _ := json.Marshal(patch)
 	if err := executeUpfTransaction(c.Request.Context(), upf, patchJSON, deleteUpfOperation); err != nil {
 		logger.WebUILog.Errorw("failed to delete UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete UPF"})
@@ -406,12 +422,18 @@ func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
 func postUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	upfDataBson := configmodels.ToBsonM(upf)
+	if upfDataBson == nil {
+		return fmt.Errorf("failed to serialize UPF")
+	}
 	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
 }
 
 func putUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	upfDataBson := configmodels.ToBsonM(upf)
+	if upfDataBson == nil {
+		return fmt.Errorf("failed to serialize UPF")
+	}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.UpfDataColl, filter, upfDataBson)
 	return err
 }

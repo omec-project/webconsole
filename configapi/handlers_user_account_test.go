@@ -4,7 +4,6 @@
 package configapi
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,14 +15,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/crypto/bcrypt"
 )
-
-type MockMongoClientEmptyDB struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientDBError struct {
-	dbadapter.DBInterface
-}
 
 type MockMongoClientInvalidUser struct {
 	dbadapter.DBInterface
@@ -37,53 +28,12 @@ type MockMongoClientRegularUser struct {
 	dbadapter.DBInterface
 }
 
-type MockMongoClientDuplicateCreation struct {
-	dbadapter.DBInterface
-}
-
 func hashPassword(password string) string {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return ""
 	}
 	return string(hashed)
-}
-
-func (db *MockMongoClientEmptyDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
-	return map[string]interface{}{}, nil
-}
-
-func (db *MockMongoClientEmptyDB) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	return results, nil
-}
-
-func (db *MockMongoClientEmptyDB) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
-	return true, nil
-}
-
-func (db *MockMongoClientEmptyDB) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
-	return nil
-}
-
-func (db *MockMongoClientEmptyDB) RestfulAPICount(collName string, filter bson.M) (int64, error) {
-	return 0, nil
-}
-
-func (db *MockMongoClientDBError) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	return nil, errors.New("DB error")
-}
-
-func (db *MockMongoClientDBError) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	return nil, errors.New("DB error")
-}
-
-func (db *MockMongoClientDBError) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
-	return false, errors.New("DB error")
-}
-
-func (db *MockMongoClientDBError) RestfulAPICount(collName string, filter bson.M) (int64, error) {
-	return 0, errors.New("DB error")
 }
 
 func (db *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
@@ -135,19 +85,6 @@ func (db *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.
 
 func (db *MockMongoClientRegularUser) RestfulAPIDeleteOne(collName string, filter bson.M) error {
 	return nil
-}
-
-func (db *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	return results, nil
-}
-
-func (db *MockMongoClientDuplicateCreation) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
-	return errors.New("E11000")
-}
-
-func (db *MockMongoClientDuplicateCreation) RestfulAPICount(collName string, filter bson.M) (int64, error) {
-	return 1, nil
 }
 
 func TestGetUserAccountsHandler(t *testing.T) {

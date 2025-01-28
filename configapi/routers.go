@@ -180,8 +180,14 @@ var routes = Routes{
 	{
 		"PostUpf",
 		http.MethodPost,
-		"/inventory/upf/:upf-hostname",
+		"/inventory/upf",
 		PostUpf,
+	},
+	{
+		"PutUpf",
+		http.MethodPut,
+		"/inventory/upf/:upf-hostname",
+		PutUpf,
 	},
 	{
 		"DeleteUpf",

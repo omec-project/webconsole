@@ -161,6 +161,11 @@ func (webui *WEBUI) Start() {
 		dbadapter.ConnectMongo(mongodb.AuthUrl, mongodb.AuthKeysDbName, &dbadapter.AuthDBClient)
 	}
 
+	resp, err := dbadapter.CommonDBClient.CreateIndex(configmodels.UpfDataColl, "hostname")
+	if !resp || err != nil {
+		logger.InitLog.Errorf("error creating UPF index in commonDB %v", err)
+	}
+
 	logger.InitLog.Infoln("WebUI server started")
 
 	/* First HTTP Server running at port to receive Config from ROC */

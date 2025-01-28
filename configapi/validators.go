@@ -3,7 +3,10 @@
 
 package configapi
 
-import "regexp"
+import (
+	"regexp"
+	"strconv"
+)
 
 const NAME_PATTERN = "^[a-zA-Z0-9-_]+$"
 const FQDN_PATTERN = "^([a-zA-Z0-9-]+\\.){2,}([a-zA-Z]{2,6})$"
@@ -22,4 +25,12 @@ func isValidFQDN(fqdn string) bool {
 		return false
 	}
 	return fqdnMatch
+}
+
+func isValidUpfPort(port string) bool {
+	portNum, err := strconv.Atoi(port)
+	if err != nil {
+		return false
+	}
+	return portNum >= 0 && portNum <= 65535
 }

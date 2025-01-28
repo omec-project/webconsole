@@ -18,11 +18,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-const (
-	gnbDataColl = "webconsoleData.snapshots.gnbData"
-	upfDataColl = "webconsoleData.snapshots.upfData"
-)
-
 func setInventoryCorsHeader(c *gin.Context) {
 	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -46,7 +41,7 @@ func GetGnbs(c *gin.Context) {
 	logger.WebUILog.Infoln("received a GET gNBs request")
 	var gnbs []*configmodels.Gnb
 	gnbs = make([]*configmodels.Gnb, 0)
-	rawGnbs, err := dbadapter.CommonDBClient.RestfulAPIGetMany(gnbDataColl, bson.M{})
+	rawGnbs, err := dbadapter.CommonDBClient.RestfulAPIGetMany(configmodels.GnbDataColl, bson.M{})
 	if err != nil {
 		logger.DbLog.Errorw("failed to retrieve gNBs", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve gNBs"})
@@ -132,7 +127,7 @@ func handleDeleteGnbTransaction(ctx context.Context, filter bson.M, gnbName stri
 		if err := session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, gnbDataColl, filter); err != nil {
+		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.GnbDataColl, filter); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
@@ -200,7 +195,7 @@ func GetUpfs(c *gin.Context) {
 	logger.WebUILog.Infoln("received a GET UPFs request")
 	var upfs []*configmodels.Upf
 	upfs = make([]*configmodels.Upf, 0)
-	rawUpfs, err := dbadapter.CommonDBClient.RestfulAPIGetMany(upfDataColl, bson.M{})
+	rawUpfs, err := dbadapter.CommonDBClient.RestfulAPIGetMany(configmodels.UpfDataColl, bson.M{})
 	if err != nil {
 		logger.DbLog.Errorw("failed to retrieve UPFs", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve UPFs"})
@@ -224,21 +219,124 @@ func GetUpfs(c *gin.Context) {
 // @Description  Create a new UPF
 // @Tags         UPFs
 // @Produce      json
-// @Param        upf-hostname   path    string                         true    "Name of the UPF"
-// @Param        port           body    configmodels.PostUpfRequest    true    "Port of the UPF"
+// @Param        upf  body  configmodels.PostUpfRequest  true  "Hostname and port of the UPF to create"
 // @Security     BearerAuth
-// @Success      200  {object}  nil  "UPF created"
-// @Failure      400  {object}  nil  "Failed to create the UPF"
+// @Success      201  {object}  nil  "UPF successfully created"
+// @Failure      400  {object}  nil  "Bad request"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
-// @Router       /config/v1/inventory/upf/{upf-hostname}  [post]
+// @Failure      500  {object}  nil  "Error creating UPF"
+// @Router       /config/v1/inventory/upf/  [post]
 func PostUpf(c *gin.Context) {
 	setInventoryCorsHeader(c)
-	if err := handlePostUpf(c); err == nil {
-		c.JSON(http.StatusOK, gin.H{})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	logger.WebUILog.Infoln("received a POST UPF request")
+	var postUpfParams configmodels.PostUpfRequest
+	err := c.ShouldBindJSON(&postUpfParams)
+	if err != nil {
+		logger.WebUILog.Errorw("invalid UPF POST input parameters", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
+		return
 	}
+	if !isValidFQDN(postUpfParams.Hostname) {
+		errorMessage := fmt.Sprintf("invalid UPF hostname '%s'. Hostname needs to represent a valid FQDN", postUpfParams.Hostname)
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
+	}
+	if !isValidUpfPort(postUpfParams.Port) {
+		errorMessage := fmt.Sprintf("invalid UPF port '%s'. Port must be a numeric string within the range [0, 65535]", postUpfParams.Port)
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
+	}
+	upf := configmodels.Upf(postUpfParams)
+	patchJSON, err := getEditUpfPatchJSON(upf)
+	if err != nil {
+		logger.WebUILog.Errorw("failed to serialize UPF", "hostname", upf.Hostname, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
+		return
+	}
+	if err = executeUpfTransaction(c.Request.Context(), upf, patchJSON, postUpfOperation); err != nil {
+		if strings.Contains(err.Error(), "E11000") {
+			logger.WebUILog.Errorw("duplicate hostname found:", "error", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "UPF already exists"})
+			return
+		}
+		logger.WebUILog.Errorw("failed to create UPF", "hostname", postUpfParams.Hostname, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create UPF"})
+		return
+	}
+	logger.WebUILog.Infof("successfully executed POST UPF %v request", postUpfParams.Hostname)
+	c.JSON(http.StatusCreated, gin.H{})
+}
+
+// PutUpf godoc
+//
+// @Description  Create or update a UPF
+// @Tags         UPFs
+// @Produce      json
+// @Param        upf-hostname   path    string                       true    "Name of the UPF to update"
+// @Param        port           body    configmodels.PutUpfRequest   true    "Port of the UPF to update"
+// @Security     BearerAuth
+// @Success      200  {object}  nil  "UPF successfully updated"
+// @Failure      400  {object}  nil  "Bad request"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Failure      500  {object}  nil  "Error updating UPF"
+// @Router       /config/v1/inventory/upf/{upf-hostname}  [put]
+func PutUpf(c *gin.Context) {
+	setInventoryCorsHeader(c)
+	logger.WebUILog.Infoln("received a PUT UPF request")
+	hostname, _ := c.Params.Get("upf-hostname")
+	if !isValidFQDN(hostname) {
+		errorMessage := fmt.Sprintf("invalid UPF hostname '%s'. Hostname needs to represent a valid FQDN", hostname)
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
+	}
+	var putUpfParams configmodels.PutUpfRequest
+	err := c.ShouldBindJSON(&putUpfParams)
+	if err != nil {
+		logger.WebUILog.Errorw("invalid UPF PUT input parameters", "hostname", hostname, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
+		return
+	}
+	if !isValidUpfPort(putUpfParams.Port) {
+		errorMessage := fmt.Sprintf("invalid UPF port '%s'. Port must be a numeric string within the range [0, 65535]", putUpfParams.Port)
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
+	}
+	putUpf := configmodels.Upf{
+		Hostname: hostname,
+		Port:     putUpfParams.Port,
+	}
+	patchJSON, err := getEditUpfPatchJSON(putUpf)
+	if err != nil {
+		logger.WebUILog.Errorw("failed to serialize UPF", "hostname", hostname, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
+		return
+	}
+	if err := executeUpfTransaction(c.Request.Context(), putUpf, patchJSON, putUpfOperation); err != nil {
+		logger.WebUILog.Errorw("failed to PUT UPF", "hostname", hostname, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
+}
+
+func getEditUpfPatchJSON(upf configmodels.Upf) ([]byte, error) {
+	patch := []dbadapter.PatchOperation{
+		{
+			Op:   "replace",
+			Path: "/site-info/upf",
+			Value: map[string]string{
+				"upf-name": upf.Hostname,
+				"upf-port": upf.Port,
+			},
+		},
+	}
+	return json.Marshal(patch)
 }
 
 // DeleteUpf godoc
@@ -264,79 +362,23 @@ func DeleteUpf(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-	filter := bson.M{"hostname": hostname}
-	err := handleDeleteUpfTransaction(c.Request.Context(), filter, hostname)
-	if err != nil {
+	upf := configmodels.Upf{
+		Hostname: hostname,
+	}
+	patch := []dbadapter.PatchOperation{
+		{
+			Op:   "remove",
+			Path: "/site-info/upf",
+		},
+	}
+	patchJSON, _ := json.Marshal(patch)
+	if err := executeUpfTransaction(c.Request.Context(), upf, patchJSON, deleteUpfOperation); err != nil {
 		logger.WebUILog.Errorw("failed to delete UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete UPF"})
 		return
 	}
 	logger.WebUILog.Infof("successfully executed DELETE UPF request for hostname: %v", hostname)
 	c.JSON(http.StatusOK, gin.H{})
-}
-
-func handleDeleteUpfTransaction(ctx context.Context, filter bson.M, hostname string) error {
-	session, err := dbadapter.CommonDBClient.StartSession()
-	if err != nil {
-		return fmt.Errorf("failed to initialize DB session: %w", err)
-	}
-	defer session.EndSession(ctx)
-
-	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
-		if err := session.StartTransaction(); err != nil {
-			return fmt.Errorf("failed to start transaction: %w", err)
-		}
-		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, upfDataColl, filter); err != nil {
-			if abortErr := session.AbortTransaction(sc); abortErr != nil {
-				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
-			}
-			return err
-		}
-		patchJSON := []byte(`[{"op": "remove", "path": "/site-info/upf"}]`)
-		if err = updateUpfInNetworkSlices(hostname, patchJSON, sc); err != nil {
-			if abortErr := session.AbortTransaction(sc); abortErr != nil {
-				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
-			}
-			return fmt.Errorf("failed to update network slices: %w", err)
-		}
-		return session.CommitTransaction(sc)
-	})
-}
-
-func handlePostUpf(c *gin.Context) error {
-	upfHostname, _ := c.Params.Get("upf-hostname")
-	if !isValidFQDN(upfHostname) {
-		errorMessage := fmt.Sprintf("invalid UPF name %s. Name needs to represent a valid FQDN", upfHostname)
-		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf("%s", errorMessage)
-	}
-	logger.WebUILog.Infof("received a POST UPF %v request", upfHostname)
-	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
-		return fmt.Errorf("invalid header")
-	}
-	var postUpfRequest configmodels.PostUpfRequest
-	err := c.ShouldBindJSON(&postUpfRequest)
-	if err != nil {
-		logger.WebUILog.Errorf("err %v", err)
-		return fmt.Errorf("invalid JSON format")
-	}
-	if postUpfRequest.Port == "" {
-		errorMessage := "post UPF request body is missing port"
-		logger.WebUILog.Errorln(errorMessage)
-		return fmt.Errorf("%s", errorMessage)
-	}
-	postUpf := configmodels.Upf{
-		Hostname: upfHostname,
-		Port:     postUpfRequest.Port,
-	}
-	msg := configmodels.ConfigMessage{
-		MsgType:   configmodels.Inventory,
-		MsgMethod: configmodels.Post_op,
-		Upf:       &postUpf,
-	}
-	configChannel <- &msg
-	logger.WebUILog.Infof("successfully added UPF [%v] to config channel", upfHostname)
-	return nil
 }
 
 func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
@@ -377,7 +419,59 @@ func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
 	return nil
 }
 
-func updateUpfInNetworkSlices(hostname string, patchJSON []byte, context context.Context) error {
+func postUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
+	filter := bson.M{"hostname": upf.Hostname}
+	upfDataBson := configmodels.ToBsonM(upf)
+	if upfDataBson == nil {
+		return fmt.Errorf("failed to serialize UPF")
+	}
+	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
+}
+
+func putUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
+	filter := bson.M{"hostname": upf.Hostname}
+	upfDataBson := configmodels.ToBsonM(upf)
+	if upfDataBson == nil {
+		return fmt.Errorf("failed to serialize UPF")
+	}
+	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.UpfDataColl, filter, upfDataBson)
+	return err
+}
+
+func deleteUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
+	filter := bson.M{"hostname": upf.Hostname}
+	return dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.UpfDataColl, filter)
+}
+
+func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON []byte, operation func(mongo.SessionContext, configmodels.Upf) error) error {
+	session, err := dbadapter.CommonDBClient.StartSession()
+	if err != nil {
+		return fmt.Errorf("failed to initialize DB session: %w", err)
+	}
+	defer session.EndSession(ctx)
+
+	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		if err := session.StartTransaction(); err != nil {
+			return fmt.Errorf("failed to start transaction: %w", err)
+		}
+		if err := operation(sc, upf); err != nil {
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
+			return err
+		}
+		err = updateUpfInNetworkSlices(sc, upf.Hostname, patchJSON)
+		if err != nil {
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
+			return fmt.Errorf("failed to update network slices: %w", err)
+		}
+		return session.CommitTransaction(sc)
+	})
+}
+
+func updateUpfInNetworkSlices(context context.Context, hostname string, patchJSON []byte) error {
 	filterByUpf := bson.M{"site-info.upf.upf-name": hostname}
 	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByUpf)
 	if err != nil {

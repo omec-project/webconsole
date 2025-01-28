@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -42,13 +43,8 @@ type Update5GSubscriberMsg struct {
 
 var (
 	execCommand = exec.Command
-	imsiData    map[string]*models.AuthenticationSubscription
 	rwLock      sync.RWMutex
 )
-
-func init() {
-	imsiData = make(map[string]*models.AuthenticationSubscription)
-}
 
 func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceived chan bool) {
 	// Start Goroutine which will listens for subscriber config updates
@@ -67,9 +63,6 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		if configMsg.MsgType == configmodels.Sub_data {
 			imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
 			logger.ConfigLog.Infoln("received imsi from config channel:", imsiVal)
-			rwLock.Lock()
-			imsiData[imsiVal] = configMsg.AuthSubData
-			rwLock.Unlock()
 			logger.ConfigLog.Infof("received Imsi [%v] configuration from config channel", configMsg.Imsi)
 			handleSubscriberPost(configMsg)
 			if factory.WebUIConfig.Configuration.Mode5G {
@@ -325,9 +318,10 @@ func getAddedImsisList(group, prevGroup *configmodels.DeviceGroups) (aimsis []st
 	if group == nil {
 		return
 	}
+	provisionedSubscribers := getProvisionedSubscribers()
 	for _, imsi := range group.Imsis {
 		if prevGroup == nil {
-			if imsiData[imsi] != nil {
+			if slices.Contains(provisionedSubscribers, imsi) {
 				aimsis = append(aimsis, imsi)
 			}
 		} else {
@@ -370,6 +364,40 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 	}
 
 	return
+}
+
+func getProvisionedSubscribers() []string {
+	var provisionedSubscribers []string
+	rawProvisionedSubscribers, errGetMany := dbadapter.AuthDBClient.RestfulAPIGetMany(authSubsDataColl, nil)
+	if errGetMany != nil {
+		logger.DbLog.Warnln(errGetMany)
+		return provisionedSubscribers
+	}
+	for _, rawProvisionedSubscriber := range rawProvisionedSubscribers {
+		ueId, ok := rawProvisionedSubscriber["ueId"].(string)
+		if !ok {
+			logger.DbLog.Warnf("cannot retrieve ueId for subscriber: %v", rawProvisionedSubscriber)
+			continue
+		}
+		provisionedSubscribers = append(provisionedSubscribers, ueId)
+	}
+	return provisionedSubscribers
+}
+
+func getSubscriberAuthDataByUeId(ueId string) *models.AuthenticationSubscription {
+	filter := bson.M{"ueId": ueId}
+	subscriberAuthDataInterface, errGetOne := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
+	if errGetOne != nil {
+		logger.DbLog.Warnln(errGetOne)
+		return nil
+	}
+	var subscriberAuthData models.AuthenticationSubscription
+	err := json.Unmarshal(configmodels.MapToByte(subscriberAuthDataInterface), &subscriberAuthData)
+	if err != nil {
+		logger.DbLog.Errorf("could not unmarshall subscriber %v", subscriberAuthDataInterface)
+		return nil
+	}
+	return &subscriberAuthData
 }
 
 func updateAmPolicyData(imsi string) {
@@ -580,20 +608,27 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 				if err != nil {
 					logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
+					return
 				}
 				snssai := &models.Snssai{
 					Sd:  slice.SliceId.Sd,
 					Sst: int32(sVal),
 				}
 
-				aimsis := getAddedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)
-				for _, imsi := range aimsis {
-					dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
-					updateAmPolicyData(imsi)
-					updateSmPolicyData(snssai, dnn, imsi)
-					updateAmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
-					updateSmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
-					updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+				/* skip delete case */
+				if confData.Msg.DevGroup != nil {
+					provisionedSubscribers := getProvisionedSubscribers()
+					for _, imsi := range confData.Msg.DevGroup.Imsis {
+						/* update only if the imsi is provisioned */
+						if slices.Contains(provisionedSubscribers, "imsi-"+imsi) {
+							dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
+							updateAmPolicyData(imsi)
+							updateSmPolicyData(snssai, dnn, imsi)
+							updateAmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
+							updateSmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+							updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+						}
+					}
 				}
 
 				dimsis := getDeletedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)

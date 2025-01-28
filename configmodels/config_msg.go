@@ -27,7 +27,6 @@ type ConfigMessage struct {
 	Slice        *Slice
 	AuthSubData  *models.AuthenticationSubscription
 	Gnb          *Gnb
-	Upf          *Upf
 	DevGroupName string
 	SliceName    string
 	Imsi         string

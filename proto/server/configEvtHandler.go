@@ -101,11 +101,6 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				logger.ConfigLog.Infof("received gNB [%v] configuration from config channel", configMsg.Gnb.Name)
 				handleGnbPost(configMsg.Gnb)
 			}
-			if configMsg.Upf != nil {
-				logger.ConfigLog.Infof("received UPF [%v] configuration from config channel", configMsg.Upf.Hostname)
-				handleUpfPost(configMsg.Upf)
-			}
-
 			// loop through all clients and send this message to all clients
 			if len(clientNFPool) == 0 {
 				logger.ConfigLog.Infoln("no client available. No need to send config")
@@ -238,17 +233,6 @@ func handleGnbPost(gnb *configmodels.Gnb) {
 	filter := bson.M{"name": gnb.Name}
 	gnbDataBson := configmodels.ToBsonM(gnb)
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(gnbDataColl, filter, gnbDataBson)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
-	}
-	rwLock.Unlock()
-}
-
-func handleUpfPost(upf *configmodels.Upf) {
-	rwLock.Lock()
-	filter := bson.M{"hostname": upf.Hostname}
-	upfDataBson := configmodels.ToBsonM(upf)
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(upfDataColl, filter, upfDataBson)
 	if errPost != nil {
 		logger.DbLog.Warnln(errPost)
 	}

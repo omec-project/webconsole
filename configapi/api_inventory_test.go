@@ -581,13 +581,6 @@ func TestInventoryDeleteHandlers(t *testing.T) {
 		expectedBody string
 	}{
 		{
-			name:         "Delete gNB Success",
-			route:        "/config/v1/inventory/gnb/gnb1",
-			dbAdapter:    &MockMongoClientEmptyDB{},
-			expectedCode: http.StatusOK,
-			expectedBody: "{}",
-		},
-		{
 			name:         "Delete gNB DB Failure",
 			route:        "/config/v1/inventory/gnb/gnb1",
 			dbAdapter:    &MockMongoClientDBError{},

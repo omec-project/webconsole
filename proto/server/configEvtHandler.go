@@ -95,7 +95,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				handleNetworkSlicePost(configMsg, subsUpdateChan)
 			}
 
-      // loop through all clients and send this message to all clients
+			// loop through all clients and send this message to all clients
 			if len(clientNFPool) == 0 {
 				logger.ConfigLog.Infoln("no client available. No need to send config")
 			}

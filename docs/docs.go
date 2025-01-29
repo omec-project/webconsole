@@ -1299,18 +1299,18 @@ const docTemplate = `{
                 }
             }
         },
-        "configmodels.PutUpfRequest": {
-            "type": "object",
-            "properties": {
-                "port": {
-                    "type": "string"
-                }
-            }
-        },
         "configmodels.PutGnbRequest": {
             "type": "object",
             "properties": {
                 "tac": {
+                    "type": "string"
+                }
+            }
+        },
+        "configmodels.PutUpfRequest": {
+            "type": "object",
+            "properties": {
+                "port": {
                     "type": "string"
                 }
             }

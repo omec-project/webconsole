@@ -174,11 +174,6 @@ func putGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
 	return err
 }
 
-func deleteGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
-	filter := bson.M{"name": gnb.Name}
-	return dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.GnbDataColl, filter)
-}
-
 func executeGnbTransaction(ctx context.Context, gnb configmodels.Gnb, patchJSON []byte, operation func(mongo.SessionContext, configmodels.Gnb) error) error {
 	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {

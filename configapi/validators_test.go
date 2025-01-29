@@ -51,6 +51,30 @@ func TestValidateFQDN(t *testing.T) {
 	}
 }
 
+func TestValidateUpfPort(t *testing.T) {
+	var testCases = []struct {
+		port     string
+		expected bool
+	}{
+		{"123", true},
+		{"7000", true},
+		{"0", true},
+		{"65535", true},
+		{"-1", false},
+		{"65536", false},
+		{"invalid", false},
+		{"123ad", false},
+		{"", false},
+	}
+
+	for _, tc := range testCases {
+		r := isValidUpfPort(tc.port)
+		if r != tc.expected {
+			t.Errorf("%s", tc.port)
+		}
+	}
+}
+
 func TestValidateGnbTac(t *testing.T) {
 	var testCases = []struct {
 		tac      string

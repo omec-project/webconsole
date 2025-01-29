@@ -55,6 +55,12 @@ type MongoDBClient struct {
 	mongoapi.MongoClient
 }
 
+type PatchOperation struct {
+	Value interface{} `json:"value,omitempty"`
+	Op    string      `json:"op"`
+	Path  string      `json:"path"`
+}
+
 func setDBClient(url, dbname string) (DBInterface, error) {
 	mClient, errConnect := mongoapi.NewMongoClient(url, dbname)
 	if mClient.Client != nil {

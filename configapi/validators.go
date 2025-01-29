@@ -27,6 +27,14 @@ func isValidFQDN(fqdn string) bool {
 	return fqdnMatch
 }
 
+func isValidUpfPort(port string) bool {
+	portNum, err := strconv.Atoi(port)
+	if err != nil {
+		return false
+	}
+	return portNum >= 0 && portNum <= 65535
+}
+
 func isValidGnbTac(tac string) bool {
 	tacNum, err := strconv.Atoi(tac)
 	if err != nil {

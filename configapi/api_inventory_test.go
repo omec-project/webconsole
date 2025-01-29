@@ -401,6 +401,7 @@ func TestGnbPutHandler(t *testing.T) {
 		})
 	}
 }
+
 func TestUpfPostHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
@@ -567,7 +568,7 @@ func TestUpfPutHandler(t *testing.T) {
 			dbAdapter:    &MockMongoClientEmptyDB{},
 			inputData:    `{"port": "123"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid UPF name 'upf1'. Name needs to represent a valid FQDN"}`,
+			expectedBody: `{"error":"invalid UPF hostname 'upf1'. Hostname needs to represent a valid FQDN"}`,
 		},
 	}
 	for _, tc := range testCases {

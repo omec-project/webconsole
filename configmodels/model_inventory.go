@@ -28,5 +28,10 @@ type Upf struct {
 }
 
 type PostUpfRequest struct {
+	Hostname string `json:"hostname"`
+	Port     string `json:"port"`
+}
+
+type PutUpfRequest struct {
 	Port string `json:"port"`
 }

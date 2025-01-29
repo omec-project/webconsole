@@ -773,7 +773,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/config/v1/inventory/upf/{upf-hostname}": {
+        "/config/v1/inventory/upf/": {
             "post": {
                 "security": [
                     {
@@ -789,15 +789,8 @@ const docTemplate = `{
                 ],
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Name of the UPF",
-                        "name": "upf-hostname",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Port of the UPF",
-                        "name": "port",
+                        "description": "Hostname and port of the UPF to create",
+                        "name": "upf",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -806,17 +799,71 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "UPF created"
+                    "201": {
+                        "description": "UPF successfully created"
                     },
                     "400": {
-                        "description": "Failed to create the UPF"
+                        "description": "Bad request"
                     },
                     "401": {
                         "description": "Authorization failed"
                     },
                     "403": {
                         "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Error creating UPF"
+                    }
+                }
+            }
+        },
+        "/config/v1/inventory/upf/{upf-hostname}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create or update a UPF",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "UPFs"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the UPF to update",
+                        "name": "upf-hostname",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Port of the UPF to update",
+                        "name": "port",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/configmodels.PutUpfRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UPF successfully updated"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Error updating UPF"
                     }
                 }
             },
@@ -1242,6 +1289,17 @@ const docTemplate = `{
             }
         },
         "configmodels.PostUpfRequest": {
+            "type": "object",
+            "properties": {
+                "hostname": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "string"
+                }
+            }
+        },
+        "configmodels.PutUpfRequest": {
             "type": "object",
             "properties": {
                 "port": {

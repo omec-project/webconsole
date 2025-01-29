@@ -8,6 +8,7 @@
 package configapi
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const (
@@ -481,17 +483,85 @@ func DeleteSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Delete One Subscriber Data")
 
-	ueId := c.Param("ueId")
-
-	c.JSON(http.StatusNoContent, gin.H{})
-
-	msg := configmodels.ConfigMessage{
-		MsgType:   configmodels.Sub_data,
-		MsgMethod: configmodels.Delete_op,
-		Imsi:      ueId,
+	ueId, exists := c.Params.Get("ueId")
+	if !exists {
+		errorMessage := "delete subscriber request is missing path param `ueId`"
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
 	}
-	configChannel <- &msg
-	logger.WebUILog.Infoln("Delete Subscriber Data complete")
+	filter := bson.M{"name": ueId}
+	err := handleDeleteSubscriberTransaction(c.Request.Context(), filter, ueId)
+	if err != nil {
+		logger.WebUILog.Errorw("failed to delete subscriber", "ueId", ueId, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete gNB"})
+		return
+	}
+	logger.WebUILog.Infof("successfully executed DELETE subscriber %v request", ueId)
+	c.JSON(http.StatusOK, gin.H{})
+}
+
+func handleDeleteSubscriberTransaction(ctx context.Context, filter bson.M, ueId string) error {
+	session, err := dbadapter.CommonDBClient.StartSession()
+	if err != nil {
+		return fmt.Errorf("failed to initialize DB session: %w", err)
+	}
+	defer session.EndSession(ctx)
+
+	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		if err := session.StartTransaction(); err != nil {
+			return fmt.Errorf("failed to start transaction: %w", err)
+		}
+		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, amDataColl, filter); err != nil {
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
+			return fmt.Errorf("failed to delete ueId from collection: %w", err)
+		}
+		if err = updateSubscriberInDeviceGroups(ueId, sc); err != nil {
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
+			return fmt.Errorf("failed to update device groups: %w", err)
+		}
+		return session.CommitTransaction(sc)
+	})
+}
+
+func updateSubscriberInDeviceGroups(ueId string, context context.Context) error {
+	filterByUeId := bson.M{
+		"imsis": ueId,
+	}
+	rawDeviceGroups, err := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, filterByUeId)
+	if err != nil {
+		return fmt.Errorf("failed to fetch device groups: %w", err)
+	}
+	for _, rawDeviceGroup := range rawDeviceGroups {
+		var deviceGroup configmodels.DeviceGroups
+		if err = json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup); err != nil {
+			return fmt.Errorf("error unmarshaling device group: %v", err)
+		}
+		filteredUeIds := []string{}
+		for _, imsi := range deviceGroup.Imsis {
+			if imsi != ueId {
+				filteredUeIds = append(filteredUeIds, imsi)
+			}
+		}
+		filteredUeIdsJSON, err := json.Marshal(filteredUeIds)
+		if err != nil {
+			return fmt.Errorf("error marshalling ueIds: %v", err)
+		}
+		patchJSON := []byte(
+			fmt.Sprintf(`[{"op": "replace", "path": "/imsis", "value": %s}]`,
+				string(filteredUeIdsJSON)),
+		)
+		filterByDeviceGroupName := bson.M{"group-name": deviceGroup.DeviceGroupName}
+		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(context, devGroupDataColl, filterByDeviceGroupName, patchJSON)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func GetRegisteredUEContext(c *gin.Context) {

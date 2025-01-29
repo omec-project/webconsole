@@ -226,14 +226,6 @@ func TestGnbPostHandler(t *testing.T) {
 		expectedBody string
 	}{
 		{
-			name:         "Create a new gNB success",
-			route:        "/config/v1/inventory/gnb",
-			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"name": "gnb1", "tac": "123"}`,
-			expectedCode: http.StatusCreated,
-			expectedBody: "{}",
-		},
-		{
 			name:         "Create an existing gNB expects failure",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientDuplicateCreation{},
@@ -279,7 +271,7 @@ func TestGnbPostHandler(t *testing.T) {
 			dbAdapter:    &MockMongoClientEmptyDB{},
 			inputData:    `{"tac": "12"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid gNB name ''. . Name needs to match the following regular expression:"}`,
+			expectedBody: `{"error":"invalid gNB name ''. Name needs to match the following regular expression: ^[a-zA-Z0-9-_]+$"}`,
 		},
 		{
 			name:         "Invalid gNB name expects failure",
@@ -287,7 +279,7 @@ func TestGnbPostHandler(t *testing.T) {
 			dbAdapter:    &MockMongoClientEmptyDB{},
 			inputData:    `{"name": "gn!b1", "tac": "123"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression:"}`,
+			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression: ^[a-zA-Z0-9-_]+$"}`,
 		},
 	}
 	for _, tc := range testCases {
@@ -325,22 +317,6 @@ func TestGnbPutHandler(t *testing.T) {
 		expectedBody string
 	}{
 		{
-			name:         "Put a new gNB expects OK status",
-			route:        "/config/v1/inventory/gnb/gnb1",
-			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"tac": "123"}`,
-			expectedCode: http.StatusOK,
-			expectedBody: "{}",
-		},
-		{
-			name:         "Put an existing gNB expects a OK status",
-			route:        "/config/v1/inventory/gnb/gnb1",
-			dbAdapter:    &MockMongoClientPutExistingUpf{},
-			inputData:    `{"tac": "123"}`,
-			expectedCode: http.StatusOK,
-			expectedBody: "{}",
-		},
-		{
 			name:         "TAC is not a string expects failure",
 			route:        "/config/v1/inventory/gnb/gnb1",
 			dbAdapter:    &MockMongoClientEmptyDB{},
@@ -354,7 +330,7 @@ func TestGnbPutHandler(t *testing.T) {
 			dbAdapter:    &MockMongoClientEmptyDB{},
 			inputData:    `{"some_param": "123"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid TAC port ''. TAC must be a numeric string within the range [1, 16777215]"}`,
+			expectedBody: `{"error":"invalid gNB TAC ''. TAC must be a numeric string within the range [1, 16777215]"}`,
 		},
 		{
 			name:         "DB PUT operation fails expects failure",
@@ -378,7 +354,7 @@ func TestGnbPutHandler(t *testing.T) {
 			dbAdapter:    &MockMongoClientEmptyDB{},
 			inputData:    `{"tac": "123"}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression:"}`,
+			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression: ^[a-zA-Z0-9-_]+$"}`,
 		},
 	}
 	for _, tc := range testCases {

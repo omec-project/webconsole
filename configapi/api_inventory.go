@@ -17,6 +17,7 @@ import (
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func setInventoryCorsHeader(c *gin.Context) {
@@ -142,7 +143,7 @@ func PutGnb(c *gin.Context) {
 		return
 	}
 	if !isValidGnbTac(putGnbParams.Tac) {
-		errorMessage := fmt.Sprintf("invalid gnb TAC '%v'. TAC must be a numeric string within the range [1, 16777215]", putGnbParams.Tac)
+		errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be a numeric string within the range [1, 16777215]", putGnbParams.Tac)
 		logger.WebUILog.Errorln(errorMessage)
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
@@ -208,20 +209,21 @@ func executeGnbTransaction(ctx context.Context, gnb configmodels.Gnb, patchJSON 
 
 func editGnbInNetworkSlices(context context.Context, gnb configmodels.Gnb) error {
 	filterByGnb := bson.M{
-		"site-info.gNodeBs": bson.M{
-			"$elemMatch": bson.M{"name": gnb.Name},
-		},
+		"site-info.gNodeBs.name": gnb.Name,
 	}
 	tacNum, _ := strconv.ParseInt(gnb.Tac, 10, 32)
 	update := bson.M{
-		"$addToSet": bson.M{
-			"site-info.gNodeBs": bson.M{
-				"name": gnb.Name,
-				"tac":  int32(tacNum),
-			},
+		"$set": bson.M{
+			"site-info.gNodeBs.$[elem].tac": int32(tacNum),
 		},
 	}
-	_, err := dbadapter.CommonDBClient.GetCollection(sliceDataColl).UpdateMany(context, filterByGnb, update)
+	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"elem.name": gnb.Name}, // Match element in array by name
+		},
+	})
+	_, err := dbadapter.CommonDBClient.GetCollection(sliceDataColl).UpdateMany(context, filterByGnb, update, arrayFilters)
+
 	if err != nil {
 		return err
 	}
@@ -279,7 +281,7 @@ func handleDeleteGnbTransaction(ctx context.Context, filter bson.M, gnbName stri
 			}
 			return fmt.Errorf("failed to delete gNB from collection: %w", err)
 		}
-		if err = deleteGnbFromNetworkSlices(gnbName, sc); err != nil {
+		if err = deleteGnbFromNetworkSlices(sc, gnbName); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
@@ -289,11 +291,9 @@ func handleDeleteGnbTransaction(ctx context.Context, filter bson.M, gnbName stri
 	})
 }
 
-func deleteGnbFromNetworkSlices(gnbName string, context context.Context) error {
+func deleteGnbFromNetworkSlices(context context.Context, gnbName string) error {
 	filterByGnb := bson.M{
-		"site-info.gNodeBs": bson.M{
-			"$elemMatch": bson.M{"name": gnbName},
-		},
+		"site-info.gNodeBs.name": gnbName,
 	}
 	update := bson.M{
 		"site-info.gNodeBs": bson.M{

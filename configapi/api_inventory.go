@@ -512,6 +512,7 @@ func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels
 		return fmt.Errorf("failed to fetch network slices: %w", err)
 	}
 
+	var messages []*configmodels.ConfigMessage
 	for _, rawNetworkSlice := range rawNetworkSlices {
 		var networkSlice configmodels.Slice
 		if err = json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
@@ -520,13 +521,17 @@ func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels
 
 		updateFunc(&networkSlice)
 
-		var msg configmodels.ConfigMessage
-		msg.MsgMethod = configmodels.Post_op
-		msg.MsgType = configmodels.Network_slice
-		msg.Slice = &networkSlice
-		msg.SliceName = networkSlice.SliceName
-		configChannel <- &msg
-		logger.ConfigLog.Infof("network slice [%v] update sent to config channel", networkSlice.SliceName)
+		msg := &configmodels.ConfigMessage{
+			MsgMethod: configmodels.Post_op,
+			MsgType:   configmodels.Network_slice,
+			Slice:     &networkSlice,
+			SliceName: networkSlice.SliceName,
+		}
+		messages = append(messages, msg)
+	}
+	for _, msg := range messages {
+		configChannel <- msg
+		logger.ConfigLog.Infof("network slice [%v] update sent to config channel", msg.SliceName)
 	}
 	return nil
 }

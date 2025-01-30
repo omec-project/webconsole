@@ -30,8 +30,6 @@ const (
 	flowRuleDataColl = "policyData.ues.flowRule"
 	devGroupDataColl = "webconsoleData.snapshots.devGroupData"
 	sliceDataColl    = "webconsoleData.snapshots.sliceData"
-	gnbDataColl      = "webconsoleData.snapshots.gnbData"
-	upfDataColl      = "webconsoleData.snapshots.upfData"
 )
 
 type Update5GSubscriberMsg struct {
@@ -97,10 +95,6 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				handleNetworkSlicePost(configMsg, subsUpdateChan)
 			}
 
-			if configMsg.Gnb != nil {
-				logger.ConfigLog.Infof("received gNB [%v] configuration from config channel", configMsg.Gnb.Name)
-				handleGnbPost(configMsg.Gnb)
-			}
 			// loop through all clients and send this message to all clients
 			if len(clientNFPool) == 0 {
 				logger.ConfigLog.Infoln("no client available. No need to send config")
@@ -224,17 +218,6 @@ func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateC
 		if err != nil {
 			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
-	}
-	rwLock.Unlock()
-}
-
-func handleGnbPost(gnb *configmodels.Gnb) {
-	rwLock.Lock()
-	filter := bson.M{"name": gnb.Name}
-	gnbDataBson := configmodels.ToBsonM(gnb)
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(gnbDataColl, filter, gnbDataBson)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
 	}
 	rwLock.Unlock()
 }

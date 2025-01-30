@@ -14,6 +14,11 @@ type Gnb struct {
 }
 
 type PostGnbRequest struct {
+	Name string `json:"name"`
+	Tac  string `json:"tac"`
+}
+
+type PutGnbRequest struct {
 	Tac string `json:"tac"`
 }
 

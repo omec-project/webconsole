@@ -212,7 +212,7 @@ func TestInventoryGetHandlers(t *testing.T) {
 	}
 }
 
-func TestGnbPostHandlers_Failure(t *testing.T) {
+func TestGnbPostHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddConfigV1Service(router)
@@ -220,129 +220,183 @@ func TestGnbPostHandlers_Failure(t *testing.T) {
 	testCases := []struct {
 		name         string
 		route        string
+		dbAdapter    dbadapter.DBInterface
 		inputData    string
-		header       string
+		expectedCode int
 		expectedBody string
 	}{
 		{
-			name:         "TAC is not a string",
-			route:        "/config/v1/inventory/gnb/gnb1",
-			inputData:    `{"tac": 1234}`,
-			header:       "application/json",
+			name:         "Create a new gNB expects created status",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1", "tac": "123"}`,
+			expectedCode: http.StatusCreated,
+			expectedBody: "{}",
+		},
+		{
+			name:         "Create an existing gNB expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientDuplicateCreation{},
+			inputData:    `{"name": "gnb1", "tac": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"gNB already exists"}`,
+		},
+		{
+			name:         "TAC is not a string expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1", "tac": 123}`,
+			expectedCode: http.StatusBadRequest,
 			expectedBody: `{"error":"invalid JSON format"}`,
 		},
 		{
-			name:         "Missing TAC",
-			route:        "/config/v1/inventory/gnb/gnb1",
-			inputData:    `{"some_param": "123"}`,
-			header:       "application/json",
-			expectedBody: `{"error":"post gNB request body is missing tac"}`,
+			name:         "Missing TAC expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB TAC ''. TAC must be a numeric string within the range [1, 16777215]"}`,
 		},
 		{
-			name:         "GnbInvalidHeader",
-			route:        "/config/v1/inventory/gnb/gnb1",
-			inputData:    `{"tac": "123"}`,
-			header:       "application",
-			expectedBody: `{"error":"invalid header"}`,
+			name:         "DB POST operation fails expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientDBError{},
+			inputData:    `{"name": "gnb1", "tac": "123"}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"error":"failed to create gNB"}`,
+		},
+		{
+			name:         "TAC cannot be converted to int expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1", "tac": "a"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB TAC 'a'. TAC must be a numeric string within the range [1, 16777215]"}`,
+		},
+		{
+			name:         "gNB name not provided expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"tac": "12"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB name ''. Name needs to match the following regular expression: ^[a-zA-Z0-9-_]+$"}`,
+		},
+		{
+			name:         "Invalid gNB name expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gn!b1", "tac": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression: ^[a-zA-Z0-9-_]+$"}`,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 1)
-			defer func() { configChannel = origChannel }()
+			dbadapter.CommonDBClient = tc.dbAdapter
 			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			req.Header.Set("Content-Type", tc.header)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
-			expectedCode := http.StatusBadRequest
-			if expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
-			if w.Body.String() != tc.expectedBody {
+			if tc.expectedBody != w.Body.String() {
 				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
-			}
-			select {
-			case msg := <-configChannel:
-				t.Errorf("unexpected message received: %+v", msg)
-			default:
-				// This is the expected outcome (no message received)
 			}
 		})
 	}
 }
 
-func TestGnbPostHandlers_Success(t *testing.T) {
+func TestGnbPutHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddConfigV1Service(router)
 
 	testCases := []struct {
-		name            string
-		route           string
-		inputData       string
-		expectedMessage configmodels.ConfigMessage
+		name         string
+		route        string
+		dbAdapter    dbadapter.DBInterface
+		inputData    string
+		expectedCode int
+		expectedBody string
 	}{
 		{
-			name:      "PostGnb",
-			route:     "/config/v1/inventory/gnb/gnb1",
-			inputData: `{"tac": "123"}`,
-			expectedMessage: configmodels.ConfigMessage{
-				MsgType:   configmodels.Inventory,
-				MsgMethod: configmodels.Post_op,
-				Gnb: &configmodels.Gnb{
-					Name: "gnb1",
-					Tac:  "123",
-				},
-			},
+			name:         "Put a new gNB expects OK status",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"tac": "123"}`,
+			expectedCode: http.StatusOK,
+			expectedBody: "{}",
+		},
+		{
+			name:         "Put an existing gNB expects a OK status",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientPutExistingUpf{},
+			inputData:    `{"tac": "123"}`,
+			expectedCode: http.StatusOK,
+			expectedBody: "{}",
+		},
+		{
+			name:         "TAC is not a string expects failure",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"tac": 123}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid JSON format"}`,
+		},
+		{
+			name:         "Missing TAC expects failure",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"some_param": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB TAC ''. TAC must be a numeric string within the range [1, 16777215]"}`,
+		},
+		{
+			name:         "DB PUT operation fails expects failure",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientDBError{},
+			inputData:    `{"tac": "123"}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"error":"failed to PUT gNB"}`,
+		},
+		{
+			name:         "TAC cannot be converted to int expects failure",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"tac": "a"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB TAC 'a'. TAC must be a numeric string within the range [1, 16777215]"}`,
+		},
+		{
+			name:         "Invalid gNB name expects failure",
+			route:        "/config/v1/inventory/gnb/gn!b1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"tac": "123"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression: ^[a-zA-Z0-9-_]+$"}`,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 1)
-			defer func() { configChannel = origChannel }()
-			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
+			dbadapter.CommonDBClient = tc.dbAdapter
+			req, err := http.NewRequest(http.MethodPut, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
-			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
 
-			expectedCode := http.StatusOK
-			expectedBody := "{}"
-
-			if expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
-			if w.Body.String() != expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-			}
-			select {
-			case msg := <-configChannel:
-
-				if msg.MsgType != tc.expectedMessage.MsgType {
-					t.Errorf("expected MsgType %+v, but got %+v", tc.expectedMessage.MsgType, msg.MsgType)
-				}
-				if msg.MsgMethod != tc.expectedMessage.MsgMethod {
-					t.Errorf("expected MsgMethod %+v, but got %+v", tc.expectedMessage.MsgMethod, msg.MsgMethod)
-				}
-				if tc.expectedMessage.Gnb != nil {
-					if msg.Gnb == nil {
-						t.Errorf("expected gNB %+v, but got nil", tc.expectedMessage.Gnb)
-					}
-					if tc.expectedMessage.Gnb.Name != msg.Gnb.Name || tc.expectedMessage.Gnb.Tac != msg.Gnb.Tac {
-						t.Errorf("expected gNB %+v, but got %+v", tc.expectedMessage.Gnb, msg.Gnb)
-					}
-				}
-			default:
-				t.Error("expected message in configChannel, but none received")
+			if tc.expectedBody != w.Body.String() {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}

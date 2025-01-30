@@ -19,14 +19,12 @@ const (
 	Device_group = iota
 	Network_slice
 	Sub_data
-	Inventory
 )
 
 type ConfigMessage struct {
 	DevGroup     *DeviceGroups
 	Slice        *Slice
 	AuthSubData  *models.AuthenticationSubscription
-	Gnb          *Gnb
 	DevGroupName string
 	SliceName    string
 	Imsi         string

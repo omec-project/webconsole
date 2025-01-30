@@ -481,29 +481,3 @@ func Test_firstConfigReceived_sliceInDB(t *testing.T) {
 		t.Errorf("Expected firstConfigReceived to return true, got %v", result)
 	}
 }
-
-func TestPostGnb(t *testing.T) {
-	gnbName := "some-gnb"
-	newGnb := configmodels.Gnb{
-		Name: gnbName,
-		Tac:  "1233",
-	}
-	postData = make([]map[string]interface{}, 0)
-	dbadapter.CommonDBClient = &MockMongoPost{}
-	handleGnbPost(&newGnb)
-
-	expected_collection := "webconsoleData.snapshots.gnbData"
-	if postData[0]["coll"] != expected_collection {
-		t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
-	}
-
-	expected_filter := bson.M{"name": gnbName}
-	if !reflect.DeepEqual(postData[0]["filter"], expected_filter) {
-		t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
-	}
-
-	var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
-	if result["tac"] != newGnb.Tac {
-		t.Errorf("Expected port %v, got %v", newGnb.Tac, result["tac"])
-	}
-}

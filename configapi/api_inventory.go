@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -65,21 +67,124 @@ func GetGnbs(c *gin.Context) {
 // @Description Create a new gNB
 // @Tags        gNBs
 // @Produce     json
-// @Param       gnb-name    path    string                         true    "Name of the gNB"
-// @Param       tac         body    configmodels.PostGnbRequest    true    "TAC of the gNB"
+// @Param       gnb    body    configmodels.PostGnbRequest    true    "Name and TAC of the gNB"
 // @Security    BearerAuth
-// @Success     200  {object}  nil  "gNB created"
-// @Failure     400  {object}  nil  "Failed to create the gNB"
+// @Success     201  {object}  nil  "gNB sucessfully created"
+// @Failure     400  {object}  nil  "Bad request"
 // @Failure     401  {object}  nil  "Authorization failed"
 // @Failure     403  {object}  nil  "Forbidden"
-// @Router      /config/v1/inventory/gnb/{gnb-name}  [post]
+// @Failure     500  {object}  nil  "Error creating gNB"
+// @Router      /config/v1/inventory/gnb  [post]
 func PostGnb(c *gin.Context) {
 	setInventoryCorsHeader(c)
-	if err := handlePostGnb(c); err == nil {
-		c.JSON(http.StatusOK, gin.H{})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	logger.WebUILog.Infoln("received a POST gNB request")
+	var postGnbParams configmodels.PostGnbRequest
+	if err := c.ShouldBindJSON(&postGnbParams); err != nil {
+		logger.WebUILog.Errorw("invalid UPF gNB input parameters", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
+		return
 	}
+	if !isValidName(postGnbParams.Name) {
+		errorMessage := fmt.Sprintf("invalid gNB name '%s'. Name needs to match the following regular expression: %s", postGnbParams.Name, NAME_PATTERN)
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
+	}
+	if !isValidGnbTac(postGnbParams.Tac) {
+		errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be a numeric string within the range [1, 16777215]", postGnbParams.Tac)
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
+	}
+	gnb := configmodels.Gnb(postGnbParams)
+	if err := executeGnbTransaction(c.Request.Context(), gnb, updateGnbInNetworkSlices, postGnbOperation); err != nil {
+		if strings.Contains(err.Error(), "E11000") {
+			logger.WebUILog.Errorw("duplicate gNB name found:", "error", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "gNB already exists"})
+			return
+		}
+		logger.WebUILog.Errorw("failed to create gNB", "name", postGnbParams.Name, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create gNB"})
+		return
+	}
+	logger.WebUILog.Infof("successfully executed POST gNB %v request", postGnbParams.Name)
+	c.JSON(http.StatusCreated, gin.H{})
+}
+
+func postGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
+	filter := bson.M{"name": gnb.Name}
+	gnbDataBson := configmodels.ToBsonM(gnb)
+	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.GnbDataColl, filter, []interface{}{gnbDataBson})
+}
+
+// PutGnb godoc
+//
+// @Description Create or update a gNB
+// @Tags        gNBs
+// @Produce     json
+// @Param       gnb-name    path    string                        true    "Name of the gNB"
+// @Param       tac         body    configmodels.PutGnbRequest    true    "TAC of the gNB"
+// @Security    BearerAuth
+// @Success     201  {object}  nil  "gNB sucessfully created"
+// @Failure     400  {object}  nil  "Bad request"
+// @Failure     401  {object}  nil  "Authorization failed"
+// @Failure     403  {object}  nil  "Forbidden"
+// @Failure     500  {object}  nil  "Error updating gNB"
+// @Router      /config/v1/inventory/gnb/{gnb-name}  [put]
+func PutGnb(c *gin.Context) {
+	setInventoryCorsHeader(c)
+	logger.WebUILog.Infoln("received a PUT gNB request")
+	gnbName, _ := c.Params.Get("gnb-name")
+	if !isValidName(gnbName) {
+		errorMessage := fmt.Sprintf("invalid gNB name '%s'. Name needs to match the following regular expression: %s", gnbName, NAME_PATTERN)
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
+	}
+	var putGnbParams configmodels.PutGnbRequest
+	if err := c.ShouldBindJSON(&putGnbParams); err != nil {
+		logger.WebUILog.Errorw("invalid gNB PUT input parameters", "name", gnbName, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
+		return
+	}
+	if !isValidGnbTac(putGnbParams.Tac) {
+		errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be a numeric string within the range [1, 16777215]", putGnbParams.Tac)
+		logger.WebUILog.Errorln(errorMessage)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		return
+	}
+	putGnb := configmodels.Gnb{
+		Name: gnbName,
+		Tac:  putGnbParams.Tac,
+	}
+	if err := executeGnbTransaction(c.Request.Context(), putGnb, updateGnbInNetworkSlices, putGnbOperation); err != nil {
+		logger.WebUILog.Errorw("failed to PUT gNB", "name", gnbName, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT gNB"})
+		return
+	}
+	logger.WebUILog.Infof("successfully executed PUT gNB request for hostname: %v", gnbName)
+	c.JSON(http.StatusOK, gin.H{})
+}
+
+func putGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
+	filter := bson.M{"name": gnb.Name}
+	gnbDataBson := configmodels.ToBsonM(gnb)
+	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.GnbDataColl, filter, gnbDataBson)
+	return err
+}
+
+func updateGnbInNetworkSlices(gnb configmodels.Gnb) error {
+	filterByGnb := bson.M{
+		"site-info.gNodeBs.name": gnb.Name,
+	}
+	tacNum, _ := strconv.ParseInt(gnb.Tac, 10, 32)
+	return updateInventoryInNetworkSlices(filterByGnb, func(networkSlice *configmodels.Slice) {
+		for i := range networkSlice.SiteInfo.GNodeBs {
+			if networkSlice.SiteInfo.GNodeBs[i].Name == gnb.Name {
+				networkSlice.SiteInfo.GNodeBs[i].Tac = int32(tacNum)
+			}
+		}
+	})
 }
 
 // DeleteGnb godoc
@@ -105,8 +210,10 @@ func DeleteGnb(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-	filter := bson.M{"name": gnbName}
-	err := handleDeleteGnbTransaction(c.Request.Context(), filter, gnbName)
+	gnb := configmodels.Gnb{
+		Name: gnbName,
+	}
+	err := executeGnbTransaction(c.Request.Context(), gnb, removeGnbFromNetworkSlices, deleteGnbOperation)
 	if err != nil {
 		logger.WebUILog.Errorw("failed to delete gNB", "gnbName", gnbName, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete gNB"})
@@ -116,7 +223,23 @@ func DeleteGnb(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func handleDeleteGnbTransaction(ctx context.Context, filter bson.M, gnbName string) error {
+func deleteGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
+	filter := bson.M{"name": gnb.Name}
+	return dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.GnbDataColl, filter)
+}
+
+func removeGnbFromNetworkSlices(gnb configmodels.Gnb) error {
+	filterByGnb := bson.M{
+		"site-info.gNodeBs.name": gnb.Name,
+	}
+	return updateInventoryInNetworkSlices(filterByGnb, func(networkSlice *configmodels.Slice) {
+		networkSlice.SiteInfo.GNodeBs = slices.DeleteFunc(networkSlice.SiteInfo.GNodeBs, func(existingGnb configmodels.SliceSiteInfoGNodeBs) bool {
+			return gnb.Name == existingGnb.Name
+		})
+	})
+}
+
+func executeGnbTransaction(ctx context.Context, gnb configmodels.Gnb, nsOperation func(configmodels.Gnb) error, gnbOperation func(mongo.SessionContext, configmodels.Gnb) error) error {
 	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DB session: %w", err)
@@ -127,13 +250,14 @@ func handleDeleteGnbTransaction(ctx context.Context, filter bson.M, gnbName stri
 		if err := session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.GnbDataColl, filter); err != nil {
+		if err := gnbOperation(sc, gnb); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
-			return fmt.Errorf("failed to delete gNB from collection: %w", err)
+			return err
 		}
-		if err = updateGnbInNetworkSlices(gnbName, sc); err != nil {
+		err = nsOperation(gnb)
+		if err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
@@ -141,42 +265,6 @@ func handleDeleteGnbTransaction(ctx context.Context, filter bson.M, gnbName stri
 		}
 		return session.CommitTransaction(sc)
 	})
-}
-
-func handlePostGnb(c *gin.Context) error {
-	gnbName, _ := c.Params.Get("gnb-name")
-	if !isValidName(gnbName) {
-		errorMessage := fmt.Sprintf("invalid gNB name %s. Name needs to match the following regular expression: %s", gnbName, NAME_PATTERN)
-		logger.ConfigLog.Errorln(errorMessage)
-		return fmt.Errorf("%s", errorMessage)
-	}
-	logger.WebUILog.Infof("received a POST gNB %v request", gnbName)
-	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
-		return fmt.Errorf("invalid header")
-	}
-	var postGnbRequest configmodels.PostGnbRequest
-	err := c.ShouldBindJSON(&postGnbRequest)
-	if err != nil {
-		logger.WebUILog.Errorf("err %v", err)
-		return fmt.Errorf("invalid JSON format")
-	}
-	if postGnbRequest.Tac == "" {
-		errorMessage := "post gNB request body is missing tac"
-		logger.WebUILog.Errorln(errorMessage)
-		return fmt.Errorf("%s", errorMessage)
-	}
-	postGnb := configmodels.Gnb{
-		Name: gnbName,
-		Tac:  postGnbRequest.Tac,
-	}
-	msg := configmodels.ConfigMessage{
-		MsgType:   configmodels.Inventory,
-		MsgMethod: configmodels.Post_op,
-		Gnb:       &postGnb,
-	}
-	configChannel <- &msg
-	logger.WebUILog.Infof("successfully added gNB [%v] to config channel", gnbName)
-	return nil
 }
 
 // GetUpfs godoc
@@ -250,13 +338,7 @@ func PostUpf(c *gin.Context) {
 		return
 	}
 	upf := configmodels.Upf(postUpfParams)
-	patchJSON, err := getEditUpfPatchJSON(upf)
-	if err != nil {
-		logger.WebUILog.Errorw("failed to serialize UPF", "hostname", upf.Hostname, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
-		return
-	}
-	if err = executeUpfTransaction(c.Request.Context(), upf, patchJSON, postUpfOperation); err != nil {
+	if err = executeUpfTransaction(c.Request.Context(), upf, updateUpfInNetworkSlices, postUpfOperation); err != nil {
 		if strings.Contains(err.Error(), "E11000") {
 			logger.WebUILog.Errorw("duplicate hostname found:", "error", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "UPF already exists"})
@@ -268,6 +350,15 @@ func PostUpf(c *gin.Context) {
 	}
 	logger.WebUILog.Infof("successfully executed POST UPF %v request", postUpfParams.Hostname)
 	c.JSON(http.StatusCreated, gin.H{})
+}
+
+func postUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
+	filter := bson.M{"hostname": upf.Hostname}
+	upfDataBson := configmodels.ToBsonM(upf)
+	if upfDataBson == nil {
+		return fmt.Errorf("failed to serialize UPF")
+	}
+	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
 }
 
 // PutUpf godoc
@@ -311,32 +402,33 @@ func PutUpf(c *gin.Context) {
 		Hostname: hostname,
 		Port:     putUpfParams.Port,
 	}
-	patchJSON, err := getEditUpfPatchJSON(putUpf)
-	if err != nil {
-		logger.WebUILog.Errorw("failed to serialize UPF", "hostname", hostname, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
-		return
-	}
-	if err := executeUpfTransaction(c.Request.Context(), putUpf, patchJSON, putUpfOperation); err != nil {
+	if err := executeUpfTransaction(c.Request.Context(), putUpf, updateUpfInNetworkSlices, putUpfOperation); err != nil {
 		logger.WebUILog.Errorw("failed to PUT UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
 		return
 	}
+	logger.WebUILog.Infof("successfully executed PUT UPF request for hostname: %v", hostname)
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func getEditUpfPatchJSON(upf configmodels.Upf) ([]byte, error) {
-	patch := []dbadapter.PatchOperation{
-		{
-			Op:   "replace",
-			Path: "/site-info/upf",
-			Value: map[string]string{
-				"upf-name": upf.Hostname,
-				"upf-port": upf.Port,
-			},
-		},
+func putUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
+	filter := bson.M{"hostname": upf.Hostname}
+	upfDataBson := configmodels.ToBsonM(upf)
+	if upfDataBson == nil {
+		return fmt.Errorf("failed to serialize UPF")
 	}
-	return json.Marshal(patch)
+	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.UpfDataColl, filter, upfDataBson)
+	return err
+}
+
+func updateUpfInNetworkSlices(upf configmodels.Upf) error {
+	filterByUpf := bson.M{"site-info.upf.upf-name": upf.Hostname}
+	return updateInventoryInNetworkSlices(filterByUpf, func(networkSlice *configmodels.Slice) {
+		networkSlice.SiteInfo.Upf = map[string]interface{}{
+			"upf-name": upf.Hostname,
+			"upf-port": upf.Port,
+		}
+	})
 }
 
 // DeleteUpf godoc
@@ -365,14 +457,7 @@ func DeleteUpf(c *gin.Context) {
 	upf := configmodels.Upf{
 		Hostname: hostname,
 	}
-	patch := []dbadapter.PatchOperation{
-		{
-			Op:   "remove",
-			Path: "/site-info/upf",
-		},
-	}
-	patchJSON, _ := json.Marshal(patch)
-	if err := executeUpfTransaction(c.Request.Context(), upf, patchJSON, deleteUpfOperation); err != nil {
+	if err := executeUpfTransaction(c.Request.Context(), upf, removeUpfFromNetworkSlices, deleteUpfOperation); err != nil {
 		logger.WebUILog.Errorw("failed to delete UPF", "hostname", hostname, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete UPF"})
 		return
@@ -381,69 +466,19 @@ func DeleteUpf(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func updateGnbInNetworkSlices(gnbName string, context context.Context) error {
-	filterByGnb := bson.M{
-		"site-info.gNodeBs": bson.M{
-			"$elemMatch": bson.M{"name": gnbName},
-		},
-	}
-	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByGnb)
-	if err != nil {
-		return fmt.Errorf("failed to fetch network slices: %w", err)
-	}
-	for _, rawNetworkSlice := range rawNetworkSlices {
-		var networkSlice configmodels.Slice
-		if err = json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
-			return fmt.Errorf("error unmarshaling network slice: %v", err)
-		}
-		filteredGNodeBs := []configmodels.SliceSiteInfoGNodeBs{}
-		for _, gnb := range networkSlice.SiteInfo.GNodeBs {
-			if gnb.Name != gnbName {
-				filteredGNodeBs = append(filteredGNodeBs, gnb)
-			}
-		}
-		filteredGNodeBsJSON, err := json.Marshal(filteredGNodeBs)
-		if err != nil {
-			return fmt.Errorf("error marshaling GNodeBs: %v", err)
-		}
-		patchJSON := []byte(
-			fmt.Sprintf(`[{"op": "replace", "path": "/site-info/gNodeBs", "value": %s}]`,
-				string(filteredGNodeBsJSON)),
-		)
-		filterBySliceName := bson.M{"slice-name": networkSlice.SliceName}
-		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(context, sliceDataColl, filterBySliceName, patchJSON)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func postUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
-	filter := bson.M{"hostname": upf.Hostname}
-	upfDataBson := configmodels.ToBsonM(upf)
-	if upfDataBson == nil {
-		return fmt.Errorf("failed to serialize UPF")
-	}
-	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
-}
-
-func putUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
-	filter := bson.M{"hostname": upf.Hostname}
-	upfDataBson := configmodels.ToBsonM(upf)
-	if upfDataBson == nil {
-		return fmt.Errorf("failed to serialize UPF")
-	}
-	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.UpfDataColl, filter, upfDataBson)
-	return err
-}
-
 func deleteUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	return dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.UpfDataColl, filter)
 }
 
-func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON []byte, operation func(mongo.SessionContext, configmodels.Upf) error) error {
+func removeUpfFromNetworkSlices(upf configmodels.Upf) error {
+	filterByUpf := bson.M{"site-info.upf.upf-name": upf.Hostname}
+	return updateInventoryInNetworkSlices(filterByUpf, func(networkSlice *configmodels.Slice) {
+		networkSlice.SiteInfo.Upf = nil
+	})
+}
+
+func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, nsOperation func(configmodels.Upf) error, upfOperation func(mongo.SessionContext, configmodels.Upf) error) error {
 	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DB session: %w", err)
@@ -454,13 +489,13 @@ func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON 
 		if err := session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		if err := operation(sc, upf); err != nil {
+		if err := upfOperation(sc, upf); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
 			return err
 		}
-		err = updateUpfInNetworkSlices(sc, upf.Hostname, patchJSON)
+		err = nsOperation(upf)
 		if err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
@@ -471,22 +506,32 @@ func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, patchJSON 
 	})
 }
 
-func updateUpfInNetworkSlices(context context.Context, hostname string, patchJSON []byte) error {
-	filterByUpf := bson.M{"site-info.upf.upf-name": hostname}
-	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByUpf)
+func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels.Slice)) error {
+	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filter)
 	if err != nil {
 		return fmt.Errorf("failed to fetch network slices: %w", err)
 	}
+
+	var messages []*configmodels.ConfigMessage
 	for _, rawNetworkSlice := range rawNetworkSlices {
-		sliceName, ok := rawNetworkSlice["slice-name"].(string)
-		if !ok {
-			return fmt.Errorf("invalid slice-name in network slice: %v", rawNetworkSlice)
+		var networkSlice configmodels.Slice
+		if err = json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
+			return fmt.Errorf("error unmarshaling network slice: %v", err)
 		}
-		filterBySliceName := bson.M{"slice-name": sliceName}
-		err = dbadapter.CommonDBClient.RestfulAPIJSONPatchWithContext(context, sliceDataColl, filterBySliceName, patchJSON)
-		if err != nil {
-			return err
+
+		updateFunc(&networkSlice)
+
+		msg := &configmodels.ConfigMessage{
+			MsgMethod: configmodels.Post_op,
+			MsgType:   configmodels.Network_slice,
+			Slice:     &networkSlice,
+			SliceName: networkSlice.SliceName,
 		}
+		messages = append(messages, msg)
+	}
+	for _, msg := range messages {
+		configChannel <- msg
+		logger.ConfigLog.Infof("network slice [%v] update sent to config channel", msg.SliceName)
 	}
 	return nil
 }

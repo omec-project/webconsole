@@ -74,3 +74,27 @@ func TestValidateUpfPort(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateGnbTac(t *testing.T) {
+	var testCases = []struct {
+		tac      string
+		expected bool
+	}{
+		{"123", true},
+		{"7000", true},
+		{"1", true},
+		{"16777215", true},
+		{"0", false},
+		{"16777216", false},
+		{"invalid", false},
+		{"123ad", false},
+		{"", false},
+	}
+
+	for _, tc := range testCases {
+		r := isValidGnbTac(tc.tac)
+		if r != tc.expected {
+			t.Errorf("%s", tc.tac)
+		}
+	}
+}

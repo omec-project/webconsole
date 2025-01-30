@@ -226,6 +226,14 @@ func TestGnbPostHandler(t *testing.T) {
 		expectedBody string
 	}{
 		{
+			name:         "Create a new gNB expects created status",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1", "tac": "123"}`,
+			expectedCode: http.StatusCreated,
+			expectedBody: "{}",
+		},
+		{
 			name:         "Create an existing gNB expects failure",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientDuplicateCreation{},
@@ -316,6 +324,22 @@ func TestGnbPutHandler(t *testing.T) {
 		expectedCode int
 		expectedBody string
 	}{
+		{
+			name:         "Put a new gNB expects OK status",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"tac": "123"}`,
+			expectedCode: http.StatusOK,
+			expectedBody: "{}",
+		},
+		{
+			name:         "Put an existing gNB expects a OK status",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientPutExistingUpf{},
+			inputData:    `{"tac": "123"}`,
+			expectedCode: http.StatusOK,
+			expectedBody: "{}",
+		},
 		{
 			name:         "TAC is not a string expects failure",
 			route:        "/config/v1/inventory/gnb/gnb1",
@@ -580,6 +604,13 @@ func TestInventoryDeleteHandlers(t *testing.T) {
 		expectedCode int
 		expectedBody string
 	}{
+		{
+			name:         "Delete gNB Success",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			expectedCode: http.StatusOK,
+			expectedBody: "{}",
+		},
 		{
 			name:         "Delete gNB DB Failure",
 			route:        "/config/v1/inventory/gnb/gnb1",

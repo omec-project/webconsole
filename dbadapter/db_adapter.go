@@ -40,7 +40,6 @@ type DBInterface interface {
 	RestfulAPIPullOne(collName string, filter bson.M, putData map[string]interface{}) error
 	RestfulAPIPullOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]interface{}) error
 	CreateIndex(collName string, keyField string) (bool, error)
-	GetCollection(collName string) *mongo.Collection
 	StartSession() (mongo.Session, error)
 	SupportsTransactions() (bool, error)
 }
@@ -204,10 +203,6 @@ func (db *MongoDBClient) RestfulAPIPullOneWithContext(context context.Context, c
 
 func (db *MongoDBClient) CreateIndex(collName string, keyField string) (bool, error) {
 	return db.MongoClient.CreateIndex(collName, keyField)
-}
-
-func (db *MongoDBClient) GetCollection(collName string) *mongo.Collection {
-	return db.MongoClient.GetCollection(collName)
 }
 
 func (db *MongoDBClient) StartSession() (mongo.Session, error) {

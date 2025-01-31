@@ -30,8 +30,6 @@ const (
 	flowRuleDataColl = "policyData.ues.flowRule"
 	devGroupDataColl = "webconsoleData.snapshots.devGroupData"
 	sliceDataColl    = "webconsoleData.snapshots.sliceData"
-	gnbDataColl      = "webconsoleData.snapshots.gnbData"
-	upfDataColl      = "webconsoleData.snapshots.upfData"
 )
 
 type Update5GSubscriberMsg struct {
@@ -97,16 +95,6 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				handleNetworkSlicePost(configMsg, subsUpdateChan)
 			}
 
-			if configMsg.Gnb != nil {
-				logger.ConfigLog.Infof("received gNB [%v] configuration from config channel", configMsg.GnbName)
-				handleGnbPost(configMsg.Gnb)
-			}
-
-			if configMsg.Upf != nil {
-				logger.ConfigLog.Infof("received UPF [%v] configuration from config channel", configMsg.UpfHostname)
-				handleUpfPost(configMsg.Upf)
-			}
-
 			// loop through all clients and send this message to all clients
 			if len(clientNFPool) == 0 {
 				logger.ConfigLog.Infoln("no client available. No need to send config")
@@ -116,16 +104,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				client.outStandingPushConfig <- configMsg
 			}
 		} else {
-			if configMsg.MsgType == configmodels.Inventory {
-				if configMsg.GnbName != "" {
-					logger.ConfigLog.Infof("received delete gNB [%v] from config channel", configMsg.GnbName)
-					handleGnbDelete(configMsg.GnbName)
-				}
-				if configMsg.UpfHostname != "" {
-					logger.ConfigLog.Infof("received delete UPF [%v] from config channel", configMsg.UpfHostname)
-					handleUpfDelete(configMsg.UpfHostname)
-				}
-			} else if configMsg.MsgType != configmodels.Sub_data {
+			if configMsg.MsgType != configmodels.Sub_data {
 				// update config snapshot
 				if configMsg.DevGroup == nil && configMsg.DevGroupName != "" {
 					logger.ConfigLog.Infof("received delete Device Group [%v] from config channel", configMsg.DevGroupName)
@@ -239,48 +218,6 @@ func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateC
 		if err != nil {
 			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
-	}
-	rwLock.Unlock()
-}
-
-func handleGnbPost(gnb *configmodels.Gnb) {
-	rwLock.Lock()
-	filter := bson.M{"name": gnb.Name}
-	gnbDataBson := configmodels.ToBsonM(gnb)
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(gnbDataColl, filter, gnbDataBson)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
-	}
-	rwLock.Unlock()
-}
-
-func handleGnbDelete(gnbName string) {
-	rwLock.Lock()
-	filter := bson.M{"name": gnbName}
-	errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(gnbDataColl, filter)
-	if errDelOne != nil {
-		logger.DbLog.Warnln(errDelOne)
-	}
-	rwLock.Unlock()
-}
-
-func handleUpfPost(upf *configmodels.Upf) {
-	rwLock.Lock()
-	filter := bson.M{"hostname": upf.Hostname}
-	upfDataBson := configmodels.ToBsonM(upf)
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(upfDataColl, filter, upfDataBson)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
-	}
-	rwLock.Unlock()
-}
-
-func handleUpfDelete(upfHostname string) {
-	rwLock.Lock()
-	filter := bson.M{"hostname": upfHostname}
-	errDelOne := dbadapter.CommonDBClient.RestfulAPIDeleteOne(upfDataColl, filter)
-	if errDelOne != nil {
-		logger.DbLog.Warnln(errDelOne)
 	}
 	rwLock.Unlock()
 }

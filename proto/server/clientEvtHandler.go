@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"math/rand"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -680,6 +681,9 @@ func clientEventMachine(client *clientNF) {
 					if ok, sliceName := isDeviceGroupInExistingSlices(client, name); ok {
 						client.clientLog.Infof("DeviceGroup: %v deleted, slice of this device group: %v", name, sliceName)
 						slice := client.slicesConfigClient[sliceName]
+						slice.SiteDeviceGroup = slices.DeleteFunc(slice.SiteDeviceGroup, func(deviceGroupName string) bool {
+							return name == deviceGroupName
+						})
 						fillSlice(client, slice.SliceName, slice, sliceProto)
 						dimsis := getDeletedImsisList(nil, cReqMsg.lastDevGroup)
 						sliceProto.DeletedImsis = dimsis

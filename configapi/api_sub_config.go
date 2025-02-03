@@ -270,9 +270,12 @@ func GetSubscribers(c *gin.Context) {
 	logger.WebUILog.Infoln("Get All Subscribers List")
 
 	var subsList []configmodels.SubsListIE
+	subsList = make([]configmodels.SubsListIE, 0)
 	amDataList, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(amDataColl, bson.M{})
 	if errGetMany != nil {
-		logger.DbLog.Warnln(errGetMany)
+		logger.DbLog.Errorw("failed to retrieve subscribers list", "error", errGetMany)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscribers list"})
+		return
 	}
 	for _, amData := range amDataList {
 

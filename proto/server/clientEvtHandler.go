@@ -488,6 +488,17 @@ func clientEventMachine(client *clientNF) {
 				lastDevGroup = client.devgroupsConfigClient[configMsg.DevGroupName]
 				client.clientLog.Debugf("Received delete configuration for  Device Group: %v ", configMsg.DevGroupName)
 				delete(client.devgroupsConfigClient, configMsg.DevGroupName)
+
+				if !client.metadataReqtd {
+					if ok, sliceName := isDeviceGroupInExistingSlices(client, configMsg.DevGroupName); ok {
+						client.clientLog.Infof("DeviceGroup: %v deleted, slice of this device group: %v", configMsg.DevGroupName, sliceName)
+						slice := client.slicesConfigClient[sliceName]
+						slice.SiteDeviceGroup = slices.DeleteFunc(slice.SiteDeviceGroup, func(deviceGroupName string) bool {
+							return configMsg.DevGroupName == deviceGroupName
+						})
+					}
+				}
+
 			}
 
 			if configMsg.Slice != nil {

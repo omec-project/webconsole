@@ -497,11 +497,11 @@ func DeleteSubscriberByID(c *gin.Context) {
 	err := handleDeleteSubscriberTransaction(c.Request.Context(), filter, ueId)
 	if err != nil {
 		logger.WebUILog.Errorw("failed to delete subscriber", "ueId", ueId, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete gNB"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete subscriber"})
 		return
 	}
 	logger.WebUILog.Infof("successfully executed DELETE subscriber %v request", ueId)
-	c.JSON(http.StatusOK, gin.H{})
+	c.JSON(http.StatusNoContent, gin.H{})
 }
 
 func handleDeleteSubscriberTransaction(ctx context.Context, filter bson.M, ueId string) error {

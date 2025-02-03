@@ -162,8 +162,14 @@ var routes = Routes{
 	{
 		"PostGnb",
 		http.MethodPost,
-		"/inventory/gnb/:gnb-name",
+		"/inventory/gnb",
 		PostGnb,
+	},
+	{
+		"PutGnb",
+		http.MethodPut,
+		"/inventory/gnb/:gnb-name",
+		PutGnb,
 	},
 	{
 		"DeleteGnb",
@@ -180,8 +186,14 @@ var routes = Routes{
 	{
 		"PostUpf",
 		http.MethodPost,
-		"/inventory/upf/:upf-hostname",
+		"/inventory/upf",
 		PostUpf,
+	},
+	{
+		"PutUpf",
+		http.MethodPut,
+		"/inventory/upf/:upf-hostname",
+		PutUpf,
 	},
 	{
 		"DeleteUpf",

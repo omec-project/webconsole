@@ -208,7 +208,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		dbadapter.CommonDBClient = &(MockMongoPost{dbadapter.CommonDBClient})
 		dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
 		handleDeviceGroupPost(&configMsg, subsUpdateChan)
-		expected_collection := "webconsoleData.snapshots.devGroupData"
+		expected_collection := devGroupDataColl
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
 		}
@@ -252,7 +252,7 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &(MockMongoDeviceGroupGetOne{dbadapter.CommonDBClient, testGroup})
 		handleDeviceGroupPost(&configMsg, subsUpdateChan)
-		expected_collection := "webconsoleData.snapshots.devGroupData"
+		expected_collection := devGroupDataColl
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
 		}
@@ -293,7 +293,7 @@ func Test_handleDeviceGroupDelete(t *testing.T) {
 		dbadapter.CommonDBClient = &MockMongoDeleteOne{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &(MockMongoDeviceGroupGetOne{dbadapter.CommonDBClient, testGroup})
 		handleDeviceGroupDelete(&configMsg, subsUpdateChan)
-		expected_collection := "webconsoleData.snapshots.devGroupData"
+		expected_collection := devGroupDataColl
 		if deleteData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, deleteData[0]["coll"])
 		}

@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/openapi/models"
@@ -495,11 +496,12 @@ func DeleteSubscriberByID(c *gin.Context) {
 	}
 	configChannel <- &msg
 	// send update message to all Device Groups where the subscriber needs to be removed
-	filterByUeId := bson.M{
-		"imsis": ueId,
+	imsi := strings.TrimPrefix(ueId, "imsi-")
+	filterByImsi := bson.M{
+		"imsis": imsi,
 	}
 	var deviceGroupUpdateMessages []*configmodels.ConfigMessage
-	rawDeviceGroups, err := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, filterByUeId)
+	rawDeviceGroups, err := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, filterByImsi)
 	if err != nil {
 		logger.WebUILog.Errorf("failed to fetch device groups: %w", err)
 		return
@@ -510,13 +512,13 @@ func DeleteSubscriberByID(c *gin.Context) {
 			logger.WebUILog.Errorf("error unmarshaling device group: %v", err)
 			return
 		}
-		filteredUeIds := []string{}
-		for _, imsi := range deviceGroup.Imsis {
-			if imsi != ueId {
-				filteredUeIds = append(filteredUeIds, imsi)
+		filteredImsis := []string{}
+		for _, currImsi := range deviceGroup.Imsis {
+			if currImsi != imsi {
+				filteredImsis = append(filteredImsis, currImsi)
 			}
 		}
-		deviceGroup.Imsis = filteredUeIds
+		deviceGroup.Imsis = filteredImsis
 		deviceGroupUpdateMessage := configmodels.ConfigMessage{
 			MsgType:   configmodels.Device_group,
 			MsgMethod: configmodels.Post_op,

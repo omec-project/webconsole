@@ -554,16 +554,13 @@ const docTemplate = `{
                         "description": "Device group deleted successfully"
                     },
                     "400": {
-                        "description": "Invalid device group name provided"
+                        "description": "Bad request"
                     },
                     "401": {
                         "description": "Authorization failed"
                     },
                     "403": {
                         "description": "Forbidden"
-                    },
-                    "500": {
-                        "description": "Error deleting device group"
                     }
                 }
             }

@@ -304,22 +304,7 @@ func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T)
 			}
 			expectedGroupName := "group1"
 			var msg *configmodels.ConfigMessage
-			select {
-			case msg = <-configChannel:
-				if msg.MsgType != configmodels.Device_group {
-					t.Errorf("Expected message type %v, got %v", configmodels.Device_group, msg.MsgType)
-				}
-				if msg.MsgMethod != configmodels.Delete_op {
-					t.Errorf("Expected message method %v, got %v", configmodels.Delete_op, msg.MsgMethod)
-				}
-				if msg.DevGroupName != expectedGroupName {
-					t.Errorf("Expected device group name %v, got %v", expectedGroupName, msg.DevGroupName)
-				}
-			default:
-				t.Error("Expected message in config channel but got none")
-			}
 			expectedSliceNames := []string{"slice1", "slice2", "slice3"}
-
 			for i := 0; i < 3; i++ {
 				select {
 				case msg = <-configChannel:
@@ -340,6 +325,20 @@ func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T)
 				default:
 					t.Error("Expected updated network slice message in config channel but got none")
 				}
+			}
+			select {
+			case msg = <-configChannel:
+				if msg.MsgType != configmodels.Device_group {
+					t.Errorf("Expected message type %v, got %v", configmodels.Device_group, msg.MsgType)
+				}
+				if msg.MsgMethod != configmodels.Delete_op {
+					t.Errorf("Expected message method %v, got %v", configmodels.Delete_op, msg.MsgMethod)
+				}
+				if msg.DevGroupName != expectedGroupName {
+					t.Errorf("Expected device group name %v, got %v", expectedGroupName, msg.DevGroupName)
+				}
+			default:
+				t.Error("Expected message in config channel but got none")
 			}
 		})
 	}

@@ -38,13 +38,13 @@ func DeviceGroupDeleteHandler(c *gin.Context) bool {
 	if groupName, exists = c.Params.Get("group-name"); exists {
 		logger.ConfigLog.Infof("received Delete Group %v from Roc/simapp", groupName)
 	}
+	updateDeviceGroupInNetworkSlices(groupName)
 	var msg configmodels.ConfigMessage
 	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = configmodels.Delete_op
 	msg.DevGroupName = groupName
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully Added Device Group [%v] with delete_op to config channel", groupName)
-	updateDeviceGroupInNetworkSlices(groupName)
 	return true
 }
 

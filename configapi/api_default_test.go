@@ -8,6 +8,7 @@ package configapi
 import (
 	"encoding/json"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -263,6 +264,146 @@ func TestGetDeviceGroupByNameDoesExists(t *testing.T) {
 	expected := `{"group-name":"group1","imsis":["1234","5678"],"site-info":"demo","ip-domain-name":"pool1","ip-domain-expanded":{"dnn":"internet","ue-ip-pool":"172.250.1.0/16","dns-primary":"1.1.1.1","dns-secondary":"8.8.8.8","mtu":1460,"ue-dnn-qos":{"dnn-mbr-uplink":10000000,"dnn-mbr-downlink":10000000,"bitrate-unit":"kbps","traffic-class":{"name":"platinum","qci":8,"arp":6,"pdb":300,"pelr":6}}}}`
 	if body != expected {
 		t.Errorf("Expected %v, got %v", expected, body)
+	}
+}
+
+func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	testCases := []struct {
+		name         string
+		route        string
+		dbAdapter    dbadapter.DBInterface
+		expectedCode int
+	}{
+		{
+			name:         "Device Group exists i",
+			route:        "/config/v1/device-group/group1",
+			dbAdapter:    &MockMongoClientManyNetworkSlices{},
+			expectedCode: http.StatusOK,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dbadapter.CommonDBClient = tc.dbAdapter
+			origChannel := configChannel
+			configChannel = make(chan *configmodels.ConfigMessage, 10)
+			defer func() { configChannel = origChannel }()
+			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+			}
+			expectedGroupName := "group1"
+			var msg *configmodels.ConfigMessage
+			select {
+			case msg = <-configChannel:
+				if msg.MsgType != configmodels.Device_group {
+					t.Errorf("Expected message type %v, got %v", configmodels.Device_group, msg.MsgType)
+				}
+				if msg.MsgMethod != configmodels.Delete_op {
+					t.Errorf("Expected message method %v, got %v", configmodels.Delete_op, msg.MsgMethod)
+				}
+				if msg.DevGroupName != expectedGroupName {
+					t.Errorf("Expected device group name %v, got %v", expectedGroupName, msg.DevGroupName)
+				}
+			default:
+				t.Error("Expected message in config channel but got none")
+			}
+			expectedSliceNames := []string{"slice1", "slice2", "slice3"}
+
+			for i := 0; i < 3; i++ {
+				select {
+				case msg = <-configChannel:
+					if msg.MsgType != configmodels.Network_slice {
+						t.Errorf("Expected message type %v, got %v", configmodels.Network_slice, msg.MsgType)
+					}
+					if msg.MsgMethod != configmodels.Post_op {
+						t.Errorf("Expected message method %v, got %v", configmodels.Post_op, msg.MsgMethod)
+					}
+					if msg.SliceName != expectedSliceNames[i] {
+						t.Errorf("Expected slice name %v, got %v", expectedSliceNames[i], msg.SliceName)
+					}
+					for _, group := range msg.Slice.SiteDeviceGroup {
+						if group == expectedGroupName {
+							t.Errorf("Expected %v to be removed from SiteDeviceGroup in slice %s, but it was found", expectedGroupName, msg.SliceName)
+						}
+					}
+				default:
+					t.Error("Expected updated network slice message in config channel but got none")
+				}
+			}
+		})
+	}
+}
+
+func TestDeviceGroupDeleteHandler_DeviceGroupDoesNotExistInNetworkSlices(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	testCases := []struct {
+		name         string
+		route        string
+		dbAdapter    dbadapter.DBInterface
+		expectedCode int
+	}{
+		{
+			name:         "Device Group exists i",
+			route:        "/config/v1/device-group/group1",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			expectedCode: http.StatusOK,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dbadapter.CommonDBClient = tc.dbAdapter
+			origChannel := configChannel
+			configChannel = make(chan *configmodels.ConfigMessage, 10)
+			defer func() { configChannel = origChannel }()
+			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+			}
+			expectedGroupName := "group1"
+			var msg *configmodels.ConfigMessage
+			select {
+			case msg = <-configChannel:
+				if msg.MsgType != configmodels.Device_group {
+					t.Errorf("Expected message type %v, got %v", configmodels.Device_group, msg.MsgType)
+				}
+				if msg.MsgMethod != configmodels.Delete_op {
+					t.Errorf("Expected message method %v, got %v", configmodels.Delete_op, msg.MsgMethod)
+				}
+				if msg.DevGroupName != expectedGroupName {
+					t.Errorf("Expected device group name %v, got %v", expectedGroupName, msg.DevGroupName)
+				}
+			default:
+				t.Error("Expected message in config channel but got none")
+			}
+
+			select {
+			case msg := <-configChannel:
+				t.Errorf("Unexpected message in config channel: %+v", msg)
+			default:
+				// No more messages, test passes
+			}
+		})
 	}
 }
 

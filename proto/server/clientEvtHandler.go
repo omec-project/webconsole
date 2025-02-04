@@ -680,11 +680,15 @@ func clientEventMachine(client *clientNF) {
 					if ok, sliceName := isDeviceGroupInExistingSlices(client, name); ok {
 						client.clientLog.Infof("DeviceGroup: %v deleted, slice of this device group: %v", name, sliceName)
 						slice := client.slicesConfigClient[sliceName]
-						fillSlice(client, slice.SliceName, slice, sliceProto)
-						dimsis := getDeletedImsisList(nil, cReqMsg.lastDevGroup)
-						sliceProto.DeletedImsis = dimsis
-						sliceProto.OperationType = protos.OpType_SLICE_UPDATE
-						sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
+						result := fillSlice(client, slice.SliceName, slice, sliceProto)
+						if result {
+							dimsis := getDeletedImsisList(nil, cReqMsg.lastDevGroup)
+							sliceProto.DeletedImsis = dimsis
+							sliceProto.OperationType = protos.OpType_SLICE_UPDATE
+							sliceDetails.NetworkSlice = append(sliceDetails.NetworkSlice, sliceProto)
+						} else {
+							client.clientLog.Infoln("Not sending slice config")
+						}
 					} else {
 						client.clientLog.Infof("Device Group: %s is not exist in available slices", name)
 						client.configChanged = false

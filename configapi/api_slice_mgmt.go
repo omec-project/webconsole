@@ -6,6 +6,7 @@
 package configapi
 
 import (
+	"encoding/json"
 	"math"
 	"slices"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"github.com/omec-project/util/httpwrapper"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 const (
@@ -41,7 +44,33 @@ func DeviceGroupDeleteHandler(c *gin.Context) bool {
 	msg.DevGroupName = groupName
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully Added Device Group [%v] with delete_op to config channel", groupName)
+	updateDeviceGroupInNetworkSlices(groupName)
 	return true
+}
+
+func updateDeviceGroupInNetworkSlices(groupName string) {
+	filterByDeviceGroup := bson.M{"site-device-group": groupName}
+	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByDeviceGroup)
+	if err != nil {
+		return
+	}
+	for _, rawNetworkSlice := range rawNetworkSlices {
+		var networkSlice configmodels.Slice
+		if err = json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
+			continue
+		}
+		networkSlice.SiteDeviceGroup = slices.DeleteFunc(networkSlice.SiteDeviceGroup, func(existingDG string) bool {
+			return groupName == existingDG
+		})
+		msg := &configmodels.ConfigMessage{
+			MsgMethod: configmodels.Post_op,
+			MsgType:   configmodels.Network_slice,
+			Slice:     &networkSlice,
+			SliceName: networkSlice.SliceName,
+		}
+		configChannel <- msg
+		logger.ConfigLog.Infof("network slice [%v] update sent to config channel", networkSlice.SliceName)
+	}
 }
 
 func convertToBps(val int64, unit string) (bitrate int64) {

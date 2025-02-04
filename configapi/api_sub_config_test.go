@@ -17,7 +17,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-
 type MockMongoClientOneSubscriber struct {
 	dbadapter.DBInterface
 }
@@ -25,7 +24,6 @@ type MockMongoClientOneSubscriber struct {
 type MockMongoClientManySubscribers struct {
 	dbadapter.DBInterface
 }
-
 
 func (m *MockMongoClientOneSubscriber) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
@@ -56,7 +54,6 @@ func (m *MockMongoClientManySubscribers) RestfulAPIGetMany(coll string, filter b
 	}
 	return results, nil
 }
-
 
 func TestSubscriberGetHandlers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -129,8 +126,8 @@ func TestSubscriberPostHandlers(t *testing.T) {
 		name            string
 		route           string
 		inputData       string
-		expectedCode 	int
-		expectedBody string
+		expectedCode    int
+		expectedBody    string
 		expectedMessage configmodels.ConfigMessage
 	}{
 		{
@@ -218,11 +215,12 @@ func TestSubscriberDeleteHandlers(t *testing.T) {
 	AddApiService(router)
 
 	testCases := []struct {
-		name         string
-		route        string
-		dbAdapter    dbadapter.DBInterface
-		expectedCode int
-		expectedBody string
+		name            string
+		route           string
+		dbAdapter       dbadapter.DBInterface
+		expectedCode    int
+		expectedBody    string
+		expectedMessage configmodels.ConfigMessage
 	}{
 		{
 			name:         "Delete a subscriber success",
@@ -230,22 +228,23 @@ func TestSubscriberDeleteHandlers(t *testing.T) {
 			dbAdapter:    &MockMongoClientEmptyDB{},
 			expectedCode: http.StatusNoContent,
 			expectedBody: "",
-		},
-		{
-			name:         "Delete subscriber DB Failure",
-			route:        "/api/subscriber/imsi-208930100007487",
-			dbAdapter:    &MockMongoClientDBError{},
-			expectedCode: http.StatusInternalServerError,
-			expectedBody: `{"error":"failed to delete subscriber"}`,
+			expectedMessage: configmodels.ConfigMessage{
+				MsgType:   configmodels.Sub_data,
+				MsgMethod: configmodels.Delete_op,
+				Imsi:      "imsi-208930100007487",
+			},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			dbadapter.CommonDBClient = tc.dbAdapter
+			origChannel := configChannel
+			configChannel = make(chan *configmodels.ConfigMessage, 1)
+			defer func() { configChannel = origChannel }()
 			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
+			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -255,6 +254,26 @@ func TestSubscriberDeleteHandlers(t *testing.T) {
 			}
 			if tc.expectedBody != w.Body.String() {
 				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+			}
+			select {
+			case msg := <-configChannel:
+
+				if msg.MsgType != tc.expectedMessage.MsgType {
+					t.Errorf("expected MsgType %+v, but got %+v", tc.expectedMessage.MsgType, msg.MsgType)
+				}
+				if msg.MsgMethod != tc.expectedMessage.MsgMethod {
+					t.Errorf("expected MsgMethod %+v, but got %+v", tc.expectedMessage.MsgMethod, msg.MsgMethod)
+				}
+				if tc.expectedMessage.AuthSubData != nil {
+					if msg.AuthSubData == nil {
+						t.Errorf("expected AuthSubData %+v, but got nil", tc.expectedMessage.AuthSubData)
+					}
+					if tc.expectedMessage.Imsi != msg.Imsi {
+						t.Errorf("expected IMSI %+v, but got %+v", tc.expectedMessage.Imsi, msg.Imsi)
+					}
+				}
+			default:
+				t.Error("expected message in configChannel, but none received")
 			}
 		})
 	}

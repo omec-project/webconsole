@@ -494,6 +494,41 @@ func DeleteSubscriberByID(c *gin.Context) {
 		Imsi:      ueId,
 	}
 	configChannel <- &msg
+	// send update message to all Device Groups where the subscriber needs to be removed
+	filterByUeId := bson.M{
+		"imsis": ueId,
+	}
+	var deviceGroupUpdateMessages []*configmodels.ConfigMessage
+	rawDeviceGroups, err := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, filterByUeId)
+	if err != nil {
+		logger.WebUILog.Errorf("failed to fetch device groups: %w", err)
+		return
+	}
+	for _, rawDeviceGroup := range rawDeviceGroups {
+		var deviceGroup configmodels.DeviceGroups
+		if err = json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup); err != nil {
+			logger.WebUILog.Errorf("error unmarshaling device group: %v", err)
+			return
+		}
+		filteredUeIds := []string{}
+		for _, imsi := range deviceGroup.Imsis {
+			if imsi != ueId {
+				filteredUeIds = append(filteredUeIds, imsi)
+			}
+		}
+		deviceGroup.Imsis = filteredUeIds
+		deviceGroupUpdateMessage := configmodels.ConfigMessage{
+			MsgType:   configmodels.Device_group,
+			MsgMethod: configmodels.Post_op,
+			DevGroupName: deviceGroup.DeviceGroupName,
+			DevGroup: &deviceGroup,
+		}
+		deviceGroupUpdateMessages = append(deviceGroupUpdateMessages, &deviceGroupUpdateMessage)
+	}
+	for _, msg := range deviceGroupUpdateMessages {
+		configChannel <- msg
+		logger.WebUILog.Infof("device group [%v] update sent to config channel", msg.DevGroupName)
+	}
 	logger.WebUILog.Infoln("Delete Subscriber Data complete")
 }
 

@@ -489,12 +489,6 @@ func DeleteSubscriberByID(c *gin.Context) {
 
 	c.JSON(http.StatusNoContent, gin.H{})
 
-	msg := configmodels.ConfigMessage{
-		MsgType:   configmodels.Sub_data,
-		MsgMethod: configmodels.Delete_op,
-		Imsi:      ueId,
-	}
-	configChannel <- &msg
 	// send update message to all Device Groups where the subscriber needs to be removed
 	imsi := strings.TrimPrefix(ueId, "imsi-")
 	filterByImsi := bson.M{
@@ -531,6 +525,14 @@ func DeleteSubscriberByID(c *gin.Context) {
 		configChannel <- msg
 		logger.WebUILog.Infof("device group [%v] update sent to config channel", msg.DevGroupName)
 	}
+
+	// send delete subscriber message
+	msg := configmodels.ConfigMessage{
+		MsgType:   configmodels.Sub_data,
+		MsgMethod: configmodels.Delete_op,
+		Imsi:      ueId,
+	}
+	configChannel <- &msg
 	logger.WebUILog.Infoln("Delete Subscriber Data complete")
 }
 

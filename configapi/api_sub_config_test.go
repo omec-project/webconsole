@@ -237,6 +237,7 @@ func TestSubscriberDeleteHandlers(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			dbadapter.CommonDBClient = tc.dbAdapter
 			origChannel := configChannel
 			configChannel = make(chan *configmodels.ConfigMessage, 1)
 			defer func() { configChannel = origChannel }()

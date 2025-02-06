@@ -602,9 +602,7 @@ const docTemplate = `{
                         "description": "Error retrieving gNBs"
                     }
                 }
-            }
-        },
-        "/config/v1/inventory/gnb/{gnb-name}": {
+            },
             "post": {
                 "security": [
                     {
@@ -612,6 +610,50 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Create a new gNB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gNBs"
+                ],
+                "parameters": [
+                    {
+                        "description": "Name and TAC of the gNB",
+                        "name": "gnb",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/configmodels.PostGnbRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "gNB sucessfully created"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Error creating gNB"
+                    }
+                }
+            }
+        },
+        "/config/v1/inventory/gnb/{gnb-name}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create or update a gNB",
                 "produces": [
                     "application/json"
                 ],
@@ -632,22 +674,25 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/configmodels.PostGnbRequest"
+                            "$ref": "#/definitions/configmodels.PutGnbRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "gNB created"
+                    "201": {
+                        "description": "gNB sucessfully created"
                     },
                     "400": {
-                        "description": "Failed to create the gNB"
+                        "description": "Bad request"
                     },
                     "401": {
                         "description": "Authorization failed"
                     },
                     "403": {
                         "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Error updating gNB"
                     }
                 }
             },
@@ -728,7 +773,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/config/v1/inventory/upf/{upf-hostname}": {
+        "/config/v1/inventory/upf/": {
             "post": {
                 "security": [
                     {
@@ -744,15 +789,8 @@ const docTemplate = `{
                 ],
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Name of the UPF",
-                        "name": "upf-hostname",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Port of the UPF",
-                        "name": "port",
+                        "description": "Hostname and port of the UPF to create",
+                        "name": "upf",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -761,17 +799,71 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "UPF created"
+                    "201": {
+                        "description": "UPF successfully created"
                     },
                     "400": {
-                        "description": "Failed to create the UPF"
+                        "description": "Bad request"
                     },
                     "401": {
                         "description": "Authorization failed"
                     },
                     "403": {
                         "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Error creating UPF"
+                    }
+                }
+            }
+        },
+        "/config/v1/inventory/upf/{upf-hostname}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create or update a UPF",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "UPFs"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the UPF to update",
+                        "name": "upf-hostname",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Port of the UPF to update",
+                        "name": "port",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/configmodels.PutUpfRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UPF successfully updated"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Error updating UPF"
                     }
                 }
             },
@@ -1188,12 +1280,34 @@ const docTemplate = `{
         "configmodels.PostGnbRequest": {
             "type": "object",
             "properties": {
+                "name": {
+                    "type": "string"
+                },
                 "tac": {
                     "type": "string"
                 }
             }
         },
         "configmodels.PostUpfRequest": {
+            "type": "object",
+            "properties": {
+                "hostname": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "string"
+                }
+            }
+        },
+        "configmodels.PutGnbRequest": {
+            "type": "object",
+            "properties": {
+                "tac": {
+                    "type": "string"
+                }
+            }
+        },
+        "configmodels.PutUpfRequest": {
             "type": "object",
             "properties": {
                 "port": {

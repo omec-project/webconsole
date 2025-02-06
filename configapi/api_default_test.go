@@ -305,7 +305,7 @@ func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T)
 			expectedGroupName := "group1"
 			var msg *configmodels.ConfigMessage
 			expectedSliceNames := []string{"slice1", "slice2", "slice3"}
-			for i := 0; i < 3; i++ {
+			for sliceName := range expectedSliceNames {
 				select {
 				case msg = <-configChannel:
 					if msg.MsgType != configmodels.Network_slice {
@@ -314,8 +314,8 @@ func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T)
 					if msg.MsgMethod != configmodels.Post_op {
 						t.Errorf("Expected message method %v, got %v", configmodels.Post_op, msg.MsgMethod)
 					}
-					if msg.SliceName != expectedSliceNames[i] {
-						t.Errorf("Expected slice name %v, got %v", expectedSliceNames[i], msg.SliceName)
+					if msg.SliceName != expectedSliceNames[sliceName] {
+						t.Errorf("Expected slice name %v, got %v", expectedSliceNames[sliceName], msg.SliceName)
 					}
 					for _, group := range msg.Slice.SiteDeviceGroup {
 						if group == expectedGroupName {

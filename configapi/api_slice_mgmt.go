@@ -52,11 +52,13 @@ func updateDeviceGroupInNetworkSlices(groupName string) {
 	filterByDeviceGroup := bson.M{"site-device-group": groupName}
 	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByDeviceGroup)
 	if err != nil {
+		logger.DbLog.Errorw("failed to retrieve network slices", "error", err)
 		return
 	}
 	for _, rawNetworkSlice := range rawNetworkSlices {
 		var networkSlice configmodels.Slice
 		if err = json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
+			logger.DbLog.Errorf("could not unmarshal network slice %v", rawNetworkSlice)
 			continue
 		}
 		networkSlice.SiteDeviceGroup = slices.DeleteFunc(networkSlice.SiteDeviceGroup, func(existingDG string) bool {

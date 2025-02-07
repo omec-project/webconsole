@@ -279,7 +279,7 @@ func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T)
 		expectedCode int
 	}{
 		{
-			name:         "Device Group exists i",
+			name:         "Delete DG associated with NSs expects config messages sent for NSs and DG",
 			route:        "/config/v1/device-group/group1",
 			dbAdapter:    &MockMongoClientManyNetworkSlices{},
 			expectedCode: http.StatusOK,
@@ -287,10 +287,14 @@ func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T)
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			originalDbAdapter := dbadapter.CommonDBClient
 			dbadapter.CommonDBClient = tc.dbAdapter
 			origChannel := configChannel
 			configChannel = make(chan *configmodels.ConfigMessage, 10)
-			defer func() { configChannel = origChannel }()
+			defer func() {
+				configChannel = origChannel
+				dbadapter.CommonDBClient = originalDbAdapter
+			}()
 			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
@@ -305,7 +309,7 @@ func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T)
 			expectedGroupName := "group1"
 			var msg *configmodels.ConfigMessage
 			expectedSliceNames := []string{"slice1", "slice2", "slice3"}
-			for sliceName := range expectedSliceNames {
+			for _, expectedSliceName := range expectedSliceNames {
 				select {
 				case msg = <-configChannel:
 					if msg.MsgType != configmodels.Network_slice {
@@ -314,8 +318,8 @@ func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T)
 					if msg.MsgMethod != configmodels.Post_op {
 						t.Errorf("Expected message method %v, got %v", configmodels.Post_op, msg.MsgMethod)
 					}
-					if msg.SliceName != expectedSliceNames[sliceName] {
-						t.Errorf("Expected slice name %v, got %v", expectedSliceNames[sliceName], msg.SliceName)
+					if msg.SliceName != expectedSliceName {
+						t.Errorf("Expected slice name %v, got %v", expectedSliceName, msg.SliceName)
 					}
 					for _, group := range msg.Slice.SiteDeviceGroup {
 						if group == expectedGroupName {
@@ -356,7 +360,7 @@ func TestDeviceGroupDeleteHandler_DeviceGroupDoesNotExistInNetworkSlices(t *test
 		expectedCode int
 	}{
 		{
-			name:         "Device Group exists i",
+			name:         "Delete DG not associated with any NS expects only one config message",
 			route:        "/config/v1/device-group/group1",
 			dbAdapter:    &MockMongoClientEmptyDB{},
 			expectedCode: http.StatusOK,
@@ -364,10 +368,14 @@ func TestDeviceGroupDeleteHandler_DeviceGroupDoesNotExistInNetworkSlices(t *test
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			originalDbAdapter := dbadapter.CommonDBClient
 			dbadapter.CommonDBClient = tc.dbAdapter
 			origChannel := configChannel
 			configChannel = make(chan *configmodels.ConfigMessage, 10)
-			defer func() { configChannel = origChannel }()
+			defer func() {
+				configChannel = origChannel
+				dbadapter.CommonDBClient = originalDbAdapter
+			}()
 			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)

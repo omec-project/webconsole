@@ -489,12 +489,22 @@ func DeleteSubscriberByID(c *gin.Context) {
 
 	c.JSON(http.StatusNoContent, gin.H{})
 
-	// send update message to all Device Groups where the subscriber needs to be removed
 	imsi := strings.TrimPrefix(ueId, "imsi-")
+	updateSubscriberInDeviceGroups(imsi)
+
+	msg := configmodels.ConfigMessage{
+		MsgType:   configmodels.Sub_data,
+		MsgMethod: configmodels.Delete_op,
+		Imsi:      ueId,
+	}
+	configChannel <- &msg
+	logger.WebUILog.Infoln("Delete Subscriber Data complete")
+}
+
+func updateSubscriberInDeviceGroups(imsi string) {
 	filterByImsi := bson.M{
 		"imsis": imsi,
 	}
-	var deviceGroupUpdateMessages []*configmodels.ConfigMessage
 	rawDeviceGroups, err := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, filterByImsi)
 	if err != nil {
 		logger.WebUILog.Errorf("failed to fetch device groups: %w", err)
@@ -504,7 +514,7 @@ func DeleteSubscriberByID(c *gin.Context) {
 		var deviceGroup configmodels.DeviceGroups
 		if err = json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup); err != nil {
 			logger.WebUILog.Errorf("error unmarshaling device group: %v", err)
-			return
+			continue
 		}
 		filteredImsis := []string{}
 		for _, currImsi := range deviceGroup.Imsis {
@@ -519,21 +529,9 @@ func DeleteSubscriberByID(c *gin.Context) {
 			DevGroupName: deviceGroup.DeviceGroupName,
 			DevGroup: &deviceGroup,
 		}
-		deviceGroupUpdateMessages = append(deviceGroupUpdateMessages, &deviceGroupUpdateMessage)
+		configChannel <- &deviceGroupUpdateMessage
+		logger.WebUILog.Infof("device group [%v] update sent to config channel", deviceGroup.DeviceGroupName)	
 	}
-	for _, msg := range deviceGroupUpdateMessages {
-		configChannel <- msg
-		logger.WebUILog.Infof("device group [%v] update sent to config channel", msg.DevGroupName)
-	}
-
-	// send delete subscriber message
-	msg := configmodels.ConfigMessage{
-		MsgType:   configmodels.Sub_data,
-		MsgMethod: configmodels.Delete_op,
-		Imsi:      ueId,
-	}
-	configChannel <- &msg
-	logger.WebUILog.Infoln("Delete Subscriber Data complete")
 }
 
 func GetRegisteredUEContext(c *gin.Context) {

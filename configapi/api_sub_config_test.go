@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -22,6 +24,10 @@ type MockMongoClientOneSubscriber struct {
 }
 
 type MockMongoClientManySubscribers struct {
+	dbadapter.DBInterface
+}
+
+type MockMongoClientDeviceGroupsWithSubscriber struct {
 	dbadapter.DBInterface
 }
 
@@ -52,6 +58,17 @@ func (m *MockMongoClientManySubscribers) RestfulAPIGetMany(coll string, filter b
 
 		results = append(results, subscriberBson)
 	}
+	return results, nil
+}
+
+func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	dg := deviceGroupWithImsis("group1", []string{"208930100007487", "208930100007488"})
+	var dgbson bson.M
+	tmp, _ := json.Marshal(dg)
+	json.Unmarshal(tmp, &dgbson)
+
+	results = append(results, dgbson)
 	return results, nil
 }
 
@@ -126,37 +143,35 @@ func TestSubscriberPostHandlers(t *testing.T) {
 		name            string
 		route           string
 		inputData       string
-		expectedCode    int
-		expectedBody    string
 		expectedMessage configmodels.ConfigMessage
 	}{
 		{
 			name:      "Create a new subscriber success",
 			route:     "/api/subscriber/imsi-208930100007487",
-			inputData: `{"UeId":"208930100007487", "plmnId":"12345", "opc":"981d464c7c52eb6e5036234984ad0bcf","key":"5122250214c33e723a5dd523fc145fc0", "sequenceNumber":"16f3b3f70fc2"}`,
+			inputData: `{"plmnId":"12345", "opc":"8e27b6af0e692e750f32667a3b14605d","key":"8baf473f2f8fd09487cccbd7097c6862", "sequenceNumber":"16f3b3f70fc2"}`,
 			expectedMessage: configmodels.ConfigMessage{
 				MsgType:   configmodels.Sub_data,
 				MsgMethod: configmodels.Post_op,
 				AuthSubData: &models.AuthenticationSubscription{
 					AuthenticationManagementField: "8000",
-					AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
+					AuthenticationMethod:          "5G_AKA",
 					Milenage: &models.Milenage{
 						Op: &models.Op{
 							EncryptionAlgorithm: 0,
 							EncryptionKey:       0,
-							OpValue:             "", // Required
 						},
 					},
 					Opc: &models.Opc{
 						EncryptionAlgorithm: 0,
 						EncryptionKey:       0,
-						// OpcValue:            "8e27b6af0e692e750f32667a3b14605d", // Required
+						OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
 					},
 					PermanentKey: &models.PermanentKey{
 						EncryptionAlgorithm: 0,
 						EncryptionKey:       0,
-						// PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862", // Required
+						PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
 					},
+					SequenceNumber: "16f3b3f70fc2",
 				},
 				Imsi: "imsi-208930100007487",
 			},
@@ -194,13 +209,11 @@ func TestSubscriberPostHandlers(t *testing.T) {
 				if msg.MsgMethod != tc.expectedMessage.MsgMethod {
 					t.Errorf("expected MsgMethod %+v, but got %+v", tc.expectedMessage.MsgMethod, msg.MsgMethod)
 				}
-				if tc.expectedMessage.AuthSubData != nil {
-					if msg.AuthSubData == nil {
-						t.Errorf("expected AuthSubData %+v, but got nil", tc.expectedMessage.AuthSubData)
-					}
-					if tc.expectedMessage.Imsi != msg.Imsi {
-						t.Errorf("expected IMSI %+v, but got %+v", tc.expectedMessage.Imsi, msg.Imsi)
-					}
+				if !reflect.DeepEqual(tc.expectedMessage.AuthSubData, msg.AuthSubData) {
+					t.Errorf("expected AuthSubData %+v, but got %+v", tc.expectedMessage.AuthSubData, msg.AuthSubData)
+				}
+				if tc.expectedMessage.Imsi != msg.Imsi {
+					t.Errorf("expected IMSI %+v, but got %+v", tc.expectedMessage.Imsi, msg.Imsi)
 				}
 			default:
 				t.Error("expected message in configChannel, but none received")
@@ -234,12 +247,25 @@ func TestSubscriberDeleteHandlers(t *testing.T) {
 				Imsi:      "imsi-208930100007487",
 			},
 		},
+		{
+			name:         "Delete a subscriber success with device group",
+			route:        "/api/subscriber/imsi-208930100007487",
+			dbAdapter:    &MockMongoClientDeviceGroupsWithSubscriber{},
+			expectedCode: http.StatusNoContent,
+			expectedBody: "",
+			expectedMessage: configmodels.ConfigMessage{
+				MsgType:   configmodels.Device_group,
+				MsgMethod: configmodels.Post_op,
+				DevGroupName: "group1",
+				DevGroup: deviceGroupWithoutImsi(),
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.CommonDBClient = tc.dbAdapter
 			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 1)
+			configChannel = make(chan *configmodels.ConfigMessage, 2)
 			defer func() { configChannel = origChannel }()
 			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
 			if err != nil {
@@ -272,10 +298,57 @@ func TestSubscriberDeleteHandlers(t *testing.T) {
 					if tc.expectedMessage.Imsi != msg.Imsi {
 						t.Errorf("expected IMSI %+v, but got %+v", tc.expectedMessage.Imsi, msg.Imsi)
 					}
+				} else {
+					if msg.DevGroup != nil {
+						if !reflect.DeepEqual(tc.expectedMessage.DevGroup.Imsis, msg.DevGroup.Imsis) {
+							t.Errorf("expected IMSIs in DG: %+v, but got %+v", tc.expectedMessage.DevGroup.Imsis, msg.DevGroup.Imsis)
+						}
+						if tc.expectedMessage.DevGroupName != msg.DevGroupName {
+							t.Errorf("expected Device group name: %+v, but got %+v", tc.expectedMessage.DevGroupName, msg.DevGroupName)
+						}
+					}
 				}
 			default:
 				t.Error("expected message in configChannel, but none received")
 			}
 		})
 	}
+}
+
+func deviceGroupWithImsis(name string, imsis []string) configmodels.DeviceGroups {
+	traffic_class := configmodels.TrafficClassInfo{
+		Name: "platinum",
+		Qci:  8,
+		Arp:  6,
+		Pdb:  300,
+		Pelr: 6,
+	}
+	qos := configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+		DnnMbrUplink:   10000000,
+		DnnMbrDownlink: 10000000,
+		BitrateUnit:    "kbps",
+		TrafficClass:   &traffic_class,
+	}
+	ipdomain := configmodels.DeviceGroupsIpDomainExpanded{
+		Dnn:          "internet",
+		UeIpPool:     "172.250.1.0/16",
+		DnsPrimary:   "1.1.1.1",
+		DnsSecondary: "8.8.8.8",
+		Mtu:          1460,
+		UeDnnQos:     &qos,
+	}
+	deviceGroup := configmodels.DeviceGroups{
+		DeviceGroupName:  name,
+		Imsis:            imsis,
+		SiteInfo:         "demo",
+		IpDomainName:     "pool1",
+		IpDomainExpanded: ipdomain,
+	}
+	return deviceGroup
+}
+
+func deviceGroupWithoutImsi() *configmodels.DeviceGroups {
+	tmp := deviceGroupWithImsis("group1", []string{"208930100007487", "208930100007488"})
+	tmp.Imsis = slices.Delete(tmp.Imsis, 0, 1)
+	return &tmp
 }

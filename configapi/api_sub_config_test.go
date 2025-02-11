@@ -148,7 +148,7 @@ func TestSubscriberPostHandlers(t *testing.T) {
 		{
 			name:      "Create a new subscriber success",
 			route:     "/api/subscriber/imsi-208930100007487",
-			inputData: `{"plmnId":"12345", "opc":"8e27b6af0e692e750f32667a3b14605d","key":"8baf473f2f8fd09487cccbd7097c6862", "sequenceNumber":"16f3b3f70fc2"}`,
+			inputData: `{"plmnID":"12345", "opc":"8e27b6af0e692e750f32667a3b14605d","key":"8baf473f2f8fd09487cccbd7097c6862", "sequenceNumber":"16f3b3f70fc2"}`,
 			expectedMessage: configmodels.ConfigMessage{
 				MsgType:   configmodels.Sub_data,
 				MsgMethod: configmodels.Post_op,
@@ -222,101 +222,108 @@ func TestSubscriberPostHandlers(t *testing.T) {
 	}
 }
 
-func TestSubscriberDeleteHandlers(t *testing.T) {
+func TestSubscriberDeleteNoDeviceGroup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)
-
-	testCases := []struct {
-		name            string
-		route           string
-		dbAdapter       dbadapter.DBInterface
-		expectedCode    int
-		expectedBody    string
-		expectedMessage configmodels.ConfigMessage
-	}{
-		{
-			name:         "Delete a subscriber success",
-			route:        "/api/subscriber/imsi-208930100007487",
-			dbAdapter:    &MockMongoClientEmptyDB{},
-			expectedCode: http.StatusNoContent,
-			expectedBody: "",
-			expectedMessage: configmodels.ConfigMessage{
-				MsgType:   configmodels.Sub_data,
-				MsgMethod: configmodels.Delete_op,
-				Imsi:      "imsi-208930100007487",
-			},
-		},
-		{
-			name:         "Delete a subscriber success with device group",
-			route:        "/api/subscriber/imsi-208930100007487",
-			dbAdapter:    &MockMongoClientDeviceGroupsWithSubscriber{},
-			expectedCode: http.StatusNoContent,
-			expectedBody: "",
-			expectedMessage: configmodels.ConfigMessage{
-				MsgType:   configmodels.Device_group,
-				MsgMethod: configmodels.Post_op,
-				DevGroupName: "group1",
-				DevGroup: deviceGroupWithoutImsi(),
-			},
-		},
+	dbAdapter := &MockMongoClientEmptyDB{}
+	dbadapter.CommonDBClient = dbAdapter
+	route := "/api/subscriber/imsi-208930100007487"
+	expectedCode := http.StatusNoContent
+	expectedBody := ""
+	expectedMessage := configmodels.ConfigMessage{
+		MsgType:   configmodels.Sub_data,
+		MsgMethod: configmodels.Delete_op,
+		Imsi:      "imsi-208930100007487",
 	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			dbadapter.CommonDBClient = tc.dbAdapter
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 2)
-			defer func() { configChannel = origChannel }()
-			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
-			if err != nil {
-				t.Fatalf("failed to create request: %v", err)
-			}
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
+	origChannel := configChannel
+	configChannel = make(chan *configmodels.ConfigMessage, 2)
+	defer func() { configChannel = origChannel }()
+	req, err := http.NewRequest(http.MethodDelete, route, nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
 
-			router.ServeHTTP(w, req)
+	router.ServeHTTP(w, req)
 
-			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+	if expectedCode != w.Code {
+		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+	}
+	if expectedBody != w.Body.String() {
+		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+	}
+	select {
+		case msg := <-configChannel:
+			if expectedMessage.MsgType != msg.MsgType {
+				t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
 			}
-			if tc.expectedBody != w.Body.String() {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+			if expectedMessage.MsgMethod != msg.MsgMethod {
+				t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
 			}
-			select {
-			case msg := <-configChannel:
+			if expectedMessage.Imsi != msg.Imsi {
+				t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)
+			}
+		default:
+			t.Error("expected message in configChannel, but none received")
+	}
+}
 
-				if msg.MsgType != tc.expectedMessage.MsgType {
-					t.Errorf("expected MsgType %+v, but got %+v", tc.expectedMessage.MsgType, msg.MsgType)
-				}
-				if msg.MsgMethod != tc.expectedMessage.MsgMethod {
-					t.Errorf("expected MsgMethod %+v, but got %+v", tc.expectedMessage.MsgMethod, msg.MsgMethod)
-				}
-				if tc.expectedMessage.AuthSubData != nil {
-					if msg.AuthSubData == nil {
-						t.Errorf("expected AuthSubData %+v, but got nil", tc.expectedMessage.AuthSubData)
-					}
-					if tc.expectedMessage.Imsi != msg.Imsi {
-						t.Errorf("expected IMSI %+v, but got %+v", tc.expectedMessage.Imsi, msg.Imsi)
-					}
-				} else {
-					if msg.DevGroup != nil {
-						if !reflect.DeepEqual(tc.expectedMessage.DevGroup.Imsis, msg.DevGroup.Imsis) {
-							t.Errorf("expected IMSIs in DG: %+v, but got %+v", tc.expectedMessage.DevGroup.Imsis, msg.DevGroup.Imsis)
-						}
-						if tc.expectedMessage.DevGroupName != msg.DevGroupName {
-							t.Errorf("expected Device group name: %+v, but got %+v", tc.expectedMessage.DevGroupName, msg.DevGroupName)
-						}
-					}
-				}
-			default:
-				t.Error("expected message in configChannel, but none received")
+func TestSubscriberDeleteWithDeviceGroup(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddApiService(router)
+	dbAdapter := &MockMongoClientDeviceGroupsWithSubscriber{}
+	dbadapter.CommonDBClient = dbAdapter
+	route := "/api/subscriber/imsi-208930100007487"
+	expectedCode := http.StatusNoContent
+	expectedBody := ""
+	expectedMessage := configmodels.ConfigMessage{
+		MsgType:   configmodels.Device_group,
+		MsgMethod: configmodels.Post_op,
+		DevGroupName: "group1",
+		DevGroup: deviceGroupWithoutImsi(),
+	}
+	origChannel := configChannel
+	configChannel = make(chan *configmodels.ConfigMessage, 2)
+	defer func() { configChannel = origChannel }()
+	req, err := http.NewRequest(http.MethodDelete, route, nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if expectedCode != w.Code {
+		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+	}
+	if expectedBody != w.Body.String() {
+		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+	}
+	select {
+		case msg := <-configChannel:
+			if expectedMessage.MsgType != msg.MsgType {
+				t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
 			}
-		})
+			if expectedMessage.MsgMethod != msg.MsgMethod {
+				t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
+			}
+			if expectedMessage.DevGroupName != msg.DevGroupName {
+				t.Errorf("expected device group name %+v, but got %+v", expectedMessage.DevGroupName, msg.DevGroupName)
+			}
+			if !reflect.DeepEqual(expectedMessage.DevGroup.Imsis, msg.DevGroup.Imsis) {
+				t.Errorf("expected IMSIs in device group: %+v, but got %+v", expectedMessage.DevGroup.Imsis, msg.DevGroup.Imsis)
+			}
+		default:
+			t.Error("expected message in configChannel, but none received")
 	}
 }
 
 func deviceGroupWithImsis(name string, imsis []string) configmodels.DeviceGroups {
-	traffic_class := configmodels.TrafficClassInfo{
+	trafficClass := configmodels.TrafficClassInfo{
 		Name: "platinum",
 		Qci:  8,
 		Arp:  6,
@@ -327,9 +334,9 @@ func deviceGroupWithImsis(name string, imsis []string) configmodels.DeviceGroups
 		DnnMbrUplink:   10000000,
 		DnnMbrDownlink: 10000000,
 		BitrateUnit:    "kbps",
-		TrafficClass:   &traffic_class,
+		TrafficClass:   &trafficClass,
 	}
-	ipdomain := configmodels.DeviceGroupsIpDomainExpanded{
+	ipDomain := configmodels.DeviceGroupsIpDomainExpanded{
 		Dnn:          "internet",
 		UeIpPool:     "172.250.1.0/16",
 		DnsPrimary:   "1.1.1.1",
@@ -342,7 +349,7 @@ func deviceGroupWithImsis(name string, imsis []string) configmodels.DeviceGroups
 		Imsis:            imsis,
 		SiteInfo:         "demo",
 		IpDomainName:     "pool1",
-		IpDomainExpanded: ipdomain,
+		IpDomainExpanded: ipDomain,
 	}
 	return deviceGroup
 }

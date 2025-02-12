@@ -222,7 +222,7 @@ func TestSubscriberPostHandlers(t *testing.T) {
 	}
 }
 
-func TestSubscriberDeleteNoDeviceGroup(t *testing.T) {
+func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)
@@ -255,22 +255,57 @@ func TestSubscriberDeleteNoDeviceGroup(t *testing.T) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 	select {
-		case msg := <-configChannel:
-			if expectedMessage.MsgType != msg.MsgType {
-				t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
-			}
-			if expectedMessage.MsgMethod != msg.MsgMethod {
-				t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
-			}
-			if expectedMessage.Imsi != msg.Imsi {
-				t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)
-			}
-		default:
-			t.Error("expected message in configChannel, but none received")
+	case msg := <-configChannel:
+		if expectedMessage.MsgType != msg.MsgType {
+			t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
+		}
+		if expectedMessage.MsgMethod != msg.MsgMethod {
+			t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
+		}
+		if expectedMessage.Imsi != msg.Imsi {
+			t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)
+		}
+	default:
+		t.Error("expected message in configChannel, but none received")
 	}
 }
 
-func TestSubscriberDeleteWithDeviceGroup(t *testing.T) {
+func TestSubscriberDeleteFailure(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddApiService(router)
+	dbAdapter := &MockMongoClientDBError{}
+	dbadapter.CommonDBClient = dbAdapter
+	route := "/api/subscriber/imsi-208930100007487"
+	expectedCode := http.StatusInternalServerError
+	expectedBody := `"Error deleting subscriber"`
+
+	origChannel := configChannel
+	configChannel = make(chan *configmodels.ConfigMessage, 1)
+	defer func() { configChannel = origChannel }()
+	req, err := http.NewRequest(http.MethodDelete, route, nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if expectedCode != w.Code {
+		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+	}
+	if expectedBody != w.Body.String() {
+		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+	}
+	select {
+	case msg := <-configChannel:
+		t.Errorf("expected no message in configChannel, but got %+v", msg)
+	default:
+	}
+}
+
+func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)
@@ -279,11 +314,16 @@ func TestSubscriberDeleteWithDeviceGroup(t *testing.T) {
 	route := "/api/subscriber/imsi-208930100007487"
 	expectedCode := http.StatusNoContent
 	expectedBody := ""
-	expectedMessage := configmodels.ConfigMessage{
-		MsgType:   configmodels.Device_group,
-		MsgMethod: configmodels.Post_op,
+	expectedDeviceGroupMessage := configmodels.ConfigMessage{
+		MsgType:      configmodels.Device_group,
+		MsgMethod:    configmodels.Post_op,
 		DevGroupName: "group1",
-		DevGroup: deviceGroupWithoutImsi(),
+		DevGroup:     deviceGroupWithoutImsi(),
+	}
+	expectedMessage := configmodels.ConfigMessage{
+		MsgType:   configmodels.Sub_data,
+		MsgMethod: configmodels.Delete_op,
+		Imsi:      "imsi-208930100007487",
 	}
 	origChannel := configChannel
 	configChannel = make(chan *configmodels.ConfigMessage, 2)
@@ -304,21 +344,35 @@ func TestSubscriberDeleteWithDeviceGroup(t *testing.T) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 	select {
-		case msg := <-configChannel:
-			if expectedMessage.MsgType != msg.MsgType {
-				t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
-			}
-			if expectedMessage.MsgMethod != msg.MsgMethod {
-				t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
-			}
-			if expectedMessage.DevGroupName != msg.DevGroupName {
-				t.Errorf("expected device group name %+v, but got %+v", expectedMessage.DevGroupName, msg.DevGroupName)
-			}
-			if !reflect.DeepEqual(expectedMessage.DevGroup.Imsis, msg.DevGroup.Imsis) {
-				t.Errorf("expected IMSIs in device group: %+v, but got %+v", expectedMessage.DevGroup.Imsis, msg.DevGroup.Imsis)
-			}
-		default:
-			t.Error("expected message in configChannel, but none received")
+	case msg := <-configChannel:
+		if expectedDeviceGroupMessage.MsgType != msg.MsgType {
+			t.Errorf("expected MsgType %+v, but got %+v", expectedDeviceGroupMessage.MsgType, msg.MsgType)
+		}
+		if expectedDeviceGroupMessage.MsgMethod != msg.MsgMethod {
+			t.Errorf("expected MsgMethod %+v, but got %+v", expectedDeviceGroupMessage.MsgMethod, msg.MsgMethod)
+		}
+		if expectedDeviceGroupMessage.DevGroupName != msg.DevGroupName {
+			t.Errorf("expected device group name %+v, but got %+v", expectedDeviceGroupMessage.DevGroupName, msg.DevGroupName)
+		}
+		if !reflect.DeepEqual(expectedDeviceGroupMessage.DevGroup.Imsis, msg.DevGroup.Imsis) {
+			t.Errorf("expected IMSIs in device group: %+v, but got %+v", expectedDeviceGroupMessage.DevGroup.Imsis, msg.DevGroup.Imsis)
+		}
+	default:
+		t.Error("expected message in configChannel, but none received")
+	}
+	select {
+	case msg := <-configChannel:
+		if expectedMessage.MsgType != msg.MsgType {
+			t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
+		}
+		if expectedMessage.MsgMethod != msg.MsgMethod {
+			t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
+		}
+		if expectedMessage.Imsi != msg.Imsi {
+			t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)
+		}
+	default:
+		t.Error("expected message in configChannel, but none received")
 	}
 }
 

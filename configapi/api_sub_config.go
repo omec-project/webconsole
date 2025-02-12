@@ -490,7 +490,7 @@ func DeleteSubscriberByID(c *gin.Context) {
 	imsi := strings.TrimPrefix(ueId, "imsi-")
 	err := updateSubscriberInDeviceGroups(imsi)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, "Error deleting subscriber")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error deleting subscriber"})
 		return
 	}
 
@@ -510,14 +510,14 @@ func updateSubscriberInDeviceGroups(imsi string) error {
 	}
 	rawDeviceGroups, err := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, filterByImsi)
 	if err != nil {
-		logger.WebUILog.Errorf("failed to fetch device groups: %w", err)
+		logger.DbLog.Errorf("failed to fetch device groups: %v", err)
 		return err
 	}
 	var deviceGroupUpdateMessages []configmodels.ConfigMessage
 	for _, rawDeviceGroup := range rawDeviceGroups {
 		var deviceGroup configmodels.DeviceGroups
 		if err = json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup); err != nil {
-			logger.WebUILog.Errorf("error unmarshaling device group: %v", err)
+			logger.DbLog.Errorf("error unmarshaling device group: %v", err)
 			return err
 		}
 		filteredImsis := []string{}
@@ -528,10 +528,10 @@ func updateSubscriberInDeviceGroups(imsi string) error {
 		}
 		deviceGroup.Imsis = filteredImsis
 		deviceGroupUpdateMessage := configmodels.ConfigMessage{
-			MsgType:   configmodels.Device_group,
-			MsgMethod: configmodels.Post_op,
+			MsgType:      configmodels.Device_group,
+			MsgMethod:    configmodels.Post_op,
 			DevGroupName: deviceGroup.DeviceGroupName,
-			DevGroup: &deviceGroup,
+			DevGroup:     &deviceGroup,
 		}
 		deviceGroupUpdateMessages = append(deviceGroupUpdateMessages, deviceGroupUpdateMessage)
 	}

@@ -278,7 +278,7 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	dbadapter.CommonDBClient = dbAdapter
 	route := "/api/subscriber/imsi-208930100007487"
 	expectedCode := http.StatusInternalServerError
-	expectedBody := `"Error deleting subscriber"`
+	expectedBody := `{"error":"error deleting subscriber"}`
 
 	origChannel := configChannel
 	configChannel = make(chan *configmodels.ConfigMessage, 1)

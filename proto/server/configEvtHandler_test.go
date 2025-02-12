@@ -21,6 +21,7 @@ import (
 var (
 	execCommandTimesCalled = 0
 	postData               []map[string]interface{}
+	deleteData             []map[string]interface{}
 )
 
 func deviceGroup(name string) configmodels.DeviceGroups {
@@ -59,6 +60,10 @@ type MockMongoPost struct {
 	dbadapter.DBInterface
 }
 
+type MockMongoDeleteOne struct {
+	dbadapter.DBInterface
+}
+
 type MockMongoGetOneNil struct {
 	dbadapter.DBInterface
 }
@@ -93,6 +98,15 @@ func (m *MockMongoPost) RestfulAPIPost(coll string, filter primitive.M, data map
 	}
 	postData = append(postData, params)
 	return true, nil
+}
+
+func (m *MockMongoDeleteOne) RestfulAPIDeleteOne(coll string, filter primitive.M) error {
+	params := map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+	}
+	deleteData = append(deleteData, params)
+	return nil
 }
 
 func (m *MockMongoGetOneNil) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
@@ -194,7 +208,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		dbadapter.CommonDBClient = &(MockMongoPost{dbadapter.CommonDBClient})
 		dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
 		handleDeviceGroupPost(&configMsg, subsUpdateChan)
-		expected_collection := "webconsoleData.snapshots.devGroupData"
+		expected_collection := devGroupDataColl
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
 		}
@@ -238,7 +252,7 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &(MockMongoDeviceGroupGetOne{dbadapter.CommonDBClient, testGroup})
 		handleDeviceGroupPost(&configMsg, subsUpdateChan)
-		expected_collection := "webconsoleData.snapshots.devGroupData"
+		expected_collection := devGroupDataColl
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
 		}
@@ -254,6 +268,38 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		}
 		if !reflect.DeepEqual(resultGroup, testGroup) {
 			t.Errorf("Expected group %v, got %v", testGroup, resultGroup)
+		}
+		receivedConfigMsg := <-subsUpdateChan
+		if !reflect.DeepEqual(receivedConfigMsg.Msg, &configMsg) {
+			t.Errorf("Expected config message %v, got %v", configMsg, receivedConfigMsg.Msg)
+		}
+		if !reflect.DeepEqual(receivedConfigMsg.PrevDevGroup, &testGroup) {
+			t.Errorf("Expected previous device group to be %v, got %v", testGroup, receivedConfigMsg.PrevDevGroup)
+		}
+	}
+}
+
+func Test_handleDeviceGroupDelete(t *testing.T) {
+	deviceGroups := []configmodels.DeviceGroups{deviceGroup("group1")}
+	factory.WebUIConfig.Configuration.Mode5G = true
+	for _, testGroup := range deviceGroups {
+		configMsg := configmodels.ConfigMessage{
+			MsgType:      configmodels.Device_group,
+			MsgMethod:    configmodels.Delete_op,
+			DevGroupName: testGroup.DeviceGroupName,
+		}
+		subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
+		deleteData = make([]map[string]interface{}, 0)
+		dbadapter.CommonDBClient = &MockMongoDeleteOne{dbadapter.CommonDBClient}
+		dbadapter.CommonDBClient = &(MockMongoDeviceGroupGetOne{dbadapter.CommonDBClient, testGroup})
+		handleDeviceGroupDelete(&configMsg, subsUpdateChan)
+		expected_collection := devGroupDataColl
+		if deleteData[0]["coll"] != expected_collection {
+			t.Errorf("Expected collection %v, got %v", expected_collection, deleteData[0]["coll"])
+		}
+		expected_filter := bson.M{"group-name": testGroup.DeviceGroupName}
+		if !reflect.DeepEqual(deleteData[0]["filter"], expected_filter) {
+			t.Errorf("Expected filter %v, got %v", expected_filter, deleteData[0]["filter"])
 		}
 		receivedConfigMsg := <-subsUpdateChan
 		if !reflect.DeepEqual(receivedConfigMsg.Msg, &configMsg) {

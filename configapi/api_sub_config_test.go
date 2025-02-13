@@ -240,7 +240,7 @@ func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 		Imsi:      "imsi-208930100007487",
 	}
 	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 2)
+	configChannel = make(chan *configmodels.ConfigMessage, 3)
 	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
 	req, err := http.NewRequest(http.MethodDelete, route, nil)
 	if err != nil {
@@ -270,6 +270,11 @@ func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 		}
 	default:
 		t.Error("expected message in configChannel, but none received")
+	}
+	select {
+	case msg := <-configChannel:
+		t.Errorf("expected no message in configChannel, but got %+v", msg)
+	default:
 	}
 }
 
@@ -331,7 +336,7 @@ func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
 		Imsi:      "imsi-208930100007487",
 	}
 	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 2)
+	configChannel = make(chan *configmodels.ConfigMessage, 3)
 	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
 	req, err := http.NewRequest(http.MethodDelete, route, nil)
 	if err != nil {
@@ -378,6 +383,11 @@ func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
 		}
 	default:
 		t.Error("expected message in configChannel, but none received")
+	}
+	select {
+	case msg := <-configChannel:
+		t.Errorf("expected no message in configChannel, but got %+v", msg)
+	default:
 	}
 }
 

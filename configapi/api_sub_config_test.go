@@ -115,7 +115,9 @@ func TestSubscriberGetHandlers(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			origDBClient := dbadapter.CommonDBClient
 			dbadapter.CommonDBClient = tc.dbAdapter
+			defer func() { dbadapter.CommonDBClient = origDBClient }()
 			req, err := http.NewRequest(http.MethodGet, tc.route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
@@ -226,6 +228,7 @@ func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)
+	origDBClient := dbadapter.CommonDBClient
 	dbAdapter := &MockMongoClientEmptyDB{}
 	dbadapter.CommonDBClient = dbAdapter
 	route := "/api/subscriber/imsi-208930100007487"
@@ -238,7 +241,7 @@ func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 	}
 	origChannel := configChannel
 	configChannel = make(chan *configmodels.ConfigMessage, 2)
-	defer func() { configChannel = origChannel }()
+	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
 	req, err := http.NewRequest(http.MethodDelete, route, nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -274,6 +277,7 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)
+	origDBClient := dbadapter.CommonDBClient
 	dbAdapter := &MockMongoClientDBError{}
 	dbadapter.CommonDBClient = dbAdapter
 	route := "/api/subscriber/imsi-208930100007487"
@@ -282,7 +286,7 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 
 	origChannel := configChannel
 	configChannel = make(chan *configmodels.ConfigMessage, 1)
-	defer func() { configChannel = origChannel }()
+	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
 	req, err := http.NewRequest(http.MethodDelete, route, nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -309,6 +313,7 @@ func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)
+	origDBClient := dbadapter.CommonDBClient
 	dbAdapter := &MockMongoClientDeviceGroupsWithSubscriber{}
 	dbadapter.CommonDBClient = dbAdapter
 	route := "/api/subscriber/imsi-208930100007487"
@@ -327,7 +332,7 @@ func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
 	}
 	origChannel := configChannel
 	configChannel = make(chan *configmodels.ConfigMessage, 2)
-	defer func() { configChannel = origChannel }()
+	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
 	req, err := http.NewRequest(http.MethodDelete, route, nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)

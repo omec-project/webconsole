@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2024 Canonical Ltd.
+// Copyright 2025 Canonical Ltd.
 
 package configapi
 

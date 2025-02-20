@@ -53,6 +53,11 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 	// we wish to start grpc server only if we received at least one config
 	// from the simapp/ROC
 	configReady := make(chan bool)
+	if factory.WebUIConfig.Configuration.Mode5G {
+		subscriberAuthData = DatabaseSubscriberAuthenticationData{}
+	} else {
+		subscriberAuthData = MemorySubscriberAuthenticationData{}
+	}
 	go configHandler(configMsgChan, configReady)
 	ready := <-configReady
 

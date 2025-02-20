@@ -46,11 +46,6 @@ var (
 )
 
 func init() {
-	if factory.WebUIConfig.Configuration.Mode5G {
-		subscriberAuthData = DatabaseSubscriberAuthenticationData{}
-	} else {
-		subscriberAuthData = MemorySubscriberAuthenticationData{}
-	}
 	imsiData = make(map[string]*models.AuthenticationSubscription)
 }
 

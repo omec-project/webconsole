@@ -34,7 +34,7 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 }
 
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) {
-	logger.WebUILog.Debugln("insert/update AuthenticationSubscription ", imsi)
+	logger.WebUILog.Debugf("insert/update authentication subscription in authenticationSubscription collection: %v", imsi)
 	filter := bson.M{"ueId": imsi}
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
@@ -42,6 +42,7 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	if errPost != nil {
 		logger.DbLog.Warnln(errPost)
 	}
+	logger.WebUILog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
 	basicAmData := map[string]interface{}{
 		"ueId": imsi,
 	}
@@ -53,12 +54,13 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 }
 
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataDelete(imsi string) {
-	logger.WebUILog.Debugln("delete AuthenticationSubscription", imsi)
+	logger.WebUILog.Debugf("delete authentication subscription from authenticationSubscription collection: %v", imsi)
 	filter := bson.M{"ueId": imsi}
 	errDelAuthSubsDataColl := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
 	if errDelAuthSubsDataColl != nil {
 		logger.DbLog.Warnln(errDelAuthSubsDataColl)
 	}
+	logger.WebUILog.Debugf("delete authentication subscription from amData collection: %v", imsi)
 	errDelAmDataColl := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
 	if errDelAmDataColl != nil {
 		logger.DbLog.Warnln(errDelAmDataColl)
@@ -74,12 +76,13 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 }
 
 func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) {
-	logger.WebUILog.Debugln("insert/update AuthenticationSubscription ", imsi)
+	logger.WebUILog.Debugf("insert/update authentication subscription in memory: %v", imsi)
 	imsiData[imsi] = authSubData
 	filter := bson.M{"ueId": imsi}
 	basicAmData := map[string]interface{}{
 		"ueId": imsi,
 	}
+	logger.WebUILog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
 	basicDataBson := configmodels.ToBsonM(basicAmData)
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
 	if errPost != nil {
@@ -88,12 +91,12 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 }
 
 func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataDelete(imsi string) {
-	logger.WebUILog.Debugln("delete AuthenticationSubscription ", imsi)
+	logger.WebUILog.Debugf("delete authentication subscription from amData collection: %v", imsi)
 	filter := bson.M{"ueId": imsi}
 	errDelAmDataColl := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
 	if errDelAmDataColl != nil {
 		logger.DbLog.Warnln(errDelAmDataColl)
 	}
-	logger.WebUILog.Debugln("remove imsi from memory", imsi)
+	logger.WebUILog.Debugf("delete authentication subscription from memory: %v", imsi)
 	delete(imsiData, imsi)
 }

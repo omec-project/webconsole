@@ -54,8 +54,10 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 	// from the simapp/ROC
 	configReady := make(chan bool)
 	if factory.WebUIConfig.Configuration.Mode5G {
+		logger.WebUILog.Debugln("instantiating in-DB subscriber authentication")
 		subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	} else {
+		logger.WebUILog.Debugln("instantiating in-memory subscriber authentication")
 		subscriberAuthData = MemorySubscriberAuthenticationData{}
 	}
 	go configHandler(configMsgChan, configReady)

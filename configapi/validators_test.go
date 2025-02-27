@@ -10,7 +10,7 @@ func TestValidateName(t *testing.T) {
 		name     string
 		expected bool
 	}{
-
+		{"validName", true},
 		{"Valid-Name", true},
 		{"Valid_Name", true},
 		{"{invalid_name}", false},
@@ -19,7 +19,6 @@ func TestValidateName(t *testing.T) {
 		{"-invalidName", false},
 		{"_invalidName", false},
 		{"4invalidName", false},
-		{"-_invalid", false},
 		{"-_invalid", false},
 		{"", false},
 	}

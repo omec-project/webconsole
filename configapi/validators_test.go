@@ -10,12 +10,17 @@ func TestValidateName(t *testing.T) {
 		name     string
 		expected bool
 	}{
-		{"validName", true},
+
 		{"Valid-Name", true},
 		{"Valid_Name", true},
 		{"{invalid_name}", false},
 		{"invalid&name", false},
 		{"invalidName(R)", false},
+		{"-invalidName", false},
+		{"_invalidName", false},
+		{"4invalidName", false},
+		{"-_invalid", false},
+		{"-_invalid", false},
 		{"", false},
 	}
 
@@ -33,6 +38,7 @@ func TestValidateFQDN(t *testing.T) {
 		expected bool
 	}{
 		{"upf-external.sdcore.svc.cluster.local", true},
+		{"123-external.sdcore.svc.cluster.local", true},
 		{"my-upf.my-domain.com", true},
 		{"www.my-upf.com", true},
 		{"some-upf-name", false},
@@ -40,6 +46,7 @@ func TestValidateFQDN(t *testing.T) {
 		{"{upf-external}.sdcore.svc.cluster.local", false},
 		{"http://my-upf.my-domain.com", false},
 		{"my-domain.com/my-upf", false},
+		{"-upf-external.sdcore.svc.cluster.local", false},
 		{"", false},
 	}
 

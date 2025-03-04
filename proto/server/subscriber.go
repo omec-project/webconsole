@@ -25,11 +25,11 @@ type DatabaseSubscriberAuthenticationData struct {
 
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
 	filter := bson.M{"ueId": imsi}
-	authSubDataInterface, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
-	if errGetOne != nil {
-		logger.DbLog.Warnln(errGetOne)
+	authSubDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
-	err := json.Unmarshal(configmodels.MapToByte(authSubDataInterface), &authSubData)
+	err = json.Unmarshal(configmodels.MapToByte(authSubDataInterface), &authSubData)
 	if err != nil {
 		logger.DbLog.Errorf("could not unmarshall subscriber %v", authSubDataInterface)
 	}
@@ -41,32 +41,32 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	filter := bson.M{"ueId": imsi}
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
-	_, errPost := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	_, err := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
 	logger.WebUILog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
 	basicAmData := map[string]interface{}{
 		"ueId": imsi,
 	}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
-	_, errPost = dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	_, err = dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
 }
 
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataDelete(imsi string) {
 	logger.WebUILog.Debugf("delete authentication subscription from authenticationSubscription collection: %v", imsi)
 	filter := bson.M{"ueId": imsi}
-	errDelAuthSubsDataColl := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
-	if errDelAuthSubsDataColl != nil {
-		logger.DbLog.Warnln(errDelAuthSubsDataColl)
+	err := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
 	logger.WebUILog.Debugf("delete authentication subscription from amData collection: %v", imsi)
-	errDelAmDataColl := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
-	if errDelAmDataColl != nil {
-		logger.DbLog.Warnln(errDelAmDataColl)
+	err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
 }
 
@@ -87,18 +87,18 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 	}
 	logger.WebUILog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
 	basicDataBson := configmodels.ToBsonM(basicAmData)
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
 }
 
 func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataDelete(imsi string) {
 	logger.WebUILog.Debugf("delete authentication subscription from amData collection: %v", imsi)
 	filter := bson.M{"ueId": imsi}
-	errDelAmDataColl := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
-	if errDelAmDataColl != nil {
-		logger.DbLog.Warnln(errDelAmDataColl)
+	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
 	logger.WebUILog.Debugf("delete authentication subscription from memory: %v", imsi)
 	delete(imsiData, imsi)

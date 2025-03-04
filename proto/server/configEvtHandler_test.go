@@ -490,13 +490,18 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 		t.Errorf("Expected filter %v, got %v", expectedFilter, postData[1]["filter"])
 	}
 
-	var AuthSubResult map[string]interface{} = postData[0]["data"].(map[string]interface{})
-	var AmDataResult map[string]interface{} = postData[0]["data"].(map[string]interface{})
-	if AuthSubResult["ueId"] != ueId {
-		t.Errorf("Expected ueId %v, got %v", ueId, AuthSubResult["ueId"])
+	var authSubResult models.AuthenticationSubscription
+	var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
+	err := json.Unmarshal(configmodels.MapToByte(result), &authSubResult)
+	if err != nil {
+		t.Errorf("Could not unmarshall result %v", result)
 	}
-	if AmDataResult["ueId"] != ueId {
-		t.Errorf("Expected ueId %v, got %v", ueId, AmDataResult["ueId"])
+	if !reflect.DeepEqual(configMsg.AuthSubData, &authSubResult) {
+		t.Errorf("Expected authSubData %v, got %v", configMsg.AuthSubData, &authSubResult)
+	}
+	var amDataResult map[string]interface{} = postData[0]["data"].(map[string]interface{})
+	if amDataResult["ueId"] != ueId {
+		t.Errorf("Expected ueId %v, got %v", ueId, amDataResult["ueId"])
 	}
 	if imsiData[ueId] != nil {
 		t.Errorf("Expected no ueId in memory, got %v", imsiData[ueId])
@@ -551,6 +556,9 @@ func Test_handleSubscriberPost4G(t *testing.T) {
 	}
 	if imsiData[ueId] == nil {
 		t.Errorf("Expected ueId %v in memory, got nil", ueId)
+	}
+	if !reflect.DeepEqual(imsiData[ueId], configMsg.AuthSubData) {
+		t.Errorf("Expected authSubData %v in memory, got %v ", configMsg.AuthSubData, imsiData[ueId])
 	}
 }
 

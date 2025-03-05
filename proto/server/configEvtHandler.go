@@ -65,7 +65,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		configMsg := <-configMsgChan
 		if configMsg.MsgType == configmodels.Sub_data {
 			imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
-			logger.ConfigLog.Infoln("received imsi from config channel: ", imsiVal)
+			logger.ConfigLog.Infoln("received imsi from config channel:", imsiVal)
 			if configMsg.MsgMethod == configmodels.Delete_op {
 				handleSubscriberDelete(configMsg.Imsi)
 			} else {
@@ -289,7 +289,7 @@ func getAddedImsisList(group, prevGroup *configmodels.DeviceGroups) (aimsis []st
 	}
 	for _, imsi := range group.Imsis {
 		if prevGroup == nil {
-			if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-" + imsi) != nil {
+			if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-"+imsi) != nil {
 				aimsis = append(aimsis, imsi)
 			}
 		} else {

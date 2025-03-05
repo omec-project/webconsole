@@ -289,7 +289,7 @@ func getAddedImsisList(group, prevGroup *configmodels.DeviceGroups) (aimsis []st
 	}
 	for _, imsi := range group.Imsis {
 		if prevGroup == nil {
-			if subscriberAuthData.SubscriberAuthenticationDataGet(imsi) != nil {
+			if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-" + imsi) != nil {
 				aimsis = append(aimsis, imsi)
 			}
 		} else {

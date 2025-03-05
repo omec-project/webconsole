@@ -5,6 +5,7 @@
 package server
 
 import (
+	context "context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -108,6 +109,16 @@ func (m *MockMongoPost) StartSession() (mongo.Session, error) {
 	return &configapi.MockSession{}, nil
 }
 
+func (m *MockMongoPost) RestfulAPIPostWithContext(context context.Context, coll string, filter primitive.M, data map[string]interface{}) (bool, error) {
+	params := map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+		"data":   data,
+	}
+	postData = append(postData, params)
+	return true, nil
+}
+
 func (m *MockMongoDeleteOne) RestfulAPIDeleteOne(coll string, filter primitive.M) error {
 	params := map[string]interface{}{
 		"coll":   coll,
@@ -119,6 +130,15 @@ func (m *MockMongoDeleteOne) RestfulAPIDeleteOne(coll string, filter primitive.M
 
 func (m *MockMongoDeleteOne) StartSession() (mongo.Session, error) {
 	return &configapi.MockSession{}, nil
+}
+
+func (m *MockMongoDeleteOne) RestfulAPIDeleteOneWithContext(context context.Context, coll string, filter primitive.M) error {
+	params := map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+	}
+	deleteData = append(deleteData, params)
+	return nil
 }
 
 func (m *MockMongoGetOneNil) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {

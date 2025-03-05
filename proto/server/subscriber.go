@@ -30,7 +30,7 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	filter := bson.M{"ueId": imsi}
 	authSubDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorf("could not retrieve subscribers %w", err)
 		return
 	}
 	err = json.Unmarshal(configmodels.MapToByte(authSubDataInterface), &authSubData)
@@ -52,32 +52,31 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 		if err = session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		logger.WebUILog.Debugf("insert/update authentication subscription in authenticationSubscription collection: %v", imsi)
+		logger.DbLog.Debugf("insert/update authentication subscription in authenticationSubscription collection: %v", imsi)
 		filter := bson.M{"ueId": imsi}
 		authDataBsonA := configmodels.ToBsonM(authSubData)
 		authDataBsonA["ueId"] = imsi
 		_, err = dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
 		if err != nil {
-			return err
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
 		}
-		logger.WebUILog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
+		logger.DbLog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
 		basicAmData := map[string]interface{}{
 			"ueId": imsi,
 		}
 		basicDataBson := configmodels.ToBsonM(basicAmData)
-		_, err = dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
+		_, err = dbadapter.CommonDBClient.RestfulAPIPostWithContext(sc, amDataColl, filter, basicDataBson)
 		if err != nil {
-			return err
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
 		}
-		if err = session.CommitTransaction(sc); err != nil {
-			return err
-		}
-		return nil
+		return session.CommitTransaction(sc)
 	})
 	if err != nil {
-		if abortErr := session.AbortTransaction(context.TODO()); abortErr != nil {
-			logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
-		}
+		logger.DbLog.Errorf("failed to provision subscriber %v in database: %w", imsi, err)
 	}
 }
 
@@ -92,26 +91,25 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 		if err = session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		logger.WebUILog.Debugf("delete authentication subscription from authenticationSubscription collection: %v", imsi)
+		logger.DbLog.Debugf("delete authentication subscription from authenticationSubscription collection: %v", imsi)
 		filter := bson.M{"ueId": imsi}
-		err = dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
+		err = dbadapter.AuthDBClient.RestfulAPIDeleteOneWithContext(sc, authSubsDataColl, filter)
 		if err != nil {
-			return err
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
 		}
-		logger.WebUILog.Debugf("delete authentication subscription from amData collection: %v", imsi)
-		err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
+		logger.DbLog.Debugf("delete authentication subscription from amData collection: %v", imsi)
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, amDataColl, filter)
 		if err != nil {
-			return err
+			if abortErr := session.AbortTransaction(sc); abortErr != nil {
+				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
+			}
 		}
-		if err = session.CommitTransaction(sc); err != nil {
-			return err
-		}
-		return nil
+		return session.CommitTransaction(sc)
 	})
 	if err != nil {
-		if abortErr := session.AbortTransaction(context.TODO()); abortErr != nil {
-			logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
-		}
+		logger.DbLog.Errorf("failed to delete subscriber %v from database: %w", imsi, err)
 	}
 }
 
@@ -130,20 +128,20 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 	basicAmData := map[string]interface{}{
 		"ueId": imsi,
 	}
-	logger.WebUILog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
+	logger.DbLog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
 	basicDataBson := configmodels.ToBsonM(basicAmData)
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorf("failed to insert/update subscriber %v: %w", imsi, err)
 	}
 }
 
 func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataDelete(imsi string) {
-	logger.WebUILog.Debugf("delete authentication subscription from amData collection: %v", imsi)
+	logger.DbLog.Debugf("delete authentication subscription from amData collection: %v", imsi)
 	filter := bson.M{"ueId": imsi}
 	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorf("failed to delete subscriber %v from database: %w", imsi, err)
 	}
 	logger.WebUILog.Debugf("delete authentication subscription from memory: %v", imsi)
 	delete(imsiData, imsi)

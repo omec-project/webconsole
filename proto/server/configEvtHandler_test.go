@@ -5,23 +5,28 @@
 package server
 
 import (
+	context "context"
 	"encoding/json"
 	"os"
 	"os/exec"
 	"reflect"
 	"testing"
 
+	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/factory"
+	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
 	execCommandTimesCalled = 0
 	postData               []map[string]interface{}
 	deleteData             []map[string]interface{}
+	ueId                   = "imsi-208930100007487"
 )
 
 func deviceGroup(name string) configmodels.DeviceGroups {
@@ -100,7 +105,34 @@ func (m *MockMongoPost) RestfulAPIPost(coll string, filter primitive.M, data map
 	return true, nil
 }
 
+func (m *MockMongoPost) StartSession() (mongo.Session, error) {
+	return &configapi.MockSession{}, nil
+}
+
+func (m *MockMongoPost) RestfulAPIPostWithContext(context context.Context, coll string, filter primitive.M, data map[string]interface{}) (bool, error) {
+	params := map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+		"data":   data,
+	}
+	postData = append(postData, params)
+	return true, nil
+}
+
 func (m *MockMongoDeleteOne) RestfulAPIDeleteOne(coll string, filter primitive.M) error {
+	params := map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+	}
+	deleteData = append(deleteData, params)
+	return nil
+}
+
+func (m *MockMongoDeleteOne) StartSession() (mongo.Session, error) {
+	return &configapi.MockSession{}, nil
+}
+
+func (m *MockMongoDeleteOne) RestfulAPIDeleteOneWithContext(context context.Context, coll string, filter primitive.M) error {
 	params := map[string]interface{}{
 		"coll":   coll,
 		"filter": filter,
@@ -439,21 +471,107 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 	}
 }
 
-func Test_handleSubscriberPost(t *testing.T) {
-	ueId := "208930100007487"
-	factory.WebUIConfig.Configuration.Mode5G = true
+func Test_handleSubscriberPost5G(t *testing.T) {
+	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	configMsg := configmodels.ConfigMessage{
-		MsgType: configmodels.Sub_data,
-		Imsi:    ueId,
+		AuthSubData: &models.AuthenticationSubscription{
+			AuthenticationManagementField: "8000",
+			AuthenticationMethod:          "5G_AKA",
+			Milenage: &models.Milenage{
+				Op: &models.Op{
+					EncryptionAlgorithm: 0,
+					EncryptionKey:       0,
+				},
+			},
+			Opc: &models.Opc{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
+			},
+			PermanentKey: &models.PermanentKey{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
+			},
+			SequenceNumber: "16f3b3f70fc2",
+		},
 	}
 
 	postData = make([]map[string]interface{}, 0)
+	imsiData = make(map[string]*models.AuthenticationSubscription, 0)
+	dbadapter.AuthDBClient = &MockMongoPost{}
 	dbadapter.CommonDBClient = &MockMongoPost{}
-	handleSubscriberPost(&configMsg)
+	handleSubscriberPost(ueId, configMsg.AuthSubData)
 
-	expected_collection := "subscriptionData.provisionedData.amData"
-	if postData[0]["coll"] != expected_collection {
-		t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
+	expectedAuthSubCollection := authSubsDataColl
+	expectedAmDataCollection := amDataColl
+	if postData[0]["coll"] != expectedAuthSubCollection {
+		t.Errorf("Expected collection %v, got %v", expectedAuthSubCollection, postData[0]["coll"])
+	}
+	if postData[1]["coll"] != expectedAmDataCollection {
+		t.Errorf("Expected collection %v, got %v", expectedAmDataCollection, postData[1]["coll"])
+	}
+
+	expectedFilter := bson.M{"ueId": ueId}
+	if !reflect.DeepEqual(postData[0]["filter"], expectedFilter) {
+		t.Errorf("Expected filter %v, got %v", expectedFilter, postData[0]["filter"])
+	}
+	if !reflect.DeepEqual(postData[1]["filter"], expectedFilter) {
+		t.Errorf("Expected filter %v, got %v", expectedFilter, postData[1]["filter"])
+	}
+
+	var authSubResult models.AuthenticationSubscription
+	var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
+	err := json.Unmarshal(configmodels.MapToByte(result), &authSubResult)
+	if err != nil {
+		t.Errorf("Could not unmarshall result %v", result)
+	}
+	if !reflect.DeepEqual(configMsg.AuthSubData, &authSubResult) {
+		t.Errorf("Expected authSubData %v, got %v", configMsg.AuthSubData, &authSubResult)
+	}
+	var amDataResult map[string]interface{} = postData[0]["data"].(map[string]interface{})
+	if amDataResult["ueId"] != ueId {
+		t.Errorf("Expected ueId %v, got %v", ueId, amDataResult["ueId"])
+	}
+	if imsiData[ueId] != nil {
+		t.Errorf("Expected no ueId in memory, got %v", imsiData[ueId])
+	}
+}
+
+func Test_handleSubscriberPost4G(t *testing.T) {
+	subscriberAuthData = MemorySubscriberAuthenticationData{}
+	configMsg := configmodels.ConfigMessage{
+		AuthSubData: &models.AuthenticationSubscription{
+			AuthenticationManagementField: "8000",
+			AuthenticationMethod:          "5G_AKA",
+			Milenage: &models.Milenage{
+				Op: &models.Op{
+					EncryptionAlgorithm: 0,
+					EncryptionKey:       0,
+				},
+			},
+			Opc: &models.Opc{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
+			},
+			PermanentKey: &models.PermanentKey{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
+			},
+			SequenceNumber: "16f3b3f70fc2",
+		},
+	}
+
+	postData = make([]map[string]interface{}, 0)
+	imsiData = make(map[string]*models.AuthenticationSubscription, 0)
+	dbadapter.CommonDBClient = &MockMongoPost{}
+	handleSubscriberPost(ueId, configMsg.AuthSubData)
+
+	expectedAmDataCollection := amDataColl
+	if postData[0]["coll"] != expectedAmDataCollection {
+		t.Errorf("Expected collection %v, got %v", expectedAmDataCollection, postData[0]["coll"])
 	}
 
 	expected_filter := bson.M{"ueId": ueId}
@@ -461,9 +579,85 @@ func Test_handleSubscriberPost(t *testing.T) {
 		t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
 	}
 
-	var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
-	if result["ueId"] != ueId {
-		t.Errorf("Expected ueId %v, got %v", ueId, result["ueId"])
+	var AmDataResult map[string]interface{} = postData[0]["data"].(map[string]interface{})
+	if AmDataResult["ueId"] != ueId {
+		t.Errorf("Expected ueId %v, got %v", ueId, AmDataResult["ueId"])
+	}
+	if imsiData[ueId] == nil {
+		t.Errorf("Expected ueId %v in memory, got nil", ueId)
+	}
+	if !reflect.DeepEqual(imsiData[ueId], configMsg.AuthSubData) {
+		t.Errorf("Expected authSubData %v in memory, got %v ", configMsg.AuthSubData, imsiData[ueId])
+	}
+}
+
+func Test_handleSubscriberDelete5G(t *testing.T) {
+	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
+
+	deleteData = make([]map[string]interface{}, 0)
+	dbadapter.AuthDBClient = &MockMongoDeleteOne{}
+	dbadapter.CommonDBClient = &MockMongoDeleteOne{}
+	handleSubscriberDelete(ueId)
+
+	expectedAuthSubCollection := authSubsDataColl
+	expectedAmDataCollection := amDataColl
+	if deleteData[0]["coll"] != expectedAuthSubCollection {
+		t.Errorf("Expected collection %v, got %v", expectedAuthSubCollection, deleteData[0]["coll"])
+	}
+	if deleteData[1]["coll"] != expectedAmDataCollection {
+		t.Errorf("Expected collection %v, got %v", expectedAmDataCollection, deleteData[1]["coll"])
+	}
+
+	expectedFilter := bson.M{"ueId": ueId}
+	if !reflect.DeepEqual(deleteData[0]["filter"], expectedFilter) {
+		t.Errorf("Expected filter %v, got %v", expectedFilter, deleteData[0]["filter"])
+	}
+	if !reflect.DeepEqual(deleteData[1]["filter"], expectedFilter) {
+		t.Errorf("Expected filter %v, got %v", expectedFilter, deleteData[1]["filter"])
+	}
+}
+
+func Test_handleSubscriberDelete4G(t *testing.T) {
+	subscriberAuthData = MemorySubscriberAuthenticationData{}
+
+	deleteData = make([]map[string]interface{}, 0)
+	imsiData = make(map[string]*models.AuthenticationSubscription, 0)
+	imsiData[ueId] = &models.AuthenticationSubscription{
+		AuthenticationManagementField: "8000",
+		AuthenticationMethod:          "5G_AKA",
+		Milenage: &models.Milenage{
+			Op: &models.Op{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+			},
+		},
+		Opc: &models.Opc{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
+		},
+		PermanentKey: &models.PermanentKey{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
+		},
+		SequenceNumber: "16f3b3f70fc2",
+	}
+	dbadapter.CommonDBClient = &MockMongoDeleteOne{}
+	handleSubscriberDelete(ueId)
+
+	expectedAmDataCollection := "subscriptionData.provisionedData.amData"
+	if deleteData[0]["coll"] != expectedAmDataCollection {
+		t.Errorf("Expected collection %v, got %v", expectedAmDataCollection, deleteData[0]["coll"])
+	}
+
+	expected_filter := bson.M{"ueId": ueId}
+	if !reflect.DeepEqual(deleteData[0]["filter"], expected_filter) {
+		t.Errorf("Expected filter %v, got %v", expected_filter, deleteData[0]["filter"])
+	}
+
+	if imsiData[ueId] != nil {
+		t.Errorf("Expected no ueId in memory, got %v", imsiData[ueId])
 	}
 }
 

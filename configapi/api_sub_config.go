@@ -462,6 +462,18 @@ func PostSubscriberByID(c *gin.Context) {
 
 	logger.WebUILog.Infoln("Received Post Subscriber Data from Roc/Simapp: ", ueId)
 
+	// Check if the IMSI already exists in the database
+	filter := bson.M{"ueId": ueId}
+	subscriber, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filter)
+	if err != nil {
+		logger.DbLog.Errorw("failed to check subscriber existence", "IMSI", ueId, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to check subscriber existence: %v", err)})
+		return
+	} else if subscriber != nil {
+		logger.WebUILog.Errorf("subscriber with IMSI %s already exists", ueId)
+		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("subscriber with IMSI %s already exists", ueId)})
+		return
+	}
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"

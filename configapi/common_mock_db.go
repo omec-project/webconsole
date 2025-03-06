@@ -144,3 +144,11 @@ func (db *MockMongoClientDuplicateCreation) RestfulAPICount(collName string, fil
 func (m *MockMongoClientDuplicateCreation) StartSession() (mongo.Session, error) {
 	return &MockSession{}, nil
 }
+
+type MockMongoClientNoSubscriberInDB struct {
+	dbadapter.DBInterface
+}
+
+func (db *MockMongoClientNoSubscriberInDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
+	return nil, nil
+}

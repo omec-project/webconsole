@@ -45,6 +45,16 @@ func (m *MockMongoClientOneSubscriber) RestfulAPIGetMany(coll string, filter bso
 	return results, nil
 }
 
+func (m *MockMongoClientOneSubscriber) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
+	subscriber := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{})
+	subscriber["ueId"] = "208930100007487"
+	subscriber["servingPlmnId"] = "12345"
+	var subscriberBson bson.M
+	tmp, _ := json.Marshal(subscriber)
+	json.Unmarshal(tmp, &subscriberBson)
+	return subscriberBson, nil
+}
+
 func (m *MockMongoClientManySubscribers) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	ueIds := []string{"208930100007487", "208930100007488"}
@@ -585,13 +595,17 @@ func TestSubscriberPostHandlers(t *testing.T) {
 		name            string
 		route           string
 		inputData       string
-		expectedMessage configmodels.ConfigMessage
+		expectedCode    int
+		expectedBody    string
+		expectedMessage *configmodels.ConfigMessage
 	}{
 		{
-			name:      "Create a new subscriber success",
-			route:     "/api/subscriber/imsi-208930100007487",
-			inputData: `{"plmnID":"12345", "opc":"8e27b6af0e692e750f32667a3b14605d","key":"8baf473f2f8fd09487cccbd7097c6862", "sequenceNumber":"16f3b3f70fc2"}`,
-			expectedMessage: configmodels.ConfigMessage{
+			name:         "Create a new subscriber success",
+			route:        "/api/subscriber/imsi-208930100007487",
+			inputData:    `{"plmnID":"12345", "opc":"8e27b6af0e692e750f32667a3b14605d","key":"8baf473f2f8fd09487cccbd7097c6862", "sequenceNumber":"16f3b3f70fc2"}`,
+			expectedCode: http.StatusCreated,
+			expectedBody: `{"imsi":"imsi-208930100007487"}`,
+			expectedMessage: &configmodels.ConfigMessage{
 				MsgType:   configmodels.Sub_data,
 				MsgMethod: configmodels.Post_op,
 				AuthSubData: &models.AuthenticationSubscription{
@@ -621,9 +635,11 @@ func TestSubscriberPostHandlers(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			origDBClient := dbadapter.CommonDBClient
+			dbadapter.CommonDBClient = &MockMongoClientNoSubscriberInDB{}
 			origChannel := configChannel
 			configChannel = make(chan *configmodels.ConfigMessage, 1)
-			defer func() { configChannel = origChannel }()
+			defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
 			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
@@ -659,6 +675,72 @@ func TestSubscriberPostHandlers(t *testing.T) {
 				}
 			default:
 				t.Error("expected message in configChannel, but none received")
+			}
+		})
+	}
+}
+
+func TestSubscriberPostHandlersSubscriberAlreadyExists(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddApiService(router)
+
+	testCases := []struct {
+		name            string
+		route           string
+		inputData       string
+		expectedCode    int
+		expectedBody    string
+		expectedMessage *configmodels.ConfigMessage
+	}{
+		{
+			name:            "Create subscriber conflict subscriber already exists",
+			route:           "/api/subscriber/imsi-208930100007487",
+			inputData:       `{"plmnID":"12345", "opc":"8e27b6af0e692e750f32667a3b14605d", "key":"8baf473f2f8fd09487cccbd7097c6862", "sequenceNumber":"16f3b3f70fc2"}`,
+			expectedCode:    http.StatusConflict,
+			expectedBody:    `{"error":"subscriber already exists"}`,
+			expectedMessage: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			origDBClient := dbadapter.CommonDBClient
+			dbadapter.CommonDBClient = &MockMongoClientOneSubscriber{}
+			origChannel := configChannel
+			configChannel = make(chan *configmodels.ConfigMessage, 1)
+			defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
+			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			expectedCode := http.StatusConflict
+			expectedBody := "{\"error\":\"subscriber with IMSI imsi-208930100007487 already exists\"}"
+
+			if expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+			}
+			if w.Body.String() != expectedBody {
+				t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+			}
+			// Validate channel behavior
+			if tc.expectedMessage == nil {
+				select {
+				case _ = <-configChannel:
+					t.Error("expected no message in configChannel, but got one")
+				default:
+					// No message received, as expected
+				}
+			} else {
+				select {
+				case _ = <-configChannel:
+				default:
+					t.Error("expected message in configChannel, but none received")
+				}
 			}
 		})
 	}

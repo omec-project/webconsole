@@ -5,6 +5,7 @@ package configapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -70,6 +71,153 @@ func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIGetMany(coll strin
 
 	results = append(results, dgbson)
 	return results, nil
+}
+
+type MockAuthDBClientEmpty struct {
+	dbadapter.DBInterface
+}
+
+func (m *MockAuthDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	if coll == "authSubsDataColl" {
+		return nil, fmt.Errorf("no data found in collection %s", coll)
+	}
+	return nil, fmt.Errorf("collection %s not found", coll)
+}
+
+type MockAuthDBClientWithData struct {
+	dbadapter.DBInterface
+}
+
+func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	if coll == "policyData.ues.amData" && filter["ueId"] != nil {
+		return map[string]interface{}{
+			"ueId":   filter["ueId"],
+			"status": "authenticated",
+		}, nil
+	}
+	return nil, fmt.Errorf("collection %s not found", coll)
+}
+
+type MockCommonDBClientEmpty struct {
+	dbadapter.DBInterface
+}
+
+func (m *MockCommonDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	switch coll {
+	case "amDataColl", "smfSelDataColl", "amPolicyDataColl", "smPolicyDataColl":
+		return nil, fmt.Errorf("no data found in collection %s", coll)
+	default:
+		return nil, fmt.Errorf("collection %s not found", coll)
+	}
+}
+
+func (m *MockCommonDBClientEmpty) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+	if coll == "smDataColl" {
+		return []map[string]interface{}{}, nil
+	}
+	return nil, fmt.Errorf("collection %s not found", coll)
+}
+
+type MockCommonDBClientWithData struct {
+	dbadapter.DBInterface
+}
+
+func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	switch coll {
+	case "subscriptionData.provisionedData.smData":
+		return map[string]interface{}{
+			"ueId": filter["ueId"],
+			"data": "session management data",
+		}, nil
+	case "subscriptionData.authenticationData.authenticationSubscription":
+		return map[string]interface{}{
+			"authenticationMethod": "5G-AKA",
+			"permanentKey":         map[string]string{"encryptionAlgorithm": "MILENAGE"},
+			"sequenceNumber":       "123456",
+		}, nil
+	case "policyData.ues.amData":
+		return map[string]interface{}{
+			"ueId":   filter["ueId"],
+			"amData": "access management data",
+		}, nil
+	case "policyData.ues.smData":
+		return map[string]interface{}{
+			"ueId":   filter["ueId"],
+			"smData": "session policy data",
+		}, nil
+	default:
+		return nil, fmt.Errorf("collection %s not found", coll)
+	}
+}
+
+func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+	if coll == "policyData.ues.smData" {
+		return []map[string]interface{}{
+			{"ueId": filter["ueId"], "smPolicy": "policy 1"},
+			{"ueId": filter["ueId"], "smPolicy": "policy 2"},
+		}, nil
+	}
+	return nil, fmt.Errorf("collection %s not found", coll)
+}
+
+func TestGetSubscriberByID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddApiService(router)
+
+	tests := []struct {
+		name                     string
+		ueId                     string
+		route                    string
+		commonDbAdapter          dbadapter.DBInterface
+		authDbAdapter            dbadapter.DBInterface
+		expectedHTTPStatus       int
+		expectedResponseContains string
+	}{
+		{
+			name:                     "No subscriber data found",
+			ueId:                     "12345",
+			route:                    "/api/subscriber/:ueId",
+			commonDbAdapter:          &MockCommonDBClientEmpty{},
+			authDbAdapter:            &MockAuthDBClientEmpty{},
+			expectedHTTPStatus:       http.StatusNotFound,
+			expectedResponseContains: `"error":"subscriber with ID 12345 not found"`,
+		},
+		{
+			name:                     "Valid subscriber data retrieved",
+			ueId:                     "12345",
+			commonDbAdapter:          &MockCommonDBClientWithData{},
+			authDbAdapter:            &MockAuthDBClientWithData{},
+			route:                    "/api/subscriber/:ueId",
+			expectedHTTPStatus:       http.StatusOK,
+			expectedResponseContains: `"ueId":"12345"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			originalAuthDBClient := dbadapter.AuthDBClient
+			originalCommonDBClient := dbadapter.CommonDBClient
+			dbadapter.CommonDBClient = tt.commonDbAdapter
+			dbadapter.AuthDBClient = tt.authDbAdapter
+			defer func() {
+				dbadapter.CommonDBClient = originalCommonDBClient
+				dbadapter.AuthDBClient = originalAuthDBClient
+			}()
+
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/subscriber/%s", tt.ueId), nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+			if w.Code != tt.expectedHTTPStatus {
+				t.Errorf("Expected `%v`, got `%v`", tt.expectedHTTPStatus, w.Code)
+			}
+			if !strings.Contains(w.Body.String(), tt.expectedResponseContains) {
+				t.Errorf("Expected response body to contain `%v`, but got `%v`", tt.expectedResponseContains, w.Body.String())
+			}
+
+		})
+	}
 }
 
 func TestSubscriberGetHandlers(t *testing.T) {

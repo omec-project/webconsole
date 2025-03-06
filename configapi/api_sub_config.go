@@ -309,48 +309,100 @@ func GetSubscriberByID(c *gin.Context) {
 
 	logger.WebUILog.Infoln("Get One Subscriber Data")
 
-	var subsData configmodels.SubsData
-
 	ueId := c.Param("ueId")
-
 	filterUeIdOnly := bson.M{"ueId": ueId}
 
-	authSubsDataInterface, errGetOneAuth := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
-	if errGetOneAuth != nil {
-		logger.DbLog.Warnln(errGetOneAuth)
+	var subsData configmodels.SubsData
+
+	authSubsDataInterface, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
-	amDataDataInterface, errGetOneAmData := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
-	if errGetOneAmData != nil {
-		logger.DbLog.Warnln(errGetOneAmData)
+	amDataDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
-	smDataDataInterface, errGetManySmData := dbadapter.CommonDBClient.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
-	if errGetManySmData != nil {
-		logger.DbLog.Warnln(errGetManySmData)
+	smDataDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
-	smfSelDataInterface, errGetOneSmfSel := dbadapter.CommonDBClient.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
-	if errGetOneSmfSel != nil {
-		logger.DbLog.Warnln(errGetOneSmfSel)
+	smfSelDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
-	amPolicyDataInterface, errGetOneAmPol := dbadapter.CommonDBClient.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
-	if errGetOneAmPol != nil {
-		logger.DbLog.Warnln(errGetOneAmPol)
+	amPolicyDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
-	smPolicyDataInterface, errGetManySmPol := dbadapter.CommonDBClient.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
-	if errGetManySmPol != nil {
-		logger.DbLog.Warnln(errGetManySmPol)
+	smPolicyDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Warnln(err)
 	}
+	// If all fetched data is empty, return 404 error
+	if authSubsDataInterface == nil &&
+		amDataDataInterface == nil &&
+		smDataDataInterface == nil &&
+		smfSelDataInterface == nil &&
+		amPolicyDataInterface == nil &&
+		smPolicyDataInterface == nil {
+		logger.WebUILog.Warnf("subscriber with ID %s not found", ueId)
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("subscriber with ID %s not found", ueId)})
+		return
+	}
+
 	var authSubsData models.AuthenticationSubscription
-	json.Unmarshal(configmodels.MapToByte(authSubsDataInterface), &authSubsData)
+	if authSubsDataInterface != nil {
+		err := json.Unmarshal(configmodels.MapToByte(authSubsDataInterface), &authSubsData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unmarshal authentication subscription data"})
+			return
+		}
+	}
+
 	var amDataData models.AccessAndMobilitySubscriptionData
-	json.Unmarshal(configmodels.MapToByte(amDataDataInterface), &amDataData)
+	if amDataDataInterface != nil {
+		err := json.Unmarshal(configmodels.MapToByte(amDataDataInterface), &amDataData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unmarshal access and mobility subscription data"})
+			return
+		}
+	}
+
 	var smDataData []models.SessionManagementSubscriptionData
-	json.Unmarshal(sliceToByte(smDataDataInterface), &smDataData)
+	if smDataDataInterface != nil {
+		err := json.Unmarshal(sliceToByte(smDataDataInterface), &smDataData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unmarshal session management subscription data"})
+			return
+		}
+	}
+
 	var smfSelData models.SmfSelectionSubscriptionData
-	json.Unmarshal(configmodels.MapToByte(smfSelDataInterface), &smfSelData)
+	if smfSelDataInterface != nil {
+		err := json.Unmarshal(configmodels.MapToByte(smfSelDataInterface), &smfSelData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unmarshal smf selection subscription data"})
+			return
+		}
+	}
+
 	var amPolicyData models.AmPolicyData
-	json.Unmarshal(configmodels.MapToByte(amPolicyDataInterface), &amPolicyData)
+	if amPolicyDataInterface != nil {
+		err := json.Unmarshal(configmodels.MapToByte(amPolicyDataInterface), &amPolicyData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unmarshal am policy data"})
+			return
+		}
+	}
+
 	var smPolicyData models.SmPolicyData
-	json.Unmarshal(configmodels.MapToByte(smPolicyDataInterface), &smPolicyData)
+	if smPolicyDataInterface != nil {
+		err := json.Unmarshal(configmodels.MapToByte(smPolicyDataInterface), &smPolicyData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unmarshal sm policy data"})
+			return
+		}
+	}
 
 	subsData = configmodels.SubsData{
 		UeId:                              ueId,

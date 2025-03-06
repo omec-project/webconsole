@@ -728,16 +728,17 @@ func TestSubscriberPostHandlersSubscriberAlreadyExists(t *testing.T) {
 				t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 			}
 			// Validate channel behavior
+
 			if tc.expectedMessage == nil {
 				select {
-				case _ = <-configChannel:
+				case <-configChannel:
 					t.Error("expected no message in configChannel, but got one")
 				default:
 					// No message received, as expected
 				}
 			} else {
 				select {
-				case _ = <-configChannel:
+				case <-configChannel:
 				default:
 					t.Error("expected message in configChannel, but none received")
 				}

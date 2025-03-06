@@ -56,22 +56,22 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 		filter := bson.M{"ueId": imsi}
 		authDataBsonA := configmodels.ToBsonM(authSubData)
 		authDataBsonA["ueId"] = imsi
-		_, err = dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
-		if err != nil {
+		if _, err = dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
+			return err
 		}
 		logger.DbLog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
 		basicAmData := map[string]interface{}{
 			"ueId": imsi,
 		}
 		basicDataBson := configmodels.ToBsonM(basicAmData)
-		_, err = dbadapter.CommonDBClient.RestfulAPIPostWithContext(sc, amDataColl, filter, basicDataBson)
-		if err != nil {
+		if _, err = dbadapter.CommonDBClient.RestfulAPIPostWithContext(sc, amDataColl, filter, basicDataBson); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
+			return err
 		}
 		return session.CommitTransaction(sc)
 	})
@@ -93,18 +93,18 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 		}
 		logger.DbLog.Debugf("delete authentication subscription from authenticationSubscription collection: %v", imsi)
 		filter := bson.M{"ueId": imsi}
-		err = dbadapter.AuthDBClient.RestfulAPIDeleteOneWithContext(sc, authSubsDataColl, filter)
-		if err != nil {
+		if err = dbadapter.AuthDBClient.RestfulAPIDeleteOneWithContext(sc, authSubsDataColl, filter); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
+			return err
 		}
 		logger.DbLog.Debugf("delete authentication subscription from amData collection: %v", imsi)
-		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, amDataColl, filter)
-		if err != nil {
+		if err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, amDataColl, filter); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
+			return err
 		}
 		return session.CommitTransaction(sc)
 	})

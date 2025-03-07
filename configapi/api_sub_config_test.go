@@ -75,24 +75,53 @@ func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIGetMany(coll strin
 
 type MockAuthDBClientEmpty struct {
 	dbadapter.DBInterface
+	PostData *[]map[string]interface{}
 }
 
 func (m *MockAuthDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	if coll == "authSubsDataColl" {
-		return nil, fmt.Errorf("no data found in collection %s", coll)
+	if m.PostData != nil {
+		*m.PostData = append(*m.PostData, map[string]interface{}{
+			"coll":   coll,
+			"filter": filter,
+		})
 	}
-	return nil, fmt.Errorf("collection %s not found", coll)
+	return nil, nil
 }
 
 type MockAuthDBClientWithData struct {
 	dbadapter.DBInterface
+	PostData *[]map[string]interface{}
 }
 
 func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	if coll == "policyData.ues.amData" && filter["ueId"] != nil {
+	if m.PostData != nil {
+		*m.PostData = append(*m.PostData, map[string]interface{}{
+			"coll":   coll,
+			"filter": filter,
+		})
+	}
+	if coll == "subscriptionData.authenticationData.authenticationSubscription" && filter["ueId"] != nil {
 		return map[string]interface{}{
-			"ueId":   filter["ueId"],
-			"status": "authenticated",
+			"AuthenticationManagementField": "8000",
+			"AuthenticationMethod":          "5G_AKA",
+			"Milenage": map[string]interface{}{
+				"Op": map[string]interface{}{
+					"EncryptionAlgorithm": 0,
+					"EncryptionKey":       0,
+					"OpValue":             "",
+				},
+			},
+			"Opc": map[string]interface{}{
+				"EncryptionAlgorithm": 0,
+				"EncryptionKey":       0,
+				"OpcValue":            "8e27b6af0e692e750f32667a3b14605d",
+			},
+			"PermanentKey": map[string]interface{}{
+				"EncryptionAlgorithm": 0,
+				"EncryptionKey":       0,
+				"Value":               "8baf473f2f8fd09487cccbd7097c6862",
+			},
+			"SequenceNumber": "16f3b3f70fc2",
 		}, nil
 	}
 	return nil, fmt.Errorf("collection %s not found", coll)
@@ -100,50 +129,82 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 
 type MockCommonDBClientEmpty struct {
 	dbadapter.DBInterface
+	PostData *[]map[string]interface{}
 }
 
 func (m *MockCommonDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	switch coll {
-	case "amDataColl", "smfSelDataColl", "amPolicyDataColl", "smPolicyDataColl":
-		return nil, fmt.Errorf("no data found in collection %s", coll)
-	default:
-		return nil, fmt.Errorf("collection %s not found", coll)
+	if m.PostData != nil {
+		*m.PostData = append(*m.PostData, map[string]interface{}{
+			"coll":   coll,
+			"filter": filter,
+		})
 	}
+	return nil, nil
+
 }
 
 func (m *MockCommonDBClientEmpty) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	if coll == "smDataColl" {
-		return []map[string]interface{}{}, nil
+	if m.PostData != nil {
+		*m.PostData = append(*m.PostData, map[string]interface{}{
+			"coll":   coll,
+			"filter": filter,
+		})
 	}
-	return nil, fmt.Errorf("collection %s not found", coll)
+	return nil, nil
 }
 
 type MockCommonDBClientWithData struct {
 	dbadapter.DBInterface
+	PostData *[]map[string]interface{}
 }
 
 func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	if m.PostData != nil {
+		*m.PostData = append(*m.PostData, map[string]interface{}{
+			"coll":   coll,
+			"filter": filter,
+		})
+	}
+	ueId, ok := filter["ueId"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid or missing ueId in filter")
+	}
+
 	switch coll {
-	case "subscriptionData.provisionedData.smData":
+	case "subscriptionData.provisionedData.amData":
+		imsi := ueId
+		mcc, mnc := "001", "100"
+
 		return map[string]interface{}{
-			"ueId": filter["ueId"],
-			"data": "session management data",
+			"ueId":           "imsi-" + imsi,
+			"servingPlmnId":  mcc + mnc,
+			"data":           "access management data",
+			"filterCriteria": filter,
 		}, nil
-	case "subscriptionData.authenticationData.authenticationSubscription":
-		return map[string]interface{}{
-			"authenticationMethod": "5G-AKA",
-			"permanentKey":         map[string]string{"encryptionAlgorithm": "MILENAGE"},
-			"sequenceNumber":       "123456",
-		}, nil
+
 	case "policyData.ues.amData":
 		return map[string]interface{}{
-			"ueId":   filter["ueId"],
+			"ueId":   ueId,
 			"amData": "access management data",
 		}, nil
+
 	case "policyData.ues.smData":
 		return map[string]interface{}{
-			"ueId":   filter["ueId"],
+			"ueId":   ueId,
 			"smData": "session policy data",
+		}, nil
+
+	case "subscriptionData.provisionedData.smfSelectionSubscriptionData":
+		return map[string]interface{}{
+			"ueId":          ueId,
+			"servingPlmnId": "001100",
+			"SubscribedSnssaiInfos": map[string]interface{}{
+				"010203": map[string]interface{}{
+					"DnnInfos": []map[string]string{
+						{"Dnn": "internet"},
+					},
+				},
+			},
 		}, nil
 	default:
 		return nil, fmt.Errorf("collection %s not found", coll)
@@ -151,51 +212,109 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 }
 
 func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	if coll == "policyData.ues.smData" {
+	if m.PostData != nil {
+		*m.PostData = append(*m.PostData, map[string]interface{}{
+			"coll":   coll,
+			"filter": filter,
+		})
+	}
+	if coll == "subscriptionData.provisionedData.smData" && filter["ueId"] != nil {
 		return []map[string]interface{}{
-			{"ueId": filter["ueId"], "smPolicy": "policy 1"},
-			{"ueId": filter["ueId"], "smPolicy": "policy 2"},
+			{
+				"ueId": filter["ueId"],
+				"data": "session management data",
+			},
 		}, nil
 	}
 	return nil, fmt.Errorf("collection %s not found", coll)
+}
+
+func comparePostData(expected, actual []map[string]interface{}) error {
+	if len(expected) != len(actual) {
+		return fmt.Errorf("length mismatch: expected %d elements, got %d elements", len(expected), len(actual))
+	}
+
+	for i := range expected {
+		if !compareMaps(expected[i], actual[i]) {
+			return fmt.Errorf("mismatch at index %d: expected %+v, got %+v", i, expected[i], actual[i])
+		}
+	}
+
+	return nil
+}
+
+func compareMaps(map1, map2 map[string]interface{}) bool {
+	if len(map1) != len(map2) {
+		return false
+	}
+	for key, val1 := range map1 {
+		val2, exists := map2[key]
+		if !exists {
+			return false
+		}
+		if fmt.Sprintf("%v", val1) != fmt.Sprintf("%v", val2) {
+			return false
+		}
+	}
+	return true
 }
 
 func TestGetSubscriberByID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)
+	postData := make([]map[string]interface{}, 0)
 
 	tests := []struct {
-		name                     string
-		ueId                     string
-		route                    string
-		commonDbAdapter          dbadapter.DBInterface
-		authDbAdapter            dbadapter.DBInterface
-		expectedHTTPStatus       int
-		expectedResponseContains string
+		name                    string
+		ueId                    string
+		route                   string
+		commonDbAdapter         dbadapter.DBInterface
+		authDbAdapter           dbadapter.DBInterface
+		expectedHTTPStatus      int
+		expectedCollections     []string
+		expectedFullResponse    string
+		expectedPostDataDetails []map[string]interface{}
 	}{
 		{
-			name:                     "No subscriber data found",
-			ueId:                     "12345",
-			route:                    "/api/subscriber/:ueId",
-			commonDbAdapter:          &MockCommonDBClientEmpty{},
-			authDbAdapter:            &MockAuthDBClientEmpty{},
-			expectedHTTPStatus:       http.StatusNotFound,
-			expectedResponseContains: `"error":"subscriber with ID 12345 not found"`,
+			name:                 "No subscriber data found",
+			ueId:                 "12345",
+			route:                "/api/subscriber/:ueId",
+			commonDbAdapter:      &MockCommonDBClientEmpty{PostData: &postData},
+			authDbAdapter:        &MockAuthDBClientEmpty{PostData: &postData},
+			expectedHTTPStatus:   http.StatusNotFound,
+			expectedFullResponse: `{"error":"subscriber with ID 12345 not found"}`,
+			expectedPostDataDetails: []map[string]interface{}{
+				{"coll": "subscriptionData.authenticationData.authenticationSubscription", "filter": map[string]interface{}{"ueId": "12345"}},
+				{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "12345"}},
+				{"coll": "subscriptionData.provisionedData.smData", "filter": map[string]interface{}{"ueId": "12345"}},
+				{"coll": "subscriptionData.provisionedData.smfSelectionSubscriptionData", "filter": map[string]interface{}{"ueId": "12345"}},
+				{"coll": "policyData.ues.amData", "filter": map[string]interface{}{"ueId": "12345"}},
+				{"coll": "policyData.ues.smData", "filter": map[string]interface{}{"ueId": "12345"}},
+			},
 		},
+
 		{
-			name:                     "Valid subscriber data retrieved",
-			ueId:                     "12345",
-			commonDbAdapter:          &MockCommonDBClientWithData{},
-			authDbAdapter:            &MockAuthDBClientWithData{},
-			route:                    "/api/subscriber/:ueId",
-			expectedHTTPStatus:       http.StatusOK,
-			expectedResponseContains: `"ueId":"12345"`,
+			name:                 "Valid subscriber data retrieved",
+			ueId:                 "12345",
+			commonDbAdapter:      &MockCommonDBClientWithData{PostData: &postData},
+			authDbAdapter:        &MockAuthDBClientWithData{PostData: &postData},
+			route:                "/api/subscriber/:ueId",
+			expectedHTTPStatus:   http.StatusOK,
+			expectedFullResponse: `{"plmnID":"","ueId":"12345","AuthenticationSubscription":{"authenticationMethod":"5G_AKA","permanentKey":{"permanentKeyValue":"","encryptionKey":0,"encryptionAlgorithm":0},"sequenceNumber":"16f3b3f70fc2","authenticationManagementField":"8000","milenage":{"op":{"opValue":"","encryptionKey":0,"encryptionAlgorithm":0}},"opc":{"opcValue":"8e27b6af0e692e750f32667a3b14605d","encryptionKey":0,"encryptionAlgorithm":0}},"AccessAndMobilitySubscriptionData":{},"SessionManagementSubscriptionData":[{"singleNssai":null}],"SmfSelectionSubscriptionData":{"subscribedSnssaiInfos":{"010203":{"dnnInfos":[{"dnn":"internet"}]}}},"AmPolicyData":{},"SmPolicyData":{"smPolicySnssaiData":null},"FlowRules":null}`,
+			expectedPostDataDetails: []map[string]interface{}{
+				{"coll": "subscriptionData.authenticationData.authenticationSubscription", "filter": map[string]interface{}{"ueId": "12345"}},
+				{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "12345"}},
+				{"coll": "subscriptionData.provisionedData.smData", "filter": map[string]interface{}{"ueId": "12345"}},
+				{"coll": "subscriptionData.provisionedData.smfSelectionSubscriptionData", "filter": map[string]interface{}{"ueId": "12345"}},
+				{"coll": "policyData.ues.amData", "filter": map[string]interface{}{"ueId": "12345"}},
+				{"coll": "policyData.ues.smData", "filter": map[string]interface{}{"ueId": "12345"}},
+			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			postData = nil
 			originalAuthDBClient := dbadapter.AuthDBClient
 			originalCommonDBClient := dbadapter.CommonDBClient
 			dbadapter.CommonDBClient = tt.commonDbAdapter
@@ -209,13 +328,15 @@ func TestGetSubscriberByID(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
-			if w.Code != tt.expectedHTTPStatus {
-				t.Errorf("Expected `%v`, got `%v`", tt.expectedHTTPStatus, w.Code)
-			}
-			if !strings.Contains(w.Body.String(), tt.expectedResponseContains) {
-				t.Errorf("Expected response body to contain `%v`, but got `%v`", tt.expectedResponseContains, w.Body.String())
+
+			responseContent := w.Body.String()
+			if !reflect.DeepEqual(responseContent, tt.expectedFullResponse) {
+				t.Errorf("Expected full response body `%v`, but got `%v`", tt.expectedFullResponse, responseContent)
 			}
 
+			if comparePostData(tt.expectedPostDataDetails, postData) != nil {
+				t.Errorf("Expected postData `%v`, but got `%v`", tt.expectedPostDataDetails, postData)
+			}
 		})
 	}
 }

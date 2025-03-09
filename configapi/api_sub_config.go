@@ -357,7 +357,7 @@ func GetSubscriberByID(c *gin.Context) {
 		smfSelDataInterface == nil &&
 		amPolicyDataInterface == nil &&
 		smPolicyDataInterface == nil {
-		logger.WebUILog.Warnf("subscriber with ID %s not found", ueId)
+		logger.WebUILog.Errorf("subscriber with ID %s not found", ueId)
 		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("subscriber with ID %s not found", ueId)})
 		return
 	}

@@ -138,6 +138,9 @@ const docTemplate = `{
                     "403": {
                         "description": "Forbidden"
                     },
+                    "409": {
+                        "description": "Subscriber already exists"
+                    },
                     "500": {
                         "description": "Error creating subscriber"
                     }

@@ -446,6 +446,7 @@ func GetSubscriberByID(c *gin.Context) {
 // @Failure      400  {object}  nil  "Invalid subscriber content"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
+// @Failure      409  {object}  nil  "Subscriber already exists"
 // @Failure      500  {object}  nil  "Error creating subscriber"
 // @Router      /api/subscriber/{imsi}  [post]
 func PostSubscriberByID(c *gin.Context) {
@@ -466,12 +467,12 @@ func PostSubscriberByID(c *gin.Context) {
 	filter := bson.M{"ueId": ueId}
 	subscriber, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filter)
 	if err != nil {
-		logger.DbLog.Errorw("failed to check subscriber existence", "IMSI", ueId, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to check subscriber existence: %v", err)})
+		logger.DbLog.Errorf("Failed querying subscriber existence for IMSI: %s; Error: %v", ueId, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to check subscriber: %s existence", ueId)})
 		return
 	} else if subscriber != nil {
-		logger.WebUILog.Errorf("subscriber with IMSI %s already exists", ueId)
-		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("subscriber with IMSI %s already exists", ueId)})
+		logger.WebUILog.Errorf("subscriber %s already exists", ueId)
+		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("subscriber %s already exists", ueId)})
 		return
 	}
 	authSubsData := models.AuthenticationSubscription{

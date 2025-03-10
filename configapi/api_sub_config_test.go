@@ -594,7 +594,7 @@ func TestSubscriberGetHandlers(t *testing.T) {
 	}
 }
 
-func TestSubscriberPostHandlersNoSubscriber(t *testing.T) {
+func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)

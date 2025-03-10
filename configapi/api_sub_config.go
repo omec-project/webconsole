@@ -467,7 +467,7 @@ func PostSubscriberByID(c *gin.Context) {
 	filter := bson.M{"ueId": ueId}
 	subscriber, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filter)
 	if err != nil {
-		logger.DbLog.Errorf("Failed querying subscriber existence for IMSI: %s; Error: %v", ueId, err)
+		logger.DbLog.Errorf("failed querying subscriber existence for IMSI: %s; Error: %v", ueId, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to check subscriber: %s existence", ueId)})
 		return
 	} else if subscriber != nil {

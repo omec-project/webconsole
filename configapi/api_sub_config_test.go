@@ -499,7 +499,7 @@ func TestGetSubscriberByID(t *testing.T) {
 			gotCommonData, _ := json.Marshal(postDataCommon)
 
 			if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
-				t.Errorf("Expected CommonPostData `%v`, but got `%v`", tt.expectedAuthPostDataDetails, postDataAuth)
+				t.Errorf("Expected CommonPostData `%v`, but got `%v`", tt.expectedCommonPostDataDetails, postDataCommon)
 			}
 
 			expectedAuthData, _ := json.Marshal(tt.expectedAuthPostDataDetails)

@@ -523,7 +523,20 @@ func PostSubscriberByID(c *gin.Context) {
 	logger.WebUILog.Infoln("Successfully Added Subscriber Data to ConfigChannel: ", ueId)
 }
 
-// Put subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
+// PutSubscriberByID godoc
+//
+// @Description  Update subscriber information by IMSI (UE ID)
+// @Tags         Subscribers
+// @Param        imsi       path    string                           true    "IMSI (UE ID)"
+// @Param        content    body    configmodels.SubsData            true    "Updated subscriber details"
+// @Security     BearerAuth
+// @Success      204  {object}  nil  "Subscriber updated successfully"
+// @Failure      400  {object}  nil  "Invalid subscriber content"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Failure      404  {object}  nil  "Subscriber not found"
+// @Failure      500  {object}  nil  "Error updating subscriber"
+// @Router       /api/subscriber/{imsi}  [put]
 func PutSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Put One Subscriber Data")

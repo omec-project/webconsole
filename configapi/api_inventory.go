@@ -69,7 +69,7 @@ func GetGnbs(c *gin.Context) {
 // @Produce     json
 // @Param       gnb    body    configmodels.PostGnbRequest    true    "Name and TAC of the gNB"
 // @Security    BearerAuth
-// @Success     201  {object}  nil  "gNB sucessfully created"
+// @Success     201  {object}  nil  "gNB successfully created"
 // @Failure     400  {object}  nil  "Bad request"
 // @Failure     401  {object}  nil  "Authorization failed"
 // @Failure     403  {object}  nil  "Forbidden"
@@ -125,7 +125,7 @@ func postGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
 // @Param       gnb-name    path    string                        true    "Name of the gNB"
 // @Param       tac         body    configmodels.PutGnbRequest    true    "TAC of the gNB"
 // @Security    BearerAuth
-// @Success     201  {object}  nil  "gNB sucessfully created"
+// @Success     201  {object}  nil  "gNB successfully created"
 // @Failure     400  {object}  nil  "Bad request"
 // @Failure     401  {object}  nil  "Authorization failed"
 // @Failure     403  {object}  nil  "Forbidden"

@@ -97,6 +97,55 @@ const docTemplate = `{
                     }
                 }
             },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update subscriber information by IMSI (UE ID)",
+                "tags": [
+                    "Subscribers"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "IMSI (UE ID)",
+                        "name": "imsi",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated subscriber details",
+                        "name": "content",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/configmodels.SubsData"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Subscriber updated successfully"
+                    },
+                    "400": {
+                        "description": "Invalid subscriber content"
+                    },
+                    "401": {
+                        "description": "Authorization failed"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Subscriber not found"
+                    },
+                    "500": {
+                        "description": "Error updating subscriber"
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -137,6 +186,9 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden"
+                    },
+                    "409": {
+                        "description": "Subscriber already exists"
                     },
                     "500": {
                         "description": "Error creating subscriber"
@@ -1445,6 +1497,9 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "configmodels.SubsData": {
+            "type": "object"
         },
         "configmodels.SubsListIE": {
             "type": "object",

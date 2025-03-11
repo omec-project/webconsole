@@ -6,7 +6,7 @@ package configapi
 import "testing"
 
 func TestValidateName(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name     string
 		expected bool
 	}{
@@ -32,7 +32,7 @@ func TestValidateName(t *testing.T) {
 }
 
 func TestValidateFQDN(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		fqdn     string
 		expected bool
 	}{
@@ -58,7 +58,7 @@ func TestValidateFQDN(t *testing.T) {
 }
 
 func TestValidateUpfPort(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		port     string
 		expected bool
 	}{
@@ -82,7 +82,7 @@ func TestValidateUpfPort(t *testing.T) {
 }
 
 func TestValidateGnbTac(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		tac      string
 		expected bool
 	}{

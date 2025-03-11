@@ -276,7 +276,6 @@ func GetSubscribers(c *gin.Context) {
 		return
 	}
 	for _, amData := range amDataList {
-
 		tmp := configmodels.SubsListIE{
 			UeId: amData["ueId"].(string),
 		}

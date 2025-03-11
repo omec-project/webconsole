@@ -145,7 +145,6 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 	json.Unmarshal(tmp, &result)
 
 	return result, nil
-
 }
 
 type MockCommonDBClientEmpty struct {
@@ -161,7 +160,6 @@ func (m *MockCommonDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (
 		})
 	}
 	return nil, nil
-
 }
 
 func (m *MockCommonDBClientEmpty) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {

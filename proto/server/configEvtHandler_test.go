@@ -5,7 +5,6 @@
 package server
 
 import (
-	context "context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -14,19 +13,16 @@ import (
 
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/factory"
-	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
 	execCommandTimesCalled = 0
 	postData               []map[string]interface{}
 	deleteData             []map[string]interface{}
-	ueId                   = "imsi-208930100007487"
 )
 
 func deviceGroup(name string) configmodels.DeviceGroups {
@@ -105,34 +101,7 @@ func (m *MockMongoPost) RestfulAPIPost(coll string, filter primitive.M, data map
 	return true, nil
 }
 
-func (m *MockMongoPost) StartSession() (mongo.Session, error) {
-	return &configapi.MockSession{}, nil
-}
-
-func (m *MockMongoPost) RestfulAPIPostWithContext(context context.Context, coll string, filter primitive.M, data map[string]interface{}) (bool, error) {
-	params := map[string]interface{}{
-		"coll":   coll,
-		"filter": filter,
-		"data":   data,
-	}
-	postData = append(postData, params)
-	return true, nil
-}
-
 func (m *MockMongoDeleteOne) RestfulAPIDeleteOne(coll string, filter primitive.M) error {
-	params := map[string]interface{}{
-		"coll":   coll,
-		"filter": filter,
-	}
-	deleteData = append(deleteData, params)
-	return nil
-}
-
-func (m *MockMongoDeleteOne) StartSession() (mongo.Session, error) {
-	return &configapi.MockSession{}, nil
-}
-
-func (m *MockMongoDeleteOne) RestfulAPIDeleteOneWithContext(context context.Context, coll string, filter primitive.M) error {
 	params := map[string]interface{}{
 		"coll":   coll,
 		"filter": filter,
@@ -472,6 +441,7 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 }
 
 func Test_handleSubscriberPost5G(t *testing.T) {
+	ueId := "208930100007487"
 	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	configMsg := configmodels.ConfigMessage{
 		AuthSubData: &models.AuthenticationSubscription{
@@ -539,6 +509,7 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 }
 
 func Test_handleSubscriberPost4G(t *testing.T) {
+	ueId := "208930100007487"
 	subscriberAuthData = MemorySubscriberAuthenticationData{}
 	configMsg := configmodels.ConfigMessage{
 		AuthSubData: &models.AuthenticationSubscription{
@@ -592,6 +563,7 @@ func Test_handleSubscriberPost4G(t *testing.T) {
 }
 
 func Test_handleSubscriberDelete5G(t *testing.T) {
+	ueId := "208930100007487"
 	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 
 	deleteData = make([]map[string]interface{}, 0)
@@ -618,6 +590,7 @@ func Test_handleSubscriberDelete5G(t *testing.T) {
 }
 
 func Test_handleSubscriberDelete4G(t *testing.T) {
+	ueId := "208930100007487"
 	subscriberAuthData = MemorySubscriberAuthenticationData{}
 
 	deleteData = make([]map[string]interface{}, 0)

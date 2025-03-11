@@ -25,7 +25,7 @@ type DatabaseSubscriberAuthenticationData struct {
 
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
 	filter := bson.M{"ueId": imsi}
-	authSubDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
+	authSubDataInterface, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
 	if err != nil {
 		logger.DbLog.Warnln(err)
 		return
@@ -56,7 +56,6 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	_, err = dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
 	if err != nil {
 		logger.DbLog.Warnln(err)
-		return
 	}
 }
 
@@ -72,7 +71,6 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
 	if err != nil {
 		logger.DbLog.Warnln(err)
-		return
 	}
 }
 

@@ -91,6 +91,11 @@ type MockMongoSliceGetOne struct {
 	testSlice configmodels.Slice
 }
 
+type MockMongoSubscriberGetOne struct {
+	dbadapter.DBInterface
+	testSubscriber bson.M
+}
+
 func (m *MockMongoPost) RestfulAPIPost(coll string, filter primitive.M, data map[string]interface{}) (bool, error) {
 	params := map[string]interface{}{
 		"coll":   coll,
@@ -139,6 +144,19 @@ func (m *MockMongoSliceGetOne) RestfulAPIGetOne(collName string, filter bson.M) 
 		return nil, err
 	}
 	return previousSliceBson, nil
+}
+
+func (m *MockMongoSubscriberGetOne) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
+	var previousSubscriberBson bson.M
+	previousSubscriber, err := json.Marshal(m.testSubscriber)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(previousSubscriber, &previousSubscriberBson)
+	if err != nil {
+		return nil, err
+	}
+	return previousSubscriberBson, nil
 }
 
 func mockExecCommand(command string, args ...string) *exec.Cmd {
@@ -440,6 +458,69 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 	}
 }
 
+func Test_handleSubscriberGet5G(t *testing.T) {
+	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
+	subscriber := models.AuthenticationSubscription{
+		AuthenticationManagementField: "8000",
+		AuthenticationMethod:          "5G_AKA",
+		Milenage: &models.Milenage{
+			Op: &models.Op{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+			},
+		},
+		Opc: &models.Opc{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
+		},
+		PermanentKey: &models.PermanentKey{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
+		},
+		SequenceNumber: "16f3b3f70fc2",
+	}
+	subscribers := []bson.M{configmodels.ToBsonM(subscriber)}
+	subscribers[0]["ueId"] = "imsi-208930100007487"
+	dbadapter.AuthDBClient = &MockMongoSubscriberGetOne{dbadapter.AuthDBClient, subscribers[0]}
+	subscriberResult := subscriberAuthData.SubscriberAuthenticationDataGet("imsi-208930100007487")
+	if !reflect.DeepEqual(&subscriber, subscriberResult) {
+		t.Errorf("Expected subscriber %v, got %v", &subscriber, subscriberResult)
+	}
+}
+
+func Test_handleSubscriberGet4G(t *testing.T) {
+	subscriberAuthData = MemorySubscriberAuthenticationData{}
+	imsiData = make(map[string]*models.AuthenticationSubscription, 0)
+	subscriber := models.AuthenticationSubscription{
+		AuthenticationManagementField: "8000",
+		AuthenticationMethod:          "5G_AKA",
+		Milenage: &models.Milenage{
+			Op: &models.Op{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+			},
+		},
+		Opc: &models.Opc{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
+		},
+		PermanentKey: &models.PermanentKey{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
+		},
+		SequenceNumber: "16f3b3f70fc2",
+	}
+	imsiData["imsi-208930100007487"] = &subscriber
+	subscriberResult := subscriberAuthData.SubscriberAuthenticationDataGet("imsi-208930100007487")
+	if !reflect.DeepEqual(&subscriber, subscriberResult) {
+		t.Errorf("Expected subscriber %v, got %v", &subscriber, subscriberResult)
+	}
+}
+
 func Test_handleSubscriberPost5G(t *testing.T) {
 	ueId := "208930100007487"
 	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
@@ -499,7 +580,7 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 	if !reflect.DeepEqual(configMsg.AuthSubData, &authSubResult) {
 		t.Errorf("Expected authSubData %v, got %v", configMsg.AuthSubData, &authSubResult)
 	}
-	var amDataResult map[string]interface{} = postData[0]["data"].(map[string]interface{})
+	var amDataResult map[string]interface{} = postData[1]["data"].(map[string]interface{})
 	if amDataResult["ueId"] != ueId {
 		t.Errorf("Expected ueId %v, got %v", ueId, amDataResult["ueId"])
 	}

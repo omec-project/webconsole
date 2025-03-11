@@ -40,14 +40,9 @@ type Update5GSubscriberMsg struct {
 
 var (
 	execCommand        = exec.Command
-	imsiData           map[string]*models.AuthenticationSubscription
 	rwLock             sync.RWMutex
 	subscriberAuthData SubscriberAuthenticationData
 )
-
-func init() {
-	imsiData = make(map[string]*models.AuthenticationSubscription)
-}
 
 func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceived chan bool) {
 	// Start Goroutine which will listens for subscriber config updates
@@ -65,7 +60,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		configMsg := <-configMsgChan
 		if configMsg.MsgType == configmodels.Sub_data {
 			imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
-			logger.ConfigLog.Infoln("received imsi from config channel: ", imsiVal)
+			logger.ConfigLog.Infoln("received imsi from config channel:", imsiVal)
 			if configMsg.MsgMethod == configmodels.Delete_op {
 				handleSubscriberDelete(configMsg.Imsi)
 			} else {

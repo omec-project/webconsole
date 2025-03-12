@@ -4,13 +4,13 @@
 package configapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +22,7 @@ import (
 
 type MockMongoClientOneSubscriber struct {
 	dbadapter.DBInterface
+	PostDataCommon *[]map[string]interface{}
 }
 
 type MockMongoClientManySubscribers struct {
@@ -43,6 +44,23 @@ func (m *MockMongoClientOneSubscriber) RestfulAPIGetMany(coll string, filter bso
 
 	results = append(results, subscriberBson)
 	return results, nil
+}
+
+func (m *MockMongoClientOneSubscriber) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
+	if m.PostDataCommon != nil {
+		*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
+			"coll":   collName,
+			"filter": filter,
+		})
+	}
+
+	subscriber := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{})
+	subscriber["ueId"] = "208930100007487"
+	subscriber["servingPlmnId"] = "12345"
+	var subscriberBson bson.M
+	tmp, _ := json.Marshal(subscriber)
+	json.Unmarshal(tmp, &subscriberBson)
+	return subscriberBson, nil
 }
 
 func (m *MockMongoClientManySubscribers) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
@@ -127,7 +145,6 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 	json.Unmarshal(tmp, &result)
 
 	return result, nil
-
 }
 
 type MockCommonDBClientEmpty struct {
@@ -143,7 +160,6 @@ func (m *MockCommonDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (
 		})
 	}
 	return nil, nil
-
 }
 
 func (m *MockCommonDBClientEmpty) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
@@ -576,91 +592,164 @@ func TestSubscriberGetHandlers(t *testing.T) {
 	}
 }
 
-func TestSubscriberPostHandlers(t *testing.T) {
+func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)
 
-	testCases := []struct {
-		name            string
-		route           string
-		inputData       string
-		expectedMessage configmodels.ConfigMessage
-	}{
-		{
-			name:      "Create a new subscriber success",
-			route:     "/api/subscriber/imsi-208930100007487",
-			inputData: `{"plmnID":"12345", "opc":"8e27b6af0e692e750f32667a3b14605d","key":"8baf473f2f8fd09487cccbd7097c6862", "sequenceNumber":"16f3b3f70fc2"}`,
-			expectedMessage: configmodels.ConfigMessage{
-				MsgType:   configmodels.Sub_data,
-				MsgMethod: configmodels.Post_op,
-				AuthSubData: &models.AuthenticationSubscription{
-					AuthenticationManagementField: "8000",
-					AuthenticationMethod:          "5G_AKA",
-					Milenage: &models.Milenage{
-						Op: &models.Op{
-							EncryptionAlgorithm: 0,
-							EncryptionKey:       0,
-						},
-					},
-					Opc: &models.Opc{
-						EncryptionAlgorithm: 0,
-						EncryptionKey:       0,
-						OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
-					},
-					PermanentKey: &models.PermanentKey{
-						EncryptionAlgorithm: 0,
-						EncryptionKey:       0,
-						PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
-					},
-					SequenceNumber: "16f3b3f70fc2",
-				},
-				Imsi: "imsi-208930100007487",
-			},
-		},
+	postDataCommon := make([]map[string]interface{}, 0)
+	route := "/api/subscriber/imsi-208930100007487"
+	inputData := map[string]string{
+		"plmnID":         "12345",
+		"opc":            "8e27b6af0e692e750f32667a3b14605d",
+		"key":            "8baf473f2f8fd09487cccbd7097c6862",
+		"sequenceNumber": "16f3b3f70fc2",
 	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 1)
-			defer func() { configChannel = origChannel }()
-			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
-			if err != nil {
-				t.Fatalf("failed to create request: %v", err)
-			}
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
 
-			router.ServeHTTP(w, req)
+	jsonData, err := json.Marshal(inputData)
+	if err != nil {
+		t.Fatalf("failed to marshal input data to JSON: %v", err)
+	}
 
-			expectedCode := http.StatusCreated
-			expectedBody := "{}"
+	commonDbAdapter := &MockMongoClientNoSubscriberInDB{PostDataCommon: &postDataCommon}
+	origDBClient := dbadapter.CommonDBClient
+	origChannel := configChannel
+	configChannel = make(chan *configmodels.ConfigMessage, 1)
+	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
+	dbadapter.CommonDBClient = commonDbAdapter
 
-			if expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
-			}
-			if w.Body.String() != expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-			}
-			select {
-			case msg := <-configChannel:
+	expectedCode := http.StatusCreated
+	expectedBody := `{}`
+	expectedCommonPostDataDetails := []map[string]interface{}{
+		{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-208930100007487"}},
+	}
+	expectedMessage := &configmodels.ConfigMessage{
+		MsgType:   configmodels.Sub_data,
+		MsgMethod: configmodels.Post_op,
+		AuthSubData: &models.AuthenticationSubscription{
+			AuthenticationManagementField: "8000",
+			AuthenticationMethod:          "5G_AKA",
+			Milenage: &models.Milenage{
+				Op: &models.Op{
+					EncryptionAlgorithm: 0,
+					EncryptionKey:       0,
+				},
+			},
+			Opc: &models.Opc{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
+			},
+			PermanentKey: &models.PermanentKey{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
+			},
+			SequenceNumber: "16f3b3f70fc2",
+		},
+		Imsi: "imsi-208930100007487",
+	}
 
-				if msg.MsgType != tc.expectedMessage.MsgType {
-					t.Errorf("expected MsgType %+v, but got %+v", tc.expectedMessage.MsgType, msg.MsgType)
-				}
-				if msg.MsgMethod != tc.expectedMessage.MsgMethod {
-					t.Errorf("expected MsgMethod %+v, but got %+v", tc.expectedMessage.MsgMethod, msg.MsgMethod)
-				}
-				if !reflect.DeepEqual(tc.expectedMessage.AuthSubData, msg.AuthSubData) {
-					t.Errorf("expected AuthSubData %+v, but got %+v", tc.expectedMessage.AuthSubData, msg.AuthSubData)
-				}
-				if tc.expectedMessage.Imsi != msg.Imsi {
-					t.Errorf("expected IMSI %+v, but got %+v", tc.expectedMessage.Imsi, msg.Imsi)
-				}
-			default:
-				t.Error("expected message in configChannel, but none received")
-			}
-		})
+	req, err := http.NewRequest(http.MethodPost, route, bytes.NewBuffer(jsonData))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != expectedCode {
+		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+	}
+	if w.Body.String() != expectedBody {
+		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+	}
+
+	expectedCommonData, _ := json.Marshal(expectedCommonPostDataDetails)
+	gotCommonData, _ := json.Marshal(postDataCommon)
+
+	if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
+		t.Errorf("Expected CommonPostData `%v`, but got `%v`", expectedCommonPostDataDetails, postDataCommon)
+	}
+
+	select {
+	case msg := <-configChannel:
+		if msg.MsgType != expectedMessage.MsgType {
+			t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
+		}
+		if msg.MsgMethod != expectedMessage.MsgMethod {
+			t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
+		}
+		if !reflect.DeepEqual(expectedMessage.AuthSubData, msg.AuthSubData) {
+			t.Errorf("expected AuthSubData %+v, but got %+v", expectedMessage.AuthSubData, msg.AuthSubData)
+		}
+		if expectedMessage.Imsi != msg.Imsi {
+			t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)
+		}
+	default:
+		t.Error("expected message in configChannel, but none received")
+	}
+}
+
+func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddApiService(router)
+
+	postDataCommon := make([]map[string]interface{}, 0)
+	route := "/api/subscriber/imsi-208930100007487"
+	inputData := map[string]string{
+		"plmnID":         "12345",
+		"opc":            "8e27b6af0e692e750f32667a3b14605d",
+		"key":            "8baf473f2f8fd09487cccbd7097c6862",
+		"sequenceNumber": "16f3b3f70fc2",
+	}
+
+	jsonData, err := json.Marshal(inputData)
+	if err != nil {
+		t.Fatalf("failed to marshal input data to JSON: %v", err)
+	}
+
+	commonDbAdapter := &MockMongoClientOneSubscriber{PostDataCommon: &postDataCommon}
+	origDBClient := dbadapter.CommonDBClient
+	origChannel := configChannel
+	configChannel = make(chan *configmodels.ConfigMessage, 1)
+	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
+	dbadapter.CommonDBClient = commonDbAdapter
+
+	expectedCode := http.StatusConflict
+	expectedBody := `{"error":"subscriber imsi-208930100007487 already exists"}`
+	expectedCommonPostDataDetails := []map[string]interface{}{
+		{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-208930100007487"}},
+	}
+
+	req, err := http.NewRequest(http.MethodPost, route, bytes.NewBuffer(jsonData))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != expectedCode {
+		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+	}
+	if w.Body.String() != expectedBody {
+		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+	}
+
+	expectedCommonData, _ := json.Marshal(expectedCommonPostDataDetails)
+	gotCommonData, _ := json.Marshal(postDataCommon)
+
+	if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
+		t.Errorf("Expected CommonPostData `%v`, but got `%v`", expectedCommonPostDataDetails, postDataCommon)
+	}
+
+	select {
+	case <-configChannel:
+		t.Error("expected no message in configChannel, but got one")
+	default:
+		// No message received as expected.
 	}
 }
 

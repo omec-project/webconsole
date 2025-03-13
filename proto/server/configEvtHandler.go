@@ -329,22 +329,6 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 	return
 }
 
-func getSubscriberAuthDataByUeId(ueId string) *models.AuthenticationSubscription {
-	filter := bson.M{"ueId": ueId}
-	subscriberAuthDataInterface, errGetOne := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
-	if errGetOne != nil {
-		logger.DbLog.Warnln(errGetOne)
-		return nil
-	}
-	var subscriberAuthData models.AuthenticationSubscription
-	err := json.Unmarshal(configmodels.MapToByte(subscriberAuthDataInterface), &subscriberAuthData)
-	if err != nil {
-		logger.DbLog.Errorf("could not unmarshall subscriber %v", subscriberAuthDataInterface)
-		return nil
-	}
-	return &subscriberAuthData
-}
-
 func updateAmPolicyData(imsi string) {
 	// ampolicydata
 	var amPolicy models.AmPolicyData

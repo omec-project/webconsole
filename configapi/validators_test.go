@@ -6,7 +6,7 @@ package configapi
 import "testing"
 
 func TestValidateName(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name     string
 		expected bool
 	}{
@@ -16,6 +16,10 @@ func TestValidateName(t *testing.T) {
 		{"{invalid_name}", false},
 		{"invalid&name", false},
 		{"invalidName(R)", false},
+		{"-invalidName", false},
+		{"_invalidName", false},
+		{"4invalidName", false},
+		{"-_invalid", false},
 		{"", false},
 	}
 
@@ -28,11 +32,12 @@ func TestValidateName(t *testing.T) {
 }
 
 func TestValidateFQDN(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		fqdn     string
 		expected bool
 	}{
 		{"upf-external.sdcore.svc.cluster.local", true},
+		{"123-external.sdcore.svc.cluster.local", true},
 		{"my-upf.my-domain.com", true},
 		{"www.my-upf.com", true},
 		{"some-upf-name", false},
@@ -40,6 +45,7 @@ func TestValidateFQDN(t *testing.T) {
 		{"{upf-external}.sdcore.svc.cluster.local", false},
 		{"http://my-upf.my-domain.com", false},
 		{"my-domain.com/my-upf", false},
+		{"-upf-external.sdcore.svc.cluster.local", false},
 		{"", false},
 	}
 
@@ -52,7 +58,7 @@ func TestValidateFQDN(t *testing.T) {
 }
 
 func TestValidateUpfPort(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		port     string
 		expected bool
 	}{
@@ -76,7 +82,7 @@ func TestValidateUpfPort(t *testing.T) {
 }
 
 func TestValidateGnbTac(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		tac      string
 		expected bool
 	}{

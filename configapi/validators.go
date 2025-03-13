@@ -8,8 +8,10 @@ import (
 	"strconv"
 )
 
-const NAME_PATTERN = "^[a-zA-Z0-9-_]+$"
-const FQDN_PATTERN = "^([a-zA-Z0-9-]+\\.){2,}([a-zA-Z]{2,6})$"
+const (
+	NAME_PATTERN = "^[a-zA-Z][a-zA-Z0-9-_]+$"
+	FQDN_PATTERN = "^([a-zA-Z0-9][a-zA-Z0-9-]+\\.){2,}([a-zA-Z]{2,6})$"
+)
 
 func isValidName(name string) bool {
 	nameMatch, err := regexp.MatchString(NAME_PATTERN, name)

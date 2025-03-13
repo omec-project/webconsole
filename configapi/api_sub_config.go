@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/openapi/models"
@@ -267,13 +268,14 @@ func GetSubscribers(c *gin.Context) {
 
 	logger.WebUILog.Infoln("Get All Subscribers List")
 
-	var subsList []configmodels.SubsListIE
+	subsList := make([]configmodels.SubsListIE, 0)
 	amDataList, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(amDataColl, bson.M{})
 	if errGetMany != nil {
-		logger.DbLog.Warnln(errGetMany)
+		logger.DbLog.Errorw("failed to retrieve subscribers list", "error", errGetMany)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscribers list"})
+		return
 	}
 	for _, amData := range amDataList {
-
 		tmp := configmodels.SubsListIE{
 			UeId: amData["ueId"].(string),
 		}
@@ -306,48 +308,118 @@ func GetSubscriberByID(c *gin.Context) {
 
 	logger.WebUILog.Infoln("Get One Subscriber Data")
 
-	var subsData configmodels.SubsData
-
 	ueId := c.Param("ueId")
-
 	filterUeIdOnly := bson.M{"ueId": ueId}
 
-	authSubsDataInterface, errGetOneAuth := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
-	if errGetOneAuth != nil {
-		logger.DbLog.Warnln(errGetOneAuth)
+	var subsData configmodels.SubsData
+
+	authSubsDataInterface, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Errorf("failed to fetch authentication subscription data from DB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		return
 	}
-	amDataDataInterface, errGetOneAmData := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
-	if errGetOneAmData != nil {
-		logger.DbLog.Warnln(errGetOneAmData)
+	amDataDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Errorf("failed to fetch am data from DB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		return
 	}
-	smDataDataInterface, errGetManySmData := dbadapter.CommonDBClient.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
-	if errGetManySmData != nil {
-		logger.DbLog.Warnln(errGetManySmData)
+	smDataDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Errorf("failed to fetch sm data from DB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		return
 	}
-	smfSelDataInterface, errGetOneSmfSel := dbadapter.CommonDBClient.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
-	if errGetOneSmfSel != nil {
-		logger.DbLog.Warnln(errGetOneSmfSel)
+	smfSelDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Errorf("failed to fetch smf selection data from DB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		return
 	}
-	amPolicyDataInterface, errGetOneAmPol := dbadapter.CommonDBClient.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
-	if errGetOneAmPol != nil {
-		logger.DbLog.Warnln(errGetOneAmPol)
+	amPolicyDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Errorf("failed to fetch am policy data from DB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		return
 	}
-	smPolicyDataInterface, errGetManySmPol := dbadapter.CommonDBClient.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
-	if errGetManySmPol != nil {
-		logger.DbLog.Warnln(errGetManySmPol)
+	smPolicyDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
+	if err != nil {
+		logger.DbLog.Errorf("failed to fetch sm policy data from DB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		return
 	}
+	// If all fetched data is empty, return 404 error
+	if authSubsDataInterface == nil &&
+		amDataDataInterface == nil &&
+		smDataDataInterface == nil &&
+		smfSelDataInterface == nil &&
+		amPolicyDataInterface == nil &&
+		smPolicyDataInterface == nil {
+		logger.WebUILog.Errorf("subscriber with ID %s not found", ueId)
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("subscriber with ID %s not found", ueId)})
+		return
+	}
+
 	var authSubsData models.AuthenticationSubscription
-	json.Unmarshal(configmodels.MapToByte(authSubsDataInterface), &authSubsData)
+	if authSubsDataInterface != nil {
+		err := json.Unmarshal(configmodels.MapToByte(authSubsDataInterface), &authSubsData)
+		if err != nil {
+			logger.WebUILog.Errorf("error unmarshalling authentication subscription data: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			return
+		}
+	}
+
 	var amDataData models.AccessAndMobilitySubscriptionData
-	json.Unmarshal(configmodels.MapToByte(amDataDataInterface), &amDataData)
+	if amDataDataInterface != nil {
+		err := json.Unmarshal(configmodels.MapToByte(amDataDataInterface), &amDataData)
+		if err != nil {
+			logger.WebUILog.Errorf("error unmarshalling access and mobility subscription data: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			return
+		}
+	}
+
 	var smDataData []models.SessionManagementSubscriptionData
-	json.Unmarshal(sliceToByte(smDataDataInterface), &smDataData)
+	if smDataDataInterface != nil {
+		err := json.Unmarshal(sliceToByte(smDataDataInterface), &smDataData)
+		if err != nil {
+			logger.WebUILog.Errorf("error unmarshalling session management subscription data: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			return
+		}
+	}
+
 	var smfSelData models.SmfSelectionSubscriptionData
-	json.Unmarshal(configmodels.MapToByte(smfSelDataInterface), &smfSelData)
+	if smfSelDataInterface != nil {
+		err := json.Unmarshal(configmodels.MapToByte(smfSelDataInterface), &smfSelData)
+		if err != nil {
+			logger.WebUILog.Errorf("error unmarshalling smf selection subscription data: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			return
+		}
+	}
+
 	var amPolicyData models.AmPolicyData
-	json.Unmarshal(configmodels.MapToByte(amPolicyDataInterface), &amPolicyData)
+	if amPolicyDataInterface != nil {
+		err := json.Unmarshal(configmodels.MapToByte(amPolicyDataInterface), &amPolicyData)
+		if err != nil {
+			logger.WebUILog.Errorf("error unmarshalling am policy data: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			return
+		}
+	}
+
 	var smPolicyData models.SmPolicyData
-	json.Unmarshal(configmodels.MapToByte(smPolicyDataInterface), &smPolicyData)
+	if smPolicyDataInterface != nil {
+		err := json.Unmarshal(configmodels.MapToByte(smPolicyDataInterface), &smPolicyData)
+		if err != nil {
+			logger.WebUILog.Errorf("error unmarshalling sm policy data: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			return
+		}
+	}
 
 	subsData = configmodels.SubsData{
 		UeId:                              ueId,
@@ -373,6 +445,7 @@ func GetSubscriberByID(c *gin.Context) {
 // @Failure      400  {object}  nil  "Invalid subscriber content"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
+// @Failure      409  {object}  nil  "Subscriber already exists"
 // @Failure      500  {object}  nil  "Error creating subscriber"
 // @Router      /api/subscriber/{imsi}  [post]
 func PostSubscriberByID(c *gin.Context) {
@@ -389,6 +462,18 @@ func PostSubscriberByID(c *gin.Context) {
 
 	logger.WebUILog.Infoln("Received Post Subscriber Data from Roc/Simapp: ", ueId)
 
+	// Check if the IMSI already exists in the database
+	filter := bson.M{"ueId": ueId}
+	subscriber, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filter)
+	if err != nil {
+		logger.DbLog.Errorf("failed querying subscriber existence for IMSI: %s; Error: %v", ueId, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to check subscriber: %s existence", ueId)})
+		return
+	} else if subscriber != nil {
+		logger.WebUILog.Errorf("subscriber %s already exists", ueId)
+		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("subscriber %s already exists", ueId)})
+		return
+	}
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
@@ -437,7 +522,20 @@ func PostSubscriberByID(c *gin.Context) {
 	logger.WebUILog.Infoln("Successfully Added Subscriber Data to ConfigChannel: ", ueId)
 }
 
-// Put subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
+// PutSubscriberByID godoc
+//
+// @Description  Update subscriber information by IMSI (UE ID)
+// @Tags         Subscribers
+// @Param        imsi       path    string                           true    "IMSI (UE ID)"
+// @Param        content    body    configmodels.SubsData            true    "Updated subscriber details"
+// @Security     BearerAuth
+// @Success      204  {object}  nil  "Subscriber updated successfully"
+// @Failure      400  {object}  nil  "Invalid subscriber content"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Failure      404  {object}  nil  "Subscriber not found"
+// @Failure      500  {object}  nil  "Error updating subscriber"
+// @Router       /api/subscriber/{imsi}  [put]
 func PutSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Put One Subscriber Data")
@@ -483,7 +581,12 @@ func DeleteSubscriberByID(c *gin.Context) {
 
 	ueId := c.Param("ueId")
 
-	c.JSON(http.StatusNoContent, gin.H{})
+	imsi := strings.TrimPrefix(ueId, "imsi-")
+	err := updateSubscriberInDeviceGroups(imsi)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error deleting subscriber"})
+		return
+	}
 
 	msg := configmodels.ConfigMessage{
 		MsgType:   configmodels.Sub_data,
@@ -491,7 +594,46 @@ func DeleteSubscriberByID(c *gin.Context) {
 		Imsi:      ueId,
 	}
 	configChannel <- &msg
+	c.JSON(http.StatusNoContent, gin.H{})
 	logger.WebUILog.Infoln("Delete Subscriber Data complete")
+}
+
+func updateSubscriberInDeviceGroups(imsi string) error {
+	filterByImsi := bson.M{
+		"imsis": imsi,
+	}
+	rawDeviceGroups, err := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, filterByImsi)
+	if err != nil {
+		logger.DbLog.Errorf("failed to fetch device groups: %v", err)
+		return err
+	}
+	var deviceGroupUpdateMessages []configmodels.ConfigMessage
+	for _, rawDeviceGroup := range rawDeviceGroups {
+		var deviceGroup configmodels.DeviceGroups
+		if err = json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup); err != nil {
+			logger.DbLog.Errorf("error unmarshaling device group: %v", err)
+			return err
+		}
+		filteredImsis := []string{}
+		for _, currImsi := range deviceGroup.Imsis {
+			if currImsi != imsi {
+				filteredImsis = append(filteredImsis, currImsi)
+			}
+		}
+		deviceGroup.Imsis = filteredImsis
+		deviceGroupUpdateMessage := configmodels.ConfigMessage{
+			MsgType:      configmodels.Device_group,
+			MsgMethod:    configmodels.Post_op,
+			DevGroupName: deviceGroup.DeviceGroupName,
+			DevGroup:     &deviceGroup,
+		}
+		deviceGroupUpdateMessages = append(deviceGroupUpdateMessages, deviceGroupUpdateMessage)
+	}
+	for _, msg := range deviceGroupUpdateMessages {
+		configChannel <- &msg
+		logger.WebUILog.Infof("device group [%v] update sent to config channel", msg.DevGroupName)
+	}
+	return nil
 }
 
 func GetRegisteredUEContext(c *gin.Context) {

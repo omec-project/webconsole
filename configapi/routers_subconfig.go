@@ -59,7 +59,7 @@ var apiRoutes = Routes{
 	{
 		"PutSubscriberByID",
 		http.MethodPut,
-		"/subscriber/:ueId/:servingPlmnId",
+		"/subscriber/:ueId",
 		PutSubscriberByID,
 	},
 
@@ -73,7 +73,7 @@ var apiRoutes = Routes{
 	{
 		"PatchSubscriberByID",
 		http.MethodPatch,
-		"/subscriber/:ueId/:servingPlmnId",
+		"/subscriber/:ueId",
 		PatchSubscriberByID,
 	},
 

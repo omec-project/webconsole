@@ -459,6 +459,9 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 }
 
 func Test_handleSubscriberGet5G(t *testing.T) {
+	origSubscriberAuthData := subscriberAuthData
+	origAuthDBClient := dbadapter.AuthDBClient
+	defer func() { subscriberAuthData = origSubscriberAuthData; dbadapter.AuthDBClient = origAuthDBClient }()
 	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	subscriber := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
@@ -491,8 +494,11 @@ func Test_handleSubscriberGet5G(t *testing.T) {
 }
 
 func Test_handleSubscriberGet4G(t *testing.T) {
+	origSubscriberAuthData := subscriberAuthData
+	origImsiData := imsiData
+	defer func() { subscriberAuthData = origSubscriberAuthData; imsiData = origImsiData }()
 	subscriberAuthData = MemorySubscriberAuthenticationData{}
-	imsiData = make(map[string]*models.AuthenticationSubscription, 0)
+	imsiData = make(map[string]*models.AuthenticationSubscription)
 	subscriber := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",
@@ -522,7 +528,19 @@ func Test_handleSubscriberGet4G(t *testing.T) {
 }
 
 func Test_handleSubscriberPost5G(t *testing.T) {
-	ueId := "208930100007487"
+	origSubscriberAuthData := subscriberAuthData
+	origImsiData := imsiData
+	origAuthDBClient := dbadapter.AuthDBClient
+	origCommonDBClient := dbadapter.CommonDBClient
+	origPostData := postData
+	defer func() {
+		subscriberAuthData = origSubscriberAuthData
+		imsiData = origImsiData
+		postData = origPostData
+		dbadapter.AuthDBClient = origAuthDBClient
+		dbadapter.CommonDBClient = origCommonDBClient
+	}()
+	ueId := "imsi-208930100007487"
 	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	configMsg := configmodels.ConfigMessage{
 		AuthSubData: &models.AuthenticationSubscription{
@@ -549,7 +567,7 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 	}
 
 	postData = make([]map[string]interface{}, 0)
-	imsiData = make(map[string]*models.AuthenticationSubscription, 0)
+	imsiData = make(map[string]*models.AuthenticationSubscription)
 	dbadapter.AuthDBClient = &MockMongoPost{}
 	dbadapter.CommonDBClient = &MockMongoPost{}
 	handleSubscriberPost(ueId, configMsg.AuthSubData)
@@ -590,7 +608,17 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 }
 
 func Test_handleSubscriberPost4G(t *testing.T) {
-	ueId := "208930100007487"
+	origSubscriberAuthData := subscriberAuthData
+	origImsiData := imsiData
+	origCommonDBClient := dbadapter.CommonDBClient
+	origPostData := postData
+	defer func() {
+		subscriberAuthData = origSubscriberAuthData
+		imsiData = origImsiData
+		postData = origPostData
+		dbadapter.CommonDBClient = origCommonDBClient
+	}()
+	ueId := "imsi-208930100007487"
 	subscriberAuthData = MemorySubscriberAuthenticationData{}
 	configMsg := configmodels.ConfigMessage{
 		AuthSubData: &models.AuthenticationSubscription{
@@ -617,7 +645,7 @@ func Test_handleSubscriberPost4G(t *testing.T) {
 	}
 
 	postData = make([]map[string]interface{}, 0)
-	imsiData = make(map[string]*models.AuthenticationSubscription, 0)
+	imsiData = make(map[string]*models.AuthenticationSubscription)
 	dbadapter.CommonDBClient = &MockMongoPost{}
 	handleSubscriberPost(ueId, configMsg.AuthSubData)
 
@@ -635,16 +663,23 @@ func Test_handleSubscriberPost4G(t *testing.T) {
 	if AmDataResult["ueId"] != ueId {
 		t.Errorf("Expected ueId %v, got %v", ueId, AmDataResult["ueId"])
 	}
-	if imsiData[ueId] == nil {
-		t.Errorf("Expected ueId %v in memory, got nil", ueId)
-	}
 	if !reflect.DeepEqual(imsiData[ueId], configMsg.AuthSubData) {
 		t.Errorf("Expected authSubData %v in memory, got %v ", configMsg.AuthSubData, imsiData[ueId])
 	}
 }
 
 func Test_handleSubscriberDelete5G(t *testing.T) {
-	ueId := "208930100007487"
+	origSubscriberAuthData := subscriberAuthData
+	origAuthDBClient := dbadapter.AuthDBClient
+	origCommonDBClient := dbadapter.CommonDBClient
+	origDeleteData := deleteData
+	defer func() {
+		subscriberAuthData = origSubscriberAuthData
+		deleteData = origDeleteData
+		dbadapter.AuthDBClient = origAuthDBClient
+		dbadapter.CommonDBClient = origCommonDBClient
+	}()
+	ueId := "imsi-208930100007487"
 	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 
 	deleteData = make([]map[string]interface{}, 0)
@@ -671,11 +706,21 @@ func Test_handleSubscriberDelete5G(t *testing.T) {
 }
 
 func Test_handleSubscriberDelete4G(t *testing.T) {
-	ueId := "208930100007487"
+	origSubscriberAuthData := subscriberAuthData
+	origImsiData := imsiData
+	origCommonDBClient := dbadapter.CommonDBClient
+	origDeleteData := deleteData
+	defer func() {
+		subscriberAuthData = origSubscriberAuthData
+		imsiData = origImsiData
+		deleteData = origDeleteData
+		dbadapter.CommonDBClient = origCommonDBClient
+	}()
+	ueId := "imsi-208930100007487"
 	subscriberAuthData = MemorySubscriberAuthenticationData{}
 
 	deleteData = make([]map[string]interface{}, 0)
-	imsiData = make(map[string]*models.AuthenticationSubscription, 0)
+	imsiData = make(map[string]*models.AuthenticationSubscription)
 	imsiData[ueId] = &models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",

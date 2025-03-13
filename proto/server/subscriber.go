@@ -27,7 +27,7 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	filter := bson.M{"ueId": imsi}
 	authSubDataInterface, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorln(err)
 		return
 	}
 	err = json.Unmarshal(configmodels.MapToByte(authSubDataInterface), &authSubData)
@@ -45,7 +45,7 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	authDataBsonA["ueId"] = imsi
 	_, err := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorln(err)
 		return
 	}
 	logger.WebUILog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
@@ -55,7 +55,7 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	basicDataBson := configmodels.ToBsonM(basicAmData)
 	_, err = dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorln(err)
 	}
 }
 
@@ -64,13 +64,13 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	filter := bson.M{"ueId": imsi}
 	err := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorln(err)
 		return
 	}
 	logger.WebUILog.Debugf("delete authentication subscription from amData collection: %v", imsi)
 	err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorln(err)
 	}
 }
 
@@ -93,7 +93,7 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 	basicDataBson := configmodels.ToBsonM(basicAmData)
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorln(err)
 	}
 }
 
@@ -102,7 +102,7 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 	filter := bson.M{"ueId": imsi}
 	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorln(err)
 		return
 	}
 	logger.WebUILog.Debugf("delete authentication subscription from memory: %v", imsi)

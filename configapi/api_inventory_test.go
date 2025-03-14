@@ -234,6 +234,14 @@ func TestGnbPostHandler(t *testing.T) {
 			expectedBody: "{}",
 		},
 		{
+			name:         "Create a new gNB without TAC expects created status",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1"}`,
+			expectedCode: http.StatusCreated,
+			expectedBody: "{}",
+		},
+		{
 			name:         "Create an existing gNB expects failure",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientDuplicateCreation{},
@@ -248,14 +256,6 @@ func TestGnbPostHandler(t *testing.T) {
 			inputData:    `{"name": "gnb1", "tac": 123}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: `{"error":"invalid JSON format"}`,
-		},
-		{
-			name:         "Missing TAC expects failure",
-			route:        "/config/v1/inventory/gnb",
-			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"name": "gnb1"}`,
-			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid gNB TAC ''. TAC must be a numeric string within the range [1, 16777215]"}`,
 		},
 		{
 			name:         "DB POST operation fails expects failure",

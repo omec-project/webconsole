@@ -90,11 +90,13 @@ func PostGnb(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-	if !isValidGnbTac(postGnbParams.Tac) {
-		errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be a numeric string within the range [1, 16777215]", postGnbParams.Tac)
-		logger.WebUILog.Errorln(errorMessage)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
-		return
+	if postGnbParams.Tac != "" {
+		if !isValidGnbTac(postGnbParams.Tac) {
+			errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be a numeric string within the range [1, 16777215]", postGnbParams.Tac)
+			logger.WebUILog.Errorln(errorMessage)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+			return
+		}
 	}
 	gnb := configmodels.Gnb(postGnbParams)
 	if err := executeGnbTransaction(c.Request.Context(), gnb, updateGnbInNetworkSlices, postGnbOperation); err != nil {

@@ -4,6 +4,8 @@
 package configapi
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -43,7 +45,7 @@ const NETWORK_SLICE_CONFIG = `{
     "gNodeBs": [
       {
         "name": "string",
-        "tac": 0
+        "tac": 1
       }
     ],
     "plmn": {
@@ -89,6 +91,23 @@ const DEVICE_GROUP_CONFIG = `{
   "ip-domain-name": "string",
   "site-info": "string"
 }`
+
+func networkSliceInvalidGnb(gnbName string, gnbTac int32) string {
+	gnb := configmodels.SliceSiteInfoGNodeBs{
+		Name: gnbName,
+		Tac:  gnbTac,
+	}
+	siteInfo := configmodels.SliceSiteInfo{
+		SiteName: "demo",
+		GNodeBs:  []configmodels.SliceSiteInfoGNodeBs{gnb},
+	}
+	slice := configmodels.Slice{
+		SliceName: "slice-1",
+		SiteInfo:  siteInfo,
+	}
+	sliceTmp, _ := json.Marshal(slice)
+	return fmt.Sprintf(string(sliceTmp[:]))
+}
 
 func TestDeviceGroupPostHandler_DeviceGroupNameValidation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -169,6 +188,57 @@ func TestNetworkSlicePostHandler_NetworkSliceNameValidation(t *testing.T) {
 			router.ServeHTTP(w, req)
 			if tc.expectedCode != w.Code {
 				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+			}
+		})
+	}
+}
+
+func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	testCases := []struct {
+		name         string
+		route        string
+		inputData    string
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "Network Slice invalid gNB",
+			route:        "/config/v1/network-slice/slice-1",
+			inputData:    networkSliceInvalidGnb("", 3),
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "{\"error\":\"invalid gNB name `` in Network Slice slice-1. Name needs to match the following regular expression: ^[a-zA-Z][a-zA-Z0-9-_]+$\"}",
+		},
+		{
+			name:         "Network Slice invalid gNB",
+			route:        "/config/v1/network-slice/slice-1",
+			inputData:    networkSliceInvalidGnb("valid-gnb", 0),
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "{\"error\":\"invalid TAC 0 for gNB valid-gnb in Network Slice slice-1. TAC must be a numeric string within the range [1, 16777215]\"}",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			origChannel := configChannel
+			configChannel = make(chan *configmodels.ConfigMessage, 1)
+			defer func() { configChannel = origChannel }()
+			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+			}
+			if tc.expectedBody != w.Body.String() {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}

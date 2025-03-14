@@ -7,6 +7,7 @@ package configapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -168,11 +169,12 @@ func NetworkSliceDeleteHandler(c *gin.Context) bool {
 	return true
 }
 
-func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
+func NetworkSlicePostHandler(c *gin.Context, msgOp int) (bool, string) {
 	sliceName, _ := c.Params.Get("slice-name")
 	if !isValidName(sliceName) {
-		logger.ConfigLog.Errorf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
-		return false
+		errorMsg := fmt.Sprintf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
+		logger.ConfigLog.Errorf(errorMsg)
+		return false, errorMsg
 	}
 	logger.ConfigLog.Infof("received slice: %v", sliceName)
 
@@ -184,8 +186,8 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		err = c.ShouldBindJSON(&request)
 	}
 	if err != nil {
-		logger.ConfigLog.Infof("err %v", err)
-		return false
+		logger.ConfigLog.Errorf("err %v", err)
+		return false, fmt.Sprintf(err.Error())
 	}
 
 	req := httpwrapper.NewRequest(c.Request, request)
@@ -198,6 +200,19 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	logger.ConfigLog.Infof("url: %v ", req.URL)
 	procReq := req.Body.(configmodels.Slice)
 
+	for _, gnb := range procReq.SiteInfo.GNodeBs {
+		if !isValidName(gnb.Name) {
+			errorMsg := fmt.Sprintf("invalid gNB name `%s` in Network Slice %s. Name needs to match the following regular expression: %s", gnb.Name, sliceName, NAME_PATTERN)
+			logger.ConfigLog.Errorln(errorMsg)
+			return false, errorMsg
+		}
+		castedGnbTac := fmt.Sprint(gnb.Tac)
+		if !isValidGnbTac(castedGnbTac) {
+			errorMsg := fmt.Sprintf("invalid TAC %s for gNB %s in Network Slice %s. TAC must be a numeric string within the range [1, 16777215]", castedGnbTac, gnb.Name, sliceName)
+			logger.ConfigLog.Errorf(errorMsg)
+			return false, errorMsg
+		}
+	}
 	slice := procReq.SliceId
 	logger.ConfigLog.Infof("network slice: sst: %v, sd: %v", slice.Sst, slice.Sd)
 
@@ -259,5 +274,5 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	msg.SliceName = sliceName
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully Added Slice [%v] to config channel", sliceName)
-	return true
+	return true, ""
 }

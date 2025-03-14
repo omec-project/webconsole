@@ -543,7 +543,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				}
 
 				/* skip delete case */
-				if confData.Msg.DevGroup != nil {
+				if confData.Msg.MsgMethod != configmodels.Delete_op {
 					for _, imsi := range confData.Msg.DevGroup.Imsis {
 						/* update only if the imsi is provisioned */
 						if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-"+imsi) != nil {

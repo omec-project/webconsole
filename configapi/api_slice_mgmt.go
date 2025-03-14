@@ -169,12 +169,12 @@ func NetworkSliceDeleteHandler(c *gin.Context) bool {
 	return true
 }
 
-func NetworkSlicePostHandler(c *gin.Context, msgOp int) (bool, string) {
+func NetworkSlicePostHandler(c *gin.Context, msgOp int) error {
 	sliceName, _ := c.Params.Get("slice-name")
 	if !isValidName(sliceName) {
-		errorMsg := fmt.Sprintf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
-		logger.ConfigLog.Errorf(errorMsg)
-		return false, errorMsg
+		err := fmt.Errorf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
+		logger.ConfigLog.Error(err.Error())
+		return err
 	}
 	logger.ConfigLog.Infof("received slice: %v", sliceName)
 
@@ -187,7 +187,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) (bool, string) {
 	}
 	if err != nil {
 		logger.ConfigLog.Errorf("err %v", err)
-		return false, fmt.Sprintf(err.Error())
+		return err
 	}
 
 	req := httpwrapper.NewRequest(c.Request, request)
@@ -202,15 +202,15 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) (bool, string) {
 
 	for _, gnb := range procReq.SiteInfo.GNodeBs {
 		if !isValidName(gnb.Name) {
-			errorMsg := fmt.Sprintf("invalid gNB name `%s` in Network Slice %s. Name needs to match the following regular expression: %s", gnb.Name, sliceName, NAME_PATTERN)
-			logger.ConfigLog.Errorln(errorMsg)
-			return false, errorMsg
+			err := fmt.Errorf("invalid gNB name `%s` in Network Slice %s. Name needs to match the following regular expression: %s", gnb.Name, sliceName, NAME_PATTERN)
+			logger.ConfigLog.Errorln(err.Error())
+			return err
 		}
 		castedGnbTac := fmt.Sprint(gnb.Tac)
 		if !isValidGnbTac(castedGnbTac) {
-			errorMsg := fmt.Sprintf("invalid TAC %s for gNB %s in Network Slice %s. TAC must be a numeric string within the range [1, 16777215]", castedGnbTac, gnb.Name, sliceName)
-			logger.ConfigLog.Errorf(errorMsg)
-			return false, errorMsg
+			err := fmt.Errorf("invalid TAC %s for gNB %s in Network Slice %s. TAC must be a numeric string within the range [1, 16777215]", castedGnbTac, gnb.Name, sliceName)
+			logger.ConfigLog.Error(err.Error())
+			return err
 		}
 	}
 	slice := procReq.SliceId
@@ -274,5 +274,5 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) (bool, string) {
 	msg.SliceName = sliceName
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully Added Slice [%v] to config channel", sliceName)
-	return true, ""
+	return nil
 }

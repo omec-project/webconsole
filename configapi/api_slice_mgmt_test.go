@@ -5,7 +5,6 @@ package configapi
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -106,7 +105,7 @@ func networkSliceInvalidGnb(gnbName string, gnbTac int32) string {
 		SiteInfo:  siteInfo,
 	}
 	sliceTmp, _ := json.Marshal(slice)
-	return fmt.Sprintf(string(sliceTmp[:]))
+	return string(sliceTmp[:])
 }
 
 func TestDeviceGroupPostHandler_DeviceGroupNameValidation(t *testing.T) {

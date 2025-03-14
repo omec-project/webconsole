@@ -39,14 +39,10 @@ type Update5GSubscriberMsg struct {
 }
 
 var (
-	execCommand = exec.Command
-	imsiData    map[string]*models.AuthenticationSubscription
-	rwLock      sync.RWMutex
+	execCommand        = exec.Command
+	rwLock             sync.RWMutex
+	subscriberAuthData SubscriberAuthenticationData
 )
-
-func init() {
-	imsiData = make(map[string]*models.AuthenticationSubscription)
-}
 
 func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceived chan bool) {
 	// Start Goroutine which will listens for subscriber config updates
@@ -65,16 +61,12 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 		if configMsg.MsgType == configmodels.Sub_data {
 			imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
 			logger.ConfigLog.Infoln("received imsi from config channel:", imsiVal)
-			rwLock.Lock()
-			imsiData[imsiVal] = configMsg.AuthSubData
-			rwLock.Unlock()
-			logger.ConfigLog.Infof("received Imsi [%v] configuration from config channel", configMsg.Imsi)
-			handleSubscriberPost(configMsg)
-			if factory.WebUIConfig.Configuration.Mode5G {
-				var configUMsg Update5GSubscriberMsg
-				configUMsg.Msg = configMsg
-				subsUpdateChan <- &configUMsg
+			if configMsg.MsgMethod == configmodels.Delete_op {
+				handleSubscriberDelete(configMsg.Imsi)
+			} else {
+				handleSubscriberPost(configMsg.Imsi, configMsg.AuthSubData)
 			}
+			logger.ConfigLog.Infof("received Imsi [%v] configuration from config channel", configMsg.Imsi)
 		}
 
 		if configMsg.MsgMethod == configmodels.Post_op || configMsg.MsgMethod == configmodels.Put_op {
@@ -130,17 +122,15 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 	}
 }
 
-func handleSubscriberPost(configMsg *configmodels.ConfigMessage) {
+func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscription) {
 	rwLock.Lock()
-	basicAmData := map[string]interface{}{
-		"ueId": configMsg.Imsi,
-	}
-	filter := bson.M{"ueId": configMsg.Imsi}
-	basicDataBson := configmodels.ToBsonM(basicAmData)
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
-	}
+	subscriberAuthData.SubscriberAuthenticationDataCreate(imsi, authSubData)
+	rwLock.Unlock()
+}
+
+func handleSubscriberDelete(imsi string) {
+	rwLock.Lock()
+	subscriberAuthData.SubscriberAuthenticationDataDelete(imsi)
 	rwLock.Unlock()
 }
 
@@ -294,7 +284,7 @@ func getAddedImsisList(group, prevGroup *configmodels.DeviceGroups) (aimsis []st
 	}
 	for _, imsi := range group.Imsis {
 		if prevGroup == nil {
-			if imsiData[imsi] != nil {
+			if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-"+imsi) != nil {
 				aimsis = append(aimsis, imsi)
 			}
 		} else {
@@ -537,33 +527,6 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string) {
 func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 	for confData := range confChan {
 		switch confData.Msg.MsgType {
-		case configmodels.Sub_data:
-			rwLock.RLock()
-			// check this Imsi is part of any of the devicegroup
-			imsi := strings.ReplaceAll(confData.Msg.Imsi, "imsi-", "")
-			if confData.Msg.MsgMethod != configmodels.Delete_op {
-				logger.WebUILog.Debugln("insert/update AuthenticationSubscription ", imsi)
-				filter := bson.M{"ueId": confData.Msg.Imsi}
-				authDataBsonA := configmodels.ToBsonM(confData.Msg.AuthSubData)
-				authDataBsonA["ueId"] = confData.Msg.Imsi
-				_, errPost := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA)
-				if errPost != nil {
-					logger.DbLog.Warnln(errPost)
-				}
-			} else {
-				logger.WebUILog.Debugln("delete AuthenticationSubscription", imsi)
-				filter := bson.M{"ueId": "imsi-" + imsi}
-				errDelOne := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
-				if errDelOne != nil {
-					logger.DbLog.Warnln(errDelOne)
-				}
-				errDel := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
-				if errDel != nil {
-					logger.DbLog.Warnln(errDel)
-				}
-			}
-			rwLock.RUnlock()
-
 		case configmodels.Device_group:
 			rwLock.RLock()
 			/* is this devicegroup part of any existing slice */

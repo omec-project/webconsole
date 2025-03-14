@@ -12,6 +12,7 @@ import (
 	"time"
 
 	protos "github.com/omec-project/config5g/proto/sdcoreConfig"
+	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -36,6 +37,8 @@ var kasp = keepalive.ServerParameters{
 	Timeout: 5 * time.Second,  // Wait 1 second for the ping ack before assuming the connection is dead
 }
 
+var imsiData map[string]*models.AuthenticationSubscription
+
 func StartServer(host string, confServ *ConfigServer, configMsgChan chan *configmodels.ConfigMessage) {
 	// add 4G endpoints in the client list. 4G endpoints are configured in the
 	// yaml file
@@ -53,6 +56,14 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 	// we wish to start grpc server only if we received at least one config
 	// from the simapp/ROC
 	configReady := make(chan bool)
+	if factory.WebUIConfig.Configuration.Mode5G {
+		logger.WebUILog.Debugln("instantiating in-DB subscriber authentication")
+		subscriberAuthData = DatabaseSubscriberAuthenticationData{}
+	} else {
+		logger.WebUILog.Debugln("instantiating in-memory subscriber authentication")
+		imsiData = make(map[string]*models.AuthenticationSubscription)
+		subscriberAuthData = MemorySubscriberAuthenticationData{}
+	}
 	go configHandler(configMsgChan, configReady)
 	ready := <-configReady
 

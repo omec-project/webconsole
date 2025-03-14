@@ -69,7 +69,7 @@ func GetGnbs(c *gin.Context) {
 // @Produce     json
 // @Param       gnb    body    configmodels.PostGnbRequest    true    "Name and TAC of the gNB"
 // @Security    BearerAuth
-// @Success     201  {object}  nil  "gNB sucessfully created"
+// @Success     201  {object}  nil  "gNB successfully created"
 // @Failure     400  {object}  nil  "Bad request"
 // @Failure     401  {object}  nil  "Authorization failed"
 // @Failure     403  {object}  nil  "Forbidden"
@@ -90,11 +90,13 @@ func PostGnb(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-	if !isValidGnbTac(postGnbParams.Tac) {
-		errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be a numeric string within the range [1, 16777215]", postGnbParams.Tac)
-		logger.WebUILog.Errorln(errorMessage)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
-		return
+	if postGnbParams.Tac != "" {
+		if !isValidGnbTac(postGnbParams.Tac) {
+			errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be a numeric string within the range [1, 16777215]", postGnbParams.Tac)
+			logger.WebUILog.Errorln(errorMessage)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+			return
+		}
 	}
 	gnb := configmodels.Gnb(postGnbParams)
 	if err := executeGnbTransaction(c.Request.Context(), gnb, updateGnbInNetworkSlices, postGnbOperation); err != nil {
@@ -125,7 +127,7 @@ func postGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
 // @Param       gnb-name    path    string                        true    "Name of the gNB"
 // @Param       tac         body    configmodels.PutGnbRequest    true    "TAC of the gNB"
 // @Security    BearerAuth
-// @Success     201  {object}  nil  "gNB sucessfully created"
+// @Success     201  {object}  nil  "gNB successfully created"
 // @Failure     400  {object}  nil  "Bad request"
 // @Failure     401  {object}  nil  "Authorization failed"
 // @Failure     403  {object}  nil  "Forbidden"

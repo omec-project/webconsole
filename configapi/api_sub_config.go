@@ -276,7 +276,6 @@ func GetSubscribers(c *gin.Context) {
 		return
 	}
 	for _, amData := range amDataList {
-
 		tmp := configmodels.SubsListIE{
 			UeId: amData["ueId"].(string),
 		}
@@ -446,6 +445,7 @@ func GetSubscriberByID(c *gin.Context) {
 // @Failure      400  {object}  nil  "Invalid subscriber content"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
+// @Failure      409  {object}  nil  "Subscriber already exists"
 // @Failure      500  {object}  nil  "Error creating subscriber"
 // @Router      /api/subscriber/{imsi}  [post]
 func PostSubscriberByID(c *gin.Context) {
@@ -462,6 +462,18 @@ func PostSubscriberByID(c *gin.Context) {
 
 	logger.WebUILog.Infoln("Received Post Subscriber Data from Roc/Simapp: ", ueId)
 
+	// Check if the IMSI already exists in the database
+	filter := bson.M{"ueId": ueId}
+	subscriber, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filter)
+	if err != nil {
+		logger.DbLog.Errorf("failed querying subscriber existence for IMSI: %s; Error: %v", ueId, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to check subscriber: %s existence", ueId)})
+		return
+	} else if subscriber != nil {
+		logger.WebUILog.Errorf("subscriber %s already exists", ueId)
+		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("subscriber %s already exists", ueId)})
+		return
+	}
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
@@ -510,7 +522,20 @@ func PostSubscriberByID(c *gin.Context) {
 	logger.WebUILog.Infoln("Successfully Added Subscriber Data to ConfigChannel: ", ueId)
 }
 
-// Put subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
+// PutSubscriberByID godoc
+//
+// @Description  Update subscriber information by IMSI (UE ID)
+// @Tags         Subscribers
+// @Param        imsi       path    string                           true    "IMSI (UE ID)"
+// @Param        content    body    configmodels.SubsData            true    "Updated subscriber details"
+// @Security     BearerAuth
+// @Success      204  {object}  nil  "Subscriber updated successfully"
+// @Failure      400  {object}  nil  "Invalid subscriber content"
+// @Failure      401  {object}  nil  "Authorization failed"
+// @Failure      403  {object}  nil  "Forbidden"
+// @Failure      404  {object}  nil  "Subscriber not found"
+// @Failure      500  {object}  nil  "Error updating subscriber"
+// @Router       /api/subscriber/{imsi}  [put]
 func PutSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Put One Subscriber Data")

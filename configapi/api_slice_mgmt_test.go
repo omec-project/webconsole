@@ -61,6 +61,7 @@ const NETWORK_SLICE_CONFIG = `{
   },
   "sliceName": "string"
 }`
+
 const DEVICE_GROUP_CONFIG = `{
   "group-name": "string",
   "imsis": [

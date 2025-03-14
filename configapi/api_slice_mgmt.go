@@ -186,7 +186,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) error {
 		err = c.ShouldBindJSON(&request)
 	}
 	if err != nil {
-		logger.ConfigLog.Errorf("err %v", err)
+		logger.ConfigLog.Error(err.Error())
 		return err
 	}
 
@@ -203,7 +203,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) error {
 	for _, gnb := range procReq.SiteInfo.GNodeBs {
 		if !isValidName(gnb.Name) {
 			err := fmt.Errorf("invalid gNB name `%s` in Network Slice %s. Name needs to match the following regular expression: %s", gnb.Name, sliceName, NAME_PATTERN)
-			logger.ConfigLog.Errorln(err.Error())
+			logger.ConfigLog.Error(err.Error())
 			return err
 		}
 		castedGnbTac := fmt.Sprint(gnb.Tac)
@@ -218,9 +218,9 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) error {
 
 	group := procReq.SiteDeviceGroup
 	slices.Sort(group)
-	slices.Compact(group)
+	group = slices.Compact(group)
 	logger.ConfigLog.Infof("number of device groups %v", len(group))
-	for i := 0; i < len(group); i++ {
+	for i := range group {
 		logger.ConfigLog.Infof("device groups(%v) - %v", i+1, group[i])
 	}
 

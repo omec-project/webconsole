@@ -242,19 +242,19 @@ func NetworkSliceSliceNameDelete(c *gin.Context) {
 // @Router       /config/v1/network-slice/{sliceName}  [post]
 func NetworkSliceSliceNamePost(c *gin.Context) {
 	logger.ConfigLog.Debugf("Received NetworkSliceSliceNamePost ")
-	if ret := NetworkSlicePostHandler(c, configmodels.Post_op); ret {
-		c.JSON(http.StatusOK, gin.H{})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{})
+	if err := NetworkSlicePostHandler(c, configmodels.Post_op); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
+	c.JSON(http.StatusOK, gin.H{})
 }
 
 // NetworkSliceSliceNamePut -
 func NetworkSliceSliceNamePut(c *gin.Context) {
 	logger.ConfigLog.Debugf("Received NetworkSliceSliceNamePut ")
-	if ret := NetworkSlicePostHandler(c, configmodels.Put_op); ret {
-		c.JSON(http.StatusOK, gin.H{})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{})
+	if err := NetworkSlicePostHandler(c, configmodels.Put_op); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
+	c.JSON(http.StatusOK, gin.H{})
 }

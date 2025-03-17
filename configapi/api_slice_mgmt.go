@@ -186,7 +186,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) error {
 		err = c.ShouldBindJSON(&request)
 	}
 	if err != nil {
-		logger.ConfigLog.Error(err.Error())
+		logger.ConfigLog.Errorln(err.Error())
 		return err
 	}
 
@@ -203,13 +203,13 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) error {
 	for _, gnb := range procReq.SiteInfo.GNodeBs {
 		if !isValidName(gnb.Name) {
 			err := fmt.Errorf("invalid gNB name `%s` in Network Slice %s. Name needs to match the following regular expression: %s", gnb.Name, sliceName, NAME_PATTERN)
-			logger.ConfigLog.Error(err.Error())
+			logger.ConfigLog.Errorln(err.Error())
 			return err
 		}
 		castedGnbTac := fmt.Sprint(gnb.Tac)
 		if !isValidGnbTac(castedGnbTac) {
 			err := fmt.Errorf("invalid TAC %s for gNB %s in Network Slice %s. TAC must be an integer within the range [1, 16777215]", castedGnbTac, gnb.Name, sliceName)
-			logger.ConfigLog.Error(err.Error())
+			logger.ConfigLog.Errorln(err.Error())
 			return err
 		}
 	}

@@ -91,7 +91,7 @@ const DEVICE_GROUP_CONFIG = `{
   "site-info": "string"
 }`
 
-func networkSliceInvalidGnb(gnbName string, gnbTac int32) string {
+func networkSliceWithGnbParams(gnbName string, gnbTac int32) string {
 	gnb := configmodels.SliceSiteInfoGNodeBs{
 		Name: gnbName,
 		Tac:  gnbTac,
@@ -205,16 +205,16 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 		expectedBody string
 	}{
 		{
-			name:         "Network Slice invalid gNB",
+			name:         "Network Slice invalid gNB name",
 			route:        "/config/v1/network-slice/slice-1",
-			inputData:    networkSliceInvalidGnb("", 3),
+			inputData:    networkSliceWithGnbParams("", 3),
 			expectedCode: http.StatusBadRequest,
 			expectedBody: "{\"error\":\"invalid gNB name `` in Network Slice slice-1. Name needs to match the following regular expression: ^[a-zA-Z][a-zA-Z0-9-_]+$\"}",
 		},
 		{
-			name:         "Network Slice invalid gNB",
+			name:         "Network Slice invalid gNB TAC",
 			route:        "/config/v1/network-slice/slice-1",
-			inputData:    networkSliceInvalidGnb("valid-gnb", 0),
+			inputData:    networkSliceWithGnbParams("valid-gnb", 0),
 			expectedCode: http.StatusBadRequest,
 			expectedBody: "{\"error\":\"invalid TAC 0 for gNB valid-gnb in Network Slice slice-1. TAC must be a numeric string within the range [1, 16777215]\"}",
 		},

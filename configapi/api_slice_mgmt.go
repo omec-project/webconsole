@@ -208,7 +208,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) error {
 		}
 		castedGnbTac := fmt.Sprint(gnb.Tac)
 		if !isValidGnbTac(castedGnbTac) {
-			err := fmt.Errorf("invalid TAC %s for gNB %s in Network Slice %s. TAC must be a numeric string within the range [1, 16777215]", castedGnbTac, gnb.Name, sliceName)
+			err := fmt.Errorf("invalid TAC %s for gNB %s in Network Slice %s. TAC must be an integer within the range [1, 16777215]", castedGnbTac, gnb.Name, sliceName)
 			logger.ConfigLog.Error(err.Error())
 			return err
 		}
@@ -220,8 +220,8 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) error {
 	slices.Sort(group)
 	group = slices.Compact(group)
 	logger.ConfigLog.Infof("number of device groups %v", len(group))
-	for i := range group {
-		logger.ConfigLog.Infof("device groups(%v) - %v", i+1, group[i])
+	for i, g := range group {
+		logger.ConfigLog.Infof("device groups(%v) - %v", i+1, g)
 	}
 
 	for index, filter := range procReq.ApplicationFilteringRules {

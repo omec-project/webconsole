@@ -216,7 +216,7 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 			route:        "/config/v1/network-slice/slice-1",
 			inputData:    networkSliceWithGnbParams("valid-gnb", 0),
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "{\"error\":\"invalid TAC 0 for gNB valid-gnb in Network Slice slice-1. TAC must be a numeric string within the range [1, 16777215]\"}",
+			expectedBody: "{\"error\":\"invalid TAC 0 for gNB valid-gnb in Network Slice slice-1. TAC must be an integer within the range [1, 16777215]\"}",
 		},
 	}
 

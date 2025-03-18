@@ -535,20 +535,26 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 				sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 				if err != nil {
 					logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
+					return
 				}
 				snssai := &models.Snssai{
 					Sd:  slice.SliceId.Sd,
 					Sst: int32(sVal),
 				}
 
-				aimsis := getAddedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)
-				for _, imsi := range aimsis {
-					dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
-					updateAmPolicyData(imsi)
-					updateSmPolicyData(snssai, dnn, imsi)
-					updateAmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
-					updateSmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
-					updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+				/* skip delete case */
+				if confData.Msg.MsgMethod != configmodels.Delete_op {
+					for _, imsi := range confData.Msg.DevGroup.Imsis {
+						/* update only if the imsi is provisioned */
+						if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-"+imsi) != nil {
+							dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
+							updateAmPolicyData(imsi)
+							updateSmPolicyData(snssai, dnn, imsi)
+							updateAmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
+							updateSmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+							updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+						}
+					}
 				}
 
 				dimsis := getDeletedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)

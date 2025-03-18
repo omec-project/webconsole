@@ -1325,7 +1325,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "tac": {
-                    "type": "string"
+                    "type": "integer"
                 }
             }
         },
@@ -1336,7 +1336,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "tac": {
-                    "type": "string"
+                    "type": "integer"
                 }
             }
         },
@@ -1355,7 +1355,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "tac": {
-                    "type": "string"
+                    "type": "integer"
                 }
             }
         },

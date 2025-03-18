@@ -226,7 +226,7 @@ func TestCreateUserAccountHandler(t *testing.T) {
 			name:         "UserThatAlreadyExists",
 			dbAdapter:    &MockMongoClientDuplicateCreation{},
 			inputData:    `{"username": "janedoe", "password" : "Admin1234"}`,
-			expectedCode: http.StatusBadRequest,
+			expectedCode: http.StatusConflict,
 			expectedBody: `{"error":"user account already exists"}`,
 		},
 		{

@@ -37,10 +37,6 @@ func isValidUpfPort(port string) bool {
 	return portNum >= 0 && portNum <= 65535
 }
 
-func isValidGnbTac(tac string) bool {
-	tacNum, err := strconv.Atoi(tac)
-	if err != nil {
-		return false
-	}
-	return tacNum >= 1 && tacNum <= 16777215
+func isValidGnbTac(tac int32) bool {
+	return tac >= 1 && tac <= 16777215
 }

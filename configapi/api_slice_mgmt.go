@@ -173,7 +173,7 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) error {
 	sliceName, _ := c.Params.Get("slice-name")
 	if !isValidName(sliceName) {
 		err := fmt.Errorf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
-		logger.ConfigLog.Error(err.Error())
+		logger.ConfigLog.Errorln(err.Error())
 		return err
 	}
 	logger.ConfigLog.Infof("received slice: %v", sliceName)
@@ -206,9 +206,8 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) error {
 			logger.ConfigLog.Errorln(err.Error())
 			return err
 		}
-		castedGnbTac := fmt.Sprint(gnb.Tac)
-		if !isValidGnbTac(castedGnbTac) {
-			err := fmt.Errorf("invalid TAC %s for gNB %s in Network Slice %s. TAC must be an integer within the range [1, 16777215]", castedGnbTac, gnb.Name, sliceName)
+		if !isValidGnbTac(gnb.Tac) {
+			err := fmt.Errorf("invalid TAC %d for gNB %s in Network Slice %s. TAC must be an integer within the range [1, 16777215]", gnb.Tac, gnb.Name, sliceName)
 			logger.ConfigLog.Errorln(err.Error())
 			return err
 		}

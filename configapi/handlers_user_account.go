@@ -131,6 +131,7 @@ func fetchDBUserAccount(username string) (*configmodels.DBUserAccount, error) {
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
 // @Failure      404  {object}  nil  "Page not found if enableAuthentication is disabled"
+// @Failure      409  {object}  nil  "User account already exists"
 // @Failure      500  {object}  nil  "Failed to create the user account"
 // @Router      /config/v1/account/  [post]
 func CreateUserAccount(c *gin.Context) {
@@ -175,7 +176,7 @@ func CreateUserAccount(c *gin.Context) {
 	if err != nil {
 		if strings.Contains(err.Error(), "E11000") {
 			logger.DbLog.Errorln("Duplicate username found:", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "user account already exists"})
+			c.JSON(http.StatusConflict, gin.H{"error": "user account already exists"})
 			return
 		}
 		logger.DbLog.Errorln(err.Error())

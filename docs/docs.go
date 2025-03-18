@@ -308,6 +308,9 @@ const docTemplate = `{
                     "404": {
                         "description": "Page not found if enableAuthentication is disabled"
                     },
+                    "409": {
+                        "description": "User account already exists"
+                    },
                     "500": {
                         "description": "Failed to create the user account"
                     }
@@ -678,7 +681,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "gNB sucessfully created"
+                        "description": "gNB successfully created"
                     },
                     "400": {
                         "description": "Bad request"
@@ -729,7 +732,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "gNB sucessfully created"
+                        "description": "gNB successfully created"
                     },
                     "400": {
                         "description": "Bad request"

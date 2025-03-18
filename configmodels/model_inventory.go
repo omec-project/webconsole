@@ -10,16 +10,16 @@ const (
 
 type Gnb struct {
 	Name string `json:"name"`
-	Tac  string `json:"tac,omitempty"`
+	Tac  *int32 `json:"tac,omitempty"`
 }
 
 type PostGnbRequest struct {
 	Name string `json:"name"`
-	Tac  string `json:"tac,omitempty"`
+	Tac  *int32 `json:"tac"`
 }
 
 type PutGnbRequest struct {
-	Tac string `json:"tac"`
+	Tac int32 `json:"tac"`
 }
 
 type Upf struct {

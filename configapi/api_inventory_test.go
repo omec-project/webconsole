@@ -24,9 +24,10 @@ type MockMongoClientOneGnb struct {
 
 func (m *MockMongoClientOneGnb) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
+	var tac int32 = 123
 	gnb := configmodels.Gnb{
 		Name: "gnb1",
-		Tac:  "123",
+		Tac:  &tac,
 	}
 	var gnbBson bson.M
 	tmp, _ := json.Marshal(gnb)
@@ -43,11 +44,11 @@ type MockMongoClientManyGnbs struct {
 func (m *MockMongoClientManyGnbs) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	names := []string{"gnb0", "gnb1", "gnb2"}
-	tacs := []string{"12", "345", "678"}
+	tacs := []int32{12, 345, 678}
 	for i, name := range names {
 		gnb := configmodels.Gnb{
 			Name: name,
-			Tac:  tacs[i],
+			Tac:  &tacs[i],
 		}
 		var gnbBson bson.M
 		tmp, _ := json.Marshal(gnb)
@@ -146,14 +147,14 @@ func TestInventoryGetHandlers(t *testing.T) {
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientOneGnb{},
 			expectedCode: http.StatusOK,
-			expectedBody: `[{"name":"gnb1","tac":"123"}]`,
+			expectedBody: `[{"name":"gnb1","tac":123}]`,
 		},
 		{
 			name:         "ManyGnbs",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientManyGnbs{},
 			expectedCode: http.StatusOK,
-			expectedBody: `[{"name":"gnb0","tac":"12"},{"name":"gnb1","tac":"345"},{"name":"gnb2","tac":"678"}]`,
+			expectedBody: `[{"name":"gnb0","tac":12},{"name":"gnb1","tac":345},{"name":"gnb2","tac":678}]`,
 		},
 		{
 			name:         "GnbDBError",
@@ -229,7 +230,7 @@ func TestGnbPostHandler(t *testing.T) {
 			name:         "Create a new gNB expects created status",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"name": "gnb1", "tac": "123"}`,
+			inputData:    `{"name": "gnb1", "tac": 123}`,
 			expectedCode: http.StatusCreated,
 			expectedBody: "{}",
 		},
@@ -245,39 +246,39 @@ func TestGnbPostHandler(t *testing.T) {
 			name:         "Create an existing gNB expects failure",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientDuplicateCreation{},
-			inputData:    `{"name": "gnb1", "tac": "123"}`,
+			inputData:    `{"name": "gnb1", "tac": 123}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: `{"error":"gNB already exists"}`,
 		},
 		{
-			name:         "TAC is not a string expects failure",
+			name:         "TAC is not an integer expects failure",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"name": "gnb1", "tac": 123}`,
+			inputData:    `{"name": "gnb1", "tac": "123"}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: `{"error":"invalid JSON format"}`,
+		},
+		{
+			name:         "TAC is zero expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1", "tac": 0}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB TAC '0'. TAC must be an integer within the range [1, 16777215]"}`,
 		},
 		{
 			name:         "DB POST operation fails expects failure",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientDBError{},
-			inputData:    `{"name": "gnb1", "tac": "123"}`,
+			inputData:    `{"name": "gnb1", "tac": 123}`,
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: `{"error":"failed to create gNB"}`,
-		},
-		{
-			name:         "TAC cannot be converted to int expects failure",
-			route:        "/config/v1/inventory/gnb",
-			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"name": "gnb1", "tac": "a"}`,
-			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid gNB TAC 'a'. TAC must be a numeric string within the range [1, 16777215]"}`,
 		},
 		{
 			name:         "gNB name not provided expects failure",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"tac": "12"}`,
+			inputData:    `{"tac": 12}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: `{"error":"invalid gNB name ''. Name needs to match the following regular expression: ^[a-zA-Z][a-zA-Z0-9-_]+$"}`,
 		},
@@ -285,7 +286,7 @@ func TestGnbPostHandler(t *testing.T) {
 			name:         "Invalid gNB name expects failure",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"name": "gn!b1", "tac": "123"}`,
+			inputData:    `{"name": "gn!b1", "tac": 123}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression: ^[a-zA-Z][a-zA-Z0-9-_]+$"}`,
 		},
@@ -328,7 +329,7 @@ func TestGnbPutHandler(t *testing.T) {
 			name:         "Put a new gNB expects OK status",
 			route:        "/config/v1/inventory/gnb/gnb1",
 			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"tac": "123"}`,
+			inputData:    `{"tac": 123}`,
 			expectedCode: http.StatusOK,
 			expectedBody: "{}",
 		},
@@ -336,15 +337,15 @@ func TestGnbPutHandler(t *testing.T) {
 			name:         "Put an existing gNB expects a OK status",
 			route:        "/config/v1/inventory/gnb/gnb1",
 			dbAdapter:    &MockMongoClientPutExistingUpf{},
-			inputData:    `{"tac": "123"}`,
+			inputData:    `{"tac": 123}`,
 			expectedCode: http.StatusOK,
 			expectedBody: "{}",
 		},
 		{
-			name:         "TAC is not a string expects failure",
+			name:         "TAC is not an integer expects failure",
 			route:        "/config/v1/inventory/gnb/gnb1",
 			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"tac": 123}`,
+			inputData:    `{"tac": "123"}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: `{"error":"invalid JSON format"}`,
 		},
@@ -352,31 +353,23 @@ func TestGnbPutHandler(t *testing.T) {
 			name:         "Missing TAC expects failure",
 			route:        "/config/v1/inventory/gnb/gnb1",
 			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"some_param": "123"}`,
+			inputData:    `{"some_param": 123}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid gNB TAC ''. TAC must be a numeric string within the range [1, 16777215]"}`,
+			expectedBody: `{"error":"invalid gNB TAC '0'. TAC must be an integer within the range [1, 16777215]"}`,
 		},
 		{
 			name:         "DB PUT operation fails expects failure",
 			route:        "/config/v1/inventory/gnb/gnb1",
 			dbAdapter:    &MockMongoClientDBError{},
-			inputData:    `{"tac": "123"}`,
+			inputData:    `{"tac": 123}`,
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: `{"error":"failed to PUT gNB"}`,
-		},
-		{
-			name:         "TAC cannot be converted to int expects failure",
-			route:        "/config/v1/inventory/gnb/gnb1",
-			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"tac": "a"}`,
-			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid gNB TAC 'a'. TAC must be a numeric string within the range [1, 16777215]"}`,
 		},
 		{
 			name:         "Invalid gNB name expects failure",
 			route:        "/config/v1/inventory/gnb/gn!b1",
 			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"tac": "123"}`,
+			inputData:    `{"tac": 123}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression: ^[a-zA-Z][a-zA-Z0-9-_]+$"}`,
 		},

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -90,9 +89,9 @@ func PostGnb(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-	if postGnbParams.Tac != "" {
-		if !isValidGnbTac(postGnbParams.Tac) {
-			errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be a numeric string within the range [1, 16777215]", postGnbParams.Tac)
+	if postGnbParams.Tac != nil {
+		if !isValidGnbTac(*postGnbParams.Tac) {
+			errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be an integer within the range [1, 16777215]", *postGnbParams.Tac)
 			logger.WebUILog.Errorln(errorMessage)
 			c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 			return
@@ -150,14 +149,14 @@ func PutGnb(c *gin.Context) {
 		return
 	}
 	if !isValidGnbTac(putGnbParams.Tac) {
-		errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be a numeric string within the range [1, 16777215]", putGnbParams.Tac)
+		errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be an integer within the range [1, 16777215]", putGnbParams.Tac)
 		logger.WebUILog.Errorln(errorMessage)
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
 	putGnb := configmodels.Gnb{
 		Name: gnbName,
-		Tac:  putGnbParams.Tac,
+		Tac:  &putGnbParams.Tac,
 	}
 	if err := executeGnbTransaction(c.Request.Context(), putGnb, updateGnbInNetworkSlices, putGnbOperation); err != nil {
 		logger.WebUILog.Errorw("failed to PUT gNB", "name", gnbName, "error", err)
@@ -179,11 +178,10 @@ func updateGnbInNetworkSlices(gnb configmodels.Gnb) error {
 	filterByGnb := bson.M{
 		"site-info.gNodeBs.name": gnb.Name,
 	}
-	tacNum, _ := strconv.ParseInt(gnb.Tac, 10, 32)
 	return updateInventoryInNetworkSlices(filterByGnb, func(networkSlice *configmodels.Slice) {
 		for i := range networkSlice.SiteInfo.GNodeBs {
 			if networkSlice.SiteInfo.GNodeBs[i].Name == gnb.Name {
-				networkSlice.SiteInfo.GNodeBs[i].Tac = int32(tacNum)
+				networkSlice.SiteInfo.GNodeBs[i].Tac = *gnb.Tac
 			}
 		}
 	})

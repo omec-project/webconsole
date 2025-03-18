@@ -7,6 +7,7 @@ package configapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -168,11 +169,12 @@ func NetworkSliceDeleteHandler(c *gin.Context) bool {
 	return true
 }
 
-func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
+func NetworkSlicePostHandler(c *gin.Context, msgOp int) error {
 	sliceName, _ := c.Params.Get("slice-name")
 	if !isValidName(sliceName) {
-		logger.ConfigLog.Errorf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
-		return false
+		err := fmt.Errorf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
+		logger.ConfigLog.Errorln(err.Error())
+		return err
 	}
 	logger.ConfigLog.Infof("received slice: %v", sliceName)
 
@@ -184,8 +186,8 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 		err = c.ShouldBindJSON(&request)
 	}
 	if err != nil {
-		logger.ConfigLog.Infof("err %v", err)
-		return false
+		logger.ConfigLog.Errorln(err.Error())
+		return err
 	}
 
 	req := httpwrapper.NewRequest(c.Request, request)
@@ -198,15 +200,27 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	logger.ConfigLog.Infof("url: %v ", req.URL)
 	procReq := req.Body.(configmodels.Slice)
 
+	for _, gnb := range procReq.SiteInfo.GNodeBs {
+		if !isValidName(gnb.Name) {
+			err := fmt.Errorf("invalid gNB name `%s` in Network Slice %s. Name needs to match the following regular expression: %s", gnb.Name, sliceName, NAME_PATTERN)
+			logger.ConfigLog.Errorln(err.Error())
+			return err
+		}
+		if !isValidGnbTac(gnb.Tac) {
+			err := fmt.Errorf("invalid TAC %d for gNB %s in Network Slice %s. TAC must be an integer within the range [1, 16777215]", gnb.Tac, gnb.Name, sliceName)
+			logger.ConfigLog.Errorln(err.Error())
+			return err
+		}
+	}
 	slice := procReq.SliceId
 	logger.ConfigLog.Infof("network slice: sst: %v, sd: %v", slice.Sst, slice.Sd)
 
 	group := procReq.SiteDeviceGroup
 	slices.Sort(group)
-	slices.Compact(group)
+	group = slices.Compact(group)
 	logger.ConfigLog.Infof("number of device groups %v", len(group))
-	for i := 0; i < len(group); i++ {
-		logger.ConfigLog.Infof("device groups(%v) - %v", i+1, group[i])
+	for i, g := range group {
+		logger.ConfigLog.Infof("device groups(%v) - %v", i+1, g)
 	}
 
 	for index, filter := range procReq.ApplicationFilteringRules {
@@ -259,5 +273,5 @@ func NetworkSlicePostHandler(c *gin.Context, msgOp int) bool {
 	msg.SliceName = sliceName
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully Added Slice [%v] to config channel", sliceName)
-	return true
+	return nil
 }

@@ -24,9 +24,10 @@ type MockMongoClientOneGnb struct {
 
 func (m *MockMongoClientOneGnb) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
+	var tac int32 = 123
 	gnb := configmodels.Gnb{
 		Name: "gnb1",
-		Tac:  123,
+		Tac:  &tac,
 	}
 	var gnbBson bson.M
 	tmp, _ := json.Marshal(gnb)
@@ -47,7 +48,7 @@ func (m *MockMongoClientManyGnbs) RestfulAPIGetMany(coll string, filter bson.M) 
 	for i, name := range names {
 		gnb := configmodels.Gnb{
 			Name: name,
-			Tac:  tacs[i],
+			Tac:  &tacs[i],
 		}
 		var gnbBson bson.M
 		tmp, _ := json.Marshal(gnb)
@@ -256,6 +257,14 @@ func TestGnbPostHandler(t *testing.T) {
 			inputData:    `{"name": "gnb1", "tac": "123"}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: `{"error":"invalid JSON format"}`,
+		},
+		{
+			name:         "TAC is zero expects failure",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    `{"name": "gnb1", "tac": 0}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: `{"error":"invalid gNB TAC '0'. TAC must be an integer within the range [1, 16777215]"}`,
 		},
 		{
 			name:         "DB POST operation fails expects failure",

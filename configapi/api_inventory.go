@@ -89,9 +89,9 @@ func PostGnb(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 		return
 	}
-	if postGnbParams.Tac != 0 {
-		if !isValidGnbTac(postGnbParams.Tac) {
-			errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be an integer within the range [1, 16777215]", postGnbParams.Tac)
+	if postGnbParams.Tac != nil {
+		if !isValidGnbTac(*postGnbParams.Tac) {
+			errorMessage := fmt.Sprintf("invalid gNB TAC '%v'. TAC must be an integer within the range [1, 16777215]", *postGnbParams.Tac)
 			logger.WebUILog.Errorln(errorMessage)
 			c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
 			return
@@ -156,7 +156,7 @@ func PutGnb(c *gin.Context) {
 	}
 	putGnb := configmodels.Gnb{
 		Name: gnbName,
-		Tac:  putGnbParams.Tac,
+		Tac:  &putGnbParams.Tac,
 	}
 	if err := executeGnbTransaction(c.Request.Context(), putGnb, updateGnbInNetworkSlices, putGnbOperation); err != nil {
 		logger.WebUILog.Errorw("failed to PUT gNB", "name", gnbName, "error", err)
@@ -181,7 +181,7 @@ func updateGnbInNetworkSlices(gnb configmodels.Gnb) error {
 	return updateInventoryInNetworkSlices(filterByGnb, func(networkSlice *configmodels.Slice) {
 		for i := range networkSlice.SiteInfo.GNodeBs {
 			if networkSlice.SiteInfo.GNodeBs[i].Name == gnb.Name {
-				networkSlice.SiteInfo.GNodeBs[i].Tac = gnb.Tac
+				networkSlice.SiteInfo.GNodeBs[i].Tac = *gnb.Tac
 			}
 		}
 	})

@@ -17,7 +17,7 @@ jobs:
       branch_name: ${{ github.ref }}
 
   build-ui:
-    uses: omec-project/.github/.github/workflows/webconsole/build-ui.yml@main
+    uses: omec-project/.github/.github/workflows/webconsole-build-ui.yml@main
     with:
       branch_name: ${{ github.ref }}
 

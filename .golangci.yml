@@ -22,13 +22,13 @@ linters:
     - misspell
     - nakedret
     - predeclared
+    - staticcheck
     - unconvert
     - unparam
     - whitespace
   disable:
     - errcheck
     - govet
-    - staticcheck
   settings:
     errcheck:
       check-type-assertions: false

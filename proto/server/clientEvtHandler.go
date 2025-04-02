@@ -458,15 +458,16 @@ func clientEventMachine(client *clientNF) {
 						}
 						if !factory.WebUIConfig.Configuration.Mode5G && resp.StatusCode == http.StatusNotFound {
 							client.clientLog.Infof("Config Check Message POST to %v. Status Code -  %v \n", client.id, resp.StatusCode)
-							if client.id == "hss" {
+							switch client.id {
+							case "hss":
 								rwLock.RLock()
 								postConfigHss(client, nil, nil)
 								rwLock.RUnlock()
-							} else if client.id == "mme-app" || client.id == "mme-s1ap" {
+							case "mme-app", "mme-s1ap":
 								postConfigMme(client)
-							} else if client.id == "pcrf" {
+							case "pcrf":
 								postConfigPcrf(client)
-							} else if client.id == "spgw" {
+							case "spgw":
 								postConfigSpgw(client)
 							}
 						}
@@ -524,7 +525,8 @@ func clientEventMachine(client *clientNF) {
 			}
 			if !factory.WebUIConfig.Configuration.Mode5G {
 				// push config to 4G network functions
-				if client.id == "hss" {
+				switch client.id {
+				case "hss":
 					// client.clientLog.Debugf("Received configuration: %v", spew.Sdump(configMsg))
 					if configMsg.MsgType == configmodels.Sub_data && configMsg.MsgMethod == configmodels.Delete_op {
 						imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
@@ -545,15 +547,15 @@ func clientEventMachine(client *clientNF) {
 						postConfigHss(client, lastDevGroup, lastSlice)
 						rwLock.RUnlock()
 					}
-				} else if client.id == "mme-app" || client.id == "mme-s1ap" {
+				case "mme-app", "mme-s1ap":
 					if (configMsg.SliceName != "") || (configMsg.DevGroupName != "") {
 						postConfigMme(client)
 					}
-				} else if client.id == "pcrf" {
+				case "pcrf":
 					if (configMsg.SliceName != "") || (configMsg.DevGroupName != "") {
 						postConfigPcrf(client)
 					}
-				} else if client.id == "spgw" {
+				case "spgw":
 					if (configMsg.SliceName != "") || (configMsg.DevGroupName != "") {
 						postConfigSpgw(client)
 					}
@@ -1129,7 +1131,8 @@ func postConfigPcrf(client *clientNF) {
 				ruleFInfo := &ruleFlowInfo{}
 				// permit out udp from 8.8.8.8/32 to assigned sport-dport
 				var desc string
-				if app.Protocol == 6 {
+				switch app.Protocol {
+				case 6:
 					if app.StartPort == 0 && app.EndPort == 0 {
 						desc = "permit out tcp from " + app.Endpoint + " to assigned"
 					} else if factory.WebUIConfig.Configuration.SdfComp {
@@ -1137,7 +1140,7 @@ func postConfigPcrf(client *clientNF) {
 					} else {
 						desc = "permit out tcp from " + app.Endpoint + " to assigned " + strconv.FormatInt(int64(app.StartPort), 10) + "-" + strconv.FormatInt(int64(app.EndPort), 10)
 					}
-				} else if app.Protocol == 17 {
+				case 17:
 					if app.StartPort == 0 && app.EndPort == 0 {
 						desc = "permit out udp from " + app.Endpoint + " to assigned"
 					} else if factory.WebUIConfig.Configuration.SdfComp {
@@ -1145,7 +1148,7 @@ func postConfigPcrf(client *clientNF) {
 					} else {
 						desc = "permit out udp from " + app.Endpoint + " to assigned " + strconv.FormatInt(int64(app.StartPort), 10) + "-" + strconv.FormatInt(int64(app.EndPort), 10)
 					}
-				} else {
+				default:
 					desc = "permit out ip from " + app.Endpoint + " to assigned"
 				}
 				ruleFInfo.FlowDesc = desc

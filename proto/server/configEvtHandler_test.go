@@ -236,7 +236,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 			t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
 		}
 		var resultGroup configmodels.DeviceGroups
-		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
+		result := postData[0]["data"].(map[string]interface{})
 		err := json.Unmarshal(configmodels.MapToByte(result), &resultGroup)
 		if err != nil {
 			t.Errorf("Could not unmarshall result %v", result)
@@ -280,7 +280,7 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 			t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
 		}
 		var resultGroup configmodels.DeviceGroups
-		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
+		result := postData[0]["data"].(map[string]interface{})
 		err := json.Unmarshal(configmodels.MapToByte(result), &resultGroup)
 		if err != nil {
 			t.Errorf("Could not unmarshall result %v", result)
@@ -387,7 +387,7 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 			t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
 		}
 		var resultSlice configmodels.Slice
-		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
+		result := postData[0]["data"].(map[string]interface{})
 		err := json.Unmarshal(configmodels.MapToByte(result), &resultSlice)
 		if err != nil {
 			t.Errorf("Could not unmarshal result %v", result)
@@ -440,7 +440,7 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 			t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
 		}
 		var resultSlice configmodels.Slice
-		var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
+		result := postData[0]["data"].(map[string]interface{})
 		err = json.Unmarshal(configmodels.MapToByte(result), &resultSlice)
 		if err != nil {
 			t.Errorf("Could not unmarshal result %v", result)
@@ -590,7 +590,7 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 	}
 
 	var authSubResult models.AuthenticationSubscription
-	var result map[string]interface{} = postData[0]["data"].(map[string]interface{})
+	result := postData[0]["data"].(map[string]interface{})
 	err := json.Unmarshal(configmodels.MapToByte(result), &authSubResult)
 	if err != nil {
 		t.Errorf("Could not unmarshall result %v", result)
@@ -598,7 +598,7 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 	if !reflect.DeepEqual(configMsg.AuthSubData, &authSubResult) {
 		t.Errorf("Expected authSubData %v, got %v", configMsg.AuthSubData, &authSubResult)
 	}
-	var amDataResult map[string]interface{} = postData[1]["data"].(map[string]interface{})
+	amDataResult := postData[1]["data"].(map[string]interface{})
 	if amDataResult["ueId"] != ueId {
 		t.Errorf("Expected ueId %v, got %v", ueId, amDataResult["ueId"])
 	}
@@ -659,7 +659,7 @@ func Test_handleSubscriberPost4G(t *testing.T) {
 		t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
 	}
 
-	var AmDataResult map[string]interface{} = postData[0]["data"].(map[string]interface{})
+	AmDataResult := postData[0]["data"].(map[string]interface{})
 	if AmDataResult["ueId"] != ueId {
 		t.Errorf("Expected ueId %v, got %v", ueId, AmDataResult["ueId"])
 	}

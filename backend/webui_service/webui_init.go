@@ -236,7 +236,7 @@ func (webui *WEBUI) Start() {
 
 	// Start grpc Server. This has embedded functionality of sending
 	// 4G config over REST Api as well.
-	var host string = "0.0.0.0:9876"
+	host := "0.0.0.0:9876"
 	confServ := &gServ.ConfigServer{}
 	go gServ.StartServer(host, confServ, configMsgChan)
 

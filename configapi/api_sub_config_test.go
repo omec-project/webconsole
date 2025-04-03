@@ -38,11 +38,7 @@ func (m *MockMongoClientOneSubscriber) RestfulAPIGetMany(coll string, filter bso
 	subscriber := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{})
 	subscriber["ueId"] = "208930100007487"
 	subscriber["servingPlmnId"] = "12345"
-	var subscriberBson bson.M
-	tmp, _ := json.Marshal(subscriber)
-	json.Unmarshal(tmp, &subscriberBson)
-
-	results = append(results, subscriberBson)
+	results = append(results, subscriber)
 	return results, nil
 }
 
@@ -57,10 +53,7 @@ func (m *MockMongoClientOneSubscriber) RestfulAPIGetOne(collName string, filter 
 	subscriber := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{})
 	subscriber["ueId"] = "208930100007487"
 	subscriber["servingPlmnId"] = "12345"
-	var subscriberBson bson.M
-	tmp, _ := json.Marshal(subscriber)
-	json.Unmarshal(tmp, &subscriberBson)
-	return subscriberBson, nil
+	return subscriber, nil
 }
 
 func (m *MockMongoClientManySubscribers) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
@@ -71,23 +64,18 @@ func (m *MockMongoClientManySubscribers) RestfulAPIGetMany(coll string, filter b
 		subscriber := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{})
 		subscriber["ueId"] = ueId
 		subscriber["servingPlmnId"] = plmnIDs[i]
-		var subscriberBson bson.M
-		tmp, _ := json.Marshal(subscriber)
-		json.Unmarshal(tmp, &subscriberBson)
-
-		results = append(results, subscriberBson)
+		results = append(results, subscriber)
 	}
 	return results, nil
 }
 
 func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
-	dg := deviceGroupWithImsis("group1", []string{"208930100007487", "208930100007488"})
-	var dgbson bson.M
-	tmp, _ := json.Marshal(dg)
-	json.Unmarshal(tmp, &dgbson)
-
-	results = append(results, dgbson)
+	dg := configmodels.ToBsonM(deviceGroupWithImsis("group1", []string{"208930100007487", "208930100007488"}))
+	if dg == nil {
+		panic("failed to convert device group to BsonM")
+	}
+	results = append(results, dg)
 	return results, nil
 }
 
@@ -118,7 +106,7 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 			"filter": filter,
 		})
 	}
-	authSubscription := &models.AuthenticationSubscription{
+	authSubscription := configmodels.ToBsonM(models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",
 		Milenage: &models.Milenage{
@@ -139,12 +127,11 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 			PermanentKeyValue:   "5122250214c33e723a5dd523fc145fc0",
 		},
 		SequenceNumber: "16f3b3f70fc2",
+	})
+	if authSubscription == nil {
+		panic("failed to convert subscriber to BsonM")
 	}
-	tmp, _ := json.Marshal(authSubscription)
-	var result map[string]interface{}
-	json.Unmarshal(tmp, &result)
-
-	return result, nil
+	return authSubscription, nil
 }
 
 type MockCommonDBClientEmpty struct {
@@ -187,7 +174,7 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 
 	switch coll {
 	case "subscriptionData.provisionedData.amData":
-		amDataData := models.AccessAndMobilitySubscriptionData{
+		amDataData := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{
 			Gpsis: []string{
 				"msisdn-0900000000",
 			},
@@ -209,25 +196,25 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 				Downlink: "1000 Kbps",
 				Uplink:   "1000 Kbps",
 			},
+		})
+		if amDataData == nil {
+			panic("failed to convert amDataData to BsonM")
 		}
-		tmp, _ := json.Marshal(amDataData)
-		var result map[string]interface{}
-		json.Unmarshal(tmp, &result)
-		return result, nil
+		return amDataData, nil
 
 	case "policyData.ues.amData":
-		amPolicyData := models.AmPolicyData{
+		amPolicyData := configmodels.ToBsonM(models.AmPolicyData{
 			SubscCats: []string{
 				"aether",
 			},
+		})
+		if amPolicyData == nil {
+			panic("failed to convert amPolicyData to BsonM")
 		}
-		tmp, _ := json.Marshal(amPolicyData)
-		var result map[string]interface{}
-		json.Unmarshal(tmp, &result)
-		return result, nil
+		return amPolicyData, nil
 
 	case "policyData.ues.smData":
-		smPolicyData := models.SmPolicyData{
+		smPolicyData := configmodels.ToBsonM(models.SmPolicyData{
 			SmPolicySnssaiData: map[string]models.SmPolicySnssaiData{
 				"01010203": {
 					Snssai: &models.Snssai{
@@ -241,14 +228,14 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 					},
 				},
 			},
+		})
+		if smPolicyData == nil {
+			panic("failed to convert smPolicyData to BsonM")
 		}
-		tmp, _ := json.Marshal(smPolicyData)
-		var result map[string]interface{}
-		json.Unmarshal(tmp, &result)
-		return result, nil
+		return smPolicyData, nil
 
 	case "subscriptionData.provisionedData.smfSelectionSubscriptionData":
-		smfSelData := models.SmfSelectionSubscriptionData{
+		smfSelData := configmodels.ToBsonM(models.SmfSelectionSubscriptionData{
 			SubscribedSnssaiInfos: map[string]models.SnssaiInfo{
 				"01010203": {
 					DnnInfos: []models.DnnInfo{
@@ -258,11 +245,11 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 					},
 				},
 			},
+		})
+		if smfSelData == nil {
+			panic("failed to convert smfSelData to BsonM")
 		}
-		tmp, _ := json.Marshal(smfSelData)
-		var result map[string]interface{}
-		json.Unmarshal(tmp, &result)
-		return result, nil
+		return smfSelData, nil
 
 	default:
 		return nil, fmt.Errorf("collection %s not found", coll)
@@ -497,30 +484,42 @@ func TestGetSubscriberByID(t *testing.T) {
 			}
 
 			responseContent := w.Body.String()
-			var actual, expected map[string]interface{}
+			var actual map[string]interface{}
 			if err := json.Unmarshal([]byte(responseContent), &actual); err != nil {
 				t.Fatalf("Failed to unmarshal actual response: %v. Raw response: %s", err, responseContent)
 			}
-			expectedJSON, _ := json.Marshal(tt.expectedFullResponse)
-			_ = json.Unmarshal(expectedJSON, &expected)
-
-			expectedResponse, _ := json.Marshal(expected)
-			actualResponse, _ := json.Marshal(actual)
-
+			expectedResponse, err := json.Marshal(tt.expectedFullResponse)
+			if err != nil {
+				t.Fatalf("failed to marshal expected response: %v", err)
+			}
+			actualResponse, err := json.Marshal(actual)
+			if err != nil {
+				t.Fatalf("failed to marshal actual response: %v", err)
+			}
 			if !reflect.DeepEqual(expectedResponse, actualResponse) {
 				t.Errorf("Mismatch in response:\nExpected:\n%s\nGot:\n%s\n", string(expectedResponse), string(actualResponse))
 			}
 
-			expectedCommonData, _ := json.Marshal(tt.expectedCommonPostDataDetails)
-			gotCommonData, _ := json.Marshal(postDataCommon)
-
+			expectedCommonData, err := json.Marshal(tt.expectedCommonPostDataDetails)
+			if err != nil {
+				t.Fatalf("failed to marshal expected post data details: %v", err)
+			}
+			gotCommonData, err := json.Marshal(postDataCommon)
+			if err != nil {
+				t.Fatalf("failed to marshal actual post data details: %v", err)
+			}
 			if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
 				t.Errorf("Expected CommonPostData `%v`, but got `%v`", tt.expectedCommonPostDataDetails, postDataCommon)
 			}
 
-			expectedAuthData, _ := json.Marshal(tt.expectedAuthPostDataDetails)
-			gotAuthData, _ := json.Marshal(postDataAuth)
-
+			expectedAuthData, err := json.Marshal(tt.expectedAuthPostDataDetails)
+			if err != nil {
+				t.Fatalf("failed to marshal expected auth post data details: %v", err)
+			}
+			gotAuthData, err := json.Marshal(postDataAuth)
+			if err != nil {
+				t.Fatalf("failed to marshal actual auth post data details: %v", err)
+			}
 			if !reflect.DeepEqual(expectedAuthData, gotAuthData) {
 				t.Errorf("Expected AuthPostData `%v`, but got `%v`", tt.expectedAuthPostDataDetails, postDataAuth)
 			}
@@ -665,9 +664,14 @@ func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 
-	expectedCommonData, _ := json.Marshal(expectedCommonPostDataDetails)
-	gotCommonData, _ := json.Marshal(postDataCommon)
-
+	expectedCommonData, err := json.Marshal(expectedCommonPostDataDetails)
+	if err != nil {
+		t.Fatalf("failed to marshal expected post data details: %v", err)
+	}
+	gotCommonData, err := json.Marshal(postDataCommon)
+	if err != nil {
+		t.Fatalf("failed to marshal actual post data details: %v", err)
+	}
 	if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
 		t.Errorf("Expected CommonPostData `%v`, but got `%v`", expectedCommonPostDataDetails, postDataCommon)
 	}
@@ -738,9 +742,14 @@ func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 
-	expectedCommonData, _ := json.Marshal(expectedCommonPostDataDetails)
-	gotCommonData, _ := json.Marshal(postDataCommon)
-
+	expectedCommonData, err := json.Marshal(expectedCommonPostDataDetails)
+	if err != nil {
+		t.Fatalf("failed to marshal expected post data details: %v", err)
+	}
+	gotCommonData, err := json.Marshal(postDataCommon)
+	if err != nil {
+		t.Fatalf("failed to marshal actual post data details: %v", err)
+	}
 	if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
 		t.Errorf("Expected CommonPostData `%v`, but got `%v`", expectedCommonPostDataDetails, postDataCommon)
 	}

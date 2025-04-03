@@ -43,9 +43,12 @@ func init() {
 	}
 }
 
-func sliceToByte(data []map[string]interface{}) (ret []byte) {
-	ret, _ = json.Marshal(data)
-	return
+func sliceToByte(data []map[string]interface{}) ([]byte, error) {
+	ret, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal data: %w", err)
+	}
+	return ret, nil
 }
 
 func setCorsHeader(c *gin.Context) {
@@ -57,7 +60,11 @@ func setCorsHeader(c *gin.Context) {
 
 func sendResponseToClient(c *gin.Context, response *http.Response) {
 	var jsonData interface{}
-	json.NewDecoder(response.Body).Decode(&jsonData)
+	if err := json.NewDecoder(response.Body).Decode(&jsonData); err != nil {
+		logger.DbLog.Errorf("failed to decode response: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode response"})
+		return
+	}
 	c.JSON(response.StatusCode, jsonData)
 }
 
@@ -316,37 +323,37 @@ func GetSubscriberByID(c *gin.Context) {
 	authSubsDataInterface, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch authentication subscription data from DB: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
 		return
 	}
 	amDataDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch am data from DB: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
 		return
 	}
 	smDataDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch sm data from DB: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
 		return
 	}
 	smfSelDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch smf selection data from DB: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
 		return
 	}
 	amPolicyDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch am policy data from DB: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
 		return
 	}
 	smPolicyDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch sm policy data from DB: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested user record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
 		return
 	}
 	// If all fetched data is empty, return 404 error
@@ -366,7 +373,7 @@ func GetSubscriberByID(c *gin.Context) {
 		err := json.Unmarshal(configmodels.MapToByte(authSubsDataInterface), &authSubsData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling authentication subscription data: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
 			return
 		}
 	}
@@ -376,17 +383,23 @@ func GetSubscriberByID(c *gin.Context) {
 		err := json.Unmarshal(configmodels.MapToByte(amDataDataInterface), &amDataData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling access and mobility subscription data: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
 			return
 		}
 	}
 
 	var smDataData []models.SessionManagementSubscriptionData
 	if smDataDataInterface != nil {
-		err := json.Unmarshal(sliceToByte(smDataDataInterface), &smDataData)
+		bytesData, err := sliceToByte(smDataDataInterface)
+		if err != nil {
+			logger.WebUILog.Errorf("failed to convert slice to byte: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
+			return
+		}
+		err = json.Unmarshal(bytesData, &smDataData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling session management subscription data: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
 			return
 		}
 	}
@@ -396,7 +409,7 @@ func GetSubscriberByID(c *gin.Context) {
 		err := json.Unmarshal(configmodels.MapToByte(smfSelDataInterface), &smfSelData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling smf selection subscription data: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
 			return
 		}
 	}
@@ -406,7 +419,7 @@ func GetSubscriberByID(c *gin.Context) {
 		err := json.Unmarshal(configmodels.MapToByte(amPolicyDataInterface), &amPolicyData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling am policy data: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
 			return
 		}
 	}
@@ -416,7 +429,7 @@ func GetSubscriberByID(c *gin.Context) {
 		err := json.Unmarshal(configmodels.MapToByte(smPolicyDataInterface), &smPolicyData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling sm policy data: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
 			return
 		}
 	}

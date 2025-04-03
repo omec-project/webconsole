@@ -247,10 +247,10 @@ func executeGnbTransaction(ctx context.Context, gnb configmodels.Gnb, nsOperatio
 	defer session.EndSession(ctx)
 
 	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
-		if err := session.StartTransaction(); err != nil {
+		if err = session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		if err := gnbOperation(sc, gnb); err != nil {
+		if err = gnbOperation(sc, gnb); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}
@@ -486,10 +486,10 @@ func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, nsOperatio
 	defer session.EndSession(ctx)
 
 	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
-		if err := session.StartTransaction(); err != nil {
+		if err = session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
-		if err := upfOperation(sc, upf); err != nil {
+		if err = upfOperation(sc, upf); err != nil {
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorw("failed to abort transaction", "error", abortErr)
 			}

@@ -5,7 +5,6 @@ package configapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -25,15 +24,14 @@ type MockMongoClientOneGnb struct {
 func (m *MockMongoClientOneGnb) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	var tac int32 = 123
-	gnb := configmodels.Gnb{
+	gnb := configmodels.ToBsonM(configmodels.Gnb{
 		Name: "gnb1",
 		Tac:  &tac,
+	})
+	if gnb == nil {
+		panic("failed to convert gNB to BsonM")
 	}
-	var gnbBson bson.M
-	tmp, _ := json.Marshal(gnb)
-	json.Unmarshal(tmp, &gnbBson)
-
-	results = append(results, gnbBson)
+	results = append(results, gnb)
 	return results, nil
 }
 
@@ -46,15 +44,14 @@ func (m *MockMongoClientManyGnbs) RestfulAPIGetMany(coll string, filter bson.M) 
 	names := []string{"gnb0", "gnb1", "gnb2"}
 	tacs := []int32{12, 345, 678}
 	for i, name := range names {
-		gnb := configmodels.Gnb{
+		gnb := configmodels.ToBsonM(configmodels.Gnb{
 			Name: name,
 			Tac:  &tacs[i],
+		})
+		if gnb == nil {
+			panic("failed to convert gNB to BsonM")
 		}
-		var gnbBson bson.M
-		tmp, _ := json.Marshal(gnb)
-		json.Unmarshal(tmp, &gnbBson)
-
-		results = append(results, gnbBson)
+		results = append(results, gnb)
 	}
 	return results, nil
 }
@@ -65,15 +62,14 @@ type MockMongoClientOneUpf struct {
 
 func (m *MockMongoClientOneUpf) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
-	upf := configmodels.Upf{
+	upf := configmodels.ToBsonM(configmodels.Upf{
 		Hostname: "upf1",
 		Port:     "123",
+	})
+	if upf == nil {
+		panic("failed to convert UPF to BsonM")
 	}
-	var upfBson bson.M
-	tmp, _ := json.Marshal(upf)
-	json.Unmarshal(tmp, &upfBson)
-
-	results = append(results, upfBson)
+	results = append(results, upf)
 	return results, nil
 }
 
@@ -90,15 +86,14 @@ func (m *MockMongoClientManyUpfs) RestfulAPIGetMany(coll string, filter bson.M) 
 	names := []string{"upf0", "upf1", "upf2"}
 	ports := []string{"12", "345", "678"}
 	for i, name := range names {
-		upf := configmodels.Upf{
+		upf := configmodels.ToBsonM(configmodels.Upf{
 			Hostname: name,
 			Port:     ports[i],
+		})
+		if upf == nil {
+			panic("failed to convert UPF to BsonM")
 		}
-		var upfBson bson.M
-		tmp, _ := json.Marshal(upf)
-		json.Unmarshal(tmp, &upfBson)
-
-		results = append(results, upfBson)
+		results = append(results, upf)
 	}
 	return results, nil
 }

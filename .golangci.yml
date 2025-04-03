@@ -16,9 +16,11 @@ output:
 linters:
   enable:
     - asciicheck
+    - errcheck
     - dogsled
     - godox
     - gomodguard
+    - govet
     - misspell
     - nakedret
     - predeclared
@@ -26,9 +28,6 @@ linters:
     - unconvert
     - unparam
     - whitespace
-  disable:
-    - errcheck
-    - govet
   settings:
     errcheck:
       check-type-assertions: false
@@ -62,6 +61,8 @@ linters:
         - XXX
     govet:
       enable-all: true
+      disable:
+        - fieldalignment
       settings:
         printf:
           funcs:

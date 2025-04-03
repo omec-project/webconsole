@@ -79,8 +79,12 @@ func GetDeviceGroupByName(c *gin.Context) {
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)
 	}
-	json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup)
-
+	err := json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup)
+	if err != nil {
+		logger.DbLog.Errorw("failed to unmarshal device group", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve device group"})
+		return
+	}
 	if deviceGroup.DeviceGroupName == "" {
 		c.JSON(http.StatusNotFound, nil)
 	} else {
@@ -196,8 +200,12 @@ func GetNetworkSliceByName(c *gin.Context) {
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)
 	}
-	json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice)
-
+	err := json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice)
+	if err != nil {
+		logger.DbLog.Errorw("failed to unmarshal network slice", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve network slice"})
+		return
+	}
 	if networkSlice.SliceName == "" {
 		c.JSON(http.StatusNotFound, nil)
 	} else {

@@ -5,6 +5,7 @@ package configapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -104,7 +105,10 @@ func networkSliceWithGnbParams(gnbName string, gnbTac int32) string {
 		SliceName: "slice-1",
 		SiteInfo:  siteInfo,
 	}
-	sliceTmp, _ := json.Marshal(slice)
+	sliceTmp, err := json.Marshal(slice)
+	if err != nil {
+		panic(fmt.Sprintf("failed to marshal network slice: %v", err))
+	}
 	return string(sliceTmp[:])
 }
 

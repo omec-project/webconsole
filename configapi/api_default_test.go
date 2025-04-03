@@ -6,7 +6,6 @@
 package configapi
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -65,12 +64,11 @@ func (m *MockMongoClientNoDeviceGroups) RestfulAPIGetMany(coll string, filter bs
 
 func (m *MockMongoClientOneDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
-	dg := deviceGroup("group1")
-	var dgbson bson.M
-	tmp, _ := json.Marshal(dg)
-	json.Unmarshal(tmp, &dgbson)
-
-	results = append(results, dgbson)
+	dg := configmodels.ToBsonM(deviceGroup("group1"))
+	if dg == nil {
+		panic("failed to convert device group to BsonM")
+	}
+	results = append(results, dg)
 	return results, nil
 }
 
@@ -78,12 +76,11 @@ func (m *MockMongoClientManyDeviceGroups) RestfulAPIGetMany(coll string, filter 
 	var results []map[string]interface{}
 	names := []string{"group1", "group2", "group3"}
 	for _, name := range names {
-		dg := deviceGroup(name)
-		var dgbson bson.M
-		tmp, _ := json.Marshal(dg)
-		json.Unmarshal(tmp, &dgbson)
-
-		results = append(results, dgbson)
+		dg := configmodels.ToBsonM(deviceGroup(name))
+		if dg == nil {
+			panic("failed to convert device group to BsonM")
+		}
+		results = append(results, dg)
 	}
 	return results, nil
 }
@@ -93,11 +90,11 @@ func (m *MockMongoClientNotFoundDeviceGroup) RestfulAPIGetOne(coll string, filte
 }
 
 func (m *MockMongoClientFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	dg := deviceGroup("group1")
-	var dgbson bson.M
-	tmp, _ := json.Marshal(dg)
-	json.Unmarshal(tmp, &dgbson)
-	return dgbson, nil
+	dg := configmodels.ToBsonM(deviceGroup("group1"))
+	if dg == nil {
+		panic("failed to convert device group to BsonM")
+	}
+	return dg, nil
 }
 
 func (m *MockMongoClientNoNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
@@ -107,11 +104,11 @@ func (m *MockMongoClientNoNetworkSlice) RestfulAPIGetMany(coll string, filter bs
 
 func (m *MockMongoClientOneNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
-	ns := networkSlice("slice1")
-	var slicebson bson.M
-	tmp, _ := json.Marshal(ns)
-	json.Unmarshal(tmp, &slicebson)
-	results = append(results, slicebson)
+	ns := configmodels.ToBsonM(networkSlice("slice1"))
+	if ns == nil {
+		panic("failed to convert network slice to BsonM")
+	}
+	results = append(results, ns)
 	return results, nil
 }
 
@@ -119,12 +116,11 @@ func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetMany(coll string, filter
 	var results []map[string]interface{}
 	names := []string{"slice1", "slice2", "slice3"}
 	for _, name := range names {
-		ns := networkSlice(name)
-		var slicebson bson.M
-		tmp, _ := json.Marshal(ns)
-		json.Unmarshal(tmp, &slicebson)
-
-		results = append(results, slicebson)
+		ns := configmodels.ToBsonM(networkSlice(name))
+		if ns == nil {
+			panic("failed to convert network slice to BsonM")
+		}
+		results = append(results, ns)
 	}
 	return results, nil
 }
@@ -134,11 +130,11 @@ func (m *MockMongoClientNotFoundNetworkSlice) RestfulAPIGetOne(coll string, filt
 }
 
 func (m *MockMongoClientFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	ns := networkSlice("slice1")
-	var slicebson bson.M
-	tmp, _ := json.Marshal(ns)
-	json.Unmarshal(tmp, &slicebson)
-	return slicebson, nil
+	ns := configmodels.ToBsonM(networkSlice("slice1"))
+	if ns == nil {
+		panic("failed to convert network slice to BsonM")
+	}
+	return ns, nil
 }
 
 func deviceGroup(name string) configmodels.DeviceGroups {
@@ -183,7 +179,10 @@ func TestGetDeviceGroupsNoGroups(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
-	body_bytes, _ := io.ReadAll(resp.Body)
+	body_bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
 	body := string(body_bytes)
 	if body != "[]" {
 		t.Errorf("Expected empty JSON list, got %v", body)
@@ -201,7 +200,10 @@ func TestGetDeviceGroupsOneGroup(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
-	body_bytes, _ := io.ReadAll(resp.Body)
+	body_bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
 	body := string(body_bytes)
 	expected := `["group1"]`
 	if body != expected {
@@ -220,7 +222,10 @@ func TestGetDeviceGroupsManyGroup(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
-	body_bytes, _ := io.ReadAll(resp.Body)
+	body_bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
 	body := string(body_bytes)
 	expected := `["group1","group2","group3"]`
 	if body != expected {
@@ -240,7 +245,10 @@ func TestGetDeviceGroupByNameDoesNotExist(t *testing.T) {
 	if resp.StatusCode != 404 {
 		t.Errorf("Expected StatusCode %d, got %d", 404, resp.StatusCode)
 	}
-	body_bytes, _ := io.ReadAll(resp.Body)
+	body_bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
 	body := string(body_bytes)
 	if body != "null" {
 		t.Errorf("Expected %v, got %v", "null", body)
@@ -259,7 +267,10 @@ func TestGetDeviceGroupByNameDoesExists(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
-	body_bytes, _ := io.ReadAll(resp.Body)
+	body_bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
 	body := string(body_bytes)
 	expected := `{"group-name":"group1","imsis":["1234","5678"],"site-info":"demo","ip-domain-name":"pool1","ip-domain-expanded":{"dnn":"internet","ue-ip-pool":"172.250.1.0/16","dns-primary":"1.1.1.1","dns-secondary":"8.8.8.8","mtu":1460,"ue-dnn-qos":{"dnn-mbr-uplink":10000000,"dnn-mbr-downlink":10000000,"bitrate-unit":"kbps","traffic-class":{"name":"platinum","qci":8,"arp":6,"pdb":300,"pelr":6}}}}`
 	if body != expected {
@@ -456,7 +467,10 @@ func TestGetNetworkSlicesNoSlices(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
-	body_bytes, _ := io.ReadAll(resp.Body)
+	body_bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
 	body := string(body_bytes)
 	if body != "[]" {
 		t.Errorf("Expected empty JSON list, got %v", body)
@@ -474,7 +488,10 @@ func TestGetNetworkSlicesOneSlice(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
-	body_bytes, _ := io.ReadAll(resp.Body)
+	body_bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
 	body := string(body_bytes)
 	expected := `["slice1"]`
 	if body != expected {
@@ -493,7 +510,10 @@ func TestGetNetworkSlicesManySlices(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
-	body_bytes, _ := io.ReadAll(resp.Body)
+	body_bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
 	body := string(body_bytes)
 	expected := `["slice1","slice2","slice3"]`
 	if body != expected {
@@ -513,7 +533,10 @@ func TestGetNetworkSliceByNameDoesNotExist(t *testing.T) {
 	if resp.StatusCode != 404 {
 		t.Errorf("Expected StatusCode %d, got %d", 404, resp.StatusCode)
 	}
-	body_bytes, _ := io.ReadAll(resp.Body)
+	body_bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
 	body := string(body_bytes)
 	if body != "null" {
 		t.Errorf("Expected %v, got %v", "null", body)
@@ -532,7 +555,10 @@ func TestGetNetworkSliceByNameDoesExists(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
 	}
-	body_bytes, _ := io.ReadAll(resp.Body)
+	body_bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
 	body := string(body_bytes)
 	expected := `{"slice-name":"slice1","slice-id":{"sst":"1","sd":"010203"},"site-device-group":["group1","group2"],"site-info":{"site-name":"demo","plmn":{"mcc":"208","mnc":"93"},"gNodeBs":[{"name":"demo-gnb1","tac":1}],"upf":{"upf-name":"upf","upf-port":"8805"}}}`
 	if body != expected {

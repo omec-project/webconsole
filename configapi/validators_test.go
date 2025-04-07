@@ -3,14 +3,17 @@
 
 package configapi
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateName(t *testing.T) {
 	testCases := []struct {
 		name     string
 		expected bool
 	}{
-		{"validName", true},
+		{genLongString(256), true},
 		{"Valid-Name", true},
 		{"Valid_Name", true},
 		{"{invalid_name}", false},
@@ -21,6 +24,7 @@ func TestValidateName(t *testing.T) {
 		{"4invalidName", false},
 		{"-_invalid", false},
 		{"", false},
+		{genLongString(257), false},
 	}
 
 	for _, tc := range testCases {
@@ -100,4 +104,12 @@ func TestValidateGnbTac(t *testing.T) {
 			t.Errorf("%d", tc.tac)
 		}
 	}
+}
+
+func genLongString(length int) string {
+	var sb strings.Builder
+	for i := 0; i < length; i++ {
+		sb.WriteString("a")
+	}
+	return sb.String()
 }

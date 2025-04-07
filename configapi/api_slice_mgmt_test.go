@@ -123,8 +123,13 @@ func TestDeviceGroupPostHandler_DeviceGroupNameValidation(t *testing.T) {
 		expectedCode int
 	}{
 		{
-			name:         "Device Group invalid name",
+			name:         "Device Group invalid name (invalid token)",
 			route:        "/config/v1/device-group/invalid&name",
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "Device Group invalid name (invalid length)",
+			route:        "/config/v1/device-group/" + genLongString(257),
 			expectedCode: http.StatusBadRequest,
 		},
 		{
@@ -165,8 +170,13 @@ func TestNetworkSlicePostHandler_NetworkSliceNameValidation(t *testing.T) {
 		expectedCode int
 	}{
 		{
-			name:         "Network Slice invalid name",
+			name:         "Network Slice invalid name (invalid token)",
 			route:        "/config/v1/network-slice/invalid&name",
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "Network Slice invalid name (invalid length)",
+			route:        "/config/v1/network-slice/" + genLongString(257),
 			expectedCode: http.StatusBadRequest,
 		},
 		{
@@ -213,7 +223,7 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 			route:        "/config/v1/network-slice/slice-1",
 			inputData:    networkSliceWithGnbParams("", 3),
 			expectedCode: http.StatusBadRequest,
-			expectedBody: "{\"error\":\"invalid gNB name `` in Network Slice slice-1. Name needs to match the following regular expression: ^[a-zA-Z][a-zA-Z0-9-_]+$\"}",
+			expectedBody: "{\"error\":\"invalid gNB name `` in Network Slice slice-1. Name needs to match the following regular expression: " + NAME_PATTERN + "\"}",
 		},
 		{
 			name:         "Network Slice invalid gNB TAC",

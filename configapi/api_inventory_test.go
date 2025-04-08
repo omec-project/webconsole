@@ -275,15 +275,23 @@ func TestGnbPostHandler(t *testing.T) {
 			dbAdapter:    &MockMongoClientEmptyDB{},
 			inputData:    `{"tac": 12}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid gNB name ''. Name needs to match the following regular expression: ^[a-zA-Z][a-zA-Z0-9-_]+$"}`,
+			expectedBody: "{\"error\":\"invalid gNB name ''. Name needs to match the following regular expression: " + NAME_PATTERN + "\"}",
 		},
 		{
-			name:         "Invalid gNB name expects failure",
+			name:         "Invalid gNB name expects failure (invalid token)",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &MockMongoClientEmptyDB{},
 			inputData:    `{"name": "gn!b1", "tac": 123}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression: ^[a-zA-Z][a-zA-Z0-9-_]+$"}`,
+			expectedBody: "{\"error\":\"invalid gNB name 'gn!b1'. Name needs to match the following regular expression: " + NAME_PATTERN + "\"}",
+		},
+		{
+			name:         "Invalid gNB name expects failure (invalid length)",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &MockMongoClientEmptyDB{},
+			inputData:    "{\"name\": \"" + genLongString(257) + "\", \"tac\": 123}",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "{\"error\":\"invalid gNB name '" + genLongString(257) + "'. Name needs to match the following regular expression: " + NAME_PATTERN + "\"}",
 		},
 	}
 	for _, tc := range testCases {
@@ -366,7 +374,7 @@ func TestGnbPutHandler(t *testing.T) {
 			dbAdapter:    &MockMongoClientEmptyDB{},
 			inputData:    `{"tac": 123}`,
 			expectedCode: http.StatusBadRequest,
-			expectedBody: `{"error":"invalid gNB name 'gn!b1'. Name needs to match the following regular expression: ^[a-zA-Z][a-zA-Z0-9-_]+$"}`,
+			expectedBody: "{\"error\":\"invalid gNB name 'gn!b1'. Name needs to match the following regular expression: " + NAME_PATTERN + "\"}",
 		},
 	}
 	for _, tc := range testCases {

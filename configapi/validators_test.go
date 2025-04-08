@@ -107,9 +107,5 @@ func TestValidateGnbTac(t *testing.T) {
 }
 
 func genLongString(length int) string {
-	var sb strings.Builder
-	for i := 0; i < length; i++ {
-		sb.WriteString("a")
-	}
-	return sb.String()
+	return strings.Repeat("a", length)
 }

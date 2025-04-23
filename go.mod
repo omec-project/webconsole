@@ -8,7 +8,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/omec-project/config5g v1.5.9
-	github.com/omec-project/openapi v1.3.4
+	github.com/omec-project/openapi v1.4.0
 	github.com/omec-project/util v1.3.0
 	github.com/prometheus/client_golang v1.22.0
 	github.com/swaggo/files v1.0.1

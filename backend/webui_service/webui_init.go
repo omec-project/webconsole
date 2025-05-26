@@ -31,7 +31,6 @@ import (
 	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
-	gServ "github.com/omec-project/webconsole/proto/server"
 	"github.com/urfave/cli"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -60,7 +59,7 @@ func (*WEBUI) GetCliCmd() (flags []cli.Flag) {
 	return webuiCLi
 }
 
-func (webui *WEBUI) Initialize(c *cli.Context) {
+func (webui *WEBUI) Initialize(c *cli.Context) error {
 	config = Config{
 		cfg: c.String("cfg"),
 	}
@@ -68,15 +67,16 @@ func (webui *WEBUI) Initialize(c *cli.Context) {
 	absPath, err := filepath.Abs(config.cfg)
 	if err != nil {
 		logger.ConfigLog.Errorln(err)
-		return
+		return fmt.Errorf("configuration file not specified: %v", err)
 	}
 
 	if err := factory.InitConfigFactory(absPath); err != nil {
 		logger.ConfigLog.Errorln(err)
-		return
+		return fmt.Errorf("failed to load config: %v", err)
 	}
 
 	webui.setLogLevel()
+	return nil
 }
 
 func (webui *WEBUI) setLogLevel() {
@@ -233,12 +233,6 @@ func (webui *WEBUI) Start() {
 		self := webui_context.WEBUI_Self()
 		self.UpdateNfProfiles()
 	}
-
-	// Start grpc Server. This has embedded functionality of sending
-	// 4G config over REST Api as well.
-	host := "0.0.0.0:9876"
-	confServ := &gServ.ConfigServer{}
-	go gServ.StartServer(host, confServ, configMsgChan)
 
 	// fetch one time configuration from the simapp/roc on startup
 	// this is to fetch existing config

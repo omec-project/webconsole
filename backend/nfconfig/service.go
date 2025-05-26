@@ -37,6 +37,10 @@ func (n *NFConfig) loadConfig(file string) error {
 		return err
 	}
 
+	if !n.cfg.TLS.enabled {
+		return nil
+	}
+
 	_, keyErr := os.Stat(n.cfg.TLS.Key)
 	_, pemErr := os.Stat(n.cfg.TLS.Pem)
 	if keyErr != nil || pemErr != nil {
@@ -44,9 +48,6 @@ func (n *NFConfig) loadConfig(file string) error {
 		n.cfg.TLS.enabled = false
 		return nil
 	}
-
-	// Both files exist, enable TLS
-	n.cfg.TLS.enabled = true
 	return nil
 }
 

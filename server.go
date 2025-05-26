@@ -8,12 +8,13 @@
 package main
 
 import (
+	"os"
+	"sync"
+
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/nfconfig"
 	"github.com/omec-project/webconsole/backend/webui_service"
 	"github.com/urfave/cli"
-	"os"
-	"sync"
 )
 
 var (

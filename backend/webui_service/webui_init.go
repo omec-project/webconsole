@@ -249,7 +249,11 @@ func (webui *WEBUI) Exec(c *cli.Context) error {
 	logger.InitLog.Debugln("filter:", args)
 	command := exec.Command("webui", args...)
 
-	webui.Initialize(c)
+	err := webui.Initialize(c)
+	if err != nil {
+		logger.InitLog.Errorln(err)
+		return err
+	}
 
 	stdout, err := command.StdoutPipe()
 	if err != nil {

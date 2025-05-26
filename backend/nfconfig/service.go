@@ -7,12 +7,13 @@ package nfconfig
 
 import (
 	"fmt"
+	"net/http"
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
-	"net/http"
-	"os"
 )
 
 type NFConfig struct {

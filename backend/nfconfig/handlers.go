@@ -6,9 +6,10 @@
 package nfconfig
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
-	"net/http"
 )
 
 func (n *NFConfig) GetAccessMobilityConfig(c *gin.Context) {

@@ -99,12 +99,13 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 }
 
 func GenerateJWT(username string, role int, jwtSecret []byte) (string, error) {
+	tokenExpirationDuration := time.Hour * 1
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtWebconsoleClaims{
 		Username: username,
 		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: &jwt.NumericDate{
-				Time: time.Now().Add(time.Hour * 1),
+				Time: time.Now().Add(tokenExpirationDuration),
 			},
 		},
 	})

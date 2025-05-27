@@ -19,7 +19,7 @@ import (
 
 var (
 	WEBUI    = &webui_service.WEBUI{}
-	NFConfig = nfconfig.NewNFConfig()
+	NFConfig *nfconfig.NFConfig
 )
 
 func main() {
@@ -30,7 +30,12 @@ func main() {
 	app.UsageText = "webconsole -cfg <webui_config_file.conf> -nfconfig-cfg <nfconfig_config_file.conf>"
 	app.Action = action
 
-	app.Flags = append(WEBUI.GetCliCmd(), NFConfig.GetCliCmd()...)
+	app.Flags = WEBUI.GetCliCmd()
+
+	app.Flags = append(app.Flags, cli.StringFlag{
+		Name:  "nfconfig-cfg",
+		Usage: "Path to NFConfig configuration file",
+	})
 
 	if err := app.Run(os.Args); err != nil {
 		logger.AppLog.Fatalf("Error running application: %v", err)
@@ -44,8 +49,13 @@ func action(c *cli.Context) error {
 		logger.AppLog.Fatalf("Failed to initialize WEBUI: %v", err)
 	}
 
-	if err := NFConfig.Initialize(c); err != nil {
-		logger.AppLog.Fatalf("Failed to initialize NFConfig: %v", err)
+	configPath := c.String("nfconfig-cfg")
+	factory := nfconfig.NewNFConfigFactory(configPath)
+
+	var err error
+	NFConfig, err = factory.Create()
+	if err != nil {
+		logger.AppLog.Fatalf("Failed to create NFConfig: %v", err)
 	}
 
 	var wg sync.WaitGroup

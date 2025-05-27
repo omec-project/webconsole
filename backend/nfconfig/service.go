@@ -7,13 +7,11 @@ package nfconfig
 
 import (
 	"fmt"
-	"net/http"
-	"os"
-
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
-	"github.com/urfave/cli"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
+	"net/http"
+	"os"
 )
 
 type NFConfig struct {
@@ -21,57 +19,46 @@ type NFConfig struct {
 	cfg    ServiceConfiguration
 }
 
-func NewNFConfig() *NFConfig {
-	return &NFConfig{
-		router: gin.Default(),
+type NFConfigFactory struct {
+	configPath string
+	cfg        ServiceConfiguration
+}
+
+func NewNFConfigFactory(configPath string) *NFConfigFactory {
+	return &NFConfigFactory{
+		configPath: configPath,
 	}
 }
 
-func (n *NFConfig) loadConfig(file string) error {
-	data, err := os.ReadFile(file)
+func (f *NFConfigFactory) Create() (*NFConfig, error) {
+	if f.configPath == "" {
+		return nil, fmt.Errorf("configuration file path not specified")
+	}
+
+	data, err := os.ReadFile(f.configPath)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to read config file: %v", err)
 	}
 
-	if err := yaml.Unmarshal(data, &n.cfg); err != nil {
-		return err
+	if err := yaml.Unmarshal(data, &f.cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config: %v", err)
 	}
 
-	if !n.cfg.TLS.enabled {
-		return nil
+	if f.cfg.TLS.enabled {
+		_, keyErr := os.Stat(f.cfg.TLS.Key)
+		_, pemErr := os.Stat(f.cfg.TLS.Pem)
+		if keyErr != nil || pemErr != nil {
+			f.cfg.TLS.enabled = false
+		}
 	}
 
-	_, keyErr := os.Stat(n.cfg.TLS.Key)
-	_, pemErr := os.Stat(n.cfg.TLS.Pem)
-	if keyErr != nil || pemErr != nil {
-		// One or two files don't exist, disable TLS
-		n.cfg.TLS.enabled = false
-		return nil
-	}
-	return nil
-}
-
-func (n *NFConfig) GetCliCmd() []cli.Flag {
-	return []cli.Flag{
-		cli.StringFlag{
-			Name:  "nfconfig-cfg",
-			Usage: "Path to NFConfig configuration file",
-		},
-	}
-}
-
-func (n *NFConfig) Initialize(c *cli.Context) error {
-	configPath := c.String("nfconfig-cfg")
-	if configPath == "" {
-		return fmt.Errorf("configuration file not specified")
+	nfConfig := &NFConfig{
+		router: gin.Default(),
+		cfg:    f.cfg,
 	}
 
-	if err := n.loadConfig(configPath); err != nil {
-		return fmt.Errorf("failed to load config: %v", err)
-	}
-
-	n.setupRoutes()
-	return nil
+	nfConfig.setupRoutes()
+	return nfConfig, nil
 }
 
 func (n *NFConfig) Start() error {

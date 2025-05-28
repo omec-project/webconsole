@@ -25,11 +25,11 @@ func NewNFConfig(config *factory.Config) (*NFConfig, error) {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}
 
-	if config.Logger.Config5g != nil {
-		if config.Logger.Config5g.DebugLevel != "" {
-			if level, err := zapcore.ParseLevel(config.Logger.Config5g.DebugLevel); err != nil {
+	if config.Logger.WEBUI != nil {
+		if config.Logger.WEBUI.DebugLevel != "" {
+			if level, err := zapcore.ParseLevel(config.Logger.WEBUI.DebugLevel); err != nil {
 				logger.InitLog.Warnf("NFConfig Log level [%s] is invalid, set to [info] level",
-					config.Logger.Config5g.DebugLevel)
+					config.Logger.WEBUI.DebugLevel)
 				logger.SetLogLevel(zap.InfoLevel)
 			} else {
 				logger.InitLog.Infof("NFConfig Log level is set to [%s] level", level)

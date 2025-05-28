@@ -44,11 +44,11 @@ func (f *NFConfigFactory) Create() (*NFConfig, error) {
 		return nil, fmt.Errorf("failed to parse config: %v", err)
 	}
 
-	if f.cfg.TLS.enabled {
+	if f.cfg.TLS.Enabled {
 		_, keyErr := os.Stat(f.cfg.TLS.Key)
 		_, pemErr := os.Stat(f.cfg.TLS.Pem)
 		if keyErr != nil || pemErr != nil {
-			f.cfg.TLS.enabled = false
+			f.cfg.TLS.Enabled = false
 		}
 	}
 
@@ -68,7 +68,7 @@ func (n *NFConfig) Start() error {
 		Handler: n.router,
 	}
 
-	if n.cfg.TLS.enabled {
+	if n.cfg.TLS.Enabled {
 		logger.ConfigLog.Infoln("Starting HTTPS server on", addr)
 		return srv.ListenAndServeTLS(n.cfg.TLS.Pem, n.cfg.TLS.Key)
 	}

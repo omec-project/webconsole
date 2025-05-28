@@ -7,9 +7,9 @@ package nfconfig
 
 type ServiceConfiguration struct {
 	TLS struct {
-		enabled bool   `yaml:"enabled"`
-		Key     string `yaml:"keyPath"`
-		Pem     string `yaml:"certPath"`
+		Enabled bool   `yaml:"enabled"`
+		Key     string `yaml:"key"`
+		Pem     string `yaml:"pem"`
 	} `yaml:"tls"`
 }
 

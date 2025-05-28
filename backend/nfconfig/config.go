@@ -5,17 +5,9 @@
 
 package nfconfig
 
-type ServiceConfiguration struct {
-	TLS struct {
-		Enabled bool   `yaml:"enabled"`
-		Key     string `yaml:"key"`
-		Pem     string `yaml:"pem"`
-	} `yaml:"tls"`
-}
-
 // TODO: implement the config models in the next PRs
 
-type AccessMobilityConfig struct{}
+type AccessAndMobilityConfig struct{}
 
 type PlmnConfig struct{}
 

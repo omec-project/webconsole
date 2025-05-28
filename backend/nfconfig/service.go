@@ -8,61 +8,46 @@ package nfconfig
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
-	"gopkg.in/yaml.v3"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"net/http"
-	"os"
 )
 
 type NFConfig struct {
+	Config *factory.Configuration
 	router *gin.Engine
-	cfg    ServiceConfiguration
 }
 
-type NFConfigFactory struct {
-	configPath string
-	cfg        ServiceConfiguration
-}
-
-func NewNFConfigFactory(configPath string) *NFConfigFactory {
-	return &NFConfigFactory{
-		configPath: configPath,
-	}
-}
-
-func (f *NFConfigFactory) Create() (*NFConfig, error) {
-	if f.configPath == "" {
-		return nil, fmt.Errorf("configuration file path not specified")
+func NewNFConfig(config *factory.Config) (*NFConfig, error) {
+	if config == nil {
+		return nil, fmt.Errorf("configuration cannot be nil")
 	}
 
-	data, err := os.ReadFile(f.configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %v", err)
-	}
-
-	if err := yaml.Unmarshal(data, &f.cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse config: %v", err)
-	}
-
-	if f.cfg.TLS.Enabled {
-		logger.ConfigLog.Infof("Checking TLS files - Key: %s, Pem: %s", f.cfg.TLS.Key, f.cfg.TLS.Pem)
-		_, keyErr := os.Stat(f.cfg.TLS.Key)
-		_, pemErr := os.Stat(f.cfg.TLS.Pem)
-		if keyErr != nil || pemErr != nil {
-			logger.ConfigLog.Errorf("TLS file check failed - KeyErr: %v, PemErr: %v", keyErr, pemErr)
-			f.cfg.TLS.Enabled = false
+	if config.Logger.Config5g != nil {
+		if config.Logger.Config5g.DebugLevel != "" {
+			if level, err := zapcore.ParseLevel(config.Logger.Config5g.DebugLevel); err != nil {
+				logger.InitLog.Warnf("NFConfig Log level [%s] is invalid, set to [info] level",
+					config.Logger.Config5g.DebugLevel)
+				logger.SetLogLevel(zap.InfoLevel)
+			} else {
+				logger.InitLog.Infof("NFConfig Log level is set to [%s] level", level)
+				logger.SetLogLevel(level)
+			}
 		} else {
-			logger.ConfigLog.Info("TLS files found successfully")
+			logger.InitLog.Warnln("NFConfig Log level not set. Default set to [info] level")
+			logger.SetLogLevel(zap.InfoLevel)
 		}
 	}
 
-	nfConfig := &NFConfig{
+	nf := &NFConfig{
+		Config: config.Configuration,
 		router: gin.Default(),
-		cfg:    f.cfg,
 	}
 
-	nfConfig.setupRoutes()
-	return nfConfig, nil
+	nf.setupRoutes()
+	return nf, nil
 }
 
 func (n *NFConfig) Start() error {
@@ -72,9 +57,9 @@ func (n *NFConfig) Start() error {
 		Handler: n.router,
 	}
 
-	if n.cfg.TLS.Enabled {
+	if n.Config.ConfigTLS.Key != "" && n.Config.ConfigTLS.PEM != "" {
 		logger.ConfigLog.Infoln("Starting HTTPS server on", addr)
-		return srv.ListenAndServeTLS(n.cfg.TLS.Pem, n.cfg.TLS.Key)
+		return srv.ListenAndServeTLS(n.Config.ConfigTLS.PEM, n.Config.ConfigTLS.Key)
 	}
 
 	logger.ConfigLog.Infoln("Starting HTTP server on", addr)

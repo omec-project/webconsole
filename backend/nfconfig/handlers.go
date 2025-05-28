@@ -14,7 +14,7 @@ import (
 
 func (n *NFConfig) GetAccessMobilityConfig(c *gin.Context) {
 	logger.ConfigLog.Infoln("Handling GET request for access-mobility config")
-	c.JSON(http.StatusOK, []AccessMobilityConfig{})
+	c.JSON(http.StatusOK, []AccessAndMobilityConfig{})
 }
 
 func (n *NFConfig) GetPlmnConfig(c *gin.Context) {

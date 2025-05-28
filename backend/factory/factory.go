@@ -38,10 +38,16 @@ func InitConfigFactory(f string) error {
 		if yamlErr := yaml.Unmarshal(content, WebUIConfig); yamlErr != nil {
 			return fmt.Errorf("[Configuration] %+v", yamlErr)
 		}
-		if WebUIConfig.Configuration.TLS != nil {
-			if WebUIConfig.Configuration.TLS.Key == "" ||
-				WebUIConfig.Configuration.TLS.PEM == "" {
-				return fmt.Errorf("[Configuration] TLS Key and PEM must be set")
+		if WebUIConfig.Configuration.UITLS != nil {
+			if WebUIConfig.Configuration.UITLS.Key == "" ||
+				WebUIConfig.Configuration.UITLS.PEM == "" {
+				return fmt.Errorf("[UI Configuration] TLS Key and PEM must be set")
+			}
+		}
+		if WebUIConfig.Configuration.ConfigTLS != nil {
+			if WebUIConfig.Configuration.ConfigTLS.Key == "" ||
+				WebUIConfig.Configuration.ConfigTLS.PEM == "" {
+				return fmt.Errorf("[NFConfig Configuration] TLS Key and PEM must be set")
 			}
 		}
 		if WebUIConfig.Configuration.Mongodb.AuthUrl == "" {

@@ -59,7 +59,7 @@ func (*WEBUI) GetCliCmd() (flags []cli.Flag) {
 	return webuiCLi
 }
 
-func (webui *WEBUI) Initialize(c *cli.Context) error {
+func (webui *WEBUI) Initialize(c *cli.Context) {
 	config = Config{
 		cfg: c.String("cfg"),
 	}
@@ -67,16 +67,15 @@ func (webui *WEBUI) Initialize(c *cli.Context) error {
 	absPath, err := filepath.Abs(config.cfg)
 	if err != nil {
 		logger.ConfigLog.Errorln(err)
-		return fmt.Errorf("configuration file not specified: %v", err)
+		return
 	}
 
 	if err := factory.InitConfigFactory(absPath); err != nil {
 		logger.ConfigLog.Errorln(err)
-		return fmt.Errorf("failed to load config: %v", err)
+		return
 	}
 
 	webui.setLogLevel()
-	return nil
 }
 
 func (webui *WEBUI) setLogLevel() {
@@ -202,7 +201,7 @@ func (webui *WEBUI) Start() {
 	go func() {
 		httpAddr := ":" + strconv.Itoa(factory.WebUIConfig.Configuration.CfgPort)
 		logger.InitLog.Infoln("Webui HTTP addr", httpAddr)
-		tlsConfig := factory.WebUIConfig.Configuration.TLS
+		tlsConfig := factory.WebUIConfig.Configuration.UITLS
 		if factory.WebUIConfig.Info.HttpVersion == 2 {
 			server, err := http2_util.NewServer(httpAddr, "", subconfig_router)
 			if server == nil {
@@ -249,12 +248,7 @@ func (webui *WEBUI) Exec(c *cli.Context) error {
 	logger.InitLog.Debugln("filter:", args)
 	command := exec.Command("webui", args...)
 
-	err := webui.Initialize(c)
-	if err != nil {
-		logger.InitLog.Errorln(err)
-		return err
-	}
-
+	webui.Initialize(c)
 	stdout, err := command.StdoutPipe()
 	if err != nil {
 		logger.InitLog.Fatalln(err)

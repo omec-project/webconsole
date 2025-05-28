@@ -32,7 +32,8 @@ type Info struct {
 
 type Configuration struct {
 	Mongodb                 *Mongodb    `yaml:"mongodb"`
-	TLS                     *TLS        `yaml:"tls"`
+	UITLS                   *TLS        `yaml:"ui_tls"`
+	ConfigTLS               *TLS        `yaml:"config_tls"`
 	RocEnd                  *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
 	LteEnd                  []*LteEndpt `yaml:"endpoints,omitempty"`          // LTE endpoints are configured and not auto-detected
 	Mode5G                  bool        `yaml:"mode5G,omitempty"`

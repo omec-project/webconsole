@@ -45,10 +45,14 @@ func (f *NFConfigFactory) Create() (*NFConfig, error) {
 	}
 
 	if f.cfg.TLS.Enabled {
+		logger.ConfigLog.Infof("Checking TLS files - Key: %s, Pem: %s", f.cfg.TLS.Key, f.cfg.TLS.Pem)
 		_, keyErr := os.Stat(f.cfg.TLS.Key)
 		_, pemErr := os.Stat(f.cfg.TLS.Pem)
 		if keyErr != nil || pemErr != nil {
+			logger.ConfigLog.Errorf("TLS file check failed - KeyErr: %v, PemErr: %v", keyErr, pemErr)
 			f.cfg.TLS.Enabled = false
+		} else {
+			logger.ConfigLog.Info("TLS files found successfully")
 		}
 	}
 

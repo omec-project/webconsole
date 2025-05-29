@@ -8,6 +8,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/nfconfig"
@@ -29,7 +30,7 @@ func main() {
 		return action(c)
 	}
 	if err := app.Run(os.Args); err != nil {
-		logger.AppLog.Fatalf("error args: %v", err)
+		logger.AppLog.Errorf("error args: %v", err)
 	}
 }
 
@@ -63,7 +64,9 @@ func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nf nfconfig.NFConfi
 
 	select {
 	case err := <-errChan:
-		logger.InitLog.Fatalf("NFConfig server failed: %v", err)
+		logger.InitLog.Errorf("NFConfig server failed: %v", err)
 		return err
+	case <-time.After(200 * time.Millisecond):
+		return nil
 	}
 }

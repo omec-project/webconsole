@@ -5,6 +5,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -17,10 +18,23 @@ type mockWebUI struct {
 }
 
 func (m *mockWebUI) Initialize(c *cli.Context) (*factory.Config, error) {
+	cfg := c.String("cfg")
+	if cfg == "" {
+		return nil, fmt.Errorf("[Configuration] config file path cannot be empty")
+	}
 	return &factory.Config{}, nil
 }
 
-func (m *mockWebUI) GetCliCmd() []cli.Flag { return nil }
+func (m *mockWebUI) GetCliCmd() []cli.Flag {
+	return []cli.Flag{
+		cli.StringFlag{
+			Name:     "cfg",
+			Usage:    "webconsole config file",
+			Required: true,
+		},
+	}
+}
+
 func (m *mockWebUI) Start() {
 	m.started = true
 }
@@ -66,5 +80,66 @@ func TestRunWebUIAndNFConfig_Failure(t *testing.T) {
 	err := runWebUIAndNFConfig(webui, nf)
 	if err == nil {
 		t.Errorf("expected error, got nil")
+	}
+}
+
+func TestMainCLIFlags(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		expectError bool
+	}{
+		{
+			name:        "missing required flag",
+			args:        []string{"webconsole"},
+			expectError: true,
+		},
+		{
+			name:        "valid config flag",
+			args:        []string{"webconsole", "-cfg", "test.conf"},
+			expectError: false,
+		},
+		{
+			name:        "empty config value",
+			args:        []string{"webconsole", "-cfg", ""},
+			expectError: true,
+		},
+		{
+			name:        "invalid flag",
+			args:        []string{"webconsole", "-invalid", "test.conf"},
+			expectError: true,
+		},
+		{
+			name:        "multiple flags with valid config",
+			args:        []string{"webconsole", "-cfg", "test.conf", "-verbose"},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := cli.NewApp()
+			app.Name = "webui"
+			app.Usage = "Web UI"
+			app.UsageText = "webconsole -cfg <webui_config_file.conf>"
+			app.Action = func(c *cli.Context) error {
+				cfg := c.String("cfg")
+				if cfg == "" {
+					return fmt.Errorf("Required flag cfg not set")
+				}
+				return nil
+			}
+			webui := &mockWebUI{}
+			app.Flags = webui.GetCliCmd()
+
+			err := app.Run(tt.args)
+
+			if tt.expectError && err == nil {
+				t.Error("expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
 	}
 }

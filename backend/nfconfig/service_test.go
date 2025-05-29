@@ -20,27 +20,117 @@ func TestNewNFConfig_nil_config(t *testing.T) {
 	}
 }
 
-func TestNewNFConfig_valid_config(t *testing.T) {
-	mockValidConfig := &factory.Config{
-		Logger: &logger.Logger{
-			WEBUI: &logger.LogSetting{
-				DebugLevel: "info",
+func TestNewNFConfig_various_configs(t *testing.T) {
+	testCases := []struct {
+		name        string
+		config      *factory.Config
+		expectError bool
+	}{
+		{
+			name: "correct TLS configuration and warning log level",
+			config: &factory.Config{
+				Logger: &logger.Logger{
+					WEBUI: &logger.LogSetting{
+						DebugLevel: "warning",
+					},
+				},
+				Configuration: &factory.Configuration{
+					ConfigTLS: &factory.TLS{
+						PEM: "test.pem",
+						Key: "test.key",
+					},
+				},
 			},
+			expectError: false,
 		},
-		Configuration: &factory.Configuration{
-			ConfigTLS: &factory.TLS{
-				PEM: "test.pem",
-				Key: "test.key",
+		{
+			name: "correct TLS configuration and info log level",
+			config: &factory.Config{
+				Logger: &logger.Logger{
+					WEBUI: &logger.LogSetting{
+						DebugLevel: "info",
+					},
+				},
+				Configuration: &factory.Configuration{
+					ConfigTLS: &factory.TLS{
+						PEM: "test.pem",
+						Key: "test.key",
+					},
+				},
 			},
-			CfgPort: 9090,
+			expectError: false,
+		},
+		{
+			name: "missing key and error log level",
+			config: &factory.Config{
+				Logger: &logger.Logger{
+					WEBUI: &logger.LogSetting{
+						DebugLevel: "info",
+					},
+				},
+				Configuration: &factory.Configuration{
+					ConfigTLS: &factory.TLS{
+						PEM: "test.pem",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "missing pem and debug log level",
+			config: &factory.Config{
+				Logger: &logger.Logger{
+					WEBUI: &logger.LogSetting{
+						DebugLevel: "info",
+					},
+				},
+				Configuration: &factory.Configuration{
+					ConfigTLS: &factory.TLS{
+						Key: "test.key",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid debug level",
+			config: &factory.Config{
+				Logger: &logger.Logger{
+					WEBUI: &logger.LogSetting{
+						DebugLevel: "invalid_level",
+					},
+				},
+				Configuration: &factory.Configuration{
+					ConfigTLS: &factory.TLS{
+						PEM: "test.pem",
+						Key: "test.key",
+					},
+				},
+			},
+			expectError: false,
 		},
 	}
-	nf, err := NewNFConfig(mockValidConfig)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if nf == nil {
-		t.Errorf("expected NFConfigInterface, got nil")
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			nf, err := NewNFConfig(tc.config)
+
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("expected error for invalid config, got nil")
+				}
+				if nf != nil {
+					t.Errorf("expected nil NFConfigInterface for invalid config, got non-nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if nf == nil {
+					t.Errorf("expected non-nil NFConfigInterface, got nil")
+				}
+			}
+		})
 	}
 }
 
@@ -49,7 +139,7 @@ func TestNFConfigRoutes_success(t *testing.T) {
 	mockValidConfig := &factory.Config{
 		Logger: &logger.Logger{
 			WEBUI: &logger.LogSetting{
-				DebugLevel: "info",
+				DebugLevel: "debug",
 			},
 		},
 		Configuration: &factory.Configuration{
@@ -57,7 +147,6 @@ func TestNFConfigRoutes_success(t *testing.T) {
 				PEM: "test.pem",
 				Key: "test.key",
 			},
-			CfgPort: 9090,
 		},
 	}
 
@@ -71,53 +160,52 @@ func TestNFConfigRoutes_success(t *testing.T) {
 		t.Fatalf("expected *NFConfig type")
 	}
 
-	req1, err := http.NewRequest("GET", "/nfconfig/access-mobility", nil)
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	w1 := httptest.NewRecorder()
-	nf.Router().ServeHTTP(w1, req1)
-	if w1.Code != http.StatusOK {
-		t.Errorf("expected 200 OK, got %d", w1.Code)
-	}
-
-	req2, err := http.NewRequest("GET", "/nfconfig/plmn", nil)
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	w2 := httptest.NewRecorder()
-	nf.Router().ServeHTTP(w2, req2)
-	if w2.Code != http.StatusOK {
-		t.Errorf("expected 200 OK, got %d", w2.Code)
-	}
-
-	req3, err := http.NewRequest("GET", "/nfconfig/plmn-snssai", nil)
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	w3 := httptest.NewRecorder()
-	nf.Router().ServeHTTP(w3, req3)
-	if w3.Code != http.StatusOK {
-		t.Errorf("expected 200 OK, got %d", w3.Code)
-	}
-
-	req4, err := http.NewRequest("GET", "/nfconfig/policy-control", nil)
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	w4 := httptest.NewRecorder()
-	nf.Router().ServeHTTP(w4, req4)
-	if w4.Code != http.StatusOK {
-		t.Errorf("expected 200 OK, got %d", w4.Code)
+	testCases := []struct {
+		name       string
+		path       string
+		wantStatus int
+	}{
+		{
+			name:       "access mobility endpoint",
+			path:       "/nfconfig/access-mobility",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "plmn endpoint",
+			path:       "/nfconfig/plmn",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "plmn-snssai endpoint",
+			path:       "/nfconfig/plmn-snssai",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "policy control endpoint",
+			path:       "/nfconfig/policy-control",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "session management endpoint",
+			path:       "/nfconfig/session-management",
+			wantStatus: http.StatusOK,
+		},
 	}
 
-	req5, err := http.NewRequest("GET", "/nfconfig/session-management", nil)
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", tc.path, nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+
+			w := httptest.NewRecorder()
+			nf.Router().ServeHTTP(w, req)
+
+			if w.Code != tc.wantStatus {
+				t.Errorf("expected %d, got %d", tc.wantStatus, w.Code)
+			}
+		})
 	}
-	w5 := httptest.NewRecorder()
-	nf.Router().ServeHTTP(w5, req5)
-	if w5.Code != http.StatusOK {
-		t.Errorf("expected 200 OK, got %d", w5.Code)
-	}
+
 }

@@ -7,6 +7,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/omec-project/webconsole/backend/logger"
@@ -23,7 +24,11 @@ func main() {
 	logger.AppLog.Infoln(app.Name)
 	app.Usage = "Web UI"
 	app.UsageText = "webconsole -cfg <webui_config_file.conf>"
+	app.Flags = WEBUI.GetCliCmd()
 	app.Action = func(c *cli.Context) error {
+		if c.String("cfg") == "" {
+			return fmt.Errorf("required flag cfg not set")
+		}
 		return action(c)
 	}
 	if err := app.Run(os.Args); err != nil {

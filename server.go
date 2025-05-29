@@ -7,11 +7,12 @@
 package main
 
 import (
+	"os"
+
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/nfconfig"
 	"github.com/omec-project/webconsole/backend/webui_service"
 	"github.com/urfave/cli"
-	"os"
 )
 
 var WEBUI = &webui_service.WEBUI{}
@@ -57,9 +58,10 @@ func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nf nfconfig.NFConfi
 
 	go webui.Start()
 
-	select {
-	case err := <-errChan:
+	err := <-errChan
+	if err != nil {
 		logger.InitLog.Errorf("NFConfig server failed: %v", err)
 		return err
 	}
+	return nil
 }

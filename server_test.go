@@ -5,10 +5,11 @@ package main
 
 import (
 	"errors"
-	"github.com/omec-project/webconsole/backend/factory"
-	"github.com/urfave/cli"
 	"testing"
 	"time"
+
+	"github.com/omec-project/webconsole/backend/factory"
+	"github.com/urfave/cli"
 )
 
 type mockWebUI struct {

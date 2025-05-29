@@ -7,12 +7,13 @@ package nfconfig
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"net/http"
 )
 
 type NFConfig struct {
@@ -32,7 +33,7 @@ var NewNFConfigFunc = NewNFConfig
 
 func NewNFConfig(config *factory.Config) (NFConfigInterface, error) {
 	if config == nil {
-		return nil, fmt.Errorf("configuration cannot be nil.")
+		return nil, fmt.Errorf("configuration cannot be nil")
 	}
 
 	if config.Logger.WEBUI != nil {

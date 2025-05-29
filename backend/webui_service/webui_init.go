@@ -255,7 +255,11 @@ func (webui *WEBUI) Exec(c *cli.Context) error {
 	logger.InitLog.Debugln("filter:", args)
 	command := exec.Command("webui", args...)
 
-	webui.Initialize(c)
+	_, err := webui.Initialize(c)
+	if err != nil {
+		logger.InitLog.Errorf("webui initialization failed: %v", err)
+		return err
+	}
 	stdout, err := command.StdoutPipe()
 	if err != nil {
 		logger.InitLog.Fatalln(err)

@@ -51,8 +51,13 @@ func NewNFConfig(config *factory.Config) (NFConfigInterface, error) {
 		Config: config.Configuration,
 		router: gin.Default(),
 	}
-
 	nf.setupRoutes()
+	err := nf.Start()
+	if err != nil {
+		logger.InitLog.Errorf("NFConfig Start failed: %v", err)
+		return nil, err
+	}
+
 	return nf, nil
 }
 

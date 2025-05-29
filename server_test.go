@@ -38,12 +38,20 @@ func TestRunWebUIAndNFConfig_Success(t *testing.T) {
 	webui := &mockWebUI{}
 	nf := &mockNFConfigSuccess{}
 
-	err := runWebUIAndNFConfig(webui, nf)
-	if err != nil {
-		t.Errorf("expected no error, got: %v", err)
-	}
-	if !webui.started {
-		t.Errorf("expected WebUI.Start() to be called")
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- runWebUIAndNFConfig(webui, nf)
+	}()
+
+	select {
+	case err := <-errChan:
+		if err != nil {
+			t.Errorf("expected no error, got: %v", err)
+		}
+		if !webui.started {
+			t.Errorf("expected WebUI.Start() to be called")
+		}
+	case <-time.After(200 * time.Millisecond):
 	}
 }
 

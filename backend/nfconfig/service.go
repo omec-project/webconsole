@@ -34,7 +34,7 @@ func NewNFConfig(config *factory.Config) (NFConfigInterface, error) {
 	if config.Logger.WEBUI != nil {
 		if config.Logger.WEBUI.DebugLevel != "" {
 			if level, err := zapcore.ParseLevel(config.Logger.WEBUI.DebugLevel); err != nil {
-				logger.InitLog.Warnf("NFConfig Log level gulsum [%s] is invalid, set to [info] level",
+				logger.InitLog.Warnf("NFConfig Log level [%s] is invalid, set to [info] level",
 					config.Logger.WEBUI.DebugLevel)
 				logger.SetLogLevel(zap.InfoLevel)
 			} else {

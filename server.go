@@ -7,13 +7,11 @@
 package main
 
 import (
-	"os"
-	"time"
-
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/nfconfig"
 	"github.com/omec-project/webconsole/backend/webui_service"
 	"github.com/urfave/cli"
+	"os"
 )
 
 var (
@@ -52,12 +50,13 @@ func action(c *cli.Context) error {
 
 func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
 	errChan := make(chan error, 1)
-
+	logger.InitLog.Infoln("Starting NFConfig")
 	go func() {
 		if err := nf.Start(); err != nil {
 			logger.InitLog.Errorf("NFConfig start failed: %v", err)
 			errChan <- err
 		}
+		logger.InitLog.Infoln("Started NFConfig")
 	}()
 
 	go webui.Start()
@@ -66,7 +65,5 @@ func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nf nfconfig.NFConfi
 	case err := <-errChan:
 		logger.InitLog.Errorf("NFConfig server failed: %v", err)
 		return err
-	case <-time.After(200 * time.Millisecond):
-		return nil
 	}
 }

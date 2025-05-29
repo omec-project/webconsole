@@ -44,12 +44,19 @@ func action(c *cli.Context) {
 		logger.InitLog.Errorf("Failed to create NFConfig: %v", err)
 		return
 	}
+	errChan := make(chan error, 1)
 	go func() {
 		if err := nfConfig.Start(); err != nil {
 			logger.InitLog.Errorf("NFConfig start failed: %v", err)
+			errChan <- err
 		}
 	}()
 
-	WEBUI.Start()
+	go WEBUI.Start()
+
+	select {
+	case err := <-errChan:
+		logger.InitLog.Fatalf("NFConfig server failed: %v", err)
+	}
 
 }

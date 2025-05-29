@@ -25,38 +25,45 @@ func main() {
 	logger.AppLog.Infoln(app.Name)
 	app.Usage = "Web UI"
 	app.UsageText = "webconsole -cfg <webui_config_file.conf>"
-	app.Action = action
-	app.Flags = WEBUI.GetCliCmd()
+	app.Action = func(c *cli.Context) error {
+		return action(c)
+	}
 	if err := app.Run(os.Args); err != nil {
 		logger.AppLog.Fatalf("error args: %v", err)
 	}
 }
 
-func action(c *cli.Context) {
+func action(c *cli.Context) error {
 	config, err := WEBUI.Initialize(c)
 	if err != nil {
-		logger.InitLog.Errorf("Failed to initialize WEBUI: %v", err)
-		return
+		logger.AppLog.Errorf("Failed to initialize WEBUI: %v", err)
+		return err
 	}
 
-	nfConfig, err := nfconfig.NewNFConfigFunc(config)
+	nf, err := nfconfig.NewNFConfigFunc(config)
 	if err != nil {
-		logger.InitLog.Errorf("Failed to create NFConfig: %v", err)
-		return
+		logger.AppLog.Errorf("Failed to create NFConfig: %v", err)
+		return err
 	}
+
+	return runWebUIAndNFConfig(WEBUI, nf)
+}
+
+func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
 	errChan := make(chan error, 1)
+
 	go func() {
-		if err := nfConfig.Start(); err != nil {
+		if err := nf.Start(); err != nil {
 			logger.InitLog.Errorf("NFConfig start failed: %v", err)
 			errChan <- err
 		}
 	}()
 
-	go WEBUI.Start()
+	go webui.Start()
 
 	select {
 	case err := <-errChan:
 		logger.InitLog.Fatalf("NFConfig server failed: %v", err)
+		return err
 	}
-
 }

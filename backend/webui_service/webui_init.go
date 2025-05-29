@@ -45,8 +45,8 @@ type (
 	}
 )
 
-type WebUIService interface {
-	Initialize(c *cli.Context)
+type WebUIInterface interface {
+	Initialize(*cli.Context) (*factory.Config, error)
 	GetCliCmd() []cli.Flag
 	Start()
 }

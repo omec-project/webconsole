@@ -207,5 +207,4 @@ func TestNFConfigRoutes_success(t *testing.T) {
 			}
 		})
 	}
-
 }

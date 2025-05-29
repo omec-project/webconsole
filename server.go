@@ -14,9 +14,7 @@ import (
 	"os"
 )
 
-var (
-	WEBUI = &webui_service.WEBUI{}
-)
+var WEBUI = &webui_service.WEBUI{}
 
 func main() {
 	app := cli.NewApp()
@@ -28,7 +26,7 @@ func main() {
 		return action(c)
 	}
 	if err := app.Run(os.Args); err != nil {
-		logger.AppLog.Errorf("error args: %v", err)
+		logger.AppLog.Fatalf("error args: %v", err)
 	}
 }
 

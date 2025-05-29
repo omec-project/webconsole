@@ -24,11 +24,15 @@ type NFConfigInterface interface {
 	Start() error
 }
 
+func (n *NFConfig) Router() *gin.Engine {
+	return n.router
+}
+
 var NewNFConfigFunc = NewNFConfig
 
 func NewNFConfig(config *factory.Config) (NFConfigInterface, error) {
 	if config == nil {
-		return nil, fmt.Errorf("configuration cannot be nil")
+		return nil, fmt.Errorf("configuration cannot be nil.")
 	}
 
 	if config.Logger.WEBUI != nil {

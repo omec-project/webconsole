@@ -5,8 +5,6 @@
 
 package nfconfig
 
-// TODO: implement the config models in the next PRs
-
 type AccessAndMobilityConfig struct{}
 
 type PlmnConfig struct{}

@@ -20,7 +20,13 @@ type NFConfig struct {
 	router *gin.Engine
 }
 
-func NewNFConfig(config *factory.Config) (*NFConfig, error) {
+type NFConfigInterface interface {
+	Start() error
+}
+
+var NewNFConfigFunc = NewNFConfig
+
+func NewNFConfig(config *factory.Config) (NFConfigInterface, error) {
 	if config == nil {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}

@@ -7,7 +7,6 @@
 package main
 
 import (
-	"github.com/omec-project/webconsole/backend/factory"
 	"os"
 
 	"github.com/omec-project/webconsole/backend/logger"
@@ -34,14 +33,21 @@ func main() {
 }
 
 func action(c *cli.Context) {
-	WEBUI.Initialize(c)
-	nfConfig, err := nfconfig.NewNFConfig(factory.WebUIConfig)
+	config, err := WEBUI.Initialize(c)
 	if err != nil {
+		logger.InitLog.Errorf("Failed to initialize WEBUI: %v", err)
+		return
+	}
+
+	nfConfig, err := nfconfig.NewNFConfigFunc(config)
+	if err != nil {
+		logger.InitLog.Errorf("Failed to create NFConfig: %v", err)
 		return
 	}
 	WEBUI.Start()
 	err = nfConfig.Start()
 	if err != nil {
+		logger.InitLog.Errorf("Failed to start NFConfig service: %v", err)
 		return
 	}
 }

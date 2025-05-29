@@ -45,6 +45,12 @@ type (
 	}
 )
 
+type WebUIService interface {
+	Initialize(c *cli.Context)
+	GetCliCmd() []cli.Flag
+	Start()
+}
+
 var config Config
 
 var webuiCLi = []cli.Flag{
@@ -59,7 +65,7 @@ func (*WEBUI) GetCliCmd() (flags []cli.Flag) {
 	return webuiCLi
 }
 
-func (webui *WEBUI) Initialize(c *cli.Context) {
+func (webui *WEBUI) Initialize(c *cli.Context) (*factory.Config, error) {
 	config = Config{
 		cfg: c.String("cfg"),
 	}
@@ -67,15 +73,16 @@ func (webui *WEBUI) Initialize(c *cli.Context) {
 	absPath, err := filepath.Abs(config.cfg)
 	if err != nil {
 		logger.ConfigLog.Errorln(err)
-		return
+		return nil, err
 	}
 
 	if err := factory.InitConfigFactory(absPath); err != nil {
 		logger.ConfigLog.Errorln(err)
-		return
+		return nil, err
 	}
-
 	webui.setLogLevel()
+	config := factory.WebUIConfig
+	return config, nil
 }
 
 func (webui *WEBUI) setLogLevel() {

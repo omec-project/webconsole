@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
@@ -98,16 +98,15 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 	}
 }
 
-func expireAfter() int64 {
-	return time.Now().Add(time.Hour * 1).Unix()
-}
-
 func GenerateJWT(username string, role int, jwtSecret []byte) (string, error) {
+	tokenExpirationDuration := time.Hour * 1
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtWebconsoleClaims{
 		Username: username,
 		Role:     role,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: expireAfter(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: &jwt.NumericDate{
+				Time: time.Now().Add(tokenExpirationDuration),
+			},
 		},
 	})
 	tokenString, err := token.SignedString(jwtSecret)

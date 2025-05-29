@@ -55,10 +55,8 @@ func action(c *cli.Context) error {
 func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
 	errChan := make(chan error, 1)
 	go func() {
-		if err := nf.Start(); err != nil {
-			logger.InitLog.Errorf("NFConfig start failed: %v", err)
-			errChan <- err
-		}
+		err := nf.Start()
+		errChan <- err
 	}()
 
 	go webui.Start()

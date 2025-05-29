@@ -44,10 +44,14 @@ func action(c *cli.Context) {
 		logger.InitLog.Errorf("Failed to create NFConfig: %v", err)
 		return
 	}
-	WEBUI.Start()
-	err = nfConfig.Start()
-	if err != nil {
-		logger.InitLog.Errorf("Failed to start NFConfig service: %v", err)
+	go WEBUI.Start()
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- nfConfig.Start()
+	}()
+
+	if err := <-errChan; err != nil {
+		logger.InitLog.Errorf("NFConfig Service error: %v", err)
 		return
 	}
 }

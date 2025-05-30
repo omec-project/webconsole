@@ -59,12 +59,7 @@ func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nf nfconfig.NFConfi
 		errChan <- err
 	}()
 
-	go webui.Start()
+	webui.Start()
 
-	err := <-errChan
-	if err != nil {
-		logger.InitLog.Errorf("NFConfig server failed: %v", err)
-		return err
-	}
-	return nil
+	return <-errChan
 }

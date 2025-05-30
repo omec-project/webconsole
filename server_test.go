@@ -70,6 +70,7 @@ func TestRunWebUIAndNFConfig_Success(t *testing.T) {
 			t.Errorf("expected WebUI.Start() to be called")
 		}
 	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("runWebUIAndNFConfig did not return within the expected time")
 	}
 }
 
@@ -125,7 +126,7 @@ func TestMainCLIFlags(t *testing.T) {
 			app.Action = func(c *cli.Context) error {
 				cfg := c.String("cfg")
 				if cfg == "" {
-					return fmt.Errorf("Required flag cfg not set")
+					return fmt.Errorf("required flag cfg not set")
 				}
 				return nil
 			}

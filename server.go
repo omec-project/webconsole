@@ -7,9 +7,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/backend/nfconfig"
 	"github.com/omec-project/webconsole/backend/webui_service"
 	"github.com/urfave/cli"
 )
@@ -22,14 +24,48 @@ func main() {
 	logger.AppLog.Infoln(app.Name)
 	app.Usage = "Web UI"
 	app.UsageText = "webconsole -cfg <webui_config_file.conf>"
-	app.Action = action
 	app.Flags = WEBUI.GetCliCmd()
+	app.Action = func(c *cli.Context) error {
+		if c.String("cfg") == "" {
+			return fmt.Errorf("required flag cfg not set")
+		}
+		return action(c)
+	}
 	if err := app.Run(os.Args); err != nil {
 		logger.AppLog.Fatalf("error args: %v", err)
 	}
 }
 
-func action(c *cli.Context) {
-	WEBUI.Initialize(c)
-	WEBUI.Start()
+func action(c *cli.Context) error {
+	config, err := WEBUI.Initialize(c)
+	if err != nil {
+		logger.AppLog.Errorf("Failed to initialize WEBUI: %v", err)
+		return err
+	}
+
+	nf, err := nfconfig.NewNFConfigFunc(config)
+	if err != nil {
+		logger.AppLog.Errorf("Failed to create NFConfig: %v", err)
+		return err
+	}
+
+	return runWebUIAndNFConfig(WEBUI, nf)
+}
+
+func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
+	errChan := make(chan error, 2)
+	go func() {
+		err := nf.Start()
+		errChan <- err
+	}()
+
+	go func() {
+		webui.Start()
+	}()
+
+	if err := <-errChan; err != nil {
+		logger.AppLog.Errorf("Service exited with error: %v", err)
+		return err
+	}
+	return nil
 }

@@ -53,13 +53,19 @@ func action(c *cli.Context) error {
 }
 
 func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
-	errChan := make(chan error, 1)
+	errChan := make(chan error, 2)
 	go func() {
 		err := nf.Start()
 		errChan <- err
 	}()
 
-	webui.Start()
+	go func() {
+		webui.Start()
+	}()
 
-	return <-errChan
+	if err := <-errChan; err != nil {
+		logger.AppLog.Errorf("Service exited with error: %v", err)
+		return err
+	}
+	return nil
 }

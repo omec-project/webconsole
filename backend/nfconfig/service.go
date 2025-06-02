@@ -12,8 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 type NFConfig struct {
@@ -40,28 +38,12 @@ func NewNFConfig(config *factory.Config) (NFConfigInterface, error) {
 	if config == nil {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}
-
-	if config.Logger.WEBUI != nil {
-		if config.Logger.WEBUI.DebugLevel != "" {
-			if level, err := zapcore.ParseLevel(config.Logger.WEBUI.DebugLevel); err != nil {
-				logger.InitLog.Warnf("NFConfig Log level [%s] is invalid, set to [info] level",
-					config.Logger.WEBUI.DebugLevel)
-				logger.SetLogLevel(zap.InfoLevel)
-			} else {
-				logger.InitLog.Infof("NFConfig Log level is set to [%s] level", level)
-				logger.SetLogLevel(level)
-			}
-		} else {
-			logger.InitLog.Warnln("NFConfig Log level not set. Default set to [info] level")
-			logger.SetLogLevel(zap.InfoLevel)
-		}
-	}
-
+	gin.SetMode(gin.ReleaseMode)
 	nf := &NFConfig{
 		Config: config.Configuration,
 		router: gin.Default(),
 	}
-	logger.InitLog.Warnln("Setting up NFConfig routes")
+	logger.InitLog.Infoln("Setting up NFConfig routes")
 	nf.setupRoutes()
 	return nf, nil
 }
@@ -73,9 +55,9 @@ func (n *NFConfig) Start() error {
 		Handler: n.router,
 	}
 
-	if n.Config.ConfigTLS.Key != "" && n.Config.ConfigTLS.PEM != "" {
+	if n.Config.NfConfigTLS.Key != "" && n.Config.NfConfigTLS.PEM != "" {
 		logger.ConfigLog.Infoln("Starting HTTPS server on", addr)
-		return srv.ListenAndServeTLS(n.Config.ConfigTLS.PEM, n.Config.ConfigTLS.Key)
+		return srv.ListenAndServeTLS(n.Config.NfConfigTLS.PEM, n.Config.NfConfigTLS.Key)
 	}
 
 	logger.ConfigLog.Infoln("Starting HTTP server on", addr)

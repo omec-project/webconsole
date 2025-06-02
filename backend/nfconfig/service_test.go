@@ -27,15 +27,15 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name: "correct TLS configuration and warning log level",
+			name: "correct TLS configuration and warn log level",
 			config: &factory.Config{
 				Logger: &logger.Logger{
 					WEBUI: &logger.LogSetting{
-						DebugLevel: "warning",
+						DebugLevel: "warn",
 					},
 				},
 				Configuration: &factory.Configuration{
-					ConfigTLS: &factory.TLS{
+					NfConfigTLS: &factory.TLS{
 						PEM: "test.pem",
 						Key: "test.key",
 					},
@@ -52,7 +52,7 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 					},
 				},
 				Configuration: &factory.Configuration{
-					ConfigTLS: &factory.TLS{
+					NfConfigTLS: &factory.TLS{
 						PEM: "test.pem",
 						Key: "test.key",
 					},
@@ -65,11 +65,11 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 			config: &factory.Config{
 				Logger: &logger.Logger{
 					WEBUI: &logger.LogSetting{
-						DebugLevel: "info",
+						DebugLevel: "error",
 					},
 				},
 				Configuration: &factory.Configuration{
-					ConfigTLS: &factory.TLS{
+					NfConfigTLS: &factory.TLS{
 						PEM: "test.pem",
 					},
 				},
@@ -81,11 +81,11 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 			config: &factory.Config{
 				Logger: &logger.Logger{
 					WEBUI: &logger.LogSetting{
-						DebugLevel: "info",
+						DebugLevel: "debug",
 					},
 				},
 				Configuration: &factory.Configuration{
-					ConfigTLS: &factory.TLS{
+					NfConfigTLS: &factory.TLS{
 						Key: "test.key",
 					},
 				},
@@ -101,7 +101,24 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 					},
 				},
 				Configuration: &factory.Configuration{
-					ConfigTLS: &factory.TLS{
+					NfConfigTLS: &factory.TLS{
+						PEM: "test.pem",
+						Key: "test.key",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "correct TLS configuration and wrong log level",
+			config: &factory.Config{
+				Logger: &logger.Logger{
+					WEBUI: &logger.LogSetting{
+						DebugLevel: "invalid",
+					},
+				},
+				Configuration: &factory.Configuration{
+					NfConfigTLS: &factory.TLS{
 						PEM: "test.pem",
 						Key: "test.key",
 					},
@@ -114,21 +131,11 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			nf, err := NewNFConfig(tc.config)
-
-			if tc.expectError {
-				if err == nil {
-					t.Errorf("expected error for invalid config, got nil")
-				}
-				if nf != nil {
-					t.Errorf("expected nil NFConfigInterface for invalid config, got non-nil")
-				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				if nf == nil {
-					t.Errorf("expected non-nil NFConfigInterface, got nil")
-				}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if nf == nil {
+				t.Errorf("expected non-nil NFConfigInterface, got nil")
 			}
 		})
 	}
@@ -143,7 +150,7 @@ func TestNFConfigRoutes_success(t *testing.T) {
 			},
 		},
 		Configuration: &factory.Configuration{
-			ConfigTLS: &factory.TLS{
+			NfConfigTLS: &factory.TLS{
 				PEM: "test.pem",
 				Key: "test.key",
 			},

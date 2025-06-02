@@ -122,7 +122,7 @@ func TestMainCLIFlags(t *testing.T) {
 			app := cli.NewApp()
 			app.Name = "webui"
 			app.Usage = "Web UI"
-			app.UsageText = "webconsole -cfg <webui_config_file.conf>"
+			app.UsageText = "webconsole -cfg <webui_config_file.yaml>"
 			app.Action = func(c *cli.Context) error {
 				cfg := c.String("cfg")
 				if cfg == "" {

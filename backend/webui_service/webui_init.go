@@ -209,7 +209,7 @@ func (webui *WEBUI) Start() {
 	go func() {
 		httpAddr := ":" + strconv.Itoa(factory.WebUIConfig.Configuration.CfgPort)
 		logger.InitLog.Infoln("Webui HTTP addr", httpAddr)
-		tlsConfig := factory.WebUIConfig.Configuration.UITLS
+		tlsConfig := factory.WebUIConfig.Configuration.WebuiTLS
 		if factory.WebUIConfig.Info.HttpVersion == 2 {
 			server, err := http2_util.NewServer(httpAddr, "", subconfig_router)
 			if server == nil {

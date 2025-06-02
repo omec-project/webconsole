@@ -31,6 +31,7 @@ import (
 	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
+	gServ "github.com/omec-project/webconsole/proto/server"
 	"github.com/urfave/cli"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -239,6 +240,12 @@ func (webui *WEBUI) Start() {
 		self := webui_context.WEBUI_Self()
 		self.UpdateNfProfiles()
 	}
+
+	// Start grpc Server. This has embedded functionality of sending
+	// 4G config over REST Api as well.
+	host := "0.0.0.0:9876"
+	confServ := &gServ.ConfigServer{}
+	go gServ.StartServer(host, confServ, configMsgChan)
 
 	// fetch one time configuration from the simapp/roc on startup
 	// this is to fetch existing config

@@ -2,7 +2,6 @@
 // Copyright 2024 Canonical Ltd.
 
 //go:build ui
-// +build ui
 
 package ui
 

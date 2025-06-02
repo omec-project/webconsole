@@ -8,7 +8,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/omec-project/webconsole/backend/factory"
 	"os"
+	"path/filepath"
 
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/nfconfig"
@@ -23,33 +25,43 @@ func main() {
 	app.Name = "webui"
 	logger.AppLog.Infoln(app.Name)
 	app.Usage = "Web UI"
-	app.UsageText = "webconsole -cfg <webui_config_file.conf>"
+	app.UsageText = "webconsole -cfg <webui_config_file.yaml>"
 	app.Flags = WEBUI.GetCliCmd()
 	app.Action = func(c *cli.Context) error {
-		if c.String("cfg") == "" {
+		cfgPath := c.String("cfg")
+		if cfgPath == "" {
 			return fmt.Errorf("required flag cfg not set")
 		}
-		return action(c)
+
+		absPath, err := filepath.Abs(cfgPath)
+		if err != nil {
+			logger.ConfigLog.Errorln(err)
+			return err
+		}
+
+		if err := factory.InitConfigFactory(absPath); err != nil {
+			logger.ConfigLog.Errorln(err)
+			return err
+		}
+		config := factory.WebUIConfig
+		factory.SetLogLevelsFromConfig(config)
+
+		WEBUI := &webui_service.WEBUI{}
+		nf, err := nfconfig.NewNFConfigFunc(config)
+		if err != nil {
+			logger.AppLog.Errorf("Failed to create NFConfig: %v", err)
+			return err
+		}
+		return runWebUIAndNFConfig(WEBUI, nf)
 	}
+
 	if err := app.Run(os.Args); err != nil {
 		logger.AppLog.Fatalf("error args: %v", err)
 	}
-}
 
-func action(c *cli.Context) error {
-	config, err := WEBUI.Initialize(c)
-	if err != nil {
-		logger.AppLog.Errorf("Failed to initialize WEBUI: %v", err)
-		return err
+	if err := app.Run(os.Args); err != nil {
+		logger.AppLog.Fatalf("error args: %v", err)
 	}
-
-	nf, err := nfconfig.NewNFConfigFunc(config)
-	if err != nil {
-		logger.AppLog.Errorf("Failed to create NFConfig: %v", err)
-		return err
-	}
-
-	return runWebUIAndNFConfig(WEBUI, nf)
 }
 
 func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {

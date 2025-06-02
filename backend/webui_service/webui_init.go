@@ -14,7 +14,6 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -33,8 +32,6 @@ import (
 	"github.com/omec-project/webconsole/dbadapter"
 	gServ "github.com/omec-project/webconsole/proto/server"
 	"github.com/urfave/cli"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 type WEBUI struct{}
@@ -47,7 +44,6 @@ type (
 )
 
 type WebUIInterface interface {
-	Initialize(*cli.Context) (*factory.Config, error)
 	GetCliCmd() []cli.Flag
 	Start()
 }
@@ -64,64 +60,6 @@ var webuiCLi = []cli.Flag{
 
 func (*WEBUI) GetCliCmd() (flags []cli.Flag) {
 	return webuiCLi
-}
-
-func (webui *WEBUI) Initialize(c *cli.Context) (*factory.Config, error) {
-	config = Config{
-		cfg: c.String("cfg"),
-	}
-
-	absPath, err := filepath.Abs(config.cfg)
-	if err != nil {
-		logger.ConfigLog.Errorln(err)
-		return nil, err
-	}
-
-	if err := factory.InitConfigFactory(absPath); err != nil {
-		logger.ConfigLog.Errorln(err)
-		return nil, err
-	}
-	webui.setLogLevel()
-	config := factory.WebUIConfig
-	return config, nil
-}
-
-func (webui *WEBUI) setLogLevel() {
-	if factory.WebUIConfig.Logger == nil {
-		logger.InitLog.Warnln("webconsole config without log level setting")
-		return
-	}
-
-	if factory.WebUIConfig.Logger.WEBUI != nil {
-		if factory.WebUIConfig.Logger.WEBUI.DebugLevel != "" {
-			if level, err := zapcore.ParseLevel(factory.WebUIConfig.Logger.WEBUI.DebugLevel); err != nil {
-				logger.InitLog.Warnf("WebUI Log level [%s] is invalid, set to [info] level",
-					factory.WebUIConfig.Logger.WEBUI.DebugLevel)
-				logger.SetLogLevel(zap.InfoLevel)
-			} else {
-				logger.InitLog.Infof("WebUI Log level is set to [%s] level", level)
-				logger.SetLogLevel(level)
-			}
-		} else {
-			logger.InitLog.Warnln("WebUI Log level not set. Default set to [info] level")
-			logger.SetLogLevel(zap.InfoLevel)
-		}
-	}
-
-	if factory.WebUIConfig.Logger.MongoDBLibrary != nil {
-		if factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel != "" {
-			if level, err := zapcore.ParseLevel(factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel); err != nil {
-				utilLogger.AppLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level",
-					factory.WebUIConfig.Logger.MongoDBLibrary.DebugLevel)
-				utilLogger.SetLogLevel(zap.InfoLevel)
-			} else {
-				utilLogger.SetLogLevel(level)
-			}
-		} else {
-			utilLogger.AppLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
-			utilLogger.SetLogLevel(zap.InfoLevel)
-		}
-	}
 }
 
 func (webui *WEBUI) FilterCli(c *cli.Context) (args []string) {
@@ -261,12 +199,6 @@ func (webui *WEBUI) Exec(c *cli.Context) error {
 	args := webui.FilterCli(c)
 	logger.InitLog.Debugln("filter:", args)
 	command := exec.Command("webui", args...)
-
-	_, err := webui.Initialize(c)
-	if err != nil {
-		logger.InitLog.Errorf("webui initialization failed: %v", err)
-		return err
-	}
 	stdout, err := command.StdoutPipe()
 	if err != nil {
 		logger.InitLog.Fatalln(err)

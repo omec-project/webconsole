@@ -49,7 +49,7 @@ func NewNFConfig(config *factory.Config) (NFConfigInterface, error) {
 }
 
 func (n *NFConfig) Start() error {
-	addr := fmt.Sprintf(":%d", 9090)
+	addr := ":9090"
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: n.router,

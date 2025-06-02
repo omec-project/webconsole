@@ -14,6 +14,9 @@ package factory
 
 import (
 	"fmt"
+	utilLogger "github.com/omec-project/util/logger"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"os"
 
 	"github.com/omec-project/webconsole/backend/logger"
@@ -77,4 +80,37 @@ func InitConfigFactory(f string) error {
 	}
 
 	return nil
+}
+
+func SetLogLevelsFromConfig(cfg *Config) {
+	if cfg.Logger == nil {
+		logger.InitLog.Warnln("webconsole config without log level setting")
+	} else if cfg.Logger.WEBUI != nil {
+		if cfg.Logger.WEBUI.DebugLevel != "" {
+			if level, err := zapcore.ParseLevel(cfg.Logger.WEBUI.DebugLevel); err != nil {
+				logger.InitLog.Warnf("WebUI Log level [%s] is invalid, set to [info] level", cfg.Logger.WEBUI.DebugLevel)
+				logger.SetLogLevel(zap.InfoLevel)
+			} else {
+				logger.InitLog.Infof("WebUI Log level is set to [%s] level", level)
+				logger.SetLogLevel(level)
+			}
+		} else {
+			logger.InitLog.Warnln("WebUI Log level not set. Default set to [info] level")
+			logger.SetLogLevel(zap.InfoLevel)
+		}
+	}
+
+	if cfg.Logger != nil && cfg.Logger.MongoDBLibrary != nil {
+		if cfg.Logger.MongoDBLibrary.DebugLevel != "" {
+			if level, err := zapcore.ParseLevel(cfg.Logger.MongoDBLibrary.DebugLevel); err != nil {
+				utilLogger.AppLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level", cfg.Logger.MongoDBLibrary.DebugLevel)
+				utilLogger.SetLogLevel(zap.InfoLevel)
+			} else {
+				utilLogger.SetLogLevel(level)
+			}
+		} else {
+			utilLogger.AppLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
+			utilLogger.SetLogLevel(zap.InfoLevel)
+		}
+	}
 }

@@ -21,6 +21,11 @@ type NFConfig struct {
 	router *gin.Engine
 }
 
+type Route struct {
+	Pattern     string
+	HandlerFunc gin.HandlerFunc
+}
+
 type NFConfigInterface interface {
 	Start() error
 }
@@ -79,11 +84,32 @@ func (n *NFConfig) Start() error {
 
 func (n *NFConfig) setupRoutes() {
 	api := n.router.Group("/nfconfig")
-	{
-		api.GET("/access-mobility", n.GetAccessMobilityConfig)
-		api.GET("/plmn", n.GetPlmnConfig)
-		api.GET("/plmn-snssai", n.GetPlmnSnssaiConfig)
-		api.GET("/policy-control", n.GetPolicyControlConfig)
-		api.GET("/session-management", n.GetSessionManagementConfig)
+	for _, route := range n.getRoutes() {
+		api.GET(route.Pattern, route.HandlerFunc)
+	}
+}
+
+func (n *NFConfig) getRoutes() []Route {
+	return []Route{
+		{
+			Pattern:     "/access-mobility",
+			HandlerFunc: n.GetAccessMobilityConfig,
+		},
+		{
+			Pattern:     "/plmn",
+			HandlerFunc: n.GetPlmnConfig,
+		},
+		{
+			Pattern:     "/plmn-snssai",
+			HandlerFunc: n.GetPlmnSnssaiConfig,
+		},
+		{
+			Pattern:     "/policy-control",
+			HandlerFunc: n.GetPolicyControlConfig,
+		},
+		{
+			Pattern:     "/session-management",
+			HandlerFunc: n.GetSessionManagementConfig,
+		},
 	}
 }

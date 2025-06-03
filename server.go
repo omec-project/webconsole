@@ -18,15 +18,14 @@ import (
 	"github.com/urfave/cli"
 )
 
-var WEBUI = &webui_service.WEBUI{}
-
 func main() {
 	app := cli.NewApp()
 	app.Name = "webui"
 	logger.AppLog.Infoln(app.Name)
 	app.Usage = "Web UI"
 	app.UsageText = "webconsole -cfg <webui_config_file.yaml>"
-	app.Flags = WEBUI.GetCliCmd()
+	tempWEBUI := &webui_service.WEBUI{}
+	app.Flags = tempWEBUI.GetCliCmd()
 	app.Action = func(c *cli.Context) error {
 		cfgPath := c.String("cfg")
 		if cfgPath == "" {
@@ -44,15 +43,18 @@ func main() {
 			return err
 		}
 		config := factory.WebUIConfig
+		if config == nil {
+			return fmt.Errorf("configuration not properly initialized")
+		}
 		factory.SetLogLevelsFromConfig(config)
 
-		WEBUI = &webui_service.WEBUI{}
-		NFConfig, err := nfconfig.NewNFConfigFunc(config)
+		webui := &webui_service.WEBUI{}
+		nfConf, err := nfconfig.NewNFConfigFunc(config)
 		if err != nil {
 			logger.AppLog.Errorf("Failed to create NFConfig: %v", err)
 			return err
 		}
-		return runWebUIAndNFConfig(WEBUI, NFConfig)
+		return runWebUIAndNFConfig(webui, nfConf)
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -60,12 +62,12 @@ func main() {
 	}
 }
 
-func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nfConfig nfconfig.NFConfigInterface) error {
+func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nfConf nfconfig.NFConfigInterface) error {
 	go func() {
 		webui.Start()
 	}()
 
-	if err := nfConfig.Start(); err != nil {
+	if err := nfConf.Start(); err != nil {
 		logger.AppLog.Errorf("Service exited with error: %v", err)
 		return err
 	}

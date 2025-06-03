@@ -9,7 +9,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/omec-project/config5g v1.6.0
 	github.com/omec-project/openapi v1.4.1
-	github.com/omec-project/util v1.3.0
+	github.com/omec-project/util v1.3.2
 	github.com/prometheus/client_golang v1.22.0
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
@@ -18,7 +18,7 @@ require (
 	go.mongodb.org/mongo-driver v1.17.3
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.38.0
-	google.golang.org/grpc v1.72.1
+	google.golang.org/grpc v1.72.2
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v2 v2.4.0
 )

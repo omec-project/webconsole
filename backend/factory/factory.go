@@ -85,7 +85,9 @@ func InitConfigFactory(f string) error {
 func SetLogLevelsFromConfig(cfg *Config) {
 	if cfg.Logger == nil {
 		logger.InitLog.Warnln("webconsole config without log level setting")
-	} else if cfg.Logger.WEBUI != nil {
+		return
+	}
+	if cfg.Logger.WEBUI != nil {
 		if cfg.Logger.WEBUI.DebugLevel != "" {
 			if level, err := zapcore.ParseLevel(cfg.Logger.WEBUI.DebugLevel); err != nil {
 				logger.InitLog.Warnf("WebUI Log level [%s] is invalid, set to [info] level", cfg.Logger.WEBUI.DebugLevel)
@@ -100,7 +102,7 @@ func SetLogLevelsFromConfig(cfg *Config) {
 		}
 	}
 
-	if cfg.Logger != nil && cfg.Logger.MongoDBLibrary != nil {
+	if cfg.Logger.MongoDBLibrary != nil {
 		if cfg.Logger.MongoDBLibrary.DebugLevel != "" {
 			if level, err := zapcore.ParseLevel(cfg.Logger.MongoDBLibrary.DebugLevel); err != nil {
 				utilLogger.AppLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level", cfg.Logger.MongoDBLibrary.DebugLevel)

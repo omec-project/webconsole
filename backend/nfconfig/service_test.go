@@ -22,9 +22,8 @@ func TestNewNFConfig_nil_config(t *testing.T) {
 
 func TestNewNFConfig_various_configs(t *testing.T) {
 	testCases := []struct {
-		name        string
-		config      *factory.Config
-		expectError bool
+		name   string
+		config *factory.Config
 	}{
 		{
 			name: "correct TLS configuration and warn log level",
@@ -41,7 +40,6 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 					},
 				},
 			},
-			expectError: false,
 		},
 		{
 			name: "correct TLS configuration and info log level",
@@ -58,7 +56,6 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 					},
 				},
 			},
-			expectError: false,
 		},
 		{
 			name: "missing key and error log level",
@@ -74,7 +71,6 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 					},
 				},
 			},
-			expectError: false,
 		},
 		{
 			name: "missing pem and debug log level",
@@ -90,7 +86,6 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 					},
 				},
 			},
-			expectError: false,
 		},
 		{
 			name: "invalid debug level",
@@ -107,7 +102,6 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 					},
 				},
 			},
-			expectError: false,
 		},
 		{
 			name: "correct TLS configuration and wrong log level",
@@ -124,7 +118,6 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 					},
 				},
 			},
-			expectError: false,
 		},
 	}
 

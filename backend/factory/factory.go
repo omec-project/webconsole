@@ -14,12 +14,12 @@ package factory
 
 import (
 	"fmt"
-	utilLogger "github.com/omec-project/util/logger"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"os"
 
+	utilLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/webconsole/backend/logger"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v2"
 )
 

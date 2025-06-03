@@ -36,19 +36,10 @@ import (
 
 type WEBUI struct{}
 
-type (
-	// Config information.
-	Config struct {
-		cfg string
-	}
-)
-
 type WebUIInterface interface {
 	GetCliCmd() []cli.Flag
 	Start()
 }
-
-var config Config
 
 var webuiCLi = []cli.Flag{
 	cli.StringFlag{

@@ -84,7 +84,7 @@ func TestRunWebUIAndNFConfig_Failure(t *testing.T) {
 	}
 }
 
-func TestMainCLIFlags(t *testing.T) {
+func TestMainValidateCLIFlags(t *testing.T) {
 	tests := []struct {
 		name        string
 		args        []string

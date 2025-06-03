@@ -8,10 +8,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/omec-project/webconsole/backend/factory"
 	"os"
 	"path/filepath"
 
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/nfconfig"
 	"github.com/omec-project/webconsole/backend/webui_service"
@@ -33,10 +33,10 @@ func main() {
 			return fmt.Errorf("required flag cfg not set")
 		}
 
-		absPath, err := filepath.Abs(cfgPath)
-		if err != nil {
-			logger.ConfigLog.Errorln(err)
-			return err
+		absPath, pathErr := filepath.Abs(cfgPath)
+		if pathErr != nil {
+			logger.ConfigLog.Errorln(pathErr)
+			return pathErr
 		}
 
 		if err := factory.InitConfigFactory(absPath); err != nil {
@@ -46,17 +46,13 @@ func main() {
 		config := factory.WebUIConfig
 		factory.SetLogLevelsFromConfig(config)
 
-		WEBUI := &webui_service.WEBUI{}
-		nf, err := nfconfig.NewNFConfigFunc(config)
+		WEBUI = &webui_service.WEBUI{}
+		NFConfig, err := nfconfig.NewNFConfigFunc(config)
 		if err != nil {
 			logger.AppLog.Errorf("Failed to create NFConfig: %v", err)
 			return err
 		}
-		return runWebUIAndNFConfig(WEBUI, nf)
-	}
-
-	if err := app.Run(os.Args); err != nil {
-		logger.AppLog.Fatalf("error args: %v", err)
+		return runWebUIAndNFConfig(WEBUI, NFConfig)
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -64,18 +60,12 @@ func main() {
 	}
 }
 
-func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
-	errChan := make(chan error, 2)
-	go func() {
-		err := nf.Start()
-		errChan <- err
-	}()
-
+func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nfConfig nfconfig.NFConfigInterface) error {
 	go func() {
 		webui.Start()
 	}()
 
-	if err := <-errChan; err != nil {
+	if err := nfConfig.Start(); err != nil {
 		logger.AppLog.Errorf("Service exited with error: %v", err)
 		return err
 	}

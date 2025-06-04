@@ -41,13 +41,13 @@ func NewNFConfig(config *factory.Config) (NFConfigInterface, error) {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}
 	gin.SetMode(gin.ReleaseMode)
-	nf := &NFConfig{
+	nfconfig := &NFConfig{
 		Config: config.Configuration,
 		router: gin.Default(),
 	}
 	logger.InitLog.Infoln("Setting up NFConfig routes")
-	nf.setupRoutes()
-	return nf, nil
+	nfconfig.setupRoutes()
+	return nfconfig, nil
 }
 
 func (n *NFConfig) Start(ctx context.Context) error {

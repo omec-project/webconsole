@@ -44,7 +44,7 @@ func InitConfigFactory(f string) error {
 		if WebUIConfig.Configuration.WebuiTLS != nil {
 			if WebUIConfig.Configuration.WebuiTLS.Key == "" ||
 				WebUIConfig.Configuration.WebuiTLS.PEM == "" {
-				return fmt.Errorf("[UI Configuration] TLS Key and PEM must be set")
+				return fmt.Errorf("[WebUI Configuration] TLS Key and PEM must be set")
 			}
 		}
 		if WebUIConfig.Configuration.NfConfigTLS != nil {

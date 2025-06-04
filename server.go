@@ -9,13 +9,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/nfconfig"
 	"github.com/omec-project/webconsole/backend/webui_service"
 	"github.com/urfave/cli"
-	"os"
-	"path/filepath"
 )
 
 func main() {

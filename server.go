@@ -69,7 +69,8 @@ func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nfConf nfconfig.NFC
 	defer cancel()
 
 	go webui.Start(ctx)
-
+	logger.InitLog.Infoln("WebUI started")
+	logger.AppLog.Infof("Calling NFConfig.Start()")
 	if err := nfConf.Start(ctx); err != nil {
 		cancel()
 		return fmt.Errorf("NFConfig failed: %w", err)

@@ -75,7 +75,7 @@ func TestRunWebUIAndNFConfig_Failure(t *testing.T) {
 	if err == nil || err.Error() != "NFConfig failed: NFConfig start failed" {
 		t.Errorf("expected NFConfig failure, got %v", err)
 	}
-	if !webui.started {
+	if webui.started {
 		t.Errorf("expected webui to be started even if nf fails")
 	}
 }

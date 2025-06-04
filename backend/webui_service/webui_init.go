@@ -9,14 +9,11 @@
 package webui_service
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
-	"os/exec"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -185,49 +182,6 @@ func (webui *WEBUI) Start(ctx context.Context) {
 
 	<-ctx.Done()
 	logger.AppLog.Infoln("WebUI shutting down due to context cancel")
-}
-
-func (webui *WEBUI) Exec(c *cli.Context) error {
-	logger.InitLog.Debugln("args:", c.String("cfg"))
-	args := webui.FilterCli(c)
-	logger.InitLog.Debugln("filter:", args)
-	command := exec.Command("webui", args...)
-	stdout, err := command.StdoutPipe()
-	if err != nil {
-		logger.InitLog.Fatalln(err)
-	}
-	wg := sync.WaitGroup{}
-	wg.Add(3)
-	go func() {
-		in := bufio.NewScanner(stdout)
-		for in.Scan() {
-			logger.InitLog.Infoln(in.Text())
-		}
-		wg.Done()
-	}()
-
-	stderr, err := command.StderrPipe()
-	if err != nil {
-		logger.InitLog.Fatalln(err)
-	}
-	go func() {
-		in := bufio.NewScanner(stderr)
-		for in.Scan() {
-			logger.InitLog.Infoln(in.Text())
-		}
-		wg.Done()
-	}()
-
-	go func() {
-		if errCmd := command.Start(); errCmd != nil {
-			logger.InitLog.Errorln("command.Start Failed")
-		}
-		wg.Done()
-	}()
-
-	wg.Wait()
-
-	return err
 }
 
 func fetchConfigAdapater() {

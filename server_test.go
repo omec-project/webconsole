@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -35,20 +36,21 @@ func (m *mockWebUI) GetCliCmd() []cli.Flag {
 	}
 }
 
-func (m *mockWebUI) Start() {
+func (m *mockWebUI) Start(ctx context.Context) {
 	m.started = true
+	<-ctx.Done()
 }
 
 type mockNFConfigSuccess struct{}
 
-func (m *mockNFConfigSuccess) Start() error {
+func (m *mockNFConfigSuccess) Start(ctx context.Context) error {
 	time.Sleep(50 * time.Millisecond)
 	return nil
 }
 
 type mockNFConfigFail struct{}
 
-func (m *mockNFConfigFail) Start() error {
+func (m *mockNFConfigFail) Start(ctx context.Context) error {
 	return errors.New("NFConfig start failed")
 }
 

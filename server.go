@@ -7,15 +7,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/nfconfig"
 	"github.com/omec-project/webconsole/backend/webui_service"
 	"github.com/urfave/cli"
+	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -32,29 +32,22 @@ func main() {
 			return fmt.Errorf("required flag cfg not set")
 		}
 
-		absPath, pathErr := filepath.Abs(cfgPath)
-		if pathErr != nil {
-			logger.ConfigLog.Errorln(pathErr)
-			return pathErr
+		absPath, err := filepath.Abs(cfgPath)
+		if err != nil {
+			return fmt.Errorf("failed to resolve config path: %w", err)
 		}
 
 		if err := factory.InitConfigFactory(absPath); err != nil {
-			logger.ConfigLog.Errorln(err)
-			return err
+			return fmt.Errorf("failed to init config: %w", err)
 		}
+
 		config := factory.WebUIConfig
 		if config == nil {
 			return fmt.Errorf("configuration not properly initialized")
 		}
 		factory.SetLogLevelsFromConfig(config)
 
-		webui := &webui_service.WEBUI{}
-		nfConf, err := nfconfig.NewNFConfigFunc(config)
-		if err != nil {
-			logger.AppLog.Errorf("Failed to create NFConfig: %v", err)
-			return err
-		}
-		return runWebUIAndNFConfig(webui, nfConf)
+		return startApplication(config)
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -62,14 +55,25 @@ func main() {
 	}
 }
 
-func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nfConf nfconfig.NFConfigInterface) error {
-	go func() {
-		webui.Start()
-	}()
-
-	if err := nfConf.Start(); err != nil {
-		logger.AppLog.Errorf("Service exited with error: %v", err)
-		return err
+func startApplication(config *factory.Config) error {
+	webui := &webui_service.WEBUI{}
+	nfConf, err := nfconfig.NewNFConfigFunc(config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize NFConfig: %w", err)
 	}
+	return runWebUIAndNFConfig(webui, nfConf)
+}
+
+func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nfConf nfconfig.NFConfigInterface) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go webui.Start(ctx)
+
+	if err := nfConf.Start(ctx); err != nil {
+		cancel()
+		return fmt.Errorf("NFConfig failed: %w", err)
+	}
+
 	return nil
 }

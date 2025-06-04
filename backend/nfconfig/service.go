@@ -6,8 +6,10 @@
 package nfconfig
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/factory"
@@ -25,7 +27,7 @@ type Route struct {
 }
 
 type NFConfigInterface interface {
-	Start() error
+	Start(ctx context.Context) error
 }
 
 func (n *NFConfig) Router() *gin.Engine {
@@ -48,20 +50,32 @@ func NewNFConfig(config *factory.Config) (NFConfigInterface, error) {
 	return nf, nil
 }
 
-func (n *NFConfig) Start() error {
+func (n *NFConfig) Start(ctx context.Context) error {
 	addr := ":9090"
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: n.router,
 	}
+	serverErrChan := make(chan error, 1)
+	go func() {
+		if n.Config.NfConfigTLS.Key != "" && n.Config.NfConfigTLS.PEM != "" {
+			logger.ConfigLog.Infoln("Starting HTTPS server on", addr)
+			serverErrChan <- srv.ListenAndServeTLS(n.Config.NfConfigTLS.PEM, n.Config.NfConfigTLS.Key)
+		} else {
+			logger.ConfigLog.Infoln("Starting HTTP server on", addr)
+			serverErrChan <- srv.ListenAndServe()
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		logger.ConfigLog.Infoln("NFConfig context cancelled, shutting down server.")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return srv.Shutdown(shutdownCtx)
 
-	if n.Config.NfConfigTLS.Key != "" && n.Config.NfConfigTLS.PEM != "" {
-		logger.ConfigLog.Infoln("Starting HTTPS server on", addr)
-		return srv.ListenAndServeTLS(n.Config.NfConfigTLS.PEM, n.Config.NfConfigTLS.Key)
+	case err := <-serverErrChan:
+		return err
 	}
-
-	logger.ConfigLog.Infoln("Starting HTTP server on", addr)
-	return srv.ListenAndServe()
 }
 
 func (n *NFConfig) setupRoutes() {

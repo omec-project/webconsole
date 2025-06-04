@@ -10,6 +10,7 @@ package webui_service
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -38,7 +39,7 @@ type WEBUI struct{}
 
 type WebUIInterface interface {
 	GetCliCmd() []cli.Flag
-	Start()
+	Start(ctx context.Context)
 }
 
 var webuiCLi = []cli.Flag{
@@ -84,7 +85,7 @@ func setupAuthenticationFeature(subconfig_router *gin.Engine) {
 	}
 }
 
-func (webui *WEBUI) Start() {
+func (webui *WEBUI) Start(ctx context.Context) {
 	// get config file info from WebUIConfig
 	mongodb := factory.WebUIConfig.Configuration.Mongodb
 	if factory.WebUIConfig.Configuration.Mode5G {
@@ -182,7 +183,8 @@ func (webui *WEBUI) Start() {
 
 	// http.ListenAndServe("0.0.0.0:5001", nil)
 
-	select {}
+	<-ctx.Done()
+	logger.AppLog.Infoln("WebUI shutting down due to context cancel")
 }
 
 func (webui *WEBUI) Exec(c *cli.Context) error {

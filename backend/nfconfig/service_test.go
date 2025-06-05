@@ -219,14 +219,14 @@ func TestNFConfigStart(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "HTTP Server Start and Graceful Shutdown",
+			name: "HTTP server start and graceful shutdown",
 			config: &factory.Configuration{
 				NfConfigTLS: nil,
 			},
 			wantErr: false,
 		},
 		{
-			name: "HTTPS Server Start and Graceful Shutdown",
+			name: "HTTPS server start and graceful shutdown",
 			config: &factory.Configuration{
 				NfConfigTLS: &factory.TLS{
 					PEM: "testdata/test.pem",
@@ -250,26 +250,26 @@ func TestNFConfigStart(t *testing.T) {
 			errChan := make(chan error, 1)
 
 			go func() {
-				t.Logf("Starting server")
+				t.Logf("starting server")
 				err := nfconf.Start(ctx)
-				t.Logf("Server stopped with error: %v", err)
+				t.Logf("server stopped with error: %v", err)
 				errChan <- err
 			}()
 
 			time.Sleep(500 * time.Millisecond)
-			t.Logf("Triggering shutdown")
+			t.Logf("triggering shutdown")
 			cancel()
 
 			select {
 			case err := <-errChan:
 				if tt.wantErr && err == nil {
-					t.Errorf("Got error = nil, wantErr %v", tt.wantErr)
+					t.Errorf("got error = nil, wantErr %v", tt.wantErr)
 				}
 				if !tt.wantErr && err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, http.ErrServerClosed) {
-					t.Errorf("Got error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("got error = %v, wantErr %v", err, tt.wantErr)
 				}
 			case <-time.After(4 * time.Second):
-				t.Fatal("Test timed out waiting for server to stop")
+				t.Fatal("test timed out waiting for server to stop")
 			}
 		})
 	}
@@ -297,7 +297,7 @@ func TestNFConfig_Start_ServerError(t *testing.T) {
 	ctx2 := context.Background()
 	err := nfc2.Start(ctx2)
 	if err == nil {
-		t.Error("Expected error when starting server on same port, got nil")
+		t.Error("expected error when starting server on same port, got nil")
 	}
 	cancel1()
 	<-errChan
@@ -315,10 +315,10 @@ func TestNFConfig_Start_ContextCancellation(t *testing.T) {
 		errChan <- nfc.Start(ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
-	t.Logf("Triggering context cancellation")
+	t.Logf("triggering context cancellation")
 	cancel()
 	err := <-errChan
 	if err != nil {
-		t.Errorf("Got error = %v, want nil after context cancellation", err)
+		t.Errorf("got error = %v, want nil after context cancellation", err)
 	}
 }

@@ -9,11 +9,10 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
-
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/docs"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // @title           Webconsole API Documentation

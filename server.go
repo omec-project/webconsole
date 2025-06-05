@@ -20,6 +20,12 @@ import (
 	"github.com/urfave/cli"
 )
 
+var (
+	initMongoDB       = dbadapter.InitMongoDB
+	newNFConfigServer = nfconfig.NewNFConfigServer
+	runServer         = runWebUIAndNFConfig
+)
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "webui"
@@ -57,19 +63,19 @@ func main() {
 }
 
 func startApplication(config *factory.Config) error {
-	if config.Configuration == nil {
+	if config == nil || config.Configuration == nil {
 		return fmt.Errorf("configuration section is nil")
 	}
-	if err := dbadapter.InitMongoDB(); err != nil {
-		logger.InitLog.Errorf("Failed to initialize MongoDB: %v", err)
+	if err := initMongoDB(); err != nil {
+		logger.InitLog.Errorf("failed to initialize MongoDB: %v", err)
 		return err
 	}
 	webui := &webui_service.WEBUI{}
-	nfConfigServer, err := nfconfig.NewNFConfigServer(config)
+	nfConfigServer, err := newNFConfigServer(config)
 	if err != nil {
 		return fmt.Errorf("failed to initialize NFConfig: %w", err)
 	}
-	return runWebUIAndNFConfig(webui, nfConfigServer)
+	return runServer(webui, nfConfigServer)
 }
 
 func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nfConf nfconfig.NFConfigInterface) error {

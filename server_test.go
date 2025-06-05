@@ -7,10 +7,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/omec-project/webconsole/backend/factory"
+	"github.com/omec-project/webconsole/backend/nfconfig"
+	"github.com/omec-project/webconsole/backend/webui_service"
 	"github.com/urfave/cli"
 )
 
@@ -56,8 +59,8 @@ func TestRunWebUIAndNFConfig_Failure(t *testing.T) {
 	if err == nil || err.Error() != "NFConfig failed: NFConfig start failed" {
 		t.Errorf("expected NFConfig failure, got %v", err)
 	}
-	if !webui.started {
-		t.Errorf("expected webui should not start when nf fails")
+	if webui.started {
+		t.Errorf("expected webui should not start when nfconfig fails")
 	}
 }
 
@@ -118,4 +121,77 @@ func TestMainValidateCLIFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+type MockNFConfig struct{}
+
+func (m *MockNFConfig) Start(ctx context.Context) error {
+	return nil
+}
+
+func TestStartApplication(t *testing.T) {
+	originalInit := initMongoDB
+	originalNewNF := newNFConfigServer
+	originalRun := runServer
+	defer func() {
+		initMongoDB = originalInit
+		newNFConfigServer = originalNewNF
+		runServer = originalRun
+	}()
+
+	t.Run("nil config", func(t *testing.T) {
+		err := startApplication(nil)
+		if err == nil || !strings.Contains(err.Error(), "nil") {
+			t.Errorf("Expected error for nil config, got: %v", err)
+		}
+	})
+
+	t.Run("mongo init failure", func(t *testing.T) {
+		initMongoDB = func() error {
+			return fmt.Errorf("mongo failed")
+		}
+		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
+		if err == nil || !strings.Contains(err.Error(), "mongo failed") {
+			t.Errorf("Expected mongo init error, got: %v", err)
+		}
+	})
+
+	t.Run("nfconfig init failure", func(t *testing.T) {
+		initMongoDB = func() error { return nil }
+		newNFConfigServer = func(config *factory.Config) (nfconfig.NFConfigInterface, error) {
+			return nil, fmt.Errorf("nfconfig init fail")
+		}
+		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
+		if err == nil || !strings.Contains(err.Error(), "nfconfig init fail") {
+			t.Errorf("Expected NF config init failure, got: %v", err)
+		}
+	})
+
+	t.Run("run failure", func(t *testing.T) {
+		initMongoDB = func() error { return nil }
+		newNFConfigServer = func(config *factory.Config) (nfconfig.NFConfigInterface, error) {
+			return &MockNFConfig{}, nil
+		}
+		runServer = func(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
+			return fmt.Errorf("run fail")
+		}
+		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
+		if err == nil || !strings.Contains(err.Error(), "run fail") {
+			t.Errorf("Expected run error, got: %v", err)
+		}
+	})
+
+	t.Run("success", func(t *testing.T) {
+		initMongoDB = func() error { return nil }
+		newNFConfigServer = func(config *factory.Config) (nfconfig.NFConfigInterface, error) {
+			return &MockNFConfig{}, nil
+		}
+		runServer = func(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
+			return nil
+		}
+		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
+		if err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		}
+	})
 }

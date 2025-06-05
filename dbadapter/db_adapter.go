@@ -8,12 +8,12 @@ package dbadapter
 import (
 	"context"
 	"fmt"
-	"github.com/omec-project/webconsole/backend/factory"
-	"github.com/omec-project/webconsole/configmodels"
 	"time"
 
 	"github.com/omec-project/util/mongoapi"
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/configmodels"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -130,7 +130,6 @@ func InitMongoDB() error {
 		"enableAuth", factory.WebUIConfig.Configuration.EnableAuthentication)
 
 	if factory.WebUIConfig.Configuration.Mode5G {
-
 		ConnectMongo(mongodb.Url, mongodb.Name, &CommonDBClient)
 		logger.InitLog.Infow("Connected to common database",
 			"url", mongodb.Url,

@@ -14,11 +14,11 @@ package factory
 
 import (
 	"fmt"
-	"github.com/urfave/cli"
 	"os"
 
 	utilLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/urfave/cli"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v2"

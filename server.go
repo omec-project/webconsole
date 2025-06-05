@@ -9,7 +9,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/omec-project/webconsole/dbadapter"
 	"os"
 	"path/filepath"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/nfconfig"
 	"github.com/omec-project/webconsole/backend/webui_service"
+	"github.com/omec-project/webconsole/dbadapter"
 	"github.com/urfave/cli"
 )
 

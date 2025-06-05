@@ -18,11 +18,20 @@ import (
 )
 
 type mockWebUI struct {
-	started bool
+	started     bool
+	startedChan chan struct{}
 }
 
 func (m *mockWebUI) Start(ctx context.Context) {
-	m.started = true
+	select {
+	case <-ctx.Done():
+		return
+	default:
+		m.started = true
+		if m.startedChan != nil {
+			close(m.startedChan)
+		}
+	}
 }
 
 type mockNFConfigSuccess struct{}
@@ -39,28 +48,35 @@ func (m *mockNFConfigFail) Start(ctx context.Context) error {
 }
 
 func TestRunWebUIAndNFConfig_Success(t *testing.T) {
-	webui := &mockWebUI{}
+	started := make(chan struct{})
+	webui := &mockWebUI{startedChan: started}
 	nf := &mockNFConfigSuccess{}
 
 	err := runWebUIAndNFConfig(webui, nf)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
-	if !webui.started {
-		t.Errorf("expected webui to be started")
+
+	select {
+	case <-started:
+	case <-time.After(100 * time.Millisecond):
+		t.Errorf("webui.Start was not called in time")
 	}
 }
 
 func TestRunWebUIAndNFConfig_Failure(t *testing.T) {
-	webui := &mockWebUI{}
+	started := make(chan struct{})
+	webui := &mockWebUI{startedChan: started}
 	nf := &mockNFConfigFail{}
 
 	err := runWebUIAndNFConfig(webui, nf)
 	if err == nil || !strings.Contains(err.Error(), "NFConfig start failed") {
 		t.Errorf("expected NFConfig failure, got %v", err)
 	}
+
+	time.Sleep(30 * time.Millisecond)
 	if webui.started {
-		t.Errorf("expected webui should not start when nfconfig fails")
+		t.Errorf("webui.Start() should respect context cancellation and not proceed")
 	}
 }
 

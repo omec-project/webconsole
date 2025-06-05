@@ -8,6 +8,8 @@ package dbadapter
 import (
 	"context"
 	"fmt"
+	"github.com/omec-project/webconsole/backend/factory"
+	"github.com/omec-project/webconsole/configmodels"
 	"time"
 
 	"github.com/omec-project/util/mongoapi"
@@ -114,6 +116,54 @@ func CheckTransactionsSupport(client *DBInterface) error {
 		}
 	}
 	logger.DbLog.Infoln("mongoDB support of transactions verified")
+	return nil
+}
+
+func InitMongoDB() error {
+	if factory.WebUIConfig.Configuration == nil {
+		return fmt.Errorf("configuration is nil")
+	}
+
+	mongodb := factory.WebUIConfig.Configuration.Mongodb
+	logger.InitLog.Infow("MongoDB configuration loaded",
+		"mode5G", factory.WebUIConfig.Configuration.Mode5G,
+		"enableAuth", factory.WebUIConfig.Configuration.EnableAuthentication)
+
+	if factory.WebUIConfig.Configuration.Mode5G {
+
+		ConnectMongo(mongodb.Url, mongodb.Name, &CommonDBClient)
+		logger.InitLog.Infow("Connected to common database",
+			"url", mongodb.Url,
+			"dbName", mongodb.Name)
+
+		if err := CheckTransactionsSupport(&CommonDBClient); err != nil {
+			logger.DbLog.Errorw("failed to connect to MongoDB client", mongodb.Name, "error", err)
+			return err
+		}
+
+		ConnectMongo(mongodb.AuthUrl, mongodb.AuthKeysDbName, &AuthDBClient)
+		logger.InitLog.Infow("Connected to auth database",
+			"url", mongodb.AuthUrl,
+			"dbName", mongodb.AuthKeysDbName)
+
+		if resp, err := CommonDBClient.CreateIndex(configmodels.UpfDataColl, "hostname"); !resp || err != nil {
+			logger.InitLog.Errorf("error creating UPF index in commonDB %v", err)
+			return err
+		}
+		if resp, err := CommonDBClient.CreateIndex(configmodels.GnbDataColl, "name"); !resp || err != nil {
+			logger.InitLog.Errorf("error creating gNB index in commonDB %v", err)
+			return err
+		}
+	}
+	if factory.WebUIConfig.Configuration.EnableAuthentication {
+		ConnectMongo(mongodb.WebuiDBUrl, mongodb.WebuiDBName, &WebuiDBClient)
+		if resp, err := WebuiDBClient.CreateIndex(configmodels.UserAccountDataColl, "username"); !resp || err != nil {
+			logger.InitLog.Errorf("error initializing webuiDB %v", err)
+			return err
+		}
+	}
+
+	logger.InitLog.Info("MongoDB initialization completed successfully")
 	return nil
 }
 

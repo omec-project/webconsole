@@ -18,27 +18,8 @@ type mockWebUI struct {
 	started bool
 }
 
-func (m *mockWebUI) Initialize(c *cli.Context) (*factory.Config, error) {
-	cfg := c.String("cfg")
-	if cfg == "" {
-		return nil, fmt.Errorf("[Configuration] config file path cannot be empty")
-	}
-	return &factory.Config{}, nil
-}
-
-func (m *mockWebUI) GetCliCmd() []cli.Flag {
-	return []cli.Flag{
-		cli.StringFlag{
-			Name:     "cfg",
-			Usage:    "webconsole config file",
-			Required: true,
-		},
-	}
-}
-
 func (m *mockWebUI) Start(ctx context.Context) {
 	m.started = true
-	<-ctx.Done()
 }
 
 type mockNFConfigSuccess struct{}
@@ -119,6 +100,7 @@ func TestMainValidateCLIFlags(t *testing.T) {
 			app.Name = "webui"
 			app.Usage = "Web UI"
 			app.UsageText = "webconsole -cfg <webui_config_file.yaml>"
+			app.Flags = factory.GetCliFlags()
 			app.Action = func(c *cli.Context) error {
 				cfg := c.String("cfg")
 				if cfg == "" {
@@ -126,9 +108,6 @@ func TestMainValidateCLIFlags(t *testing.T) {
 				}
 				return nil
 			}
-			webui := &mockWebUI{}
-			app.Flags = webui.GetCliCmd()
-
 			err := app.Run(tt.args)
 
 			if tt.expectError && err == nil {

@@ -16,9 +16,9 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 )
 
-type NFConfig struct {
+type NFConfigServer struct {
 	Config *factory.Configuration
-	router *gin.Engine
+	Router *gin.Engine
 }
 
 type Route struct {
@@ -30,35 +30,33 @@ type NFConfigInterface interface {
 	Start(ctx context.Context) error
 }
 
-func (n *NFConfig) Router() *gin.Engine {
-	return n.router
+func (n *NFConfigServer) router() *gin.Engine {
+	return n.Router
 }
 
-var NewNFConfigFunc = NewNFConfig
-
-func NewNFConfig(config *factory.Config) (NFConfigInterface, error) {
+func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 	if config == nil {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}
 	gin.SetMode(gin.ReleaseMode)
-	nfconfig := &NFConfig{
+	nfconfigServer := &NFConfigServer{
 		Config: config.Configuration,
-		router: gin.Default(),
+		Router: gin.Default(),
 	}
 	logger.InitLog.Infoln("Setting up NFConfig routes")
-	nfconfig.setupRoutes()
-	return nfconfig, nil
+	nfconfigServer.setupRoutes()
+	return nfconfigServer, nil
 }
 
-func (n *NFConfig) Start(ctx context.Context) error {
-	addr := ":9090"
+func (n *NFConfigServer) Start(ctx context.Context) error {
+	addr := ":5001"
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: n.router,
+		Handler: n.Router,
 	}
 	serverErrChan := make(chan error, 1)
 	go func() {
-		if n.Config.NfConfigTLS.Key != "" && n.Config.NfConfigTLS.PEM != "" {
+		if n.Config.NfConfigTLS != nil && n.Config.NfConfigTLS.Key != "" && n.Config.NfConfigTLS.PEM != "" {
 			logger.ConfigLog.Infoln("Starting HTTPS server on", addr)
 			serverErrChan <- srv.ListenAndServeTLS(n.Config.NfConfigTLS.PEM, n.Config.NfConfigTLS.Key)
 		} else {
@@ -78,14 +76,14 @@ func (n *NFConfig) Start(ctx context.Context) error {
 	}
 }
 
-func (n *NFConfig) setupRoutes() {
-	api := n.router.Group("/nfconfig")
+func (n *NFConfigServer) setupRoutes() {
+	api := n.Router.Group("/nfconfig")
 	for _, route := range n.getRoutes() {
 		api.GET(route.Pattern, route.HandlerFunc)
 	}
 }
 
-func (n *NFConfig) getRoutes() []Route {
+func (n *NFConfigServer) getRoutes() []Route {
 	return []Route{
 		{
 			Pattern:     "/access-mobility",

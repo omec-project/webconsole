@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/omec-project/webconsole/dbadapter"
 	"os"
 	"path/filepath"
 
@@ -25,8 +26,7 @@ func main() {
 	logger.AppLog.Infoln(app.Name)
 	app.Usage = "Web UI"
 	app.UsageText = "webconsole -cfg <webui_config_file.yaml>"
-	tempWEBUI := &webui_service.WEBUI{}
-	app.Flags = tempWEBUI.GetCliCmd()
+	app.Flags = factory.GetCliFlags()
 	app.Action = func(c *cli.Context) error {
 		cfgPath := c.String("cfg")
 		if cfgPath == "" {
@@ -57,12 +57,19 @@ func main() {
 }
 
 func startApplication(config *factory.Config) error {
+	if config.Configuration == nil {
+		return fmt.Errorf("configuration section is nil")
+	}
+	if err := dbadapter.InitMongoDB(); err != nil {
+		logger.InitLog.Errorf("Failed to initialize MongoDB: %v", err)
+		return err
+	}
 	webui := &webui_service.WEBUI{}
-	nfConf, err := nfconfig.NewNFConfigFunc(config)
+	nfConfigServer, err := nfconfig.NewNFConfigServer(config)
 	if err != nil {
 		return fmt.Errorf("failed to initialize NFConfig: %w", err)
 	}
-	return runWebUIAndNFConfig(webui, nfConf)
+	return runWebUIAndNFConfig(webui, nfConfigServer)
 }
 
 func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nfConf nfconfig.NFConfigInterface) error {

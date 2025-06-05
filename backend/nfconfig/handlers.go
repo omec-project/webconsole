@@ -12,27 +12,27 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 )
 
-func (n *NFConfig) GetAccessMobilityConfig(c *gin.Context) {
+func (n *NFConfigServer) GetAccessMobilityConfig(c *gin.Context) {
 	logger.ConfigLog.Infoln("Handling GET request for access-mobility config")
 	c.JSON(http.StatusOK, []AccessAndMobilityConfig{})
 }
 
-func (n *NFConfig) GetPlmnConfig(c *gin.Context) {
+func (n *NFConfigServer) GetPlmnConfig(c *gin.Context) {
 	logger.ConfigLog.Infoln("Handling GET request for plmn config")
 	c.JSON(http.StatusOK, []PlmnConfig{})
 }
 
-func (n *NFConfig) GetPlmnSnssaiConfig(c *gin.Context) {
+func (n *NFConfigServer) GetPlmnSnssaiConfig(c *gin.Context) {
 	logger.ConfigLog.Infoln("Handling GET request for plmn-snssai config")
 	c.JSON(http.StatusOK, []PlmnSnssaiConfig{})
 }
 
-func (n *NFConfig) GetPolicyControlConfig(c *gin.Context) {
+func (n *NFConfigServer) GetPolicyControlConfig(c *gin.Context) {
 	logger.ConfigLog.Infoln("Handling GET request for policy-control config")
 	c.JSON(http.StatusOK, []PolicyControlConfig{})
 }
 
-func (n *NFConfig) GetSessionManagementConfig(c *gin.Context) {
+func (n *NFConfigServer) GetSessionManagementConfig(c *gin.Context) {
 	logger.ConfigLog.Infoln("Handling GET request for session-management config")
 	c.JSON(http.StatusOK, []SessionManagementConfig{})
 }

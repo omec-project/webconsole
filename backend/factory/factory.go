@@ -14,6 +14,7 @@ package factory
 
 import (
 	"fmt"
+	"github.com/urfave/cli"
 	"os"
 
 	utilLogger "github.com/omec-project/util/logger"
@@ -114,5 +115,14 @@ func SetLogLevelsFromConfig(cfg *Config) {
 			utilLogger.AppLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
 			utilLogger.SetLogLevel(zap.InfoLevel)
 		}
+	}
+}
+
+func GetCliFlags() []cli.Flag {
+	return []cli.Flag{
+		cli.StringFlag{
+			Name:  "cfg",
+			Usage: "Path to configuration file",
+		},
 	}
 }

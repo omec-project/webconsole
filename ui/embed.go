@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024 Canonical Ltd.
 
-// +build ui
+//go:build ui
 
 package ui
 
 import (
-    "embed"
+	"embed"
 )
 
 //go:embed all:frontend_files

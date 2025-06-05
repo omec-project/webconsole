@@ -8,17 +8,17 @@ Copyright 2021-present Open Networking Foundation
 The config.proto file contains the messages and methods to be used by the
 grpc server and client for exchange of config info.
 To add updates, just change the file and run in webconsole folder the following
-command : 
-    make -f Makefile_docker docker-build
+command:
+make -f Makefile_docker docker-build
 
-The Dockerfile contains the commands to generate the golang files from this config.proto. 
-The commands are as follows : 
+The Dockerfile contains the commands to generate the golang files from this config.proto.
+The commands are as follows:
 
     protoc -I ./ --go_out=. config.proto # This generates the messages
     protoc -I ./ --go-grpc_out=. config.proto # This generates the services
 
 To run the above commands, we install the protoc compiler and the protobuf go
-based plugin. The commands for installing are as follows : 
+based plugin. The commands for installing are as follows:
 
     curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protoc-3.14.0-linux-x86_64.zip
     unzip -o protoc-3.14.0-linux-x86_64.zip -d ./proto 

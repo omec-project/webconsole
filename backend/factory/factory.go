@@ -16,7 +16,11 @@ import (
 	"fmt"
 	"os"
 
+	utilLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/urfave/cli"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v2"
 )
 
@@ -38,10 +42,16 @@ func InitConfigFactory(f string) error {
 		if yamlErr := yaml.Unmarshal(content, WebUIConfig); yamlErr != nil {
 			return fmt.Errorf("[Configuration] %+v", yamlErr)
 		}
-		if WebUIConfig.Configuration.TLS != nil {
-			if WebUIConfig.Configuration.TLS.Key == "" ||
-				WebUIConfig.Configuration.TLS.PEM == "" {
-				return fmt.Errorf("[Configuration] TLS Key and PEM must be set")
+		if WebUIConfig.Configuration.WebuiTLS != nil {
+			if WebUIConfig.Configuration.WebuiTLS.Key == "" ||
+				WebUIConfig.Configuration.WebuiTLS.PEM == "" {
+				return fmt.Errorf("[WebUI Configuration] TLS Key and PEM must be set")
+			}
+		}
+		if WebUIConfig.Configuration.NfConfigTLS != nil {
+			if WebUIConfig.Configuration.NfConfigTLS.Key == "" ||
+				WebUIConfig.Configuration.NfConfigTLS.PEM == "" {
+				return fmt.Errorf("[NFConfig Configuration] TLS Key and PEM must be set")
 			}
 		}
 		if WebUIConfig.Configuration.Mongodb.AuthUrl == "" {
@@ -71,4 +81,48 @@ func InitConfigFactory(f string) error {
 	}
 
 	return nil
+}
+
+func SetLogLevelsFromConfig(cfg *Config) {
+	if cfg.Logger == nil {
+		logger.InitLog.Warnln("webconsole config without log level setting")
+		return
+	}
+	if cfg.Logger.WEBUI != nil {
+		if cfg.Logger.WEBUI.DebugLevel != "" {
+			if level, err := zapcore.ParseLevel(cfg.Logger.WEBUI.DebugLevel); err != nil {
+				logger.InitLog.Warnf("WebUI Log level [%s] is invalid, set to [info] level", cfg.Logger.WEBUI.DebugLevel)
+				logger.SetLogLevel(zap.InfoLevel)
+			} else {
+				logger.InitLog.Infof("WebUI Log level is set to [%s] level", level)
+				logger.SetLogLevel(level)
+			}
+		} else {
+			logger.InitLog.Warnln("WebUI Log level not set. Default set to [info] level")
+			logger.SetLogLevel(zap.InfoLevel)
+		}
+	}
+
+	if cfg.Logger.MongoDBLibrary != nil {
+		if cfg.Logger.MongoDBLibrary.DebugLevel != "" {
+			if level, err := zapcore.ParseLevel(cfg.Logger.MongoDBLibrary.DebugLevel); err != nil {
+				utilLogger.AppLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level", cfg.Logger.MongoDBLibrary.DebugLevel)
+				utilLogger.SetLogLevel(zap.InfoLevel)
+			} else {
+				utilLogger.SetLogLevel(level)
+			}
+		} else {
+			utilLogger.AppLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
+			utilLogger.SetLogLevel(zap.InfoLevel)
+		}
+	}
+}
+
+func GetCliFlags() []cli.Flag {
+	return []cli.Flag{
+		cli.StringFlag{
+			Name:  "cfg",
+			Usage: "Path to configuration file",
+		},
+	}
 }

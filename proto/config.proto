@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
 //
 // SPDX-License-Identifier: Apache-2.0
-// 
+//
 
 syntax = "proto3";
 package sdcoreConfig;
@@ -39,7 +39,7 @@ message GNodeB {
 }
 
 message UpfInfo {
-  string      UpfName = 1; 
+  string      UpfName = 1;
   uint32      UpfPort = 2;
 }
 
@@ -60,7 +60,7 @@ message AppInfo {
 
 message NetworkSlice {
   string Name = 1;
-  NSSAI Nssai = 2; 
+  NSSAI Nssai = 2;
   QoS   Qos   = 3;
   repeated DeviceGroup  DeviceGroup  = 4;
   SiteInfo Site = 5;
@@ -124,7 +124,7 @@ enum PccFlowTos {
 }
 
 enum PccFlowStatus {
-  ENABLED_UPLINK = 0; 
+  ENABLED_UPLINK = 0;
   ENABLED_DOWNLINK = 1;
   ENABLED = 2;
   DISABLED = 3;
@@ -156,7 +156,7 @@ message PccRuleQos {
 
 
 message PccRule {
-  repeated PccFlowInfo FlowInfos = 1;  
+  repeated PccFlowInfo FlowInfos = 1;
   string RuleId = 2;                 //Name of Rule
   PccRuleQos Qos =3;
 }

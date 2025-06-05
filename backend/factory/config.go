@@ -32,13 +32,14 @@ type Info struct {
 
 type Configuration struct {
 	Mongodb                 *Mongodb    `yaml:"mongodb"`
-	TLS                     *TLS        `yaml:"tls"`
+	WebuiTLS                *TLS        `yaml:"webui-tls"`
+	NfConfigTLS             *TLS        `yaml:"nfconfig-tls"`
 	RocEnd                  *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
 	LteEnd                  []*LteEndpt `yaml:"endpoints,omitempty"`          // LTE endpoints are configured and not auto-detected
 	Mode5G                  bool        `yaml:"mode5G,omitempty"`
 	SdfComp                 bool        `yaml:"spec-compliant-sdf"`
 	EnableAuthentication    bool        `yaml:"enableAuthentication,omitempty"`
-	SendPebbleNotifications bool        `yaml:"send_pebble_notifications,omitempty"`
+	SendPebbleNotifications bool        `yaml:"send-pebble-notifications,omitempty"`
 	CfgPort                 int         `yaml:"cfgport,omitempty"`
 }
 

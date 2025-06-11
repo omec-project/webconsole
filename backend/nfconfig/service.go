@@ -34,14 +34,30 @@ func (n *NFConfigServer) router() *gin.Engine {
 	return n.Router
 }
 
+func enforceAcceptJSON() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		acceptHeader := c.GetHeader("Accept")
+		if acceptHeader != "application/json" {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+				"error": "Accept header must be 'application/json'",
+			})
+			return
+		}
+		c.Next()
+	}
+}
+
 func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 	if config == nil {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}
 	gin.SetMode(gin.ReleaseMode)
+	router := gin.Default()
+	router.Use(enforceAcceptJSON())
+
 	nfconfigServer := &NFConfigServer{
 		Config: config.Configuration,
-		Router: gin.Default(),
+		Router: router,
 	}
 	logger.InitLog.Infoln("Setting up NFConfig routes")
 	nfconfigServer.setupRoutes()

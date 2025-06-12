@@ -137,7 +137,7 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 	}
 }
 
-func TestNFConfigRoutes_success(t *testing.T) {
+func TestNFConfigRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	mockValidConfig := &factory.Config{
 		Logger: &logger.Logger{
@@ -164,40 +164,77 @@ func TestNFConfigRoutes_success(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name       string
-		path       string
-		wantStatus int
+		name         string
+		path         string
+		acceptHeader string
+		wantStatus   int
 	}{
 		{
-			name:       "access mobility endpoint",
-			path:       "/nfconfig/access-mobility",
-			wantStatus: http.StatusOK,
+			name:         "access mobility endpoint status OK",
+			path:         "/nfconfig/access-mobility",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusOK,
 		},
 		{
-			name:       "plmn endpoint",
-			path:       "/nfconfig/plmn",
-			wantStatus: http.StatusOK,
+			name:         "plmn endpoint status OK",
+			path:         "/nfconfig/plmn",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusOK,
 		},
 		{
-			name:       "plmn-snssai endpoint",
-			path:       "/nfconfig/plmn-snssai",
-			wantStatus: http.StatusOK,
+			name:         "plmn-snssai endpoint status OK",
+			path:         "/nfconfig/plmn-snssai",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusOK,
 		},
 		{
-			name:       "policy control endpoint",
-			path:       "/nfconfig/policy-control",
-			wantStatus: http.StatusOK,
+			name:         "policy control endpoint status OK",
+			path:         "/nfconfig/policy-control",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusOK,
 		},
 		{
-			name:       "session management endpoint",
-			path:       "/nfconfig/session-management",
-			wantStatus: http.StatusOK,
+			name:         "session management endpoint status OK",
+			path:         "/nfconfig/session-management",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusOK,
+		},
+		{
+			name:         "access mobility endpoint invalid accept header",
+			path:         "/nfconfig/access-mobility",
+			acceptHeader: "",
+			wantStatus:   http.StatusBadRequest,
+		},
+		{
+			name:         "plmn endpoint invalid accept header",
+			path:         "/nfconfig/plmn",
+			acceptHeader: "json",
+			wantStatus:   http.StatusBadRequest,
+		},
+		{
+			name:         "plmn-snssai endpoint invalid accept header",
+			path:         "/nfconfig/plmn-snssai",
+			acceptHeader: "text/html",
+			wantStatus:   http.StatusBadRequest,
+		},
+		{
+			name:         "policy control endpoint invalid accept header",
+			path:         "/nfconfig/policy-control",
+			acceptHeader: "text/html",
+			wantStatus:   http.StatusBadRequest,
+		},
+		{
+			name:         "session management endpoint invalid accept header",
+			path:         "/nfconfig/session-management",
+			acceptHeader: "application/jsons",
+			wantStatus:   http.StatusBadRequest,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			req, err := http.NewRequest("GET", tc.path, nil)
+			req.Header.Set("Accept", tc.acceptHeader)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}

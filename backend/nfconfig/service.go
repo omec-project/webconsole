@@ -38,6 +38,7 @@ func enforceAcceptJSON() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		acceptHeader := c.GetHeader("Accept")
 		if acceptHeader != "application/json" {
+			logger.ConfigLog.Infoln("Invalid Accept header value: '%s'. Expected 'application/json'", acceptHeader)
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 				"error": "Accept header must be 'application/json'",
 			})

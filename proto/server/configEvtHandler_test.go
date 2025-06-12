@@ -5,7 +5,10 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"os"
 	"os/exec"
 	"reflect"
@@ -114,6 +117,37 @@ func (m *MockMongoDeleteOne) RestfulAPIDeleteOne(coll string, filter primitive.M
 	deleteData = append(deleteData, params)
 	return nil
 }
+
+type Session interface {
+	EndSession(ctx context.Context)
+	StartTransaction(opts ...*options.TransactionOptions) error
+	AbortTransaction(ctx context.Context) error
+	CommitTransaction(ctx context.Context) error
+}
+
+// In production, wrap mongo.Session
+type MongoSessionWrapper struct {
+	s mongo.Session
+}
+
+func (w *MongoSessionWrapper) EndSession(ctx context.Context) { w.s.EndSession(ctx) }
+func (w *MongoSessionWrapper) StartTransaction(opts ...*options.TransactionOptions) error {
+	return w.s.StartTransaction(opts...)
+}
+func (w *MongoSessionWrapper) AbortTransaction(ctx context.Context) error {
+	return w.s.AbortTransaction(ctx)
+}
+func (w *MongoSessionWrapper) CommitTransaction(ctx context.Context) error {
+	return w.s.CommitTransaction(ctx)
+}
+
+// In tests, use your MockSession
+type MockSession struct{}
+
+func (m *MockSession) EndSession(ctx context.Context)                             {}
+func (m *MockSession) StartTransaction(opts ...*options.TransactionOptions) error { return nil }
+func (m *MockSession) AbortTransaction(ctx context.Context) error                 { return nil }
+func (m *MockSession) CommitTransaction(ctx context.Context) error                { return nil }
 
 func (m *MockMongoGetOneNil) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
 	var value map[string]interface{}

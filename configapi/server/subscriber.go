@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -65,7 +66,6 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 		}
 		return nil
 	})
-
 	if err != nil {
 		logger.DbLog.Errorln(err)
 		return err
@@ -105,7 +105,6 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 
 		return nil
 	})
-
 	if err != nil {
 		logger.DbLog.Errorln(err)
 		return err

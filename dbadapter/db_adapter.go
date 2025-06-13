@@ -70,7 +70,8 @@ func RealSessionRunner(client *mongo.Client) SessionRunner {
 				return err
 			}
 			if err := fn(sc); err != nil {
-				_ = session.AbortTransaction(sc)
+				abortErr := session.AbortTransaction(sc)
+				logger.DbLog.Warnf("failed to abort transaction: %v", abortErr)
 				return err
 			}
 			return session.CommitTransaction(sc)

@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/omec-project/util/mongoapi"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -60,7 +61,7 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 	for {
 		logger.ConfigLog.Infoln("waiting for configuration event")
 		configMsg := <-configMsgChan
-		mongoClient := dbadapter.CommonDBClient.(*dbadapter.MongoDBClient)
+		mongoClient := dbadapter.CommonDBClient.(*mongoapi.MongoClient)
 		sessionRunner := dbadapter.RealSessionRunner(mongoClient.Client)
 		if configMsg.MsgType == configmodels.Sub_data {
 			imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
@@ -643,7 +644,7 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string, session
 }
 
 func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
-	mongoClient := dbadapter.CommonDBClient.(*dbadapter.MongoDBClient)
+	mongoClient := dbadapter.CommonDBClient.(*mongoapi.MongoClient)
 	sessionRunner := dbadapter.RealSessionRunner(mongoClient.Client)
 	for confData := range confChan {
 		switch confData.Msg.MsgType {

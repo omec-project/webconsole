@@ -41,10 +41,18 @@ func (m *mockNFConfigSuccess) Start(ctx context.Context) error {
 	return nil
 }
 
+func (m *mockNFConfigSuccess) TriggerSync() {
+	time.Sleep(50 * time.Millisecond)
+}
+
 type mockNFConfigFail struct{}
 
 func (m *mockNFConfigFail) Start(ctx context.Context) error {
 	return errors.New("NFConfig start failed")
+}
+
+func (m *mockNFConfigFail) TriggerSync() {
+	time.Sleep(50 * time.Millisecond)
 }
 
 func TestRunWebUIAndNFConfig_Success(t *testing.T) {
@@ -143,6 +151,10 @@ type MockNFConfig struct{}
 
 func (m *MockNFConfig) Start(ctx context.Context) error {
 	return nil
+}
+
+func (m *MockNFConfig) TriggerSync() {
+	time.Sleep(50 * time.Millisecond)
 }
 
 func TestStartApplication(t *testing.T) {

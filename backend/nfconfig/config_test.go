@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/omec-project/openapi/nfConfigApi/server"
 	"github.com/omec-project/webconsole/configmodels"
@@ -61,6 +62,43 @@ func makeNetworkSlice(mcc, mnc, sst, sd string) configmodels.Slice {
 		SiteInfo:        site_info,
 	}
 	return slice
+}
+
+func TestTriggerSync_Success(t *testing.T) {
+	n := &NFConfigServer{}
+
+	called := false
+	syncInMemoryConfigFunc = func(n *NFConfigServer) error {
+		called = true
+		return nil
+	}
+
+	n.TriggerSync()
+	time.Sleep(100 * time.Millisecond)
+
+	if !called {
+		t.Fatal("expected syncInMemoryConfig to be called")
+	}
+}
+
+func TestTriggerSync_RetryAndThenSuccess(t *testing.T) {
+	n := &NFConfigServer{}
+
+	callCount := 0
+	syncInMemoryConfigFunc = func(n *NFConfigServer) error {
+		callCount++
+		if callCount < 3 {
+			return fmt.Errorf("mock error")
+		}
+		return nil
+	}
+
+	n.TriggerSync()
+
+	time.Sleep(10 * time.Second)
+	if callCount != 3 {
+		t.Fatalf("expected 3 calls to syncInMemoryConfigFunc, got %d", callCount)
+	}
 }
 
 func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {

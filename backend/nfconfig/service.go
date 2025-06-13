@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,8 @@ type NFConfigServer struct {
 	Config         *factory.Configuration
 	Router         *gin.Engine
 	inMemoryConfig *inMemoryConfig
+	syncCancelFunc context.CancelFunc
+	syncMutex      sync.Mutex
 }
 
 type Route struct {
@@ -29,6 +32,7 @@ type Route struct {
 
 type NFConfigInterface interface {
 	Start(ctx context.Context) error
+	TriggerSync()
 }
 
 func (n *NFConfigServer) router() *gin.Engine {

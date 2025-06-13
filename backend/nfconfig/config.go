@@ -6,8 +6,10 @@
 package nfconfig
 
 import (
+	"context"
 	"encoding/json"
 	"strconv"
+	"time"
 
 	"github.com/omec-project/openapi/nfConfigApi/server"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -22,6 +24,38 @@ type inMemoryConfig struct {
 	accessAndMobility []server.AccessAndMobility
 	sessionManagement []server.SessionManagement
 	policyControl     []server.PolicyControl
+}
+
+func (n *NFConfigServer) TriggerSync() {
+	n.syncMutex.Lock()
+	defer n.syncMutex.Unlock()
+
+	if n.syncCancelFunc != nil {
+		n.syncCancelFunc()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	n.syncCancelFunc = cancel
+	logger.NfConfigLog.Debugln("Starting in-memory NF configuration synchronization with new context")
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				logger.NfConfigLog.Infoln("No-op. Sync in-memory configuration was cancelled")
+				return
+			default:
+				err := syncInMemoryConfigFunc(n)
+				if err == nil {
+					return
+				}
+				logger.NfConfigLog.Warnf("Sync in-memory configuration failed, retrying: %v", err)
+				time.Sleep(3 * time.Second)
+			}
+		}
+	}()
+}
+
+var syncInMemoryConfigFunc = func(n *NFConfigServer) error {
+	return n.syncInMemoryConfig()
 }
 
 func (n *NFConfigServer) syncInMemoryConfig() error {

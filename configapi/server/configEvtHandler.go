@@ -5,6 +5,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -13,11 +14,13 @@ import (
 	"sync"
 
 	"github.com/omec-project/openapi/models"
+	"github.com/omec-project/util/mongoapi"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const (
@@ -58,13 +61,15 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 	for {
 		logger.ConfigLog.Infoln("waiting for configuration event")
 		configMsg := <-configMsgChan
+		mongoClient := dbadapter.CommonDBClient.(*mongoapi.MongoClient)
+		sessionRunner := dbadapter.RealSessionRunner(mongoClient.Client)
 		if configMsg.MsgType == configmodels.Sub_data {
 			imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
 			logger.ConfigLog.Infoln("received imsi from config channel:", imsiVal)
 			if configMsg.MsgMethod == configmodels.Delete_op {
-				handleSubscriberDelete(configMsg.Imsi)
+				handleSubscriberDelete(configMsg.Imsi, sessionRunner)
 			} else {
-				handleSubscriberPost(configMsg.Imsi, configMsg.AuthSubData)
+				handleSubscriberPost(configMsg.Imsi, configMsg.AuthSubData, sessionRunner)
 			}
 			logger.ConfigLog.Infof("received Imsi [%v] configuration from config channel", configMsg.Imsi)
 		}
@@ -79,12 +84,12 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			// update config snapshot
 			if configMsg.DevGroup != nil {
 				logger.ConfigLog.Infof("received Device Group [%v] configuration from config channel", configMsg.DevGroupName)
-				handleDeviceGroupPost(configMsg, subsUpdateChan)
+				handleDeviceGroupPost(configMsg, subsUpdateChan, sessionRunner)
 			}
 
 			if configMsg.Slice != nil {
 				logger.ConfigLog.Infof("received Slice [%v] configuration from config channel", configMsg.SliceName)
-				handleNetworkSlicePost(configMsg, subsUpdateChan)
+				handleNetworkSlicePost(configMsg, subsUpdateChan, sessionRunner)
 			}
 
 			// loop through all clients and send this message to all clients
@@ -100,12 +105,12 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				// update config snapshot
 				if configMsg.DevGroup == nil && configMsg.DevGroupName != "" {
 					logger.ConfigLog.Infof("received delete Device Group [%v] from config channel", configMsg.DevGroupName)
-					handleDeviceGroupDelete(configMsg, subsUpdateChan)
+					handleDeviceGroupDelete(configMsg, subsUpdateChan, sessionRunner)
 				}
 
 				if configMsg.Slice == nil && configMsg.SliceName != "" {
 					logger.ConfigLog.Infof("received delete Slice [%v] from config channel", configMsg.SliceName)
-					handleNetworkSliceDelete(configMsg, subsUpdateChan)
+					handleNetworkSliceDelete(configMsg, subsUpdateChan, sessionRunner)
 				}
 			} else {
 				logger.ConfigLog.Infof("received delete Subscriber [%v] from config channel", configMsg.Imsi)
@@ -122,20 +127,27 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 	}
 }
 
-func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscription) {
+func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscription, sessionRunner dbadapter.SessionRunner) {
 	rwLock.Lock()
-	subscriberAuthData.SubscriberAuthenticationDataCreate(imsi, authSubData)
+	err := subscriberAuthData.SubscriberAuthenticationDataCreate(imsi, authSubData, sessionRunner)
+	if err != nil {
+		logger.DbLog.Errorln("Subscriber Authentication Data Create Error:", err)
+	}
 	rwLock.Unlock()
 }
 
-func handleSubscriberDelete(imsi string) {
+func handleSubscriberDelete(imsi string, sessionRunner dbadapter.SessionRunner) {
 	rwLock.Lock()
-	subscriberAuthData.SubscriberAuthenticationDataDelete(imsi)
+	err := subscriberAuthData.SubscriberAuthenticationDataDelete(imsi, sessionRunner)
+	if err != nil {
+		logger.DbLog.Errorln("SubscriberAuthDataDelete error:", err)
+	}
 	rwLock.Unlock()
 }
 
-func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg, sessionRunner dbadapter.SessionRunner) {
 	rwLock.Lock()
+	defer rwLock.Unlock()
 	if factory.WebUIConfig.Configuration.Mode5G {
 		var config5gMsg Update5GSubscriberMsg
 		config5gMsg.Msg = configMsg
@@ -144,15 +156,24 @@ func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan
 	}
 	filter := bson.M{"group-name": configMsg.DevGroupName}
 	devGroupDataBsonA := configmodels.ToBsonM(configMsg.DevGroup)
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	ctx := context.TODO()
+	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
+		_, err := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
+		if err != nil {
+			logger.DbLog.Errorw("failed to post device group data for %v: %v", configMsg.DevGroupName, err)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		logger.DbLog.Errorln(err)
+		return
 	}
-	rwLock.Unlock()
 }
 
-func handleDeviceGroupDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+func handleDeviceGroupDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg, sessionRunner dbadapter.SessionRunner) {
 	rwLock.Lock()
+	defer rwLock.Unlock()
 	if factory.WebUIConfig.Configuration.Mode5G {
 		var config5gMsg Update5GSubscriberMsg
 		config5gMsg.Msg = configMsg
@@ -160,15 +181,24 @@ func handleDeviceGroupDelete(configMsg *configmodels.ConfigMessage, subsUpdateCh
 		subsUpdateChan <- &config5gMsg
 	}
 	filter := bson.M{"group-name": configMsg.DevGroupName}
-	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
+	ctx := context.TODO()
+	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
+		err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
+		if err != nil {
+			logger.DbLog.Errorw("failed to delete device group data for %v: %v", configMsg.DevGroupName, err)
+			return err
+		}
+		return nil
+	})
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorln(err)
+		return
 	}
-	rwLock.Unlock()
 }
 
-func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg, sessionRunner dbadapter.SessionRunner) {
 	rwLock.Lock()
+	defer rwLock.Unlock()
 	if factory.WebUIConfig.Configuration.Mode5G {
 		var config5gMsg Update5GSubscriberMsg
 		config5gMsg.Msg = configMsg
@@ -177,21 +207,31 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 	}
 	filter := bson.M{"slice-name": configMsg.SliceName}
 	sliceDataBsonA := configmodels.ToBsonM(configMsg.Slice)
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	ctx := context.TODO()
+	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
+		_, err := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
+		if err != nil {
+			logger.DbLog.Warnf("failed to post slice data for %v: %v", configMsg.SliceName, err)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		logger.DbLog.Errorln(err)
+		return
 	}
+
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
 		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/create")
 		if err != nil {
 			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
 	}
-	rwLock.Unlock()
 }
 
-func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg, sessionRunner dbadapter.SessionRunner) {
 	rwLock.Lock()
+	defer rwLock.Unlock()
 	if factory.WebUIConfig.Configuration.Mode5G {
 		var config5gMsg Update5GSubscriberMsg
 		config5gMsg.Msg = configMsg
@@ -199,9 +239,18 @@ func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateC
 		subsUpdateChan <- &config5gMsg
 	}
 	filter := bson.M{"slice-name": configMsg.SliceName}
-	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
+	ctx := context.TODO()
+	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
+		err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
+		if err != nil {
+			logger.DbLog.Warnf("failed to delete slice data for %v: %v", configMsg.SliceName, err)
+			return err
+		}
+		return nil
+	})
 	if err != nil {
-		logger.DbLog.Warnln(err)
+		logger.DbLog.Errorln(err)
+		return
 	}
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
 		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/delete")
@@ -209,7 +258,6 @@ func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateC
 			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
 	}
-	rwLock.Unlock()
 }
 
 func firstConfigReceived() bool {
@@ -329,20 +377,29 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 	return
 }
 
-func updateAmPolicyData(imsi string) {
-	// ampolicydata
+func updateAmPolicyData(imsi string, sessionRunner dbadapter.SessionRunner) error {
 	var amPolicy models.AmPolicyData
 	amPolicy.SubscCats = append(amPolicy.SubscCats, "aether")
 	amPolicyDatBsonA := configmodels.ToBsonM(amPolicy)
 	amPolicyDatBsonA["ueId"] = "imsi-" + imsi
 	filter := bson.M{"ueId": "imsi-" + imsi}
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(amPolicyDataColl, filter, amPolicyDatBsonA)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	ctx := context.TODO()
+	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
+		_, err := dbadapter.CommonDBClient.RestfulAPIPost(amPolicyDataColl, filter, amPolicyDatBsonA)
+		if err != nil {
+			logger.DbLog.Errorf("failed to update AM Policy Data for IMSI %s: %v", imsi, err)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		logger.DbLog.Errorln(err)
+		return err
 	}
+	return nil
 }
 
-func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
+func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string, sessionRunner dbadapter.SessionRunner) error {
 	var smPolicyData models.SmPolicyData
 	var smPolicySnssaiData models.SmPolicySnssaiData
 	dnnData := map[string]models.SmPolicyDnnData{
@@ -358,13 +415,23 @@ func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
 	smPolicyDatBsonA := configmodels.ToBsonM(smPolicyData)
 	smPolicyDatBsonA["ueId"] = "imsi-" + imsi
 	filter := bson.M{"ueId": "imsi-" + imsi}
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(smPolicyDataColl, filter, smPolicyDatBsonA)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	ctx := context.TODO()
+	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
+		_, err := dbadapter.CommonDBClient.RestfulAPIPost(smPolicyDataColl, filter, smPolicyDatBsonA)
+		if err != nil {
+			logger.DbLog.Warnf("failed to update SM Policy Data for IMSI %s: %v", imsi, err)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		logger.DbLog.Errorln(err)
+		return err
 	}
+	return nil
 }
 
-func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string) {
+func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string, sessionRunner dbadapter.SessionRunner) error {
 	amData := models.AccessAndMobilitySubscriptionData{
 		Gpsis: []string{
 			"msisdn-0900000000",
@@ -388,14 +455,24 @@ func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 			{"servingPlmnId": bson.M{"$exists": false}},
 		},
 	}
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, amDataBsonA)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	ctx := context.TODO()
+	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
+		_, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, amDataBsonA)
+		if err != nil {
+			logger.DbLog.Warnf("failed to update AM provisioned Data for IMSI %s: %v", imsi, err)
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		logger.DbLog.Errorln(err)
+		return err
 	}
+	return nil
 }
 
-func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) {
-	// TODO smData
+func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string, sessionRunner dbadapter.SessionRunner) error {
 	smData := models.SessionManagementSubscriptionData{
 		SingleNssai: snssai,
 		DnnConfigurations: map[string]models.DnnConfiguration{
@@ -429,13 +506,24 @@ func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 	smDataBsonA["ueId"] = "imsi-" + imsi
 	smDataBsonA["servingPlmnId"] = mcc + mnc
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(smDataColl, filter, smDataBsonA)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	ctx := context.TODO()
+	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
+		_, err := dbadapter.CommonDBClient.RestfulAPIPost(smDataColl, filter, smDataBsonA)
+		if err != nil {
+			logger.DbLog.Errorf("failed to update SM provisioned Data for IMSI %s: %v", imsi, err)
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		logger.DbLog.Errorln(err)
+		return err
 	}
+	return nil
 }
 
-func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string) {
+func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string, sessionRunner dbadapter.SessionRunner) error {
 	smfSelData := models.SmfSelectionSubscriptionData{
 		SubscribedSnssaiInfos: map[string]models.SnssaiInfo{
 			SnssaiModelsToHex(*snssai): {
@@ -451,10 +539,21 @@ func updateSmfSelectionProviosionedData(snssai *models.Snssai, mcc, mnc, dnn, im
 	smfSelecDataBsonA["ueId"] = "imsi-" + imsi
 	smfSelecDataBsonA["servingPlmnId"] = mcc + mnc
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(smfSelDataColl, filter, smfSelecDataBsonA)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	ctx := context.TODO()
+	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
+		_, err := dbadapter.CommonDBClient.RestfulAPIPost(smfSelDataColl, filter, smfSelecDataBsonA)
+		if err != nil {
+			logger.DbLog.Warnf("failed to update SMF selection provisioned data for IMSI %s: %v", imsi, err)
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		logger.DbLog.Errorln(err)
+		return err
 	}
+	return nil
 }
 
 func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg) *configmodels.Slice {
@@ -499,32 +598,54 @@ func getDeleteGroupsList(slice, prevSlice *configmodels.Slice) (names []string) 
 	return
 }
 
-func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string) {
+func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string, sessionRunner dbadapter.SessionRunner) error {
 	filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
-	errDelOneAmPol := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amPolicyDataColl, filterImsiOnly)
-	if errDelOneAmPol != nil {
-		logger.DbLog.Warnln(errDelOneAmPol)
+
+	ctx := context.TODO()
+	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
+		// AM policy
+		err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amPolicyDataColl, filterImsiOnly)
+		if err != nil {
+			logger.DbLog.Warnf("failed to delete AM policy data for IMSI %s: %v", imsi, err)
+			return err
+		}
+		// SM policy
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(smPolicyDataColl, filterImsiOnly)
+		if err != nil {
+			logger.DbLog.Warnf("failed to delete SM policy data for IMSI %s: %v", imsi, err)
+			return err
+		}
+		// AM data
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
+		if err != nil {
+			logger.DbLog.Warnf("failed to delete AM data for IMSI %s: %v", imsi, err)
+			return err
+		}
+		// SM data
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(smDataColl, filter)
+		if err != nil {
+			logger.DbLog.Warnf("failed to delete SM data for IMSI %s: %v", imsi, err)
+			return err
+		}
+		// SMF selection
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(smfSelDataColl, filter)
+		if err != nil {
+			logger.DbLog.Warnf("failed to delete SMF selection data for IMSI %s: %v", imsi, err)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		logger.DbLog.Errorln(err)
+		return err
 	}
-	errDelOneSmPol := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smPolicyDataColl, filterImsiOnly)
-	if errDelOneSmPol != nil {
-		logger.DbLog.Warnln(errDelOneSmPol)
-	}
-	errDelOneAmData := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
-	if errDelOneAmData != nil {
-		logger.DbLog.Warnln(errDelOneAmData)
-	}
-	errDelOneSmData := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smDataColl, filter)
-	if errDelOneSmData != nil {
-		logger.DbLog.Warnln(errDelOneSmData)
-	}
-	errDelOneSmfSel := dbadapter.CommonDBClient.RestfulAPIDeleteOne(smfSelDataColl, filter)
-	if errDelOneSmfSel != nil {
-		logger.DbLog.Warnln(errDelOneSmfSel)
-	}
+	return nil
 }
 
 func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
+	mongoClient := dbadapter.CommonDBClient.(*mongoapi.MongoClient)
+	sessionRunner := dbadapter.RealSessionRunner(mongoClient.Client)
 	for confData := range confChan {
 		switch confData.Msg.MsgType {
 		case configmodels.Device_group:
@@ -541,25 +662,31 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 					Sd:  slice.SliceId.Sd,
 					Sst: int32(sVal),
 				}
-
 				/* skip delete case */
 				if confData.Msg.MsgMethod != configmodels.Delete_op {
 					for _, imsi := range confData.Msg.DevGroup.Imsis {
 						/* update only if the imsi is provisioned */
 						if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-"+imsi) != nil {
 							dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
-							updateAmPolicyData(imsi)
-							updateSmPolicyData(snssai, dnn, imsi)
-							updateAmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
-							updateSmProvisionedData(snssai, confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
-							updateSmfSelectionProviosionedData(snssai, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, dnn, imsi)
+							updatePolicyAndProvisionedData(
+								imsi,
+								slice.SiteInfo.Plmn.Mcc,
+								slice.SiteInfo.Plmn.Mnc,
+								snssai,
+								dnn,
+								confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos,
+								sessionRunner,
+							)
 						}
 					}
 				}
 
 				dimsis := getDeletedImsisList(confData.Msg.DevGroup, confData.PrevDevGroup)
 				for _, imsi := range dimsis {
-					removeSubscriberEntriesRelatedToDeviceGroups(slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
+					err = removeSubscriberEntriesRelatedToDeviceGroups(slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi, sessionRunner)
+					if err != nil {
+						logger.ConfigLog.Errorln(err)
+					}
 				}
 			}
 			rwLock.RUnlock()
@@ -588,28 +715,57 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 							dnn := devGroupConfig.IpDomainExpanded.Dnn
 							mcc := slice.SiteInfo.Plmn.Mcc
 							mnc := slice.SiteInfo.Plmn.Mnc
-							updateAmPolicyData(imsi)
-							updateSmPolicyData(snssai, dnn, imsi)
-							updateAmProvisionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, imsi)
-							updateSmProvisionedData(snssai, devGroupConfig.IpDomainExpanded.UeDnnQos, mcc, mnc, dnn, imsi)
-							updateSmfSelectionProviosionedData(snssai, mcc, mnc, dnn, imsi)
+							updatePolicyAndProvisionedData(
+								imsi,
+								mcc,
+								mnc,
+								snssai,
+								dnn,
+								devGroupConfig.IpDomainExpanded.UeDnnQos,
+								sessionRunner,
+							)
 						}
 					}
 				}
 			}
-
 			dgnames := getDeleteGroupsList(slice, confData.PrevSlice)
 			for _, dgname := range dgnames {
 				devGroupConfig := getDeviceGroupByName(dgname)
 				if devGroupConfig != nil {
 					for _, imsi := range devGroupConfig.Imsis {
-						removeSubscriberEntriesRelatedToDeviceGroups(confData.PrevSlice.SiteInfo.Plmn.Mcc, confData.PrevSlice.SiteInfo.Plmn.Mnc, imsi)
+						err := removeSubscriberEntriesRelatedToDeviceGroups(confData.PrevSlice.SiteInfo.Plmn.Mcc, confData.PrevSlice.SiteInfo.Plmn.Mnc, imsi, sessionRunner)
+						if err != nil {
+							logger.ConfigLog.Errorln(err)
+						}
 					}
 				}
 			}
 			rwLock.RUnlock()
 		}
-	} // end of for loop
+	}
+}
+
+func updatePolicyAndProvisionedData(imsi string, mcc string, mnc string, snssai *models.Snssai, dnn string, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, sessionRunner dbadapter.SessionRunner) {
+	err := updateAmPolicyData(imsi, sessionRunner)
+	if err != nil {
+		logger.ConfigLog.Errorln(err)
+	}
+	err = updateSmPolicyData(snssai, dnn, imsi, sessionRunner)
+	if err != nil {
+		logger.ConfigLog.Errorln(err)
+	}
+	err = updateAmProvisionedData(snssai, qos, mcc, mnc, imsi, sessionRunner)
+	if err != nil {
+		logger.ConfigLog.Errorln(err)
+	}
+	err = updateSmProvisionedData(snssai, qos, mcc, mnc, dnn, imsi, sessionRunner)
+	if err != nil {
+		logger.ConfigLog.Errorln(err)
+	}
+	err = updateSmfSelectionProvisionedData(snssai, mcc, mnc, dnn, imsi, sessionRunner)
+	if err != nil {
+		logger.ConfigLog.Errorln(err)
+	}
 }
 
 func convertToString(val uint64) string {

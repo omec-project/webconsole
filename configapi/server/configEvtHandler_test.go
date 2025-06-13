@@ -5,7 +5,9 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"reflect"
@@ -17,6 +19,7 @@ import (
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
@@ -115,6 +118,10 @@ func (m *MockMongoDeleteOne) RestfulAPIDeleteOne(coll string, filter primitive.M
 	return nil
 }
 
+func (m *MockMongoDeleteOne) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	return map[string]interface{}{}, nil
+}
+
 func (m *MockMongoGetOneNil) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
 	var value map[string]interface{}
 	return value, nil
@@ -171,8 +178,13 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 	execCommand = mockExecCommand
 	defer func() { execCommand = exec.Command }()
 	numPebbleNotificationsSent := execCommandTimesCalled
+	called := false
 	networkSlice := []configmodels.Slice{networkSlice("slice1")}
 	factory.WebUIConfig.Configuration.SendPebbleNotifications = true
+	mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+		called = true
+		return fn(nil)
+	}
 
 	configMsg := configmodels.ConfigMessage{
 		SliceName: networkSlice[0].SliceName,
@@ -181,9 +193,40 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 	subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
 	dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 	dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
-	handleNetworkSlicePost(&configMsg, subsUpdateChan)
+	handleNetworkSlicePost(&configMsg, subsUpdateChan, mockRunner)
 
+	if !called {
+		t.Error("SessionRunner did not call and DB is not updated.")
+	}
 	if execCommandTimesCalled != numPebbleNotificationsSent+1 {
+		t.Errorf("Unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent+1)
+	}
+}
+
+func Test_sendPebbleNotification_on_when_handleNetworkSlicePost_fails_pebbleNotifications_not_send(t *testing.T) {
+	execCommand = mockExecCommand
+	defer func() { execCommand = exec.Command }()
+	numPebbleNotificationsSent := execCommandTimesCalled
+	called := false
+	networkSlice := []configmodels.Slice{networkSlice("slice1")}
+	factory.WebUIConfig.Configuration.SendPebbleNotifications = true
+	mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+		return fmt.Errorf("transaction error")
+	}
+
+	configMsg := configmodels.ConfigMessage{
+		SliceName: networkSlice[0].SliceName,
+		Slice:     &networkSlice[0],
+	}
+	subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
+	dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
+	dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
+	handleNetworkSlicePost(&configMsg, subsUpdateChan, mockRunner)
+
+	if called {
+		t.Error("SessionRunner called and DB updated. Should not have been called.")
+	}
+	if execCommandTimesCalled != numPebbleNotificationsSent {
 		t.Errorf("Unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent+1)
 	}
 }
@@ -192,8 +235,13 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 	execCommand = mockExecCommand
 	defer func() { execCommand = exec.Command }()
 	numPebbleNotificationsSent := execCommandTimesCalled
+	called := false
 	networkSlices := []configmodels.Slice{networkSlice("slice1")}
 	factory.WebUIConfig.Configuration.SendPebbleNotifications = false
+	mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+		called = true
+		return fn(nil)
+	}
 
 	for _, testSlice := range networkSlices {
 		configMsg := configmodels.ConfigMessage{
@@ -203,7 +251,11 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 		subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
 		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
-		handleNetworkSlicePost(&configMsg, subsUpdateChan)
+		handleNetworkSlicePost(&configMsg, subsUpdateChan, mockRunner)
+	}
+
+	if !called {
+		t.Error("SessionRunner was not called and DB is not updated.")
 	}
 
 	if execCommandTimesCalled != numPebbleNotificationsSent {
@@ -217,6 +269,11 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 	deviceGroups[3].IpDomainExpanded.UeDnnQos.TrafficClass = nil
 	deviceGroups[4].IpDomainExpanded.UeDnnQos = nil
 	factory.WebUIConfig.Configuration.Mode5G = true
+	called := false
+	mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+		called = true
+		return fn(nil)
+	}
 	for _, testGroup := range deviceGroups {
 		configMsg := configmodels.ConfigMessage{
 			DevGroupName: testGroup.DeviceGroupName,
@@ -226,7 +283,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		postData = make([]map[string]interface{}, 0)
 		dbadapter.CommonDBClient = &(MockMongoPost{dbadapter.CommonDBClient})
 		dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
-		handleDeviceGroupPost(&configMsg, subsUpdateChan)
+		handleDeviceGroupPost(&configMsg, subsUpdateChan, mockRunner)
 		expected_collection := devGroupDataColl
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
@@ -248,6 +305,9 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		if !reflect.DeepEqual(receivedConfigMsg.Msg, &configMsg) {
 			t.Errorf("Expected config message %v, got %v", configMsg, receivedConfigMsg.Msg)
 		}
+		if !called {
+			t.Error("SessionRunner was not called and DB is not updated.")
+		}
 		if receivedConfigMsg.PrevDevGroup.DeviceGroupName != "" {
 			t.Errorf("Expected previous device group name to be empty, got %v", receivedConfigMsg.PrevDevGroup.DeviceGroupName)
 		}
@@ -260,7 +320,11 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 	deviceGroups[3].IpDomainExpanded.UeDnnQos.TrafficClass = nil
 	deviceGroups[4].IpDomainExpanded.UeDnnQos = nil
 	factory.WebUIConfig.Configuration.Mode5G = true
-
+	called := false
+	mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+		called = true
+		return fn(nil)
+	}
 	for _, testGroup := range deviceGroups {
 		configMsg := configmodels.ConfigMessage{
 			DevGroupName: testGroup.DeviceGroupName,
@@ -270,7 +334,7 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		postData = make([]map[string]interface{}, 0)
 		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &(MockMongoDeviceGroupGetOne{dbadapter.CommonDBClient, testGroup})
-		handleDeviceGroupPost(&configMsg, subsUpdateChan)
+		handleDeviceGroupPost(&configMsg, subsUpdateChan, mockRunner)
 		expected_collection := devGroupDataColl
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
@@ -295,12 +359,20 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		if !reflect.DeepEqual(receivedConfigMsg.PrevDevGroup, &testGroup) {
 			t.Errorf("Expected previous device group to be %v, got %v", testGroup, receivedConfigMsg.PrevDevGroup)
 		}
+		if !called {
+			t.Error("SessionRunner was not called and DB is not updated.")
+		}
 	}
 }
 
 func Test_handleDeviceGroupDelete(t *testing.T) {
 	deviceGroups := []configmodels.DeviceGroups{deviceGroup("group1")}
 	factory.WebUIConfig.Configuration.Mode5G = true
+	called := false
+	mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+		called = true
+		return fn(nil)
+	}
 	for _, testGroup := range deviceGroups {
 		configMsg := configmodels.ConfigMessage{
 			MsgType:      configmodels.Device_group,
@@ -311,7 +383,7 @@ func Test_handleDeviceGroupDelete(t *testing.T) {
 		deleteData = make([]map[string]interface{}, 0)
 		dbadapter.CommonDBClient = &MockMongoDeleteOne{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &(MockMongoDeviceGroupGetOne{dbadapter.CommonDBClient, testGroup})
-		handleDeviceGroupDelete(&configMsg, subsUpdateChan)
+		handleDeviceGroupDelete(&configMsg, subsUpdateChan, mockRunner)
 		expected_collection := devGroupDataColl
 		if deleteData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, deleteData[0]["coll"])
@@ -326,6 +398,9 @@ func Test_handleDeviceGroupDelete(t *testing.T) {
 		}
 		if !reflect.DeepEqual(receivedConfigMsg.PrevDevGroup, &testGroup) {
 			t.Errorf("Expected previous device group to be %v, got %v", testGroup, receivedConfigMsg.PrevDevGroup)
+		}
+		if !called {
+			t.Error("SessionRunner was not called and DB is not updated.")
 		}
 	}
 }
@@ -366,7 +441,7 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 	networkSlices[2].SiteInfo.GNodeBs = []configmodels.SliceSiteInfoGNodeBs{}
 	networkSlices[3].SiteDeviceGroup = []string{}
 	factory.WebUIConfig.Configuration.Mode5G = true
-
+	called := false
 	for _, testSlice := range networkSlices {
 		configMsg := configmodels.ConfigMessage{
 			SliceName: testSlice.SliceName,
@@ -376,8 +451,12 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 		postData = make([]map[string]interface{}, 0)
 		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
-		handleNetworkSlicePost(&configMsg, subsUpdateChan)
+		mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+			called = true
+			return fn(nil)
+		}
 
+		handleNetworkSlicePost(&configMsg, subsUpdateChan, mockRunner)
 		expected_collection := "webconsoleData.snapshots.sliceData"
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
@@ -402,6 +481,9 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 		if receivedConfigMsg.PrevSlice.SliceName != "" {
 			t.Errorf("Expected previous network slice name to be empty, got %v", receivedConfigMsg.PrevSlice.SliceName)
 		}
+		if !called {
+			t.Error("SessionRunner was not called and DB is not updated.")
+		}
 	}
 }
 
@@ -410,7 +492,7 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 	networkSlices[2].SiteInfo.GNodeBs = []configmodels.SliceSiteInfoGNodeBs{}
 	networkSlices[3].SiteDeviceGroup = []string{}
 	factory.WebUIConfig.Configuration.Mode5G = true
-
+	called := false
 	for _, testSlice := range networkSlices {
 		configMsg := configmodels.ConfigMessage{
 			SliceName: testSlice.SliceName,
@@ -429,7 +511,14 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 		}
 		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &MockMongoSliceGetOne{dbadapter.CommonDBClient, testSlice}
-		handleNetworkSlicePost(&configMsg, subsUpdateChan)
+		mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+			called = true
+			return fn(nil)
+		}
+		handleNetworkSlicePost(&configMsg, subsUpdateChan, mockRunner)
+		if !called {
+			t.Error("SessionRunner was not called and DB is not updated.")
+		}
 
 		expected_collection := "webconsoleData.snapshots.sliceData"
 		if postData[0]["coll"] != expected_collection {
@@ -565,12 +654,16 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 			SequenceNumber: "16f3b3f70fc2",
 		},
 	}
-
+	called := false
+	mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+		called = true
+		return fn(nil)
+	}
 	postData = make([]map[string]interface{}, 0)
 	imsiData = make(map[string]*models.AuthenticationSubscription)
 	dbadapter.AuthDBClient = &MockMongoPost{}
 	dbadapter.CommonDBClient = &MockMongoPost{}
-	handleSubscriberPost(ueId, configMsg.AuthSubData)
+	handleSubscriberPost(ueId, configMsg.AuthSubData, mockRunner)
 
 	expectedAuthSubCollection := authSubsDataColl
 	expectedAmDataCollection := amDataColl
@@ -604,6 +697,9 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 	}
 	if imsiData[ueId] != nil {
 		t.Errorf("Expected no ueId in memory, got %v", imsiData[ueId])
+	}
+	if !called {
+		t.Error("SessionRunner was not called and DB is not updated.")
 	}
 }
 
@@ -647,7 +743,12 @@ func Test_handleSubscriberPost4G(t *testing.T) {
 	postData = make([]map[string]interface{}, 0)
 	imsiData = make(map[string]*models.AuthenticationSubscription)
 	dbadapter.CommonDBClient = &MockMongoPost{}
-	handleSubscriberPost(ueId, configMsg.AuthSubData)
+	called := false
+	mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+		called = true
+		return fn(nil)
+	}
+	handleSubscriberPost(ueId, configMsg.AuthSubData, mockRunner)
 
 	expectedAmDataCollection := amDataColl
 	if postData[0]["coll"] != expectedAmDataCollection {
@@ -665,6 +766,9 @@ func Test_handleSubscriberPost4G(t *testing.T) {
 	}
 	if !reflect.DeepEqual(imsiData[ueId], configMsg.AuthSubData) {
 		t.Errorf("Expected authSubData %v in memory, got %v ", configMsg.AuthSubData, imsiData[ueId])
+	}
+	if !called {
+		t.Error("SessionRunner was not called and DB is not updated.")
 	}
 }
 
@@ -685,7 +789,12 @@ func Test_handleSubscriberDelete5G(t *testing.T) {
 	deleteData = make([]map[string]interface{}, 0)
 	dbadapter.AuthDBClient = &MockMongoDeleteOne{}
 	dbadapter.CommonDBClient = &MockMongoDeleteOne{}
-	handleSubscriberDelete(ueId)
+	called := false
+	mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+		called = true
+		return fn(nil)
+	}
+	handleSubscriberDelete(ueId, mockRunner)
 
 	expectedAuthSubCollection := authSubsDataColl
 	expectedAmDataCollection := amDataColl
@@ -702,6 +811,9 @@ func Test_handleSubscriberDelete5G(t *testing.T) {
 	}
 	if !reflect.DeepEqual(deleteData[1]["filter"], expectedFilter) {
 		t.Errorf("Expected filter %v, got %v", expectedFilter, deleteData[1]["filter"])
+	}
+	if !called {
+		t.Error("SessionRunner was not called and DB is not updated.")
 	}
 }
 
@@ -743,7 +855,12 @@ func Test_handleSubscriberDelete4G(t *testing.T) {
 		SequenceNumber: "16f3b3f70fc2",
 	}
 	dbadapter.CommonDBClient = &MockMongoDeleteOne{}
-	handleSubscriberDelete(ueId)
+	called := false
+	mockRunner := func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+		called = true
+		return fn(nil)
+	}
+	handleSubscriberDelete(ueId, mockRunner)
 
 	expectedAmDataCollection := "subscriptionData.provisionedData.amData"
 	if deleteData[0]["coll"] != expectedAmDataCollection {
@@ -757,6 +874,9 @@ func Test_handleSubscriberDelete4G(t *testing.T) {
 
 	if imsiData[ueId] != nil {
 		t.Errorf("Expected no ueId in memory, got %v", imsiData[ueId])
+	}
+	if !called {
+		t.Error("SessionRunner was not called and DB is not updated.")
 	}
 }
 

@@ -196,7 +196,7 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 	handleNetworkSlicePost(&configMsg, subsUpdateChan, mockRunner)
 
 	if !called {
-		t.Error("SessionRunner was not called")
+		t.Error("SessionRunner did not call and DB is not updated.")
 	}
 	if execCommandTimesCalled != numPebbleNotificationsSent+1 {
 		t.Errorf("Unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent+1)
@@ -224,7 +224,7 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost_fails_pebbleNoti
 	handleNetworkSlicePost(&configMsg, subsUpdateChan, mockRunner)
 
 	if called {
-		t.Error("SessionRunner was not called")
+		t.Error("SessionRunner called and DB updated. Should not have been called.")
 	}
 	if execCommandTimesCalled != numPebbleNotificationsSent {
 		t.Errorf("Unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent+1)
@@ -255,7 +255,7 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 	}
 
 	if !called {
-		t.Error("SessionRunner was not called")
+		t.Error("SessionRunner was not called and DB is not updated.")
 	}
 
 	if execCommandTimesCalled != numPebbleNotificationsSent {
@@ -306,7 +306,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 			t.Errorf("Expected config message %v, got %v", configMsg, receivedConfigMsg.Msg)
 		}
 		if !called {
-			t.Error("SessionRunner was not called")
+			t.Error("SessionRunner was not called and DB is not updated.")
 		}
 		if receivedConfigMsg.PrevDevGroup.DeviceGroupName != "" {
 			t.Errorf("Expected previous device group name to be empty, got %v", receivedConfigMsg.PrevDevGroup.DeviceGroupName)
@@ -360,7 +360,7 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 			t.Errorf("Expected previous device group to be %v, got %v", testGroup, receivedConfigMsg.PrevDevGroup)
 		}
 		if !called {
-			t.Error("SessionRunner was not called")
+			t.Error("SessionRunner was not called and DB is not updated.")
 		}
 	}
 }
@@ -400,7 +400,7 @@ func Test_handleDeviceGroupDelete(t *testing.T) {
 			t.Errorf("Expected previous device group to be %v, got %v", testGroup, receivedConfigMsg.PrevDevGroup)
 		}
 		if !called {
-			t.Error("SessionRunner was not called")
+			t.Error("SessionRunner was not called and DB is not updated.")
 		}
 	}
 }
@@ -457,10 +457,6 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 		}
 
 		handleNetworkSlicePost(&configMsg, subsUpdateChan, mockRunner)
-		if !called {
-			t.Error("SessionRunner was not called")
-		}
-
 		expected_collection := "webconsoleData.snapshots.sliceData"
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
@@ -484,6 +480,9 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 		}
 		if receivedConfigMsg.PrevSlice.SliceName != "" {
 			t.Errorf("Expected previous network slice name to be empty, got %v", receivedConfigMsg.PrevSlice.SliceName)
+		}
+		if !called {
+			t.Error("SessionRunner was not called and DB is not updated.")
 		}
 	}
 }
@@ -518,7 +517,7 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 		}
 		handleNetworkSlicePost(&configMsg, subsUpdateChan, mockRunner)
 		if !called {
-			t.Error("SessionRunner was not called")
+			t.Error("SessionRunner was not called and DB is not updated.")
 		}
 
 		expected_collection := "webconsoleData.snapshots.sliceData"
@@ -700,7 +699,7 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 		t.Errorf("Expected no ueId in memory, got %v", imsiData[ueId])
 	}
 	if !called {
-		t.Error("SessionRunner was not called")
+		t.Error("SessionRunner was not called and DB is not updated.")
 	}
 }
 
@@ -769,7 +768,7 @@ func Test_handleSubscriberPost4G(t *testing.T) {
 		t.Errorf("Expected authSubData %v in memory, got %v ", configMsg.AuthSubData, imsiData[ueId])
 	}
 	if !called {
-		t.Error("SessionRunner was not called")
+		t.Error("SessionRunner was not called and DB is not updated.")
 	}
 }
 
@@ -814,7 +813,7 @@ func Test_handleSubscriberDelete5G(t *testing.T) {
 		t.Errorf("Expected filter %v, got %v", expectedFilter, deleteData[1]["filter"])
 	}
 	if !called {
-		t.Error("SessionRunner was not called")
+		t.Error("SessionRunner was not called and DB is not updated.")
 	}
 }
 
@@ -877,7 +876,7 @@ func Test_handleSubscriberDelete4G(t *testing.T) {
 		t.Errorf("Expected no ueId in memory, got %v", imsiData[ueId])
 	}
 	if !called {
-		t.Error("SessionRunner was not called")
+		t.Error("SessionRunner was not called and DB is not updated.")
 	}
 }
 

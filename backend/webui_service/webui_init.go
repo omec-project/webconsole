@@ -29,13 +29,15 @@ import (
 	gServ "github.com/omec-project/webconsole/proto/server"
 )
 
-type WEBUI struct{}
+type WEBUI struct {
+	TriggerSyncNFConfigFunc func()
+}
 
 type WebUIInterface interface {
 	Start(ctx context.Context)
 }
 
-func setupAuthenticationFeature(subconfig_router *gin.Engine) {
+func (webui *WEBUI) setupAuthenticationFeature(subconfig_router *gin.Engine) {
 	jwtSecret, err := auth.GenerateJWTSecret()
 	if err != nil {
 		logger.InitLog.Error(err)
@@ -43,17 +45,18 @@ func setupAuthenticationFeature(subconfig_router *gin.Engine) {
 	}
 	configapi.AddUserAccountService(subconfig_router, jwtSecret)
 	auth.AddAuthenticationService(subconfig_router, jwtSecret)
-	configapi.AddApiServiceWithAuthorization(subconfig_router, jwtSecret)
-	configapi.AddConfigV1ServiceWithAuthorization(subconfig_router, jwtSecret)
+	authMiddleware := auth.AdminOrUserAuthMiddleware(jwtSecret)
+	configapi.AddApiService(subconfig_router, authMiddleware)
+	configapi.AddConfigV1Service(subconfig_router, webui.triggerNFConfigSyncMiddleware(), authMiddleware)
 }
 
 func (webui *WEBUI) Start(ctx context.Context) {
 	subconfig_router := utilLogger.NewGinWithZap(logger.GinLog)
 	if factory.WebUIConfig.Configuration.EnableAuthentication {
-		setupAuthenticationFeature(subconfig_router)
+		webui.setupAuthenticationFeature(subconfig_router)
 	} else {
 		configapi.AddApiService(subconfig_router)
-		configapi.AddConfigV1Service(subconfig_router)
+		configapi.AddConfigV1Service(subconfig_router, webui.triggerNFConfigSyncMiddleware())
 	}
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
@@ -169,4 +172,25 @@ func fetchConfigAdapater() {
 		logger.InitLog.Infof("fetching config from simapp/roc. Response code = %d", resp.StatusCode)
 		break
 	}
+}
+
+func (webui *WEBUI) triggerNFConfigSyncMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+		if isWritingMethod(c.Request.Method) && isStatusSuccess(c.Writer.Status()) {
+			if webui.TriggerSyncNFConfigFunc != nil {
+				logger.WebUILog.Infof("Triggered synchronization of NF config")
+				webui.TriggerSyncNFConfigFunc()
+			}
+		}
+	}
+}
+
+func isWritingMethod(method string) bool {
+	return method == http.MethodPost || method == http.MethodPut ||
+		method == http.MethodDelete || method == http.MethodPatch
+}
+
+func isStatusSuccess(status int) bool {
+	return status >= 200 && status <= 299
 }

@@ -70,10 +70,13 @@ func startApplication(config *factory.Config) error {
 		logger.InitLog.Errorf("failed to initialize MongoDB: %v", err)
 		return err
 	}
-	webui := &webui_service.WEBUI{}
+
 	nfConfigServer, err := newNFConfigServer(config)
 	if err != nil {
 		return fmt.Errorf("failed to initialize NFConfig: %w", err)
+	}
+	webui := &webui_service.WEBUI{
+		TriggerSyncNFConfigFunc: nfConfigServer.TriggerSync,
 	}
 	return runServer(webui, nfConfigServer)
 }

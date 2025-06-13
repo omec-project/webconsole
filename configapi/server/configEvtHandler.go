@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go.mongodb.org/mongo-driver/mongo"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -20,6 +19,7 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const (
@@ -215,7 +215,6 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 		}
 		return nil
 	})
-
 	if err != nil {
 		logger.DbLog.Errorln(err)
 		return
@@ -516,7 +515,6 @@ func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 
 		return nil
 	})
-
 	if err != nil {
 		logger.DbLog.Errorln(err)
 		return err
@@ -550,7 +548,6 @@ func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc, dnn, ims
 
 		return nil
 	})
-
 	if err != nil {
 		logger.DbLog.Errorln(err)
 		return err
@@ -638,7 +635,6 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string, session
 		}
 		return nil
 	})
-
 	if err != nil {
 		logger.DbLog.Errorln(err)
 		return err

@@ -10,7 +10,6 @@ package webui_service
 
 import (
 	"context"
-	gServ "github.com/omec-project/webconsole/configapi/server"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
@@ -26,6 +25,7 @@ import (
 	"github.com/omec-project/webconsole/backend/metrics"
 	"github.com/omec-project/webconsole/backend/webui_context"
 	"github.com/omec-project/webconsole/configapi"
+	gServ "github.com/omec-project/webconsole/configapi/server"
 	"github.com/omec-project/webconsole/configmodels"
 )
 

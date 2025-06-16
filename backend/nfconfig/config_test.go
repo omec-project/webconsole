@@ -68,6 +68,8 @@ func TestTriggerSync_Success(t *testing.T) {
 	n := &NFConfigServer{}
 
 	called := false
+	originalSyncInMemoryFunc := syncInMemoryConfigFunc
+	defer func() { syncInMemoryConfigFunc = originalSyncInMemoryFunc }()
 	syncInMemoryConfigFunc = func(n *NFConfigServer) error {
 		called = true
 		return nil
@@ -85,6 +87,8 @@ func TestTriggerSync_RetryAndThenSuccess(t *testing.T) {
 	n := &NFConfigServer{}
 
 	callCount := 0
+	originalSyncInMemoryFunc := syncInMemoryConfigFunc
+	defer func() { syncInMemoryConfigFunc = originalSyncInMemoryFunc }()
 	syncInMemoryConfigFunc = func(n *NFConfigServer) error {
 		callCount++
 		if callCount < 3 {
@@ -175,13 +179,14 @@ func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {
 			mockDB := &MockDBClient{
 				Slices: tc.slices,
 			}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			dbadapter.CommonDBClient = mockDB
 			n := &NFConfigServer{
 				inMemoryConfig: &inMemoryConfig{},
 			}
 
 			err := n.syncInMemoryConfig()
-
 			if err != nil {
 				t.Errorf("expected no error. Got %s", err)
 			}
@@ -191,7 +196,6 @@ func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {
 			if !reflect.DeepEqual(tc.expectedPlmnSnssai, n.inMemoryConfig.plmnSnssai) {
 				t.Errorf("Expected PLMN-SNSSAI %v, got %v", tc.expectedPlmnSnssai, n.inMemoryConfig.plmnSnssai)
 			}
-
 		})
 	}
 }
@@ -227,6 +231,8 @@ func TestSyncPlmnSnssaiConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 				Slices: []configmodels.Slice{makeNetworkSlice("999", "99", "9", "999")},
 				err:    fmt.Errorf("mock error"),
 			}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			dbadapter.CommonDBClient = mockDB
 			n := &NFConfigServer{
 				inMemoryConfig: &inMemoryConfig{
@@ -277,13 +283,14 @@ func TestSyncPlmnSnssaiConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T) {
 			mockDB := &MockDBClient{
 				Slices: tc.slices,
 			}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			dbadapter.CommonDBClient = mockDB
 			n := &NFConfigServer{
 				inMemoryConfig: &inMemoryConfig{},
 			}
 
 			err := n.syncInMemoryConfig()
-
 			if err != nil {
 				t.Errorf("expected no error. Got %s", err)
 			}

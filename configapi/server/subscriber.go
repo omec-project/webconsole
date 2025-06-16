@@ -4,7 +4,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
@@ -13,13 +12,12 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type SubscriberAuthenticationData interface {
 	SubscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription)
-	SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription, sessionRunner dbadapter.SessionRunner) error
-	SubscriberAuthenticationDataDelete(imsi string, sessionRunner dbadapter.SessionRunner) error
+	SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error
+	SubscriberAuthenticationDataDelete(imsi string) error
 }
 
 type DatabaseSubscriberAuthenticationData struct {
@@ -41,8 +39,7 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	return authSubData
 }
 
-func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription, sessionRunner dbadapter.SessionRunner) error {
-	ctx := context.TODO()
+func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
 	filter := bson.M{"ueId": imsi}
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
@@ -54,29 +51,21 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	}
 	basicAmData := map[string]interface{}{"ueId": imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
-	err = sessionRunner(ctx, func(sc mongo.SessionContext) error {
-		_, dbErr := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
-		if dbErr != nil {
-			cleanupErr := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
-			if cleanupErr != nil {
-				logger.DbLog.Errorw("rollback failed after amData op", "error", cleanupErr)
-				return fmt.Errorf("amData update failed: %v, rollback failed: %w", err, cleanupErr)
-			}
-			return fmt.Errorf("amData update failed, rolled back AuthDB change: %w", err)
+	_, dbErr := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
+	if dbErr != nil {
+		logger.DbLog.Errorw("failed to update amData", "error", dbErr)
+		cleanupErr := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
+		if cleanupErr != nil {
+			logger.DbLog.Errorw("rollback failed after amData op", "error", cleanupErr)
+			return fmt.Errorf("amData update failed: %v, rollback failed: %w", err, cleanupErr)
 		}
-		return nil
-	})
-	if err != nil {
-		logger.DbLog.Errorln(err)
-		return err
+		return fmt.Errorf("amData update failed, rolled back AuthDB change: %w", err)
 	}
-
 	return nil
 }
 
-func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataDelete(imsi string, sessionRunner dbadapter.SessionRunner) error {
+func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataDelete(imsi string) error {
 	filter := bson.M{"ueId": imsi}
-	ctx := context.TODO()
 	oldAuthRecord, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln("failed to fetch record for potential compensation:", err)
@@ -90,25 +79,18 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	}
 
 	logger.WebUILog.Debugf("delete authentication subscription from amData collection: %v", imsi)
-	err = sessionRunner(ctx, func(sc mongo.SessionContext) error {
-		dbErr := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
-		if dbErr != nil {
-			// restore AuthDB record
-			logger.DbLog.Errorw("failed to delete from CommonDB; attempting to restore AuthDB", "error", dbErr)
-			_, restoreErr := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, oldAuthRecord)
-			if restoreErr != nil {
-				logger.DbLog.Errorw("compensation (restore) failed after CommonDB delete error", "error", restoreErr)
-				return fmt.Errorf("CommonDB delete error: %v, compensation error: %w", err, restoreErr)
-			}
-			return fmt.Errorf("commonDB delete error, compensated by restoring AuthDB: %w", err)
+	dbErr := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
+	if dbErr != nil {
+		// restore AuthDB record
+		logger.DbLog.Errorw("failed to delete from CommonDB; attempting to restore AuthDB", "error", dbErr)
+		_, restoreErr := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, oldAuthRecord)
+		if restoreErr != nil {
+			logger.DbLog.Errorw("compensation (restore) failed after CommonDB delete error", "error", restoreErr)
+			return fmt.Errorf("CommonDB delete error: %v, compensation error: %w", err, restoreErr)
 		}
-
-		return nil
-	})
-	if err != nil {
-		logger.DbLog.Errorln(err)
-		return err
+		return fmt.Errorf("commonDB delete error, compensated by restoring AuthDB: %w", err)
 	}
+
 	return nil
 }
 
@@ -120,44 +102,27 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 	return imsiData[imsi]
 }
 
-func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription, sessionRunner dbadapter.SessionRunner) error {
+func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
 	filter := bson.M{"ueId": imsi}
 	basicAmData := map[string]interface{}{
 		"ueId": imsi,
 	}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
-
-	ctx := context.TODO()
-	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
-		logger.WebUILog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
-		_, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
-		if err != nil {
-			return fmt.Errorf("failed to update amData: %w", err)
-		}
-		return nil
-	})
+	logger.WebUILog.Debugf("insert/update authentication subscription in amData collection: %v", imsi)
+	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson)
 	if err != nil {
-		logger.DbLog.Errorln(err)
-		return err
+		return fmt.Errorf("failed to update amData: %w", err)
 	}
 	logger.WebUILog.Debugf("insert/update authentication subscription in memory: %v", imsi)
 	imsiData[imsi] = authSubData
 	return nil
 }
 
-func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataDelete(imsi string, sessionRunner dbadapter.SessionRunner) error {
+func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataDelete(imsi string) error {
 	filter := bson.M{"ueId": imsi}
-	ctx := context.TODO()
-	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
-		err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
-		if err != nil {
-			return fmt.Errorf("failed to delete from amData collection: %w", err)
-		}
-		return nil
-	})
+	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
 	if err != nil {
-		logger.DbLog.Errorln(err)
-		return err
+		return fmt.Errorf("failed to delete from amData collection: %w", err)
 	}
 	logger.WebUILog.Debugf("delete authentication subscription from memory: %v", imsi)
 	delete(imsiData, imsi)

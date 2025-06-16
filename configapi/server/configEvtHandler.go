@@ -175,7 +175,7 @@ func handleDeviceGroupDelete(configMsg *configmodels.ConfigMessage, subsUpdateCh
 	if err != nil {
 		logger.DbLog.Errorw("failed to delete device group data for %v: %v", configMsg.DevGroupName, err)
 	}
-	logger.DbLog.Infof("succeded to device group data for %v", configMsg.DevGroupName)
+	logger.DbLog.Infof("succeeded to device group data for %v", configMsg.DevGroupName)
 }
 
 func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
@@ -189,18 +189,16 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 	}
 	filter := bson.M{"slice-name": configMsg.SliceName}
 	sliceDataBsonA := configmodels.ToBsonM(configMsg.Slice)
-	_, err := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
-	if err != nil {
-		logger.DbLog.Warnf("failed to post slice data for %v: %v", configMsg.SliceName, err)
+	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
+	if errPost != nil {
+		logger.DbLog.Warnln(errPost)
 	}
-
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
 		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/create")
 		if err != nil {
 			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
 	}
-	logger.ConfigLog.Debugf("succeded to post slice data for %v and send peeble notification", configMsg.SliceName)
 }
 
 func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
@@ -217,14 +215,12 @@ func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateC
 	if err != nil {
 		logger.DbLog.Warnf("failed to delete slice data for %v: %v", configMsg.SliceName, err)
 	}
-
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
 		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/delete")
 		if err != nil {
 			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
 	}
-	logger.ConfigLog.Debugf("succeded to delete slice data for %v and send peeble notification", configMsg.SliceName)
 }
 
 func firstConfigReceived() bool {
@@ -344,7 +340,7 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 	return
 }
 
-func updateAmPolicyData(imsi string) error {
+func updateAmPolicyData(imsi string) {
 	var amPolicy models.AmPolicyData
 	amPolicy.SubscCats = append(amPolicy.SubscCats, "aether")
 	amPolicyDatBsonA := configmodels.ToBsonM(amPolicy)
@@ -352,14 +348,11 @@ func updateAmPolicyData(imsi string) error {
 	filter := bson.M{"ueId": "imsi-" + imsi}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amPolicyDataColl, filter, amPolicyDatBsonA)
 	if err != nil {
-		logger.DbLog.Errorf("failed to update AM Policy Data for IMSI %s: %v", imsi, err)
-		return err
+		logger.DbLog.Warnf("failed to update AM Policy Data for IMSI %s: %v", imsi, err)
 	}
-	logger.ConfigLog.Debugf("succeded to update AM Policy Data for IMSI %s", imsi)
-	return nil
 }
 
-func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) error {
+func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
 	var smPolicyData models.SmPolicyData
 	var smPolicySnssaiData models.SmPolicySnssaiData
 	dnnData := map[string]models.SmPolicyDnnData{
@@ -378,13 +371,10 @@ func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) error {
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(smPolicyDataColl, filter, smPolicyDatBsonA)
 	if err != nil {
 		logger.DbLog.Warnf("failed to update SM Policy Data for IMSI %s: %v", imsi, err)
-		return err
 	}
-	logger.ConfigLog.Debugf("succeded to update SM Policy Data for IMSI %s", imsi)
-	return nil
 }
 
-func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string) error {
+func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string) {
 	amData := models.AccessAndMobilitySubscriptionData{
 		Gpsis: []string{
 			"msisdn-0900000000",
@@ -411,13 +401,10 @@ func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, amDataBsonA)
 	if err != nil {
 		logger.DbLog.Warnf("failed to update AM provisioned Data for IMSI %s: %v", imsi, err)
-		return err
 	}
-	logger.ConfigLog.Debugf("succeded to update AM provisioned Data for IMSI %s", imsi)
-	return nil
 }
 
-func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) error {
+func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) {
 	smData := models.SessionManagementSubscriptionData{
 		SingleNssai: snssai,
 		DnnConfigurations: map[string]models.DnnConfiguration{
@@ -453,14 +440,11 @@ func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(smDataColl, filter, smDataBsonA)
 	if err != nil {
-		logger.DbLog.Errorf("failed to update SM provisioned Data for IMSI %s: %v", imsi, err)
-		return err
+		logger.DbLog.Warnf("failed to update SM provisioned Data for IMSI %s: %v", imsi, err)
 	}
-	logger.ConfigLog.Debugf("succeded to update SM provisioned Data for IMSI %s", imsi)
-	return nil
 }
 
-func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string) error {
+func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string) {
 	smfSelData := models.SmfSelectionSubscriptionData{
 		SubscribedSnssaiInfos: map[string]models.SnssaiInfo{
 			SnssaiModelsToHex(*snssai): {
@@ -479,10 +463,7 @@ func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc, dnn, ims
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(smfSelDataColl, filter, smfSelecDataBsonA)
 	if err != nil {
 		logger.DbLog.Warnf("failed to update SMF selection provisioned data for IMSI %s: %v", imsi, err)
-		return err
 	}
-	logger.ConfigLog.Debugf("succeded to update SMF selection provisioned data for IMSI %s", imsi)
-	return nil
 }
 
 func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg) *configmodels.Slice {
@@ -569,7 +550,7 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string, session
 		logger.DbLog.Errorf("failed to delete subscriber entries related to device groups for IMSI %s: %v", imsi, err)
 		return err
 	}
-	logger.DbLog.Debugf("succeded to delete subscriber entries related to device groups for IMSI %s", imsi)
+	logger.DbLog.Debugf("succeeded to delete subscriber entries related to device groups for IMSI %s", imsi)
 	return nil
 }
 
@@ -674,26 +655,11 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 }
 
 func updatePolicyAndProvisionedData(imsi string, mcc string, mnc string, snssai *models.Snssai, dnn string, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos) {
-	err := updateAmPolicyData(imsi)
-	if err != nil {
-		logger.ConfigLog.Errorln(err)
-	}
-	err = updateSmPolicyData(snssai, dnn, imsi)
-	if err != nil {
-		logger.ConfigLog.Errorln(err)
-	}
-	err = updateAmProvisionedData(snssai, qos, mcc, mnc, imsi)
-	if err != nil {
-		logger.ConfigLog.Errorln(err)
-	}
-	err = updateSmProvisionedData(snssai, qos, mcc, mnc, dnn, imsi)
-	if err != nil {
-		logger.ConfigLog.Errorln(err)
-	}
-	err = updateSmfSelectionProvisionedData(snssai, mcc, mnc, dnn, imsi)
-	if err != nil {
-		logger.ConfigLog.Errorln(err)
-	}
+	updateAmPolicyData(imsi)
+	updateSmPolicyData(snssai, dnn, imsi)
+	updateAmProvisionedData(snssai, qos, mcc, mnc, imsi)
+	updateSmProvisionedData(snssai, qos, mcc, mnc, dnn, imsi)
+	updateSmfSelectionProvisionedData(snssai, mcc, mnc, dnn, imsi)
 }
 
 func convertToString(val uint64) string {

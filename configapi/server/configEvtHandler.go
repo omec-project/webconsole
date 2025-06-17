@@ -61,15 +61,21 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 	for {
 		logger.ConfigLog.Infoln("waiting for configuration event")
 		configMsg := <-configMsgChan
+
 		if configMsg.MsgType == configmodels.Sub_data {
 			imsiVal := strings.ReplaceAll(configMsg.Imsi, "imsi-", "")
 			logger.ConfigLog.Infoln("received imsi from config channel:", imsiVal)
+			var err error
 			if configMsg.MsgMethod == configmodels.Delete_op {
-				handleSubscriberDelete(configMsg.Imsi)
+				err = handleSubscriberDelete(configMsg.Imsi)
 			} else {
-				handleSubscriberPost(configMsg.Imsi, configMsg.AuthSubData)
+				err = handleSubscriberPost(configMsg.Imsi, configMsg.AuthSubData)
+			}
+			if err != nil {
+				logger.ConfigLog.Errorf("error handling subscriber %v: %v", configMsg.Imsi, err)
 			}
 			logger.ConfigLog.Infof("received Imsi [%v] configuration from config channel", configMsg.Imsi)
+			continue
 		}
 
 		if configMsg.MsgMethod == configmodels.Post_op || configMsg.MsgMethod == configmodels.Put_op {
@@ -82,68 +88,77 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			// update config snapshot
 			if configMsg.DevGroup != nil {
 				logger.ConfigLog.Infof("received Device Group [%v] configuration from config channel", configMsg.DevGroupName)
-				handleDeviceGroupPost(configMsg, subsUpdateChan)
+				if err := handleDeviceGroupPost(configMsg, subsUpdateChan); err != nil {
+					logger.ConfigLog.Errorf("error posting device group %v: %v", configMsg.DevGroupName, err)
+					continue
+				}
 
 				if configMsg.Slice != nil {
 					logger.ConfigLog.Infof("received Slice [%v] configuration from config channel", configMsg.SliceName)
-					handleNetworkSlicePost(configMsg, subsUpdateChan)
-				}
-
-				// loop through all clients and send this message to all clients
-				if len(clientNFPool) == 0 {
-					logger.ConfigLog.Infoln("no client available. No need to send config")
-				}
-				for _, client := range clientNFPool {
-					logger.ConfigLog.Infoln("push config for client:", client.id)
-					client.outStandingPushConfig <- configMsg
+					if err := handleNetworkSlicePost(configMsg, subsUpdateChan); err != nil {
+						logger.ConfigLog.Errorf("Error posting slice %v: %v", configMsg.SliceName, err)
+						continue
+					}
 				}
 			} else {
 				if configMsg.MsgType != configmodels.Sub_data {
 					// update config snapshot
 					if configMsg.DevGroup == nil && configMsg.DevGroupName != "" {
 						logger.ConfigLog.Infof("received delete Device Group [%v] from config channel", configMsg.DevGroupName)
-						handleDeviceGroupDelete(configMsg, subsUpdateChan)
+						if err := handleDeviceGroupDelete(configMsg, subsUpdateChan); err != nil {
+							logger.ConfigLog.Errorf("error deleting device group %v: %v", configMsg.DevGroupName, err)
+							continue
+						}
 					}
 
 					if configMsg.Slice == nil && configMsg.SliceName != "" {
 						logger.ConfigLog.Infof("received delete Slice [%v] from config channel", configMsg.SliceName)
-						handleNetworkSliceDelete(configMsg, subsUpdateChan)
+						if err := handleNetworkSliceDelete(configMsg, subsUpdateChan); err != nil {
+							logger.ConfigLog.Errorf("Error deleting slice %v: %v", configMsg.SliceName, err)
+							continue
+						}
 					}
 				} else {
 					logger.ConfigLog.Infof("received delete Subscriber [%v] from config channel", configMsg.Imsi)
 				}
-				// loop through all clients and send this message to all clients
-				if len(clientNFPool) == 0 {
-					logger.ConfigLog.Infoln("no client available. No need to send config")
-				}
-				for _, client := range clientNFPool {
-					logger.ConfigLog.Infoln("push config for client:", client.id)
-					client.outStandingPushConfig <- configMsg
-				}
+			}
+			// loop through all clients and send this message to all clients
+			if len(clientNFPool) == 0 {
+				logger.ConfigLog.Infoln("no client available. No need to send config")
+			}
+			for _, client := range clientNFPool {
+				logger.ConfigLog.Infoln("push config for client:", client.id)
+				client.outStandingPushConfig <- configMsg
 			}
 		}
 	}
 }
 
-func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscription) {
+func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscription) error {
 	rwLock.Lock()
+	defer rwLock.Unlock()
 	err := subscriberAuthData.SubscriberAuthenticationDataCreate(imsi, authSubData)
 	if err != nil {
 		logger.DbLog.Errorln("Subscriber Authentication Data Create Error:", err)
+		return err
 	}
-	rwLock.Unlock()
+	logger.DbLog.Debugf("successfully processed subscriber post for IMSI: %s", imsi)
+	return nil
 }
 
-func handleSubscriberDelete(imsi string) {
+func handleSubscriberDelete(imsi string) error {
 	rwLock.Lock()
+	defer rwLock.Unlock()
 	err := subscriberAuthData.SubscriberAuthenticationDataDelete(imsi)
 	if err != nil {
 		logger.DbLog.Errorln("SubscriberAuthDataDelete error:", err)
+		return err
 	}
-	rwLock.Unlock()
+	logger.DbLog.Debugf("successfully processed subscriber delete for IMSI: %s", imsi)
+	return nil
 }
 
-func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	if factory.WebUIConfig.Configuration.Mode5G {
@@ -157,11 +172,14 @@ func handleDeviceGroupPost(configMsg *configmodels.ConfigMessage, subsUpdateChan
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
 	if err != nil {
 		logger.DbLog.Errorw("failed to post device group data for %v: %v", configMsg.DevGroupName, err)
+		return err
 	}
-	logger.DbLog.Infof("succeeded to post device group data for %v", configMsg.DevGroupName)
+	logger.DbLog.Debugf("succeeded to post device group data for %v", configMsg.DevGroupName)
+	// TriggerSync
+	return nil
 }
 
-func handleDeviceGroupDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+func handleDeviceGroupDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	if factory.WebUIConfig.Configuration.Mode5G {
@@ -174,11 +192,14 @@ func handleDeviceGroupDelete(configMsg *configmodels.ConfigMessage, subsUpdateCh
 	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorw("failed to delete device group data for %v: %v", configMsg.DevGroupName, err)
+		return err
 	}
-	logger.DbLog.Infof("succeeded to device group data for %v", configMsg.DevGroupName)
+	logger.DbLog.Debugf("succeeded to device group data for %v", configMsg.DevGroupName)
+	// TriggerSync
+	return nil
 }
 
-func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	if factory.WebUIConfig.Configuration.Mode5G {
@@ -189,19 +210,23 @@ func handleNetworkSlicePost(configMsg *configmodels.ConfigMessage, subsUpdateCha
 	}
 	filter := bson.M{"slice-name": configMsg.SliceName}
 	sliceDataBsonA := configmodels.ToBsonM(configMsg.Slice)
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
-	if errPost != nil {
-		logger.DbLog.Warnln(errPost)
+	_, err := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
+	if err != nil {
+		logger.DbLog.Errorf("failed to post slice data for %v: %v", configMsg.SliceName, err)
+		return err
 	}
+	logger.DbLog.Debugf("succeeded to post slice data for %v", configMsg.SliceName)
+	// TriggerSync
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
 		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/create")
 		if err != nil {
 			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
 	}
+	return nil
 }
 
-func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) {
+func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateChan chan *Update5GSubscriberMsg) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	if factory.WebUIConfig.Configuration.Mode5G {
@@ -213,14 +238,18 @@ func handleNetworkSliceDelete(configMsg *configmodels.ConfigMessage, subsUpdateC
 	filter := bson.M{"slice-name": configMsg.SliceName}
 	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
 	if err != nil {
-		logger.DbLog.Warnf("failed to delete slice data for %v: %v", configMsg.SliceName, err)
+		logger.DbLog.Errorf("failed to delete slice data for %v: %v", configMsg.SliceName, err)
+		return err
 	}
+	logger.DbLog.Debugf("succeeded to delete slice data for %v", configMsg.SliceName)
+	// TriggerSync
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
 		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/delete")
 		if err != nil {
 			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
 	}
+	return nil
 }
 
 func firstConfigReceived() bool {
@@ -340,7 +369,7 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 	return
 }
 
-func updateAmPolicyData(imsi string) {
+func updateAmPolicyData(imsi string) error {
 	var amPolicy models.AmPolicyData
 	amPolicy.SubscCats = append(amPolicy.SubscCats, "aether")
 	amPolicyDatBsonA := configmodels.ToBsonM(amPolicy)
@@ -348,11 +377,15 @@ func updateAmPolicyData(imsi string) {
 	filter := bson.M{"ueId": "imsi-" + imsi}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amPolicyDataColl, filter, amPolicyDatBsonA)
 	if err != nil {
-		logger.DbLog.Warnf("failed to update AM Policy Data for IMSI %s: %v", imsi, err)
+		logger.DbLog.Errorf("failed to update AM Policy Data for IMSI %s: %v", imsi, err)
+		return err
 	}
+	logger.DbLog.Debugf("succeeded to update AM Policy Data for IMSI %s", imsi)
+	// TriggerSync
+	return nil
 }
 
-func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
+func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) error {
 	var smPolicyData models.SmPolicyData
 	var smPolicySnssaiData models.SmPolicySnssaiData
 	dnnData := map[string]models.SmPolicyDnnData{
@@ -370,11 +403,15 @@ func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) {
 	filter := bson.M{"ueId": "imsi-" + imsi}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(smPolicyDataColl, filter, smPolicyDatBsonA)
 	if err != nil {
-		logger.DbLog.Warnf("failed to update SM Policy Data for IMSI %s: %v", imsi, err)
+		logger.DbLog.Errorf("failed to update SM Policy Data for IMSI %s: %v", imsi, err)
+		return err
 	}
+	logger.DbLog.Debugf("succeeded to update SM Policy Data for IMSI %s", imsi)
+	// TriggerSync
+	return nil
 }
 
-func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string) {
+func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string) error {
 	amData := models.AccessAndMobilitySubscriptionData{
 		Gpsis: []string{
 			"msisdn-0900000000",
@@ -400,11 +437,15 @@ func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 	}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, amDataBsonA)
 	if err != nil {
-		logger.DbLog.Warnf("failed to update AM provisioned Data for IMSI %s: %v", imsi, err)
+		logger.DbLog.Errorf("failed to update AM provisioned Data for IMSI %s: %v", imsi, err)
+		return err
 	}
+	logger.DbLog.Debugf("succeeded to update AM provisioned Data for IMSI %s", imsi)
+	// TriggerSync
+	return nil
 }
 
-func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) {
+func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, dnn, imsi string) error {
 	smData := models.SessionManagementSubscriptionData{
 		SingleNssai: snssai,
 		DnnConfigurations: map[string]models.DnnConfiguration{
@@ -440,11 +481,15 @@ func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(smDataColl, filter, smDataBsonA)
 	if err != nil {
-		logger.DbLog.Warnf("failed to update SM provisioned Data for IMSI %s: %v", imsi, err)
+		logger.DbLog.Errorf("failed to update SM provisioned Data for IMSI %s: %v", imsi, err)
+		return err
 	}
+	logger.DbLog.Debugf("updated SM provisioned Data for IMSI %s", imsi)
+	// TriggerSync
+	return nil
 }
 
-func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string) {
+func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc, dnn, imsi string) error {
 	smfSelData := models.SmfSelectionSubscriptionData{
 		SubscribedSnssaiInfos: map[string]models.SnssaiInfo{
 			SnssaiModelsToHex(*snssai): {
@@ -462,8 +507,12 @@ func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc, dnn, ims
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(smfSelDataColl, filter, smfSelecDataBsonA)
 	if err != nil {
-		logger.DbLog.Warnf("failed to update SMF selection provisioned data for IMSI %s: %v", imsi, err)
+		logger.DbLog.Errorf("failed to update SMF selection provisioned data for IMSI %s: %v", imsi, err)
+		return err
 	}
+	logger.DbLog.Debugf("updated SMF selection provisioned data for IMSI %s", imsi)
+	// TriggerSync
+	return nil
 }
 
 func isDeviceGroupExistInSlice(msg *Update5GSubscriberMsg) *configmodels.Slice {
@@ -517,31 +566,31 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string, session
 		// AM policy
 		err := dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(ctx, amPolicyDataColl, filterImsiOnly)
 		if err != nil {
-			logger.DbLog.Warnf("failed to delete AM policy data for IMSI %s: %v", imsi, err)
+			logger.DbLog.Errorf("failed to delete AM policy data for IMSI %s: %v", imsi, err)
 			return err
 		}
 		// SM policy
 		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(ctx, smPolicyDataColl, filterImsiOnly)
 		if err != nil {
-			logger.DbLog.Warnf("failed to delete SM policy data for IMSI %s: %v", imsi, err)
+			logger.DbLog.Errorf("failed to delete SM policy data for IMSI %s: %v", imsi, err)
 			return err
 		}
 		// AM data
 		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(ctx, amDataColl, filter)
 		if err != nil {
-			logger.DbLog.Warnf("failed to delete AM data for IMSI %s: %v", imsi, err)
+			logger.DbLog.Errorf("failed to delete AM data for IMSI %s: %v", imsi, err)
 			return err
 		}
 		// SM data
 		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(ctx, smDataColl, filter)
 		if err != nil {
-			logger.DbLog.Warnf("failed to delete SM data for IMSI %s: %v", imsi, err)
+			logger.DbLog.Errorf("failed to delete SM data for IMSI %s: %v", imsi, err)
 			return err
 		}
 		// SMF selection
 		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(ctx, smfSelDataColl, filter)
 		if err != nil {
-			logger.DbLog.Warnf("failed to delete SMF selection data for IMSI %s: %v", imsi, err)
+			logger.DbLog.Errorf("failed to delete SMF selection data for IMSI %s: %v", imsi, err)
 			return err
 		}
 		return nil
@@ -551,6 +600,7 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string, session
 		return err
 	}
 	logger.DbLog.Debugf("succeeded to delete subscriber entries related to device groups for IMSI %s", imsi)
+	// TriggerSync
 	return nil
 }
 
@@ -561,9 +611,13 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 		switch confData.Msg.MsgType {
 		case configmodels.Device_group:
 			rwLock.RLock()
-			/* is this devicegroup part of any existing slice */
-			slice := isDeviceGroupExistInSlice(confData)
-			if slice != nil {
+			func() {
+				defer rwLock.RUnlock()
+				// Is this devicegroup part of any existing slice
+				slice := isDeviceGroupExistInSlice(confData)
+				if slice == nil {
+					return
+				}
 				sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 				if err != nil {
 					logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
@@ -579,7 +633,7 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 						/* update only if the imsi is provisioned */
 						if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-"+imsi) != nil {
 							dnn := confData.Msg.DevGroup.IpDomainExpanded.Dnn
-							updatePolicyAndProvisionedData(
+							err = updatePolicyAndProvisionedData(
 								imsi,
 								slice.SiteInfo.Plmn.Mcc,
 								slice.SiteInfo.Plmn.Mnc,
@@ -587,6 +641,10 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 								dnn,
 								confData.Msg.DevGroup.IpDomainExpanded.UeDnnQos,
 							)
+							if err != nil {
+								logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %v", imsi, err)
+								continue
+							}
 						}
 					}
 				}
@@ -598,68 +656,89 @@ func Config5GUpdateHandle(confChan chan *Update5GSubscriberMsg) {
 						logger.ConfigLog.Errorln(err)
 					}
 				}
-			}
-			rwLock.RUnlock()
-
+			}()
 		case configmodels.Network_slice:
 			rwLock.RLock()
-			logger.WebUILog.Debugln("insert/update Network Slice")
-			slice := confData.Msg.Slice
-			if slice == nil && confData.PrevSlice != nil {
-				logger.WebUILog.Debugln("deleted Slice:", confData.PrevSlice)
-			}
-			if slice != nil {
-				sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
-				if err != nil {
-					logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
+			func() {
+				defer rwLock.RUnlock()
+				logger.WebUILog.Debugln("insert/update Network Slice")
+				slice := confData.Msg.Slice
+				if slice == nil && confData.PrevSlice != nil {
+					logger.WebUILog.Debugln("deleted Slice:", confData.PrevSlice)
 				}
-				snssai := &models.Snssai{
-					Sd:  slice.SliceId.Sd,
-					Sst: int32(sVal),
+				if slice != nil {
+					sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
+					if err != nil {
+						logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
+						return
+					}
+					snssai := &models.Snssai{
+						Sd:  slice.SliceId.Sd,
+						Sst: int32(sVal),
+					}
+					for _, dgName := range slice.SiteDeviceGroup {
+						logger.ConfigLog.Infoln("dgName:", dgName)
+						devGroupConfig := getDeviceGroupByName(dgName)
+						if devGroupConfig != nil {
+							for _, imsi := range devGroupConfig.Imsis {
+								dnn := devGroupConfig.IpDomainExpanded.Dnn
+								mcc := slice.SiteInfo.Plmn.Mcc
+								mnc := slice.SiteInfo.Plmn.Mnc
+								err = updatePolicyAndProvisionedData(
+									imsi,
+									mcc,
+									mnc,
+									snssai,
+									dnn,
+									devGroupConfig.IpDomainExpanded.UeDnnQos,
+								)
+								if err != nil {
+									logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %v", imsi, err)
+									continue
+								}
+							}
+						}
+					}
 				}
-				for _, dgName := range slice.SiteDeviceGroup {
-					logger.ConfigLog.Infoln("dgName:", dgName)
-					devGroupConfig := getDeviceGroupByName(dgName)
+				dgnames := getDeleteGroupsList(slice, confData.PrevSlice)
+				for _, dgname := range dgnames {
+					devGroupConfig := getDeviceGroupByName(dgname)
 					if devGroupConfig != nil {
 						for _, imsi := range devGroupConfig.Imsis {
-							dnn := devGroupConfig.IpDomainExpanded.Dnn
-							mcc := slice.SiteInfo.Plmn.Mcc
-							mnc := slice.SiteInfo.Plmn.Mnc
-							updatePolicyAndProvisionedData(
-								imsi,
-								mcc,
-								mnc,
-								snssai,
-								dnn,
-								devGroupConfig.IpDomainExpanded.UeDnnQos,
-							)
+							err := removeSubscriberEntriesRelatedToDeviceGroups(confData.PrevSlice.SiteInfo.Plmn.Mcc, confData.PrevSlice.SiteInfo.Plmn.Mnc, imsi, sessionRunner)
+							if err != nil {
+								logger.ConfigLog.Errorln(err)
+							}
 						}
 					}
 				}
-			}
-			dgnames := getDeleteGroupsList(slice, confData.PrevSlice)
-			for _, dgname := range dgnames {
-				devGroupConfig := getDeviceGroupByName(dgname)
-				if devGroupConfig != nil {
-					for _, imsi := range devGroupConfig.Imsis {
-						err := removeSubscriberEntriesRelatedToDeviceGroups(confData.PrevSlice.SiteInfo.Plmn.Mcc, confData.PrevSlice.SiteInfo.Plmn.Mnc, imsi, sessionRunner)
-						if err != nil {
-							logger.ConfigLog.Errorln(err)
-						}
-					}
-				}
-			}
-			rwLock.RUnlock()
+			}()
 		}
 	}
 }
 
-func updatePolicyAndProvisionedData(imsi string, mcc string, mnc string, snssai *models.Snssai, dnn string, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos) {
-	updateAmPolicyData(imsi)
-	updateSmPolicyData(snssai, dnn, imsi)
-	updateAmProvisionedData(snssai, qos, mcc, mnc, imsi)
-	updateSmProvisionedData(snssai, qos, mcc, mnc, dnn, imsi)
-	updateSmfSelectionProvisionedData(snssai, mcc, mnc, dnn, imsi)
+func updatePolicyAndProvisionedData(imsi string, mcc string, mnc string, snssai *models.Snssai, dnn string, qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos) error {
+	err := updateAmPolicyData(imsi)
+	if err != nil {
+		return fmt.Errorf("updateAmPolicyData failed: %w", err)
+	}
+	err = updateSmPolicyData(snssai, dnn, imsi)
+	if err != nil {
+		return fmt.Errorf("updateSmPolicyData failed: %w", err)
+	}
+	err = updateAmProvisionedData(snssai, qos, mcc, mnc, imsi)
+	if err != nil {
+		return fmt.Errorf("updateAmProvisionedData failed: %w", err)
+	}
+	err = updateSmProvisionedData(snssai, qos, mcc, mnc, dnn, imsi)
+	if err != nil {
+		return fmt.Errorf("updateSmProvisionedData failed: %w", err)
+	}
+	err = updateSmfSelectionProvisionedData(snssai, mcc, mnc, dnn, imsi)
+	if err != nil {
+		return fmt.Errorf("updateSmfSelectionProvisionedData failed: %w", err)
+	}
+	return nil
 }
 
 func convertToString(val uint64) string {

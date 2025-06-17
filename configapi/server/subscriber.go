@@ -96,7 +96,6 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 			}
 			return fmt.Errorf("amData delete failed, rolled back AuthDB change: %w", err)
 		}
-		// If we couldn't fetch the original record, just report the error
 		return fmt.Errorf("amData delete failed, unable to rollback AuthDB change: %w", err)
 	}
 	logger.WebUILog.Debugf("successfully deleted authentication subscription from amData collection: %v", imsi)

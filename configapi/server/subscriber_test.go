@@ -214,7 +214,9 @@ func TestSubscriberAuthenticationDataDelete_CommonDBDeleteFails_RollbackFails(t 
 
 func TestSubscriberAuthenticationDataDelete_NoDataInAuthDB_Exits(t *testing.T) {
 	authDB := &mockDB{
-		getOneFunc:    func(c string, f bson.M) (map[string]interface{}, error) { return nil, fmt.Errorf("not found") },
+		getOneFunc: func(c string, f bson.M) (map[string]interface{}, error) {
+			return nil, fmt.Errorf("data not found in AuthDB")
+		},
 		deleteOneFunc: func(c string, f bson.M) error { return nil },
 		postFunc:      func(c string, f bson.M, data map[string]interface{}) (bool, error) { return true, nil },
 	}
@@ -233,6 +235,6 @@ func TestSubscriberAuthenticationDataDelete_NoDataInAuthDB_Exits(t *testing.T) {
 	s := DatabaseSubscriberAuthenticationData{}
 	err := s.SubscriberAuthenticationDataDelete("imsi-12345")
 	if err == nil || !strings.Contains(err.Error(), "not found") {
-		t.Errorf("expected unable to rollback error, got %v", err)
+		t.Errorf("expected data not found in AuthDB, got %v", err)
 	}
 }

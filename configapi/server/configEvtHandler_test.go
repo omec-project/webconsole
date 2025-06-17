@@ -184,7 +184,10 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 	subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
 	dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 	dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
-	handleNetworkSlicePost(&configMsg, subsUpdateChan)
+	postErr := handleNetworkSlicePost(&configMsg, subsUpdateChan)
+	if postErr != nil {
+		t.Errorf("Could not handle network slice post: %v", postErr)
+	}
 	if execCommandTimesCalled != numPebbleNotificationsSent+1 {
 		t.Errorf("Unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent+1)
 	}
@@ -204,7 +207,10 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 		subsUpdateChan := make(chan *Update5GSubscriberMsg, 10)
 		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
-		handleNetworkSlicePost(&configMsg, subsUpdateChan)
+		postErr := handleNetworkSlicePost(&configMsg, subsUpdateChan)
+		if postErr != nil {
+			t.Errorf("Could not handle network slice post: %v", postErr)
+		}
 	}
 	if execCommandTimesCalled != numPebbleNotificationsSent {
 		t.Errorf("Unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent)
@@ -226,7 +232,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		postData = make([]map[string]interface{}, 0)
 		dbadapter.CommonDBClient = &(MockMongoPost{dbadapter.CommonDBClient})
 		dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
-		handleDeviceGroupPost(&configMsg, subsUpdateChan)
+		postErr := handleDeviceGroupPost(&configMsg, subsUpdateChan)
 		expected_collection := devGroupDataColl
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
@@ -251,6 +257,9 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		if receivedConfigMsg.PrevDevGroup.DeviceGroupName != "" {
 			t.Errorf("Expected previous device group name to be empty, got %v", receivedConfigMsg.PrevDevGroup.DeviceGroupName)
 		}
+		if postErr != nil {
+			t.Errorf("Could not handle device group post: %v", postErr)
+		}
 	}
 }
 
@@ -269,7 +278,10 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		postData = make([]map[string]interface{}, 0)
 		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &(MockMongoDeviceGroupGetOne{dbadapter.CommonDBClient, testGroup})
-		handleDeviceGroupPost(&configMsg, subsUpdateChan)
+		postErr := handleDeviceGroupPost(&configMsg, subsUpdateChan)
+		if postErr != nil {
+			t.Errorf("Could not handle device group post: %v", postErr)
+		}
 		expected_collection := devGroupDataColl
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
@@ -310,7 +322,10 @@ func Test_handleDeviceGroupDelete(t *testing.T) {
 		deleteData = make([]map[string]interface{}, 0)
 		dbadapter.CommonDBClient = &MockMongoDeleteOne{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &(MockMongoDeviceGroupGetOne{dbadapter.CommonDBClient, testGroup})
-		handleDeviceGroupDelete(&configMsg, subsUpdateChan)
+		delErr := handleDeviceGroupDelete(&configMsg, subsUpdateChan)
+		if delErr != nil {
+			t.Errorf("Could not handle device group delete: %v", delErr)
+		}
 		expected_collection := devGroupDataColl
 		if deleteData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, deleteData[0]["coll"])
@@ -374,7 +389,10 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 		postData = make([]map[string]interface{}, 0)
 		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &MockMongoGetOneNil{dbadapter.CommonDBClient}
-		handleNetworkSlicePost(&configMsg, subsUpdateChan)
+		postErr := handleNetworkSlicePost(&configMsg, subsUpdateChan)
+		if postErr != nil {
+			t.Errorf("Could not handle network slice post: %v", postErr)
+		}
 		expected_collection := "webconsoleData.snapshots.sliceData"
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
@@ -425,7 +443,10 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 		}
 		dbadapter.CommonDBClient = &MockMongoPost{dbadapter.CommonDBClient}
 		dbadapter.CommonDBClient = &MockMongoSliceGetOne{dbadapter.CommonDBClient, testSlice}
-		handleNetworkSlicePost(&configMsg, subsUpdateChan)
+		postErr := handleNetworkSlicePost(&configMsg, subsUpdateChan)
+		if postErr != nil {
+			t.Errorf("Could not handle network slice post: %v", postErr)
+		}
 		expected_collection := "webconsoleData.snapshots.sliceData"
 		if postData[0]["coll"] != expected_collection {
 			t.Errorf("Expected collection %v, got %v", expected_collection, postData[0]["coll"])
@@ -564,8 +585,10 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 	imsiData = make(map[string]*models.AuthenticationSubscription)
 	dbadapter.AuthDBClient = &MockMongoPost{}
 	dbadapter.CommonDBClient = &MockMongoPost{}
-	handleSubscriberPost(ueId, configMsg.AuthSubData)
-
+	postErr := handleSubscriberPost(ueId, configMsg.AuthSubData)
+	if postErr != nil {
+		t.Errorf("Could not handle subscriber post: %v", postErr)
+	}
 	expectedAuthSubCollection := authSubsDataColl
 	expectedAmDataCollection := amDataColl
 	if postData[0]["coll"] != expectedAuthSubCollection {
@@ -641,7 +664,10 @@ func Test_handleSubscriberPost4G(t *testing.T) {
 	postData = make([]map[string]interface{}, 0)
 	imsiData = make(map[string]*models.AuthenticationSubscription)
 	dbadapter.CommonDBClient = &MockMongoPost{}
-	handleSubscriberPost(ueId, configMsg.AuthSubData)
+	postErr := handleSubscriberPost(ueId, configMsg.AuthSubData)
+	if postErr != nil {
+		t.Errorf("Could not handle subscriber post: %v", postErr)
+	}
 
 	expectedAmDataCollection := amDataColl
 	if postData[0]["coll"] != expectedAmDataCollection {
@@ -679,8 +705,10 @@ func Test_handleSubscriberDelete5G(t *testing.T) {
 	deleteData = make([]map[string]interface{}, 0)
 	dbadapter.AuthDBClient = &MockMongoDeleteOne{}
 	dbadapter.CommonDBClient = &MockMongoDeleteOne{}
-	handleSubscriberDelete(ueId)
-
+	delErr := handleSubscriberDelete(ueId)
+	if delErr != nil {
+		t.Errorf("Could not handle subscriber delete: %v", delErr)
+	}
 	expectedAuthSubCollection := authSubsDataColl
 	expectedAmDataCollection := amDataColl
 	if deleteData[0]["coll"] != expectedAuthSubCollection {
@@ -737,7 +765,10 @@ func Test_handleSubscriberDelete4G(t *testing.T) {
 		SequenceNumber: "16f3b3f70fc2",
 	}
 	dbadapter.CommonDBClient = &MockMongoDeleteOne{}
-	handleSubscriberDelete(ueId)
+	delErr := handleSubscriberDelete(ueId)
+	if delErr != nil {
+		t.Errorf("Could not handle subscriber delete: %v", delErr)
+	}
 
 	expectedAmDataCollection := "subscriptionData.provisionedData.amData"
 	if deleteData[0]["coll"] != expectedAmDataCollection {

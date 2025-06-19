@@ -17,7 +17,7 @@ import (
 	"github.com/omec-project/webconsole/backend/nfconfig"
 	"github.com/omec-project/webconsole/backend/webui_service"
 	"github.com/omec-project/webconsole/dbadapter"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v3"
 )
 
 var (
@@ -27,39 +27,41 @@ var (
 )
 
 func main() {
-	app := cli.NewApp()
+	app := &cli.Command{}
 	app.Name = "webui"
 	logger.AppLog.Infoln(app.Name)
 	app.Usage = "Web UI"
 	app.UsageText = "webconsole -cfg <webui_config_file.yaml>"
 	app.Flags = factory.GetCliFlags()
-	app.Action = func(c *cli.Context) error {
-		cfgPath := c.String("cfg")
-		if cfgPath == "" {
-			return fmt.Errorf("required flag cfg not set")
-		}
+	app.Action = action
 
-		absPath, err := filepath.Abs(cfgPath)
-		if err != nil {
-			return fmt.Errorf("failed to resolve config path: %w", err)
-		}
-
-		if err := factory.InitConfigFactory(absPath); err != nil {
-			return fmt.Errorf("failed to init config: %w", err)
-		}
-
-		config := factory.WebUIConfig
-		if config == nil {
-			return fmt.Errorf("configuration not properly initialized")
-		}
-		factory.SetLogLevelsFromConfig(config)
-
-		return startApplication(config)
-	}
-
-	if err := app.Run(os.Args); err != nil {
+	if err := app.Run(context.Background(), os.Args); err != nil {
 		logger.AppLog.Fatalf("error args: %v", err)
 	}
+}
+
+func action(ctx context.Context, c *cli.Command) error {
+	cfgPath := c.String("cfg")
+	if cfgPath == "" {
+		return fmt.Errorf("required flag cfg not set")
+	}
+
+	absPath, err := filepath.Abs(cfgPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve config path: %w", err)
+	}
+
+	if err := factory.InitConfigFactory(absPath); err != nil {
+		return fmt.Errorf("failed to init config: %w", err)
+	}
+
+	config := factory.WebUIConfig
+	if config == nil {
+		return fmt.Errorf("configuration not properly initialized")
+	}
+	factory.SetLogLevelsFromConfig(config)
+
+	return startApplication(config)
 }
 
 func startApplication(config *factory.Config) error {

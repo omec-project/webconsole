@@ -257,6 +257,7 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) error {
 	logger.ConfigLog.Infof("site UPF: %v", site.Upf)
 
 	prevSlice := getSliceByName(sliceName)
+	request.SliceName = sliceName
 	if err := handleNetworkSlicePost(&request, &prevSlice); err != nil {
 		logger.ConfigLog.Errorf("Error posting slice %v: %v", sliceName, err)
 		return err

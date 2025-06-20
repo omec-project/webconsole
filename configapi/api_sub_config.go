@@ -23,16 +23,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-const (
-	authSubsDataColl = "subscriptionData.authenticationData.authenticationSubscription"
-	amDataColl       = "subscriptionData.provisionedData.amData"
-	smDataColl       = "subscriptionData.provisionedData.smData"
-	smfSelDataColl   = "subscriptionData.provisionedData.smfSelectionSubscriptionData"
-	amPolicyDataColl = "policyData.ues.amData"
-	smPolicyDataColl = "policyData.ues.smData"
-	flowRuleDataColl = "policyData.ues.flowRule"
-)
-
 var httpsClient *http.Client
 
 func init() {
@@ -467,7 +457,7 @@ func PostSubscriberByID(c *gin.Context) {
 	var subsOverrideData configmodels.SubsOverrideData
 	if err := c.ShouldBindJSON(&subsOverrideData); err != nil {
 		logger.WebUILog.Errorln("Post One Subscriber Data - ShouldBindJSON failed ", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: failed to parse JSON."})
 		return
 	}
 
@@ -523,7 +513,12 @@ func PostSubscriberByID(c *gin.Context) {
 	if subsOverrideData.SequenceNumber != "" {
 		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
 	}
-	c.JSON(http.StatusCreated, gin.H{})
+	err = handleSubscriberPost(ueId, &authSubsData)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create subscriber %s. Please check the log for details.", ueId)})
+		return
+	}
+	logger.WebUILog.Infoln("Subscriber %s created successfully", ueId)
 
 	msg := configmodels.ConfigMessage{
 		MsgType:     configmodels.Sub_data,
@@ -532,7 +527,8 @@ func PostSubscriberByID(c *gin.Context) {
 		Imsi:        ueId,
 	}
 	configChannel <- &msg
-	logger.WebUILog.Infoln("Successfully Added Subscriber Data to ConfigChannel: ", ueId)
+
+	c.JSON(http.StatusCreated, gin.H{})
 }
 
 // PutSubscriberByID godoc
@@ -553,22 +549,82 @@ func PutSubscriberByID(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Put One Subscriber Data")
 
-	var subsData configmodels.SubsData
-	if err := c.ShouldBindJSON(&subsData); err != nil {
-		logger.WebUILog.Panic(err.Error())
+	setCorsHeader(c)
+
+	var subsOverrideData configmodels.SubsOverrideData
+	if err := c.ShouldBindJSON(&subsOverrideData); err != nil {
+		logger.WebUILog.Errorln("Put One Subscriber Data - ShouldBindJSON failed ", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: failed to parse JSON."})
+		return
 	}
 
 	ueId := c.Param("ueId")
-	c.JSON(http.StatusNoContent, gin.H{})
+	logger.WebUILog.Infoln("Received Put Subscriber Data from Roc/Simapp: ", ueId)
+
+	filter := bson.M{"ueId": ueId}
+	subscriber, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filter)
+	if err != nil {
+		logger.DbLog.Errorf("failed querying subscriber existence for IMSI: %s; Error: %v", ueId, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to check subscriber: %s existence", ueId)})
+		return
+	}
+	if subscriber == nil {
+		logger.WebUILog.Errorf("subscriber %s does not exist", ueId)
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("subscriber %s does not exist", ueId)})
+		return
+	}
+	authSubsData := models.AuthenticationSubscription{
+		AuthenticationManagementField: "8000",
+		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
+		Milenage: &models.Milenage{
+			Op: &models.Op{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				OpValue:             "", // Required
+			},
+		},
+		Opc: &models.Opc{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			// OpcValue:            "8e27b6af0e692e750f32667a3b14605d", // Required
+		},
+		PermanentKey: &models.PermanentKey{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			// PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862", // Required
+		},
+		// SequenceNumber: "16f3b3f70fc2",
+	}
+
+	// override values
+	/*if subsOverrideData.PlmnID != "" {
+		servingPlmnId = subsOverrideData.PlmnID
+	}*/
+	if subsOverrideData.OPc != "" {
+		authSubsData.Opc.OpcValue = subsOverrideData.OPc
+	}
+	if subsOverrideData.Key != "" {
+		authSubsData.PermanentKey.PermanentKeyValue = subsOverrideData.Key
+	}
+	if subsOverrideData.SequenceNumber != "" {
+		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
+	}
+	err = handleSubscriberPut(ueId, &authSubsData)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update subscriber %s. Please check the log for details.", ueId)})
+		return
+	}
+	logger.WebUILog.Infoln("Subscriber %s updated successfully", ueId)
 
 	msg := configmodels.ConfigMessage{
 		MsgType:     configmodels.Sub_data,
-		MsgMethod:   configmodels.Post_op,
-		AuthSubData: &subsData.AuthenticationSubscription,
+		MsgMethod:   configmodels.Put_op,
+		AuthSubData: &authSubsData,
 		Imsi:        ueId,
 	}
 	configChannel <- &msg
-	logger.WebUILog.Infoln("Put Subscriber Data complete")
+
+	c.JSON(http.StatusNoContent, gin.H{})
 }
 
 // Patch subscriber by IMSI(ueId) and PlmnID(servingPlmnId)
@@ -597,9 +653,17 @@ func DeleteSubscriberByID(c *gin.Context) {
 	imsi := strings.TrimPrefix(ueId, "imsi-")
 	err := updateSubscriberInDeviceGroups(imsi)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "error deleting subscriber"})
+		logger.WebUILog.Errorf("Failed to update subscriber: %s.", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error deleting subscriber. Please check the log for details."})
 		return
 	}
+
+	if err = handleSubscriberDelete(imsi); err != nil {
+		logger.WebUILog.Errorf("Error deleting subscriber: %s", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error deleting subscriber. Please check the log for details."})
+		return
+	}
+	logger.WebUILog.Infoln("Subscriber %s deleted successfully", imsi)
 
 	msg := configmodels.ConfigMessage{
 		MsgType:   configmodels.Sub_data,
@@ -607,8 +671,8 @@ func DeleteSubscriberByID(c *gin.Context) {
 		Imsi:      ueId,
 	}
 	configChannel <- &msg
+
 	c.JSON(http.StatusNoContent, gin.H{})
-	logger.WebUILog.Infoln("Delete Subscriber Data complete")
 }
 
 func updateSubscriberInDeviceGroups(imsi string) error {
@@ -634,6 +698,11 @@ func updateSubscriberInDeviceGroups(imsi string) error {
 			}
 		}
 		deviceGroup.Imsis = filteredImsis
+		prevDevGroup := getDeviceGroupByName(deviceGroup.DeviceGroupName)
+		if err = handleDeviceGroupPost(deviceGroup, prevDevGroup); err != nil {
+			logger.ConfigLog.Errorf("error posting device group %v: %v", deviceGroup, err)
+			return err
+		}
 		deviceGroupUpdateMessage := configmodels.ConfigMessage{
 			MsgType:      configmodels.Device_group,
 			MsgMethod:    configmodels.Post_op,

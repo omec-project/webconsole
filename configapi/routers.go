@@ -99,13 +99,6 @@ var routes = Routes{
 	},
 
 	{
-		"DeviceGroupGroupNamePatch",
-		http.MethodPatch,
-		"/device-group/:group-name",
-		DeviceGroupGroupNamePatch,
-	},
-
-	{
 		"DeviceGroupGroupNamePut",
 		http.MethodPut,
 		"/device-group/:group-name",

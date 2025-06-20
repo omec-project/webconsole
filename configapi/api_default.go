@@ -15,18 +15,24 @@ package configapi
 
 import (
 	"encoding/json"
-	"net/http"
-
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"net/http"
 )
 
 const (
 	devGroupDataColl = "webconsoleData.snapshots.devGroupData"
 	sliceDataColl    = "webconsoleData.snapshots.sliceData"
+	amDataColl       = "subscriptionData.provisionedData.amData"
+	smDataColl       = "subscriptionData.provisionedData.smData"
+	smfSelDataColl   = "subscriptionData.provisionedData.smfSelectionSubscriptionData"
+	amPolicyDataColl = "policyData.ues.amData"
+	smPolicyDataColl = "policyData.ues.smData"
+	authSubsDataColl = "subscriptionData.authenticationData.authenticationSubscription"
 )
 
 // GetDeviceGroups godoc
@@ -102,29 +108,46 @@ func GetDeviceGroupByName(c *gin.Context) {
 // @Failure      400  {object}  nil  "Bad request"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
+// @Failure      500  {object}  nil  "Device Group Deletion Failed"
 // @Router       /config/v1/device-group/{deviceGroupName}  [delete]
 func DeviceGroupGroupNameDelete(c *gin.Context) {
 	logger.ConfigLog.Debugf("DeviceGroupGroupNameDelete")
-	if ret := DeviceGroupDeleteHandler(c); ret {
-		c.JSON(http.StatusOK, gin.H{})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{})
+	groupName := c.Param("group-name")
+	if groupName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "group-name is not provided"})
+		return
 	}
+	if err := deviceGroupDeleteHelper(groupName); err != nil {
+		logger.ConfigLog.Errorf("Device group delete failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Device group delete failed. Please check the log for details"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
 }
 
 // DeviceGroupGroupNamePut -
 func DeviceGroupGroupNamePut(c *gin.Context) {
 	logger.ConfigLog.Debugf("DeviceGroupGroupNamePut")
-	if ret := DeviceGroupPostHandler(c, configmodels.Put_op); ret {
-		c.JSON(http.StatusOK, gin.H{})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{})
+	groupName := c.Param("group-name")
+	if groupName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "group-name is not provided"})
+		return
 	}
-}
-
-// DeviceGroupGroupNamePatch -
-func DeviceGroupGroupNamePatch(c *gin.Context) {
-	logger.ConfigLog.Debugf("DeviceGroupGroupNamePatch")
+	if !isValidName(groupName) {
+		logger.ConfigLog.Errorf("invalid Device Group name %s. Name needs to match the following regular expression: %s", groupName, NAME_PATTERN)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf(
+				"Invalid Device Group name %s. Name needs to match the following regular expression: %s",
+				groupName, NAME_PATTERN,
+			),
+		})
+		return
+	}
+	if err := deviceGroupPostHelper(c, configmodels.Put_op, groupName); err != nil {
+		logger.ConfigLog.Errorf("Device group update failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Device group update failed. Please check the log for details"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{})
 }
 
@@ -139,15 +162,32 @@ func DeviceGroupGroupNamePatch(c *gin.Context) {
 // @Failure      400  {object}  nil  "Invalid device group content"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
+// @Failure      409  {object}  nil  "Device group exists"
 // @Failure      500  {object}  nil  "Error creating device group"
 // @Router       /config/v1/device-group/{deviceGroupName}  [post]
 func DeviceGroupGroupNamePost(c *gin.Context) {
 	logger.ConfigLog.Debugf("DeviceGroupGroupNamePost")
-	if ret := DeviceGroupPostHandler(c, configmodels.Post_op); ret {
-		c.JSON(http.StatusOK, gin.H{})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{})
+	groupName := c.Param("group-name")
+	if groupName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "group-name is not provided"})
+		return
 	}
+	if !isValidName(groupName) {
+		logger.ConfigLog.Errorf("invalid Device Group name %s. Name needs to match the following regular expression: %s", groupName, NAME_PATTERN)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf(
+				"Invalid Device Group name %s. Name needs to match the following regular expression: %s",
+				groupName, NAME_PATTERN,
+			),
+		})
+		return
+	}
+	if err := deviceGroupPostHelper(c, configmodels.Post_op, groupName); err != nil {
+		logger.ConfigLog.Errorf("Device group create failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Device group create failed. Please check the log for details"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
 }
 
 // GetNetworkSlices godoc
@@ -228,11 +268,29 @@ func GetNetworkSliceByName(c *gin.Context) {
 // @Router      /config/v1/network-slice/{sliceName}  [delete]
 func NetworkSliceSliceNameDelete(c *gin.Context) {
 	logger.ConfigLog.Debugf("Received NetworkSliceSliceNameDelete ")
-	if ret := NetworkSliceDeleteHandler(c); ret {
-		c.JSON(http.StatusOK, gin.H{})
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{})
+	sliceName := c.Param("slice-name")
+	if sliceName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "slice-name is not provided"})
+		return
 	}
+	if !isValidName(sliceName) {
+		logger.ConfigLog.Errorf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf(
+				"Invalid slice name %s. Name needs to match the following regular expression: %s",
+				sliceName, NAME_PATTERN,
+			),
+		})
+		return
+	}
+	if err := networkSliceDeleteHelper(sliceName); err != nil {
+		logger.ConfigLog.Errorf("Network slice delete failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": fmt.Sprintf("Failed to delete network slice %s. Please check the log for details.", sliceName),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
 }
 
 // NetworkSliceSliceNamePost godoc
@@ -246,12 +304,28 @@ func NetworkSliceSliceNameDelete(c *gin.Context) {
 // @Failure      400  {object}  nil  "Invalid network slice content"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
+// @Failure      409  {object}  nil  "Resource Conflict"
 // @Failure      500  {object}  nil  "Error creating network slice"
 // @Router       /config/v1/network-slice/{sliceName}  [post]
 func NetworkSliceSliceNamePost(c *gin.Context) {
 	logger.ConfigLog.Debugf("Received NetworkSliceSliceNamePost ")
-	if err := NetworkSlicePostHandler(c, configmodels.Post_op); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	sliceName, _ := c.Params.Get("slice-name")
+	if sliceName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "slice-name is not provided"})
+		return
+	}
+	if !isValidName(sliceName) {
+		logger.ConfigLog.Errorf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf(
+				"Invalid slice name %s. Name needs to match the following regular expression: %s",
+				sliceName, NAME_PATTERN,
+			),
+		})
+		return
+	}
+	if err := networkSlicePostHelper(c, configmodels.Post_op, sliceName); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create network slice %s. Please check the log for details.", sliceName)})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{})
@@ -260,8 +334,23 @@ func NetworkSliceSliceNamePost(c *gin.Context) {
 // NetworkSliceSliceNamePut -
 func NetworkSliceSliceNamePut(c *gin.Context) {
 	logger.ConfigLog.Debugf("Received NetworkSliceSliceNamePut ")
-	if err := NetworkSlicePostHandler(c, configmodels.Put_op); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	sliceName, _ := c.Params.Get("slice-name")
+	if sliceName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "slice-name is not provided"})
+		return
+	}
+	if !isValidName(sliceName) {
+		logger.ConfigLog.Errorf("invalid Network Slice name %s. Name needs to match the following regular expression: %s", sliceName, NAME_PATTERN)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf(
+				"Invalid slice name %s. Name needs to match the following regular expression: %s",
+				sliceName, NAME_PATTERN,
+			),
+		})
+		return
+	}
+	if err := networkSlicePostHelper(c, configmodels.Put_op, sliceName); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update network slice %s. Please check the log for details.", sliceName)})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{})

@@ -69,6 +69,7 @@ func GetGnbs(c *gin.Context) {
 // @Param       gnb    body    configmodels.PostGnbRequest    true    "Name and TAC of the gNB"
 // @Security    BearerAuth
 // @Success     201  {object}  nil  "gNB successfully created"
+// @Failure     409  {object}  nil  "Resource Conflict"
 // @Failure     400  {object}  nil  "Bad request"
 // @Failure     401  {object}  nil  "Authorization failed"
 // @Failure     403  {object}  nil  "Forbidden"
@@ -313,6 +314,7 @@ func GetUpfs(c *gin.Context) {
 // @Failure      400  {object}  nil  "Bad request"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
+// @Failure      409  {object}  nil  "Resource Conflict"
 // @Failure      500  {object}  nil  "Error creating UPF"
 // @Router       /config/v1/inventory/upf/  [post]
 func PostUpf(c *gin.Context) {
@@ -518,9 +520,12 @@ func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels
 		if err = json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
 			return fmt.Errorf("error unmarshaling network slice: %v", err)
 		}
-
+		prevSlice := getSliceByName(networkSlice.SliceName)
 		updateFunc(&networkSlice)
-
+		if err = handleNetworkSlicePost(&networkSlice, &prevSlice); err != nil {
+			logger.ConfigLog.Errorf("Error posting slice %v: %v", networkSlice.SliceName, err)
+			return fmt.Errorf("error posting slice %v: %w", networkSlice.SliceName, err)
+		}
 		msg := &configmodels.ConfigMessage{
 			MsgMethod: configmodels.Post_op,
 			MsgType:   configmodels.Network_slice,

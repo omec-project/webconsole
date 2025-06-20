@@ -25,8 +25,8 @@ import (
 	"github.com/omec-project/webconsole/backend/metrics"
 	"github.com/omec-project/webconsole/backend/webui_context"
 	"github.com/omec-project/webconsole/configapi"
-	gServ "github.com/omec-project/webconsole/configapi/server"
 	"github.com/omec-project/webconsole/configmodels"
+	gServ "github.com/omec-project/webconsole/proto/server"
 )
 
 type WEBUI struct{}

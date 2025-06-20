@@ -15,6 +15,7 @@ import (
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
@@ -58,11 +59,11 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 	configReady := make(chan bool)
 	if factory.WebUIConfig.Configuration.Mode5G {
 		logger.WebUILog.Debugln("instantiating in-DB subscriber authentication")
-		subscriberAuthData = DatabaseSubscriberAuthenticationData{}
+		subscriberAuthData = configapi.DatabaseSubscriberAuthenticationData{}
 	} else {
 		logger.WebUILog.Debugln("instantiating in-memory subscriber authentication")
 		imsiData = make(map[string]*models.AuthenticationSubscription)
-		subscriberAuthData = MemorySubscriberAuthenticationData{}
+		subscriberAuthData = configapi.MemorySubscriberAuthenticationData{}
 	}
 	go configHandler(configMsgChan, configReady)
 	ready := <-configReady

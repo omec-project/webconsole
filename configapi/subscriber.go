@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Canonical Ltd.
 
-package server
+package configapi
 
 import (
 	"encoding/json"
@@ -17,12 +17,15 @@ import (
 type SubscriberAuthenticationData interface {
 	SubscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription)
 	SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error
+	SubscriberAuthenticationDataUpdate(imsi string, authSubData *models.AuthenticationSubscription) error
 	SubscriberAuthenticationDataDelete(imsi string) error
 }
 
 type DatabaseSubscriberAuthenticationData struct {
 	SubscriberAuthenticationData
 }
+
+var imsiData map[string]*models.AuthenticationSubscription
 
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
 	filter := bson.M{"ueId": imsi}
@@ -62,7 +65,32 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 		return fmt.Errorf("authData update failed, rolled back AuthDB change: %w", err)
 	}
 	logger.WebUILog.Debugf("successfully updated authentication subscription in amData collection: %v", imsi)
-	// TriggerSync
+	return nil
+}
+
+func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataUpdate(imsi string, authSubData *models.AuthenticationSubscription) error {
+	filter := bson.M{"ueId": imsi}
+	authDataBsonA := configmodels.ToBsonM(authSubData)
+	authDataBsonA["ueId"] = imsi
+	// write to AuthDB
+	if _, err := dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, authDataBsonA); err != nil {
+		logger.DbLog.Errorw("failed to update authentication subscription", "error", err)
+		return err
+	}
+	logger.WebUILog.Debugf("updated authentication subscription in authenticationSubscription collection: %v", imsi)
+	// write to CommonDB
+	basicAmData := map[string]interface{}{"ueId": imsi}
+	basicDataBson := configmodels.ToBsonM(basicAmData)
+	if _, err := dbadapter.CommonDBClient.RestfulAPIPutOne(amDataColl, filter, basicDataBson); err != nil {
+		logger.DbLog.Errorw("failed to update amData", "error", err)
+		// rollback AuthDB operation
+		if cleanupErr := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter); cleanupErr != nil {
+			logger.DbLog.Errorw("rollback failed after authData op", "error", cleanupErr)
+			return fmt.Errorf("authData update failed: %v, rollback failed: %w", err, cleanupErr)
+		}
+		return fmt.Errorf("authData update failed, rolled back AuthDB change: %w", err)
+	}
+	logger.WebUILog.Debugf("successfully updated authentication subscription in amData collection: %v", imsi)
 	return nil
 }
 
@@ -99,7 +127,6 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 		return fmt.Errorf("amData delete failed, unable to rollback AuthDB change: %w", err)
 	}
 	logger.WebUILog.Debugf("successfully deleted authentication subscription from amData collection: %v", imsi)
-	// TriggerSync
 	return nil
 }
 
@@ -124,7 +151,6 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 	logger.WebUILog.Debugf("successfully inserted/updated authentication subscription in amData collection: %v", imsi)
 	logger.WebUILog.Debugf("insert/update authentication subscription in memory: %v", imsi)
 	imsiData[imsi] = authSubData
-	// TriggerSync
 	return nil
 }
 
@@ -136,6 +162,5 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 	logger.WebUILog.Debugf("successfully deleted authentication subscription from amData collection: %v", imsi)
 	logger.WebUILog.Debugf("delete authentication subscription from memory: %v", imsi)
 	delete(imsiData, imsi)
-	// TriggerSync
 	return nil
 }

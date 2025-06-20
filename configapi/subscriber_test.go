@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Canonical Ltd.
 
-package server
+package configapi
 
 import (
 	"fmt"

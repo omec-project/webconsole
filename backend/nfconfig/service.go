@@ -20,7 +20,7 @@ import (
 type NFConfigServer struct {
 	config         *factory.Configuration
 	Router         *gin.Engine
-	inMemoryConfig *inMemoryConfig
+	inMemoryConfig inMemoryConfig
 	syncCancelFunc context.CancelFunc
 	syncMutex      sync.Mutex
 }

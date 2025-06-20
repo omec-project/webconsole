@@ -206,7 +206,7 @@ func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {
 			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			dbadapter.CommonDBClient = mockDB
 			n := &NFConfigServer{
-				inMemoryConfig: &inMemoryConfig{},
+				inMemoryConfig: inMemoryConfig{},
 			}
 
 			err := n.syncInMemoryConfig()
@@ -260,7 +260,7 @@ func TestSyncPlmnSnssaiConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			dbadapter.CommonDBClient = mockDB
 			n := &NFConfigServer{
-				inMemoryConfig: &inMemoryConfig{
+				inMemoryConfig: inMemoryConfig{
 					plmn:       tc.expectedPlmn,
 					plmnSnssai: tc.expectedPlmnSnssai,
 				},
@@ -335,7 +335,7 @@ func TestSyncPlmnSnssaiConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T) {
 			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			dbadapter.CommonDBClient = mockDB
 			n := &NFConfigServer{
-				inMemoryConfig: &inMemoryConfig{},
+				inMemoryConfig: inMemoryConfig{},
 			}
 
 			err := n.syncInMemoryConfig()

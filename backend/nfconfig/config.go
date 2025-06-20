@@ -59,10 +59,6 @@ var syncInMemoryConfigFunc = func(n *NFConfigServer) error {
 }
 
 func (n *NFConfigServer) syncInMemoryConfig() error {
-	if n.inMemoryConfig == nil {
-		n.inMemoryConfig = &inMemoryConfig{}
-	}
-
 	sliceDataColl := "webconsoleData.snapshots.sliceData"
 	rawSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, bson.M{})
 	if err != nil {
@@ -118,7 +114,7 @@ func (n *NFConfigServer) syncPlmnSnssaiConfig(slices []configmodels.Slice) {
 }
 
 func parseSnssaiFromSlice(sliceId configmodels.SliceSliceId) (nfConfigApi.Snssai, error) {
-	logger.NfConfigLog.Infoln(sliceId)
+	logger.NfConfigLog.Debugln("Parsing slice ID: ", sliceId)
 	val, err := strconv.ParseInt(sliceId.Sst, 10, 64)
 	if err != nil {
 		return nfConfigApi.Snssai{}, err

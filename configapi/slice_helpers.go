@@ -3,6 +3,9 @@ package configapi
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
+	"strconv"
+
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/util/mongoapi"
 	"github.com/omec-project/webconsole/backend/factory"
@@ -10,8 +13,6 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
-	"os/exec"
-	"strconv"
 )
 
 var (

@@ -303,6 +303,29 @@ func TestSyncPlmnSnssaiConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Empty SST is ignored",
+			slices: []configmodels.Slice{
+				makeNetworkSlice("123", "23", "1", "01234"),
+				makeNetworkSlice("123", "455", "", "56789"),
+			},
+			expectedResult: []nfConfigApi.PlmnSnssai{
+				{
+					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					SNssaiList: []nfConfigApi.Snssai{
+						{Sst: 1, Sd: &SD1},
+					},
+				},
+			},
+		},
+		{
+			name: "Invalid SST final list is empty",
+			slices: []configmodels.Slice{
+
+				makeNetworkSlice("123", "455", "a", "56789"),
+			},
+			expectedResult: []nfConfigApi.PlmnSnssai{},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

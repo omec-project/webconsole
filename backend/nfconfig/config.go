@@ -144,6 +144,9 @@ func convertPlmnMapToList(plmnMap map[configmodels.SliceSiteInfoPlmn]map[configm
 			}
 			snssaiList = append(snssaiList, newSnssai)
 		}
+		if len(snssaiList) == 0 {
+			continue
+		}
 		result = append(result, nfConfigApi.PlmnSnssai{
 			PlmnId:     nfConfigApi.PlmnId{Mcc: plmn.Mcc, Mnc: plmn.Mnc},
 			SNssaiList: snssaiList,

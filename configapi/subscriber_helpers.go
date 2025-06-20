@@ -2,6 +2,7 @@ package configapi
 
 import (
 	"context"
+
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"

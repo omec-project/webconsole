@@ -14,6 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/util/logger"
 	"github.com/omec-project/webconsole/backend/factory"
+	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
 )
 
 func TestNewNFConfig_nil_config(t *testing.T) {
@@ -126,6 +128,12 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			mockDB := &MockDBClient{
+				Slices: []configmodels.Slice{},
+			}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			dbadapter.CommonDBClient = mockDB
 			nf, err := NewNFConfigServer(tc.config)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -152,6 +160,13 @@ func TestNFConfigRoutes(t *testing.T) {
 			},
 		},
 	}
+
+	mockDB := &MockDBClient{
+		Slices: []configmodels.Slice{},
+	}
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	dbadapter.CommonDBClient = mockDB
 
 	nfInterface, err := NewNFConfigServer(mockValidConfig)
 	if err != nil {
@@ -277,6 +292,12 @@ func TestNFConfigStart(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Logf("Starting test: %s", tt.name)
 			gin.SetMode(gin.TestMode)
+			mockDB := &MockDBClient{
+				Slices: []configmodels.Slice{},
+			}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			dbadapter.CommonDBClient = mockDB
 			nfconf := &NFConfigServer{
 				config: tt.config,
 				Router: gin.New(),

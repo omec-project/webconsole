@@ -18,7 +18,7 @@ import (
 
 	utilLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/webconsole/backend/logger"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v3"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v2"
@@ -120,7 +120,7 @@ func SetLogLevelsFromConfig(cfg *Config) {
 
 func GetCliFlags() []cli.Flag {
 	return []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "cfg",
 			Usage: "Path to configuration file",
 		},

@@ -14,7 +14,7 @@ import (
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/nfconfig"
 	"github.com/omec-project/webconsole/backend/webui_service"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v3"
 )
 
 type mockWebUI struct {
@@ -123,19 +123,19 @@ func TestMainValidateCLIFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := cli.NewApp()
+			app := &cli.Command{}
 			app.Name = "webui"
 			app.Usage = "Web UI"
 			app.UsageText = "webconsole -cfg <webui_config_file.yaml>"
 			app.Flags = factory.GetCliFlags()
-			app.Action = func(c *cli.Context) error {
+			app.Action = func(ctx context.Context, c *cli.Command) error {
 				cfg := c.String("cfg")
 				if cfg == "" {
 					return fmt.Errorf("required flag cfg not set")
 				}
 				return nil
 			}
-			err := app.Run(tt.args)
+			err := app.Run(context.Background(), tt.args)
 
 			if tt.expectError && err == nil {
 				t.Error("expected error but got none")

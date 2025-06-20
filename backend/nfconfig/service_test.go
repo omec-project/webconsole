@@ -278,7 +278,7 @@ func TestNFConfigStart(t *testing.T) {
 			t.Logf("Starting test: %s", tt.name)
 			gin.SetMode(gin.TestMode)
 			nfconf := &NFConfigServer{
-				Config: tt.config,
+				config: tt.config,
 				Router: gin.New(),
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -315,11 +315,11 @@ func TestNFConfigStart(t *testing.T) {
 func TestNFConfig_Start_ServerError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nfc1 := &NFConfigServer{
-		Config: &factory.Configuration{},
+		config: &factory.Configuration{},
 		Router: gin.New(),
 	}
 	nfc2 := &NFConfigServer{
-		Config: &factory.Configuration{},
+		config: &factory.Configuration{},
 		Router: gin.New(),
 	}
 	ctx1, cancel1 := context.WithCancel(context.Background())
@@ -343,7 +343,7 @@ func TestNFConfig_Start_ServerError(t *testing.T) {
 func TestNFConfig_Start_ContextCancellation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nfc := &NFConfigServer{
-		Config: &factory.Configuration{},
+		config: &factory.Configuration{},
 		Router: gin.New(),
 	}
 	ctx, cancel := context.WithCancel(context.Background())

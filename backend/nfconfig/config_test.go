@@ -321,7 +321,6 @@ func TestSyncPlmnSnssaiConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T) {
 		{
 			name: "Invalid SST final list is empty",
 			slices: []configmodels.Slice{
-
 				makeNetworkSlice("123", "455", "a", "56789"),
 			},
 			expectedResult: []nfConfigApi.PlmnSnssai{},

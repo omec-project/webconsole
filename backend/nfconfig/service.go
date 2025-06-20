@@ -18,7 +18,7 @@ import (
 )
 
 type NFConfigServer struct {
-	Config         *factory.Configuration
+	config         *factory.Configuration
 	Router         *gin.Engine
 	inMemoryConfig *inMemoryConfig
 	syncCancelFunc context.CancelFunc
@@ -62,7 +62,7 @@ func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 	router.Use(enforceAcceptJSON())
 
 	nfconfigServer := &NFConfigServer{
-		Config: config.Configuration,
+		config: config.Configuration,
 		Router: router,
 	}
 
@@ -83,9 +83,9 @@ func (n *NFConfigServer) Start(ctx context.Context) error {
 	}
 	serverErrChan := make(chan error, 1)
 	go func() {
-		if n.Config.NfConfigTLS != nil && n.Config.NfConfigTLS.Key != "" && n.Config.NfConfigTLS.PEM != "" {
+		if n.config.NfConfigTLS != nil && n.config.NfConfigTLS.Key != "" && n.config.NfConfigTLS.PEM != "" {
 			logger.NfConfigLog.Infoln("Starting HTTPS server on", addr)
-			serverErrChan <- srv.ListenAndServeTLS(n.Config.NfConfigTLS.PEM, n.Config.NfConfigTLS.Key)
+			serverErrChan <- srv.ListenAndServeTLS(n.config.NfConfigTLS.PEM, n.config.NfConfigTLS.Key)
 		} else {
 			logger.NfConfigLog.Infoln("Starting HTTP server on", addr)
 			serverErrChan <- srv.ListenAndServe()

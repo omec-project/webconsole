@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/omec-project/openapi/nfConfigApi/server"
+	"github.com/omec-project/openapi/nfConfigApi"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
@@ -106,25 +106,27 @@ func TestTriggerSync_RetryAndThenSuccess(t *testing.T) {
 }
 
 func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {
+	SD1 := "01234"
+	SD2 := "abcd"
 	tests := []struct {
 		name               string
 		slices             []configmodels.Slice
-		expectedPlmn       []server.PlmnId
-		expectedPlmnSnssai []server.PlmnSnssai
+		expectedPlmn       []nfConfigApi.PlmnId
+		expectedPlmnSnssai []nfConfigApi.PlmnSnssai
 	}{
 		{
 			name: "Two slices same PLMN different S-NSSAI",
 			slices: []configmodels.Slice{
 				makeNetworkSlice("123", "23", "1", "01234"),
-				makeNetworkSlice("123", "23", "2", "56789"),
+				makeNetworkSlice("123", "23", "2", "abcd"),
 			},
-			expectedPlmn: []server.PlmnId{{Mcc: "123", Mnc: "23"}},
-			expectedPlmnSnssai: []server.PlmnSnssai{
+			expectedPlmn: []nfConfigApi.PlmnId{{Mcc: "123", Mnc: "23"}},
+			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{
 				{
-					PlmnId: server.PlmnId{Mcc: "123", Mnc: "23"},
-					SNssaiList: []server.Snssai{
-						{Sst: 1, Sd: "01234"},
-						{Sst: 2, Sd: "56789"},
+					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					SNssaiList: []nfConfigApi.Snssai{
+						{Sst: 1, Sd: &SD1},
+						{Sst: 2, Sd: &SD2},
 					},
 				},
 			},
@@ -135,12 +137,12 @@ func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {
 				makeNetworkSlice("123", "23", "1", "01234"),
 				makeNetworkSlice("123", "23", "1", "01234"),
 			},
-			expectedPlmn: []server.PlmnId{{Mcc: "123", Mnc: "23"}},
-			expectedPlmnSnssai: []server.PlmnSnssai{
+			expectedPlmn: []nfConfigApi.PlmnId{{Mcc: "123", Mnc: "23"}},
+			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{
 				{
-					PlmnId: server.PlmnId{Mcc: "123", Mnc: "23"},
-					SNssaiList: []server.Snssai{
-						{Sst: 1, Sd: "01234"},
+					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					SNssaiList: []nfConfigApi.Snssai{
+						{Sst: 1, Sd: &SD1},
 					},
 				},
 			},
@@ -149,20 +151,20 @@ func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {
 			name: "Two slices different PLMN ",
 			slices: []configmodels.Slice{
 				makeNetworkSlice("123", "23", "1", "01234"),
-				makeNetworkSlice("123", "455", "2", "56789"),
+				makeNetworkSlice("123", "455", "2", "abcd"),
 			},
-			expectedPlmn: []server.PlmnId{{Mcc: "123", Mnc: "23"}, {Mcc: "123", Mnc: "455"}},
-			expectedPlmnSnssai: []server.PlmnSnssai{
+			expectedPlmn: []nfConfigApi.PlmnId{{Mcc: "123", Mnc: "23"}, {Mcc: "123", Mnc: "455"}},
+			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{
 				{
-					PlmnId: server.PlmnId{Mcc: "123", Mnc: "23"},
-					SNssaiList: []server.Snssai{
-						{Sst: 1, Sd: "01234"},
+					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					SNssaiList: []nfConfigApi.Snssai{
+						{Sst: 1, Sd: &SD1},
 					},
 				},
 				{
-					PlmnId: server.PlmnId{Mcc: "123", Mnc: "455"},
-					SNssaiList: []server.Snssai{
-						{Sst: 2, Sd: "56789"},
+					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "455"},
+					SNssaiList: []nfConfigApi.Snssai{
+						{Sst: 2, Sd: &SD2},
 					},
 				},
 			},
@@ -170,8 +172,29 @@ func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {
 		{
 			name:               "Empty slices",
 			slices:             []configmodels.Slice{},
-			expectedPlmn:       []server.PlmnId{},
-			expectedPlmnSnssai: []server.PlmnSnssai{},
+			expectedPlmn:       []nfConfigApi.PlmnId{},
+			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{},
+		},
+		{
+			name: "One slice no SD",
+			slices: []configmodels.Slice{
+				makeNetworkSlice("123", "23", "1", ""),
+			},
+			expectedPlmn: []nfConfigApi.PlmnId{{Mcc: "123", Mnc: "23"}},
+			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{
+				{
+					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					SNssaiList: []nfConfigApi.Snssai{
+						{Sst: 1},
+					},
+				},
+			},
+		},
+		{
+			name:               "Empty slices",
+			slices:             []configmodels.Slice{},
+			expectedPlmn:       []nfConfigApi.PlmnId{},
+			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{},
 		},
 	}
 	for _, tc := range tests {
@@ -201,25 +224,27 @@ func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {
 }
 
 func TestSyncPlmnSnssaiConfig_DBError_KeepsPreviousConfig(t *testing.T) {
+	SD1 := "01234"
+	SD2 := "abcd"
 	tests := []struct {
 		name               string
-		expectedPlmn       []server.PlmnId
-		expectedPlmnSnssai []server.PlmnSnssai
+		expectedPlmn       []nfConfigApi.PlmnId
+		expectedPlmnSnssai []nfConfigApi.PlmnSnssai
 	}{
 		{
 			name:               "Initial empty PLMN S-NSSAI config",
-			expectedPlmn:       []server.PlmnId{},
-			expectedPlmnSnssai: []server.PlmnSnssai{},
+			expectedPlmn:       []nfConfigApi.PlmnId{},
+			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{},
 		},
 		{
 			name:         "Initial not empty PLMN S-NSSAI config",
-			expectedPlmn: []server.PlmnId{{Mcc: "44", Mnc: "22"}, {Mcc: "167", Mnc: "24"}},
-			expectedPlmnSnssai: []server.PlmnSnssai{
+			expectedPlmn: []nfConfigApi.PlmnId{{Mcc: "44", Mnc: "22"}, {Mcc: "167", Mnc: "24"}},
+			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{
 				{
-					PlmnId: server.PlmnId{Mcc: "123", Mnc: "23"},
-					SNssaiList: []server.Snssai{
-						{Sst: 1, Sd: "01234"},
-						{Sst: 2, Sd: "56789"},
+					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					SNssaiList: []nfConfigApi.Snssai{
+						{Sst: 1, Sd: &SD1},
+						{Sst: 2, Sd: &SD2},
 					},
 				},
 			},
@@ -257,10 +282,11 @@ func TestSyncPlmnSnssaiConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 }
 
 func TestSyncPlmnSnssaiConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T) {
+	SD1 := "01234"
 	tests := []struct {
 		name           string
 		slices         []configmodels.Slice
-		expectedResult []server.PlmnSnssai
+		expectedResult []nfConfigApi.PlmnSnssai
 	}{
 		{
 			name: "Invalid SST is ignored",
@@ -268,11 +294,11 @@ func TestSyncPlmnSnssaiConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T) {
 				makeNetworkSlice("123", "23", "1", "01234"),
 				makeNetworkSlice("123", "455", "a", "56789"),
 			},
-			expectedResult: []server.PlmnSnssai{
+			expectedResult: []nfConfigApi.PlmnSnssai{
 				{
-					PlmnId: server.PlmnId{Mcc: "123", Mnc: "23"},
-					SNssaiList: []server.Snssai{
-						{Sst: 1, Sd: "01234"},
+					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					SNssaiList: []nfConfigApi.Snssai{
+						{Sst: 1, Sd: &SD1},
 					},
 				},
 			},

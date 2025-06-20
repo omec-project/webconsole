@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/omec-project/openapi/nfConfigApi/server"
+	"github.com/omec-project/openapi/nfConfigApi"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
@@ -19,11 +19,11 @@ import (
 )
 
 type inMemoryConfig struct {
-	plmn              []server.PlmnId
-	plmnSnssai        []server.PlmnSnssai
-	accessAndMobility []server.AccessAndMobility
-	sessionManagement []server.SessionManagement
-	policyControl     []server.PolicyControl
+	plmn              []nfConfigApi.PlmnId
+	plmnSnssai        []nfConfigApi.PlmnSnssai
+	accessAndMobility []nfConfigApi.AccessAndMobility
+	sessionManagement []nfConfigApi.SessionManagement
+	policyControl     []nfConfigApi.PolicyControl
 }
 
 func (n *NFConfigServer) TriggerSync() {
@@ -89,10 +89,10 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 }
 
 func (n *NFConfigServer) syncPlmnConfig(slices []configmodels.Slice) {
-	plmnSet := make(map[server.PlmnId]bool)
-	result := []server.PlmnId{}
+	plmnSet := make(map[nfConfigApi.PlmnId]bool)
+	result := []nfConfigApi.PlmnId{}
 	for _, s := range slices {
-		plmn := server.PlmnId{Mcc: s.SiteInfo.Plmn.Mcc, Mnc: s.SiteInfo.Plmn.Mnc}
+		plmn := nfConfigApi.PlmnId{Mcc: s.SiteInfo.Plmn.Mcc, Mnc: s.SiteInfo.Plmn.Mnc}
 		if !plmnSet[plmn] {
 			plmnSet[plmn] = true
 			result = append(result, plmn)
@@ -104,42 +104,48 @@ func (n *NFConfigServer) syncPlmnConfig(slices []configmodels.Slice) {
 }
 
 func (n *NFConfigServer) syncPlmnSnssaiConfig(slices []configmodels.Slice) {
-	plmnMap := make(map[server.PlmnId]map[server.Snssai]struct{})
+	plmnMap := make(map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId]struct{})
 	for _, s := range slices {
-		plmn := server.PlmnId{Mcc: s.SiteInfo.Plmn.Mcc, Mnc: s.SiteInfo.Plmn.Mnc}
-		snssai, err := parseSnssaiFromSlice(s.SliceId)
-		if err != nil {
-			logger.NfConfigLog.Warnf("Error in parsing SST: %v. Network slice `%s` will be ignored", err, s.SliceName)
-			continue
-		}
-
+		plmn := s.SiteInfo.Plmn
 		if plmnMap[plmn] == nil {
-			plmnMap[plmn] = map[server.Snssai]struct{}{}
+			plmnMap[plmn] = map[configmodels.SliceSliceId]struct{}{}
 		}
-		plmnMap[plmn][snssai] = struct{}{}
+		plmnMap[plmn][s.SliceId] = struct{}{}
 	}
 
 	n.inMemoryConfig.plmnSnssai = convertPlmnMapToList(plmnMap)
 	logger.NfConfigLog.Debugln("Updated PLMN S-NSSAI in-memory configuration. New configuration: ", n.inMemoryConfig.plmnSnssai)
 }
 
-func parseSnssaiFromSlice(sliceId configmodels.SliceSliceId) (server.Snssai, error) {
+func parseSnssaiFromSlice(sliceId configmodels.SliceSliceId) (nfConfigApi.Snssai, error) {
+	logger.NfConfigLog.Infoln(sliceId)
 	val, err := strconv.ParseInt(sliceId.Sst, 10, 64)
 	if err != nil {
-		return server.Snssai{}, err
+		return nfConfigApi.Snssai{}, err
 	}
-	return server.Snssai{Sst: int32(val), Sd: sliceId.Sd}, nil
+	snssai := nfConfigApi.Snssai{
+		Sst: int32(val),
+	}
+	if sliceId.Sd != "" {
+		snssai.Sd = &sliceId.Sd
+	}
+	return snssai, nil
 }
 
-func convertPlmnMapToList(plmnMap map[server.PlmnId]map[server.Snssai]struct{}) []server.PlmnSnssai {
-	result := []server.PlmnSnssai{}
+func convertPlmnMapToList(plmnMap map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId]struct{}) []nfConfigApi.PlmnSnssai {
+	result := []nfConfigApi.PlmnSnssai{}
 	for plmn, snssaiSet := range plmnMap {
-		snssaiList := make([]server.Snssai, 0, len(snssaiSet))
+		snssaiList := make([]nfConfigApi.Snssai, 0, len(snssaiSet))
 		for snssai := range snssaiSet {
-			snssaiList = append(snssaiList, snssai)
+			newSnssai, err := parseSnssaiFromSlice(snssai)
+			if err != nil {
+				logger.NfConfigLog.Warnf("Error in parsing SST: %v. Network slice `%s` will be ignored", err, snssai)
+				continue
+			}
+			snssaiList = append(snssaiList, newSnssai)
 		}
-		result = append(result, server.PlmnSnssai{
-			PlmnId:     plmn,
+		result = append(result, nfConfigApi.PlmnSnssai{
+			PlmnId:     nfConfigApi.PlmnId{Mcc: plmn.Mcc, Mnc: plmn.Mnc},
 			SNssaiList: snssaiList,
 		})
 	}
@@ -147,16 +153,16 @@ func convertPlmnMapToList(plmnMap map[server.PlmnId]map[server.Snssai]struct{}) 
 }
 
 func (n *NFConfigServer) syncAccessAndMobilityConfig() {
-	n.inMemoryConfig.accessAndMobility = []server.AccessAndMobility{}
+	n.inMemoryConfig.accessAndMobility = []nfConfigApi.AccessAndMobility{}
 	logger.NfConfigLog.Debugln("Updated Access and Mobility in-memory configuration. New configuration: ", n.inMemoryConfig.accessAndMobility)
 }
 
 func (n *NFConfigServer) syncSessionManagementConfig() {
-	n.inMemoryConfig.sessionManagement = []server.SessionManagement{}
+	n.inMemoryConfig.sessionManagement = []nfConfigApi.SessionManagement{}
 	logger.NfConfigLog.Debugln("Updated Session Management in-memory configuration. New configuration: ", n.inMemoryConfig.sessionManagement)
 }
 
 func (n *NFConfigServer) syncPolicyControlConfig() {
-	n.inMemoryConfig.policyControl = []server.PolicyControl{}
+	n.inMemoryConfig.policyControl = []nfConfigApi.PolicyControl{}
 	logger.NfConfigLog.Debugln("Updated Policy Control in-memory configuration. New configuration: ", n.inMemoryConfig.policyControl)
 }

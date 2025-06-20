@@ -99,6 +99,8 @@ github.com/omec-project/config5g v1.6.2 h1:bfLxwVSt6LAWCQtBmjUuks5CO3qambvcy3VjS
 github.com/omec-project/config5g v1.6.2/go.mod h1:LuaRiJTCJXCkQF7nKB5fOcz6oVMF/8oid+EKCYFAy0E=
 github.com/omec-project/openapi v1.4.1 h1:F9RAjS5at/xcd2Iadl4/V0I3veYnH2WiFc3B7bj6Y8k=
 github.com/omec-project/openapi v1.4.1/go.mod h1:RVoo/FjKWlqg95hRRqBhQYzoCUZlE+h6/u4vj8bP2Jo=
+github.com/omec-project/openapi v1.5.0 h1:WV3JjYwqio1xRTb1Nvc6kpSGgf+/VzrScU9WS9PBNwE=
+github.com/omec-project/openapi v1.5.0/go.mod h1:4nwAVKA4GUXw5OnjxYOU8LAoRrpGTG/ruJLgKiE/Ccs=
 github.com/omec-project/util v1.3.2 h1:5JP4ZYqMPPESSYrgc6LQNlcvJ/Xhrq8u5jSV405iuX8=
 github.com/omec-project/util v1.3.2/go.mod h1:Q5hNzZ0VSIbYzi+FRaJrvVD12BxK0n5uoNvvV3qn+ro=
 github.com/pelletier/go-toml/v2 v2.2.4 h1:mye9XuhQ6gvn5h28+VilKrrPoQVanw5PMw/TB0t5Ec4=
@@ -183,6 +185,8 @@ golang.org/x/net v0.0.0-20220722155237-a158d28d115b/go.mod h1:XRhObCWvk6IyKnWLug
 golang.org/x/net v0.7.0/go.mod h1:2Tu9+aMcznHK/AK1HMvgo6xiTLG5rD5rZLDS+rp2Bjs=
 golang.org/x/net v0.40.0 h1:79Xs7wF06Gbdcg4kdCCIQArK11Z1hr5POQ6+fIYHNuY=
 golang.org/x/net v0.40.0/go.mod h1:y0hY0exeL2Pku80/zKK7tpntoX23cqL3Oa6njdgRtds=
+golang.org/x/net v0.41.0 h1:vBTly1HeNPEn3wtREYfy4GZ/NECgw2Cnl+nK6Nz3uvw=
+golang.org/x/net v0.41.0/go.mod h1:B/K4NNqkfmg07DQYrbwvSluqCJOOXwUjeb/5lOisjbA=
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.15.0 h1:KWH3jNZsfyT6xfAfKiz6MRNmd46ByHDYaZ7KSkCtdW8=

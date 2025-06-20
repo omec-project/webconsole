@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,8 +18,11 @@ import (
 )
 
 type NFConfigServer struct {
-	Config *factory.Configuration
-	Router *gin.Engine
+	config         *factory.Configuration
+	Router         *gin.Engine
+	inMemoryConfig inMemoryConfig
+	syncCancelFunc context.CancelFunc
+	syncMutex      sync.Mutex
 }
 
 type Route struct {
@@ -28,6 +32,7 @@ type Route struct {
 
 type NFConfigInterface interface {
 	Start(ctx context.Context) error
+	TriggerSync()
 }
 
 func (n *NFConfigServer) router() *gin.Engine {
@@ -38,7 +43,7 @@ func enforceAcceptJSON() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		acceptHeader := c.GetHeader("Accept")
 		if acceptHeader != "application/json" {
-			logger.ConfigLog.Warnf("Invalid Accept header value: '%s'. Expected 'application/json'", acceptHeader)
+			logger.NfConfigLog.Warnf("Invalid Accept header value: '%s'. Expected 'application/json'", acceptHeader)
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 				"error": "Accept header must be 'application/json'",
 			})
@@ -57,9 +62,14 @@ func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 	router.Use(enforceAcceptJSON())
 
 	nfconfigServer := &NFConfigServer{
-		Config: config.Configuration,
+		config: config.Configuration,
 		Router: router,
 	}
+
+	if err := nfconfigServer.syncInMemoryConfig(); err != nil {
+		return nil, fmt.Errorf("failed to sync NF configuration data: %w", err)
+	}
+
 	logger.InitLog.Infoln("Setting up NFConfig routes")
 	nfconfigServer.setupRoutes()
 	return nfconfigServer, nil
@@ -73,17 +83,17 @@ func (n *NFConfigServer) Start(ctx context.Context) error {
 	}
 	serverErrChan := make(chan error, 1)
 	go func() {
-		if n.Config.NfConfigTLS != nil && n.Config.NfConfigTLS.Key != "" && n.Config.NfConfigTLS.PEM != "" {
-			logger.ConfigLog.Infoln("Starting HTTPS server on", addr)
-			serverErrChan <- srv.ListenAndServeTLS(n.Config.NfConfigTLS.PEM, n.Config.NfConfigTLS.Key)
+		if n.config.NfConfigTLS != nil && n.config.NfConfigTLS.Key != "" && n.config.NfConfigTLS.PEM != "" {
+			logger.NfConfigLog.Infoln("Starting HTTPS server on", addr)
+			serverErrChan <- srv.ListenAndServeTLS(n.config.NfConfigTLS.PEM, n.config.NfConfigTLS.Key)
 		} else {
-			logger.ConfigLog.Infoln("Starting HTTP server on", addr)
+			logger.NfConfigLog.Infoln("Starting HTTP server on", addr)
 			serverErrChan <- srv.ListenAndServe()
 		}
 	}()
 	select {
 	case <-ctx.Done():
-		logger.ConfigLog.Infoln("NFConfig context cancelled, shutting down server.")
+		logger.NfConfigLog.Infoln("NFConfig context cancelled, shutting down server.")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)

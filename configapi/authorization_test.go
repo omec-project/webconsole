@@ -32,8 +32,8 @@ func setUpRouter() *gin.Engine {
 	dbadapter.WebuiDBClient = &MockMongoClientSuccess{}
 	router.Use(auth.AdminOrUserAuthMiddleware(mockJWTSecret))
 	AddUserAccountService(router, mockJWTSecret)
-	AddApiServiceWithAuthorization(router, mockJWTSecret)
-	AddConfigV1ServiceWithAuthorization(router, mockJWTSecret)
+	AddApiService(router)
+	AddConfigV1Service(router)
 	return router
 }
 

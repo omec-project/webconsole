@@ -44,6 +44,9 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
 	filter := bson.M{"ueId": imsi}
+	if authSubData == nil {
+		return fmt.Errorf("authentication subscription data is nil")
+	}
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
 	// write to AuthDB

@@ -462,6 +462,10 @@ func PostSubscriberByID(c *gin.Context) {
 	}
 
 	ueId := c.Param("ueId")
+	if ueId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing ueId in request URL"})
+		return
+	}
 
 	logger.WebUILog.Infoln("Received Post Subscriber Data from Roc/Simapp: ", ueId)
 
@@ -513,6 +517,11 @@ func PostSubscriberByID(c *gin.Context) {
 	if subsOverrideData.SequenceNumber != "" {
 		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
 	}
+	if subsOverrideData.OPc == "" || subsOverrideData.Key == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required authentication data: OPc and Key must be provided"})
+		return
+	}
+	logger.WebUILog.Debugf("Using OPc: %s, Key: %s, SeqNo: %s", subsOverrideData.OPc, subsOverrideData.Key, subsOverrideData.SequenceNumber)
 	err = handleSubscriberPost(ueId, &authSubsData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create subscriber %s. Please check the log for details.", ueId)})

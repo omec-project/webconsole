@@ -494,14 +494,22 @@ func PostSubscriberByID(c *gin.Context) {
 		Opc: &models.Opc{
 			EncryptionAlgorithm: 0,
 			EncryptionKey:       0,
-			// OpcValue:            "8e27b6af0e692e750f32667a3b14605d", // Required
+			OpcValue:            "",
 		},
 		PermanentKey: &models.PermanentKey{
 			EncryptionAlgorithm: 0,
 			EncryptionKey:       0,
-			// PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862", // Required
+			PermanentKeyValue:   "",
 		},
-		// SequenceNumber: "16f3b3f70fc2",
+	}
+	if authSubsData.Opc == nil || authSubsData.PermanentKey == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required authentication data"})
+		return
+	}
+
+	if authSubsData.Opc.OpcValue == "" || authSubsData.PermanentKey.PermanentKeyValue == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "OPc and Key values are required"})
+		return
 	}
 
 	if subsOverrideData.OPc != "" {

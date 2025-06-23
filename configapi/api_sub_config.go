@@ -481,46 +481,40 @@ func PostSubscriberByID(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("subscriber %s already exists", ueId)})
 		return
 	}
+
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
-		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
+		AuthenticationMethod:          "5G_AKA",
 		Milenage: &models.Milenage{
 			Op: &models.Op{
 				EncryptionAlgorithm: 0,
 				EncryptionKey:       0,
-				OpValue:             "", // Required
+				OpValue:             "",
 			},
 		},
-		Opc: &models.Opc{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			// OpcValue:            "8e27b6af0e692e750f32667a3b14605d", // Required
-		},
-		PermanentKey: &models.PermanentKey{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			// PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862", // Required
-		},
-		// SequenceNumber: "16f3b3f70fc2",
 	}
 
-	// override values
-	/*if subsOverrideData.PlmnID != "" {
-		servingPlmnId = subsOverrideData.PlmnID
-	}*/
-	if subsOverrideData.OPc != "" {
-		authSubsData.Opc.OpcValue = subsOverrideData.OPc
-	}
-	if subsOverrideData.Key != "" {
-		authSubsData.PermanentKey.PermanentKeyValue = subsOverrideData.Key
-	}
-	if subsOverrideData.SequenceNumber != "" {
-		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
-	}
 	if subsOverrideData.OPc == "" || subsOverrideData.Key == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required authentication data: OPc and Key must be provided"})
 		return
 	}
+
+	authSubsData.Opc = &models.Opc{
+		EncryptionAlgorithm: 0,
+		EncryptionKey:       0,
+		OpcValue:            subsOverrideData.OPc,
+	}
+
+	authSubsData.PermanentKey = &models.PermanentKey{
+		EncryptionAlgorithm: 0,
+		EncryptionKey:       0,
+		PermanentKeyValue:   subsOverrideData.Key,
+	}
+
+	if subsOverrideData.SequenceNumber != "" {
+		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
+	}
+
 	logger.WebUILog.Debugf("Using OPc: %s, Key: %s, SeqNo: %s", subsOverrideData.OPc, subsOverrideData.Key, subsOverrideData.SequenceNumber)
 	err = handleSubscriberPost(ueId, &authSubsData)
 	if err != nil {

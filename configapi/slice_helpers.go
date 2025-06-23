@@ -51,7 +51,7 @@ func sendPebbleNotification(key string) error {
 	return nil
 }
 
-func syncSliceDeviceGroupSubscribers(slice *configmodels.Slice, prevSlice *configmodels.Slice) error {
+var syncSliceDeviceGroupSubscribers = func(slice *configmodels.Slice, prevSlice *configmodels.Slice) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	logger.WebUILog.Debugln("insert/update Network Slice")

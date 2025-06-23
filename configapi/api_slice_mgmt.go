@@ -146,12 +146,12 @@ func deviceGroupPostHelper(c *gin.Context, msgOp int, groupName string) error {
 		logger.ConfigLog.Infof("MbrUpLink: %v", ipdomain.UeDnnQos.DnnMbrUplink)
 	}
 	prevDevGroup := getDeviceGroupByName(groupName)
+	request.DeviceGroupName = groupName
 	if err := handleDeviceGroupPost(request, prevDevGroup); err != nil {
 		logger.ConfigLog.Errorf("error posting device group %v: %v", request, err)
 		return err
 	}
 	var msg configmodels.ConfigMessage
-	request.DeviceGroupName = groupName
 	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = msgOp
 	msg.DevGroup = &request

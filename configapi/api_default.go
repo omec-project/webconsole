@@ -205,22 +205,21 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 func GetNetworkSlices(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Get all Network Slices")
-
 	networkSlices := make([]string, 0)
+
 	rawNetworkSlices, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, bson.M{})
 	if errGetMany != nil {
 		logger.DbLog.Warnln(errGetMany)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving network slices"})
-		return
-	}
-	if len(rawNetworkSlices) == 0 {
-		logger.WebUILog.Infoln("No network slices found in database")
-		c.JSON(http.StatusOK, networkSlices)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slices"})
 		return
 	}
 
 	for _, rawNetworkSlice := range rawNetworkSlices {
-		networkSlices = append(networkSlices, rawNetworkSlice["slice-name"].(string))
+		if name, ok := rawNetworkSlice["slice-name"].(string); ok && name != "" {
+			networkSlices = append(networkSlices, name)
+		} else {
+			logger.WebUILog.Warnf("Skipping invalid or missing slice-name field: %+v", rawNetworkSlice)
+		}
 	}
 
 	c.JSON(http.StatusOK, networkSlices)

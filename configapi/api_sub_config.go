@@ -481,43 +481,26 @@ func PostSubscriberByID(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("subscriber %s already exists", ueId)})
 		return
 	}
+	if subsOverrideData.OPc == "" || subsOverrideData.Key == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required authentication data: OPc and Key must be provided"})
+		return
+	}
+
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
-		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
-		Milenage: &models.Milenage{
-			Op: &models.Op{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-				OpValue:             "", // Required
-			},
-		},
+		AuthenticationMethod:          "5G_AKA",
 		Opc: &models.Opc{
+			OpcValue:            subsOverrideData.OPc,
 			EncryptionAlgorithm: 0,
 			EncryptionKey:       0,
-			OpcValue:            "",
 		},
 		PermanentKey: &models.PermanentKey{
+			PermanentKeyValue:   subsOverrideData.Key,
 			EncryptionAlgorithm: 0,
 			EncryptionKey:       0,
-			PermanentKeyValue:   "",
 		},
 	}
-	if authSubsData.Opc == nil || authSubsData.PermanentKey == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required authentication data"})
-		return
-	}
 
-	if authSubsData.Opc.OpcValue == "" || authSubsData.PermanentKey.PermanentKeyValue == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "OPc and Key values are required"})
-		return
-	}
-
-	if subsOverrideData.OPc != "" {
-		authSubsData.Opc.OpcValue = subsOverrideData.OPc
-	}
-	if subsOverrideData.Key != "" {
-		authSubsData.PermanentKey.PermanentKeyValue = subsOverrideData.Key
-	}
 	if subsOverrideData.SequenceNumber != "" {
 		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
 	}

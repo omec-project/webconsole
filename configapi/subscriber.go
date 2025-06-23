@@ -44,7 +44,7 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
 	filter := bson.M{"ueId": imsi}
-	logger.WebUILog.Debugf("%+v", authSubData)
+	logger.WebUILog.Infof("%+v", authSubData)
 	if authSubData == nil {
 		return fmt.Errorf("authentication subscription data is nil")
 	}
@@ -61,7 +61,7 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 		logger.DbLog.Errorw("failed to update authentication subscription", "error", err)
 		return err
 	}
-	logger.WebUILog.Debugf("updated authentication subscription in authenticationSubscription collection: %v", imsi)
+	logger.WebUILog.Infof("updated authentication subscription in authenticationSubscription collection: %v", imsi)
 	// write to CommonDB
 	basicAmData := map[string]interface{}{"ueId": imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
@@ -74,7 +74,7 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 		}
 		return fmt.Errorf("authData update failed, rolled back AuthDB change: %w", err)
 	}
-	logger.WebUILog.Debugf("successfully updated authentication subscription in amData collection: %v", imsi)
+	logger.WebUILog.Infof("successfully updated authentication subscription in amData collection: %v", imsi)
 	return nil
 }
 

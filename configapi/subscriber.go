@@ -47,6 +47,12 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	if authSubData == nil {
 		return fmt.Errorf("authentication subscription data is nil")
 	}
+	if authSubData.Opc == nil || authSubData.PermanentKey == nil {
+		return fmt.Errorf("authentication data incomplete: Opc or PermanentKey is nil")
+	}
+	if authSubData.Opc.OpcValue == "" || authSubData.PermanentKey.PermanentKeyValue == "" {
+		return fmt.Errorf("authentication data incomplete: OpcValue or PermanentKeyValue is empty")
+	}
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
 	// write to AuthDB

@@ -8,6 +8,7 @@ package nfconfig
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"strconv"
 	"time"
 
@@ -86,16 +87,23 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 
 func (n *NFConfigServer) syncPlmnConfig(slices []configmodels.Slice) {
 	plmnSet := make(map[nfConfigApi.PlmnId]bool)
-	result := []nfConfigApi.PlmnId{}
+	newPlmnConfig := []nfConfigApi.PlmnId{}
 	for _, s := range slices {
-		plmn := nfConfigApi.PlmnId{Mcc: s.SiteInfo.Plmn.Mcc, Mnc: s.SiteInfo.Plmn.Mnc}
+		plmn := *nfConfigApi.NewPlmnId(s.SiteInfo.Plmn.Mcc, s.SiteInfo.Plmn.Mnc)
 		if !plmnSet[plmn] {
 			plmnSet[plmn] = true
-			result = append(result, plmn)
+			newPlmnConfig = append(newPlmnConfig, plmn)
 		}
 	}
 
-	n.inMemoryConfig.plmn = result
+	sort.Slice(newPlmnConfig, func(i, j int) bool {
+		if newPlmnConfig[i].Mcc != newPlmnConfig[j].Mcc {
+			return newPlmnConfig[i].Mcc < newPlmnConfig[j].Mcc
+		}
+		return newPlmnConfig[i].Mnc < newPlmnConfig[j].Mnc
+	})
+
+	n.inMemoryConfig.plmn = newPlmnConfig
 	logger.NfConfigLog.Debugln("Updated PLMN in-memory configuration. New configuration: ", n.inMemoryConfig.plmn)
 }
 
@@ -109,7 +117,7 @@ func (n *NFConfigServer) syncPlmnSnssaiConfig(slices []configmodels.Slice) {
 		plmnMap[plmn][s.SliceId] = struct{}{}
 	}
 
-	n.inMemoryConfig.plmnSnssai = convertPlmnMapToList(plmnMap)
+	n.inMemoryConfig.plmnSnssai = convertPlmnMapToSortedList(plmnMap)
 	logger.NfConfigLog.Debugln("Updated PLMN S-NSSAI in-memory configuration. New configuration: ", n.inMemoryConfig.plmnSnssai)
 }
 
@@ -117,19 +125,18 @@ func parseSnssaiFromSlice(sliceId configmodels.SliceSliceId) (nfConfigApi.Snssai
 	logger.NfConfigLog.Debugln("Parsing slice ID: ", sliceId)
 	val, err := strconv.ParseInt(sliceId.Sst, 10, 64)
 	if err != nil {
-		return nfConfigApi.Snssai{}, err
+		return *nfConfigApi.NewSnssaiWithDefaults(), err
 	}
-	snssai := nfConfigApi.Snssai{
-		Sst: int32(val),
-	}
+
+	snssai := nfConfigApi.NewSnssai(int32(val))
 	if sliceId.Sd != "" {
-		snssai.Sd = &sliceId.Sd
+		snssai.SetSd(sliceId.Sd)
 	}
-	return snssai, nil
+	return *snssai, nil
 }
 
-func convertPlmnMapToList(plmnMap map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId]struct{}) []nfConfigApi.PlmnSnssai {
-	result := []nfConfigApi.PlmnSnssai{}
+func convertPlmnMapToSortedList(plmnMap map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId]struct{}) []nfConfigApi.PlmnSnssai {
+	newPlmnSnssaiConfig := []nfConfigApi.PlmnSnssai{}
 	for plmn, snssaiSet := range plmnMap {
 		snssaiList := make([]nfConfigApi.Snssai, 0, len(snssaiSet))
 		for snssai := range snssaiSet {
@@ -143,12 +150,41 @@ func convertPlmnMapToList(plmnMap map[configmodels.SliceSiteInfoPlmn]map[configm
 		if len(snssaiList) == 0 {
 			continue
 		}
-		result = append(result, nfConfigApi.PlmnSnssai{
-			PlmnId:     nfConfigApi.PlmnId{Mcc: plmn.Mcc, Mnc: plmn.Mnc},
-			SNssaiList: snssaiList,
+		plmnId := nfConfigApi.NewPlmnId(plmn.Mcc, plmn.Mnc)
+		plmnSnssai := nfConfigApi.NewPlmnSnssai(*plmnId, snssaiList)
+		newPlmnSnssaiConfig = append(newPlmnSnssaiConfig, *plmnSnssai)
+	}
+	return sortPlmnSnssaiConfig(newPlmnSnssaiConfig)
+}
+
+func sortPlmnSnssaiConfig(plmnSnssai []nfConfigApi.PlmnSnssai) []nfConfigApi.PlmnSnssai {
+	sort.Slice(plmnSnssai, func(i, j int) bool {
+		if plmnSnssai[i].PlmnId.Mcc != plmnSnssai[j].PlmnId.Mcc {
+			return plmnSnssai[i].PlmnId.Mcc < plmnSnssai[j].PlmnId.Mcc
+		}
+		return plmnSnssai[i].PlmnId.Mnc < plmnSnssai[j].PlmnId.Mnc
+	})
+
+	for i := range plmnSnssai {
+		sort.Slice(plmnSnssai[i].SNssaiList, func(a, b int) bool {
+			s1 := plmnSnssai[i].SNssaiList[a]
+			s2 := plmnSnssai[i].SNssaiList[b]
+			if s1.Sst != s2.Sst {
+				return s1.Sst < s2.Sst
+			}
+			if s1.Sd == nil && s2.Sd != nil {
+				return true
+			}
+			if s1.Sd != nil && s2.Sd == nil {
+				return false
+			}
+			if s1.Sd != nil && s2.Sd != nil {
+				return *s1.Sd < *s2.Sd
+			}
+			return false
 		})
 	}
-	return result
+	return plmnSnssai
 }
 
 func (n *NFConfigServer) syncAccessAndMobilityConfig() {

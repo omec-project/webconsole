@@ -460,6 +460,7 @@ func PostSubscriberByID(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: failed to parse JSON."})
 		return
 	}
+	logger.WebUILog.Debugf("%+v", subsOverrideData)
 
 	ueId := c.Param("ueId")
 	if ueId == "" {
@@ -504,6 +505,7 @@ func PostSubscriberByID(c *gin.Context) {
 	if subsOverrideData.SequenceNumber != "" {
 		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
 	}
+	logger.WebUILog.Debugf("%+v", authSubsData)
 
 	logger.WebUILog.Debugf("Using OPc: %s, Key: %s, SeqNo: %s", subsOverrideData.OPc, subsOverrideData.Key, subsOverrideData.SequenceNumber)
 	err = handleSubscriberPost(ueId, &authSubsData)

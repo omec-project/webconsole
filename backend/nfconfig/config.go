@@ -97,7 +97,6 @@ func (n *NFConfigServer) syncPlmnConfig(slices []configmodels.Slice) {
 	}
 
 	sort.Slice(newPlmnConfig, func(i, j int) bool {
-
 		if newPlmnConfig[i].GetMcc() != newPlmnConfig[j].GetMcc() {
 			return newPlmnConfig[i].GetMcc() < newPlmnConfig[j].GetMcc()
 		}

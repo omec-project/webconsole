@@ -97,10 +97,11 @@ func (n *NFConfigServer) syncPlmnConfig(slices []configmodels.Slice) {
 	}
 
 	sort.Slice(newPlmnConfig, func(i, j int) bool {
-		if newPlmnConfig[i].Mcc != newPlmnConfig[j].Mcc {
-			return newPlmnConfig[i].Mcc < newPlmnConfig[j].Mcc
+
+		if newPlmnConfig[i].GetMcc() != newPlmnConfig[j].GetMcc() {
+			return newPlmnConfig[i].GetMcc() < newPlmnConfig[j].GetMcc()
 		}
-		return newPlmnConfig[i].Mnc < newPlmnConfig[j].Mnc
+		return newPlmnConfig[i].GetMnc() < newPlmnConfig[j].GetMnc()
 	})
 
 	n.inMemoryConfig.plmn = newPlmnConfig
@@ -159,27 +160,27 @@ func convertPlmnMapToSortedList(plmnMap map[configmodels.SliceSiteInfoPlmn]map[c
 
 func sortPlmnSnssaiConfig(plmnSnssai []nfConfigApi.PlmnSnssai) []nfConfigApi.PlmnSnssai {
 	sort.Slice(plmnSnssai, func(i, j int) bool {
-		if plmnSnssai[i].PlmnId.Mcc != plmnSnssai[j].PlmnId.Mcc {
-			return plmnSnssai[i].PlmnId.Mcc < plmnSnssai[j].PlmnId.Mcc
+		if plmnSnssai[i].PlmnId.GetMcc() != plmnSnssai[j].PlmnId.GetMcc() {
+			return plmnSnssai[i].PlmnId.GetMcc() < plmnSnssai[j].PlmnId.GetMcc()
 		}
-		return plmnSnssai[i].PlmnId.Mnc < plmnSnssai[j].PlmnId.Mnc
+		return plmnSnssai[i].PlmnId.GetMnc() < plmnSnssai[j].PlmnId.GetMnc()
 	})
 
 	for i := range plmnSnssai {
 		sort.Slice(plmnSnssai[i].SNssaiList, func(a, b int) bool {
 			s1 := plmnSnssai[i].SNssaiList[a]
 			s2 := plmnSnssai[i].SNssaiList[b]
-			if s1.Sst != s2.Sst {
-				return s1.Sst < s2.Sst
+			if s1.GetSst() != s2.GetSst() {
+				return s1.GetSst() < s2.GetSst()
 			}
-			if s1.Sd == nil && s2.Sd != nil {
+			if !s1.HasSd() && s2.HasSd() {
 				return true
 			}
-			if s1.Sd != nil && s2.Sd == nil {
+			if s1.HasSd() && !s2.HasSd() {
 				return false
 			}
-			if s1.Sd != nil && s2.Sd != nil {
-				return *s1.Sd < *s2.Sd
+			if s1.HasSd() && s2.HasSd() {
+				return s1.GetSd() < s2.GetSd()
 			}
 			return false
 		})

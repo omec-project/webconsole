@@ -28,7 +28,6 @@ func handleNetworkSlicePost(slice *configmodels.Slice, prevSlice *configmodels.S
 		return err
 	}
 	logger.DbLog.Debugf("succeeded to post slice data for %v", slice.SliceName)
-
 	err = syncSliceDeviceGroupSubscribers(slice, prevSlice)
 	if err != nil {
 		return err
@@ -334,9 +333,7 @@ func getSliceByName(name string) configmodels.Slice {
 }
 
 func handleNetworkSliceDelete(sliceName string) error {
-	rwLock.Lock()
 	prevSlice := getSliceByName(sliceName)
-	defer rwLock.Unlock()
 	filter := bson.M{"slice-name": sliceName}
 	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
 	if err != nil {

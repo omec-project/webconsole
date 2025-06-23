@@ -24,8 +24,6 @@ var (
 )
 
 func handleDeviceGroupPost(devGroup configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) error {
-	rwLock.Lock()
-
 	if devGroup.DeviceGroupName == "" {
 		err := fmt.Errorf("device group name is empty")
 		logger.DbLog.Errorw("device group name is required for posting device group data", "error", err)
@@ -35,7 +33,6 @@ func handleDeviceGroupPost(devGroup configmodels.DeviceGroups, prevDevGroup *con
 	filter := bson.M{"group-name": devGroup.DeviceGroupName}
 	devGroupDataBsonA := configmodels.ToBsonM(devGroup)
 	result, err := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
-	rwLock.Unlock()
 	if err != nil {
 		logger.DbLog.Errorw("failed to post device group data for %v: %v", devGroup.DeviceGroupName, err)
 		return err

@@ -44,6 +44,7 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
 	filter := bson.M{"ueId": imsi}
+	logger.WebUILog.Debugf("%+v", authSubData)
 	if authSubData == nil {
 		return fmt.Errorf("authentication subscription data is nil")
 	}

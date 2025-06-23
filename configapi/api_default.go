@@ -210,7 +210,15 @@ func GetNetworkSlices(c *gin.Context) {
 	rawNetworkSlices, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, bson.M{})
 	if errGetMany != nil {
 		logger.DbLog.Warnln(errGetMany)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving network slices"})
+		return
 	}
+	if len(rawNetworkSlices) == 0 {
+		logger.WebUILog.Infoln("No network slices found in database")
+		c.JSON(http.StatusOK, networkSlices)
+		return
+	}
+
 	for _, rawNetworkSlice := range rawNetworkSlices {
 		networkSlices = append(networkSlices, rawNetworkSlice["slice-name"].(string))
 	}

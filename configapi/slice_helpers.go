@@ -62,6 +62,11 @@ var syncSliceDeviceGroupSubscribers = func(slice *configmodels.Slice, prevSlice 
 	}
 	if slice != nil {
 		logger.WebUILog.Debugln("insert/update Slice:", slice)
+		if slice.SliceId.Sst == "" {
+			err := fmt.Errorf("missing SST in slice %s", slice.SliceName)
+			logger.DbLog.Error(err)
+			return err
+		}
 		sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 		if err != nil {
 			logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
@@ -340,8 +345,8 @@ func handleNetworkSliceDelete(sliceName string) error {
 		logger.DbLog.Errorf("failed to delete slice data for %v: %v", sliceName, err)
 		return err
 	}
-	slice := getSliceByName(sliceName)
-	if err := syncSliceDeviceGroupSubscribers(&slice, &prevSlice); err != nil {
+	// slice is nil as it is deleted
+	if err = syncSliceDeviceGroupSubscribers(nil, &prevSlice); err != nil {
 		logger.WebUILog.Errorf("failed to sync slice %v: %v", sliceName, err)
 		return err
 	}

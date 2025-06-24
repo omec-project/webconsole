@@ -27,12 +27,10 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 				found = true
 			}
 		}
-
 		if !found {
 			dimsis = append(dimsis, pimsi)
 		}
 	}
-
 	return
 }
 

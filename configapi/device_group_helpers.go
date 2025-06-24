@@ -54,7 +54,14 @@ func syncDeviceGroupSubscriber(devGroup configmodels.DeviceGroups, prevDevGroup 
 	defer rwLock.Unlock()
 	slice := isDeviceGroupExistInSlice(devGroup.DeviceGroupName)
 	if slice == nil {
+		logger.WebUILog.Infof("Device group %s not associated with any slice — skipping sync", devGroup.DeviceGroupName)
 		return nil
+	}
+	logger.WebUILog.Infof("Device group %s is part of slice %s", devGroup.DeviceGroupName, slice.SliceName)
+	if slice.SliceId.Sst == "" {
+		err := fmt.Errorf("missing SST in slice %s", slice.SliceName)
+		logger.DbLog.Error(err)
+		return err
 	}
 	sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 	if err != nil {

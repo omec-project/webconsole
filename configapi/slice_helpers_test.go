@@ -79,7 +79,9 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 	defer func() { execCommand = exec.Command }()
 
 	origSync := syncSliceDeviceGroupSubscribers
-	syncSliceDeviceGroupSubscribers = func(_, _ *configmodels.Slice) error { return nil }
+	syncSliceDeviceGroupSubscribers = func(_, _ *configmodels.Slice, _ dbadapter.SessionRunner) error {
+		return nil
+	}
 	defer func() { syncSliceDeviceGroupSubscribers = origSync }()
 
 	numPebbleNotificationsSent := execCommandTimesCalled
@@ -105,7 +107,9 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 	execCommandTimesCalled = 0
 
 	origSync := syncSliceDeviceGroupSubscribers
-	syncSliceDeviceGroupSubscribers = func(_, _ *configmodels.Slice) error { return nil }
+	syncSliceDeviceGroupSubscribers = func(_, _ *configmodels.Slice, _ dbadapter.SessionRunner) error {
+		return nil
+	}
 	defer func() { syncSliceDeviceGroupSubscribers = origSync }()
 
 	factory.WebUIConfig = &factory.Config{
@@ -145,6 +149,10 @@ func (m *MockMongoPost) RestfulAPIPost(coll string, filter primitive.M, data map
 
 func (m *MockMongoPost) RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error) {
 	return []map[string]interface{}{}, nil
+}
+
+func (m *MockMongoPost) Client() *mongo.Client {
+	return nil
 }
 
 type MockCombinedDB struct {

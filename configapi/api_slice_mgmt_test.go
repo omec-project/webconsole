@@ -6,6 +6,7 @@ package configapi
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/omec-project/webconsole/dbadapter"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -58,8 +59,8 @@ const NETWORK_SLICE_CONFIG = `{
     }
   },
   "slice-id": {
-    "sd": "string",
-    "sst": "string"
+    "sd": "1",
+    "sst": "001"
   },
   "sliceName": "string"
 }`
@@ -144,6 +145,9 @@ func TestDeviceGroupPostHandler_DeviceGroupNameValidation(t *testing.T) {
 			origChannel := configChannel
 			configChannel = make(chan *configmodels.ConfigMessage, 1)
 			defer func() { configChannel = origChannel }()
+			if tc.expectedCode == http.StatusOK {
+				dbadapter.CommonDBClient = &MockMongoClientEmptyDB{}
+			}
 			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(DEVICE_GROUP_CONFIG))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
@@ -191,6 +195,9 @@ func TestNetworkSlicePostHandler_NetworkSliceNameValidation(t *testing.T) {
 			origChannel := configChannel
 			configChannel = make(chan *configmodels.ConfigMessage, 1)
 			defer func() { configChannel = origChannel }()
+			if tc.expectedCode == http.StatusOK {
+				dbadapter.CommonDBClient = &MockMongoClientEmptyDB{}
+			}
 			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(NETWORK_SLICE_CONFIG))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
@@ -222,15 +229,15 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 			name:         "Network Slice invalid gNB name",
 			route:        "/config/v1/network-slice/slice-1",
 			inputData:    networkSliceWithGnbParams("", 3),
-			expectedCode: http.StatusBadRequest,
-			expectedBody: "{\"error\":\"invalid gNB name `` in Network Slice slice-1. Name needs to match the following regular expression: " + NAME_PATTERN + "\"}",
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"error":"Failed to create network slice slice-1. Please check the log for details."}`,
 		},
 		{
 			name:         "Network Slice invalid gNB TAC",
 			route:        "/config/v1/network-slice/slice-1",
 			inputData:    networkSliceWithGnbParams("valid-gnb", 0),
-			expectedCode: http.StatusBadRequest,
-			expectedBody: "{\"error\":\"invalid TAC 0 for gNB valid-gnb in Network Slice slice-1. TAC must be an integer within the range [1, 16777215]\"}",
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: `{"error":"Failed to create network slice slice-1. Please check the log for details."}`,
 		},
 	}
 

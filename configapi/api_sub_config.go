@@ -506,9 +506,9 @@ func PostSubscriberByID(c *gin.Context) {
 		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
 	}
 	logger.WebUILog.Infof("%+v", authSubsData)
-
+	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	logger.WebUILog.Infof("Using OPc: %s, Key: %s, SeqNo: %s", subsOverrideData.OPc, subsOverrideData.Key, subsOverrideData.SequenceNumber)
-	err = handleSubscriberPost(ueId, &authSubsData)
+	err = handleSubscriberPost(ueId, &authSubsData, subscriberAuthData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create subscriber %s. Please check the log for details.", ueId)})
 		return
@@ -604,7 +604,8 @@ func PutSubscriberByID(c *gin.Context) {
 	if subsOverrideData.SequenceNumber != "" {
 		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
 	}
-	err = handleSubscriberPut(ueId, &authSubsData)
+	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
+	err = handleSubscriberPut(ueId, &authSubsData, subscriberAuthData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update subscriber %s. Please check the log for details.", ueId)})
 		return
@@ -652,8 +653,8 @@ func DeleteSubscriberByID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error deleting subscriber. Please check the log for details."})
 		return
 	}
-
-	if err = handleSubscriberDelete(imsi); err != nil {
+	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
+	if err = handleSubscriberDelete(imsi, subscriberAuthData); err != nil {
 		logger.WebUILog.Errorf("Error deleting subscriber: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error deleting subscriber. Please check the log for details."})
 		return

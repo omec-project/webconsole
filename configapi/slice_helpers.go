@@ -58,7 +58,22 @@ var syncSliceDeviceGroupSubscribers = func(slice *configmodels.Slice, prevSlice 
 	sessionRunner := dbadapter.RealSessionRunner(mongoClient.Client)
 
 	if slice == nil && prevSlice != nil {
-		logger.WebUILog.Debugln("deleted Slice:", prevSlice)
+		logger.WebUILog.Infof("Deleted slice: %s", prevSlice.SliceName)
+
+		dgnames := getDeletedDeviceGroupsList(nil, prevSlice)
+		for _, dgname := range dgnames {
+			devGroupConfig := getDeviceGroupByName(dgname)
+			if devGroupConfig != nil {
+				for _, imsi := range devGroupConfig.Imsis {
+					err := removeSubscriberEntriesRelatedToDeviceGroups(prevSlice.SiteInfo.Plmn.Mcc, prevSlice.SiteInfo.Plmn.Mnc, imsi, sessionRunner)
+					if err != nil {
+						logger.ConfigLog.Errorln(err)
+						return err
+					}
+				}
+			}
+		}
+		return nil
 	}
 	if slice != nil {
 		logger.WebUILog.Debugln("insert/update Slice:", slice)

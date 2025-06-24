@@ -7,6 +7,7 @@ package nfconfig
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -15,6 +16,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type NFConfigServer struct {
@@ -39,20 +43,6 @@ func (n *NFConfigServer) router() *gin.Engine {
 	return n.Router
 }
 
-func enforceAcceptJSON() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		acceptHeader := c.GetHeader("Accept")
-		if acceptHeader != "application/json" {
-			logger.NfConfigLog.Warnf("Invalid Accept header value: '%s'. Expected 'application/json'", acceptHeader)
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-				"error": "Accept header must be 'application/json'",
-			})
-			return
-		}
-		c.Next()
-	}
-}
-
 func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 	if config == nil {
 		return nil, fmt.Errorf("configuration cannot be nil")
@@ -73,6 +63,64 @@ func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 	logger.InitLog.Infoln("Setting up NFConfig routes")
 	nfconfigServer.setupRoutes()
 	return nfconfigServer, nil
+}
+
+func (n *NFConfigServer) TriggerSync() {
+	n.syncMutex.Lock()
+	defer n.syncMutex.Unlock()
+
+	if n.syncCancelFunc != nil {
+		n.syncCancelFunc()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	n.syncCancelFunc = cancel
+	logger.NfConfigLog.Debugln("Starting in-memory NF configuration synchronization with new context")
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				logger.NfConfigLog.Infoln("No-op. Sync in-memory configuration was cancelled")
+				return
+			default:
+				err := syncInMemoryConfigFunc(n)
+				if err == nil {
+					return
+				}
+				logger.NfConfigLog.Warnf("Sync in-memory configuration failed, retrying: %v", err)
+				time.Sleep(3 * time.Second)
+			}
+		}
+	}()
+}
+
+var syncInMemoryConfigFunc = func(n *NFConfigServer) error {
+	return n.syncInMemoryConfig()
+}
+
+func (n *NFConfigServer) syncInMemoryConfig() error {
+	sliceDataColl := "webconsoleData.snapshots.sliceData"
+	rawSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, bson.M{})
+	if err != nil {
+		return err
+	}
+
+	slices := []configmodels.Slice{}
+	for _, rawSlice := range rawSlices {
+		var s configmodels.Slice
+		if err := json.Unmarshal(configmodels.MapToByte(rawSlice), &s); err != nil {
+			logger.NfConfigLog.Warnf("Failed to unmarshal slice: %v. Network slice `%s` will be ignored", err, s.SliceName)
+			continue
+		}
+		slices = append(slices, s)
+	}
+
+	n.inMemoryConfig.syncPlmn(slices)
+	n.inMemoryConfig.syncPlmnSnssai(slices)
+	n.inMemoryConfig.syncAccessAndMobility()
+	n.inMemoryConfig.syncSessionManagement()
+	n.inMemoryConfig.syncPolicyControl()
+	logger.NfConfigLog.Infoln("Updated NF in-memory configuration")
+	return nil
 }
 
 func (n *NFConfigServer) Start(ctx context.Context) error {
@@ -132,5 +180,19 @@ func (n *NFConfigServer) getRoutes() []Route {
 			Pattern:     "/session-management",
 			HandlerFunc: n.GetSessionManagementConfig,
 		},
+	}
+}
+
+func enforceAcceptJSON() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		acceptHeader := c.GetHeader("Accept")
+		if acceptHeader != "application/json" {
+			logger.NfConfigLog.Warnf("Invalid Accept header value: '%s'. Expected 'application/json'", acceptHeader)
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+				"error": "Accept header must be 'application/json'",
+			})
+			return
+		}
+		c.Next()
 	}
 }

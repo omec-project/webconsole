@@ -6,17 +6,12 @@
 package nfconfig
 
 import (
-	"context"
-	"encoding/json"
 	"sort"
 	"strconv"
-	"time"
 
 	"github.com/omec-project/openapi/nfConfigApi"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
-	"github.com/omec-project/webconsole/dbadapter"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type inMemoryConfig struct {
@@ -27,65 +22,7 @@ type inMemoryConfig struct {
 	policyControl     []nfConfigApi.PolicyControl
 }
 
-func (n *NFConfigServer) TriggerSync() {
-	n.syncMutex.Lock()
-	defer n.syncMutex.Unlock()
-
-	if n.syncCancelFunc != nil {
-		n.syncCancelFunc()
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	n.syncCancelFunc = cancel
-	logger.NfConfigLog.Debugln("Starting in-memory NF configuration synchronization with new context")
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				logger.NfConfigLog.Infoln("No-op. Sync in-memory configuration was cancelled")
-				return
-			default:
-				err := syncInMemoryConfigFunc(n)
-				if err == nil {
-					return
-				}
-				logger.NfConfigLog.Warnf("Sync in-memory configuration failed, retrying: %v", err)
-				time.Sleep(3 * time.Second)
-			}
-		}
-	}()
-}
-
-var syncInMemoryConfigFunc = func(n *NFConfigServer) error {
-	return n.syncInMemoryConfig()
-}
-
-func (n *NFConfigServer) syncInMemoryConfig() error {
-	sliceDataColl := "webconsoleData.snapshots.sliceData"
-	rawSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, bson.M{})
-	if err != nil {
-		return err
-	}
-
-	slices := []configmodels.Slice{}
-	for _, rawSlice := range rawSlices {
-		var s configmodels.Slice
-		if err := json.Unmarshal(configmodels.MapToByte(rawSlice), &s); err != nil {
-			logger.NfConfigLog.Warnf("Failed to unmarshal slice: %v. Network slice `%s` will be ignored", err, s.SliceName)
-			continue
-		}
-		slices = append(slices, s)
-	}
-
-	n.syncPlmnConfig(slices)
-	n.syncPlmnSnssaiConfig(slices)
-	n.syncAccessAndMobilityConfig()
-	n.syncSessionManagementConfig()
-	n.syncPolicyControlConfig()
-	logger.NfConfigLog.Infoln("Updated NF in-memory configuration")
-	return nil
-}
-
-func (n *NFConfigServer) syncPlmnConfig(slices []configmodels.Slice) {
+func (c *inMemoryConfig) syncPlmn(slices []configmodels.Slice) {
 	plmnSet := make(map[nfConfigApi.PlmnId]bool)
 	newPlmnConfig := []nfConfigApi.PlmnId{}
 	for _, s := range slices {
@@ -103,11 +40,11 @@ func (n *NFConfigServer) syncPlmnConfig(slices []configmodels.Slice) {
 		return newPlmnConfig[i].GetMnc() < newPlmnConfig[j].GetMnc()
 	})
 
-	n.inMemoryConfig.plmn = newPlmnConfig
-	logger.NfConfigLog.Debugln("Updated PLMN in-memory configuration. New configuration: ", n.inMemoryConfig.plmn)
+	c.plmn = newPlmnConfig
+	logger.NfConfigLog.Debugln("Updated PLMN in-memory configuration. New configuration: ", c.plmn)
 }
 
-func (n *NFConfigServer) syncPlmnSnssaiConfig(slices []configmodels.Slice) {
+func (c *inMemoryConfig) syncPlmnSnssai(slices []configmodels.Slice) {
 	plmnMap := make(map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId]struct{})
 	for _, s := range slices {
 		plmn := s.SiteInfo.Plmn
@@ -117,8 +54,8 @@ func (n *NFConfigServer) syncPlmnSnssaiConfig(slices []configmodels.Slice) {
 		plmnMap[plmn][s.SliceId] = struct{}{}
 	}
 
-	n.inMemoryConfig.plmnSnssai = convertPlmnMapToSortedList(plmnMap)
-	logger.NfConfigLog.Debugln("Updated PLMN S-NSSAI in-memory configuration. New configuration: ", n.inMemoryConfig.plmnSnssai)
+	c.plmnSnssai = convertPlmnMapToSortedList(plmnMap)
+	logger.NfConfigLog.Debugln("Updated PLMN S-NSSAI in-memory configuration. New configuration: ", c.plmnSnssai)
 }
 
 func parseSnssaiFromSlice(sliceId configmodels.SliceSliceId) (nfConfigApi.Snssai, error) {
@@ -154,10 +91,11 @@ func convertPlmnMapToSortedList(plmnMap map[configmodels.SliceSiteInfoPlmn]map[c
 		plmnSnssai := nfConfigApi.NewPlmnSnssai(*plmnId, snssaiList)
 		newPlmnSnssaiConfig = append(newPlmnSnssaiConfig, *plmnSnssai)
 	}
-	return sortPlmnSnssaiConfig(newPlmnSnssaiConfig)
+	sortPlmnSnssaiConfig(newPlmnSnssaiConfig)
+	return newPlmnSnssaiConfig
 }
 
-func sortPlmnSnssaiConfig(plmnSnssai []nfConfigApi.PlmnSnssai) []nfConfigApi.PlmnSnssai {
+func sortPlmnSnssaiConfig(plmnSnssai []nfConfigApi.PlmnSnssai) {
 	sort.Slice(plmnSnssai, func(i, j int) bool {
 		if plmnSnssai[i].PlmnId.GetMcc() != plmnSnssai[j].PlmnId.GetMcc() {
 			return plmnSnssai[i].PlmnId.GetMcc() < plmnSnssai[j].PlmnId.GetMcc()
@@ -184,20 +122,19 @@ func sortPlmnSnssaiConfig(plmnSnssai []nfConfigApi.PlmnSnssai) []nfConfigApi.Plm
 			return false
 		})
 	}
-	return plmnSnssai
 }
 
-func (n *NFConfigServer) syncAccessAndMobilityConfig() {
-	n.inMemoryConfig.accessAndMobility = []nfConfigApi.AccessAndMobility{}
-	logger.NfConfigLog.Debugln("Updated Access and Mobility in-memory configuration. New configuration: ", n.inMemoryConfig.accessAndMobility)
+func (c *inMemoryConfig) syncAccessAndMobility() {
+	c.accessAndMobility = []nfConfigApi.AccessAndMobility{}
+	logger.NfConfigLog.Debugln("Updated Access and Mobility in-memory configuration. New configuration: ", c.accessAndMobility)
 }
 
-func (n *NFConfigServer) syncSessionManagementConfig() {
-	n.inMemoryConfig.sessionManagement = []nfConfigApi.SessionManagement{}
-	logger.NfConfigLog.Debugln("Updated Session Management in-memory configuration. New configuration: ", n.inMemoryConfig.sessionManagement)
+func (c *inMemoryConfig) syncSessionManagement() {
+	c.sessionManagement = []nfConfigApi.SessionManagement{}
+	logger.NfConfigLog.Debugln("Updated Session Management in-memory configuration. New configuration: ", c.sessionManagement)
 }
 
-func (n *NFConfigServer) syncPolicyControlConfig() {
-	n.inMemoryConfig.policyControl = []nfConfigApi.PolicyControl{}
-	logger.NfConfigLog.Debugln("Updated Policy Control in-memory configuration. New configuration: ", n.inMemoryConfig.policyControl)
+func (c *inMemoryConfig) syncPolicyControl() {
+	c.policyControl = []nfConfigApi.PolicyControl{}
+	logger.NfConfigLog.Debugln("Updated Policy Control in-memory configuration. New configuration: ", c.policyControl)
 }

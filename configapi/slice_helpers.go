@@ -58,22 +58,8 @@ var syncSliceDeviceGroupSubscribers = func(slice *configmodels.Slice, prevSlice 
 	sessionRunner := dbadapter.RealSessionRunner(mongoClient.Client)
 
 	if slice == nil && prevSlice != nil {
-		logger.WebUILog.Infof("Deleted slice: %s", prevSlice.SliceName)
-
-		dgnames := getDeletedDeviceGroupsList(nil, prevSlice)
-		for _, dgname := range dgnames {
-			devGroupConfig := getDeviceGroupByName(dgname)
-			if devGroupConfig != nil {
-				for _, imsi := range devGroupConfig.Imsis {
-					err := removeSubscriberEntriesRelatedToDeviceGroups(prevSlice.SiteInfo.Plmn.Mcc, prevSlice.SiteInfo.Plmn.Mnc, imsi, sessionRunner)
-					if err != nil {
-						logger.ConfigLog.Errorln(err)
-						return err
-					}
-				}
-			}
-		}
-		return nil
+		logger.WebUILog.Debugf("Deleted slice: %s", prevSlice.SliceName)
+		return cleanupDeviceGroups(nil, prevSlice, sessionRunner)
 	}
 	if slice != nil {
 		logger.WebUILog.Debugln("insert/update Slice:", slice)
@@ -92,40 +78,54 @@ var syncSliceDeviceGroupSubscribers = func(slice *configmodels.Slice, prevSlice 
 			Sst: int32(sVal),
 		}
 		for _, dgName := range slice.SiteDeviceGroup {
-			logger.ConfigLog.Infoln("dgName:", dgName)
+			logger.ConfigLog.Debugf("dgName:", dgName)
 			devGroupConfig := getDeviceGroupByName(dgName)
-			if devGroupConfig != nil {
-				for _, imsi := range devGroupConfig.Imsis {
-					dnn := devGroupConfig.IpDomainExpanded.Dnn
-					mcc := slice.SiteInfo.Plmn.Mcc
-					mnc := slice.SiteInfo.Plmn.Mnc
-					err = updatePolicyAndProvisionedData(
-						imsi,
-						mcc,
-						mnc,
-						snssai,
-						dnn,
-						devGroupConfig.IpDomainExpanded.UeDnnQos,
-					)
-					if err != nil {
-						logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %v", imsi, err)
-						return err
-					}
+			if devGroupConfig == nil {
+				logger.ConfigLog.Warnf("Device group not found: %s", dgName)
+				continue
+			}
+
+			for _, imsi := range devGroupConfig.Imsis {
+				dnn := devGroupConfig.IpDomainExpanded.Dnn
+				mcc := slice.SiteInfo.Plmn.Mcc
+				mnc := slice.SiteInfo.Plmn.Mnc
+				err = updatePolicyAndProvisionedData(
+					imsi,
+					mcc,
+					mnc,
+					snssai,
+					dnn,
+					devGroupConfig.IpDomainExpanded.UeDnnQos,
+				)
+				if err != nil {
+					logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %v", imsi, err)
+					return err
 				}
 			}
 		}
 	}
 
+	if err := cleanupDeviceGroups(slice, prevSlice, sessionRunner); err != nil {
+		return err
+	}
+	return nil
+}
+
+func cleanupDeviceGroups(slice, prevSlice *configmodels.Slice, sessionRunner dbadapter.SessionRunner) error {
 	dgnames := getDeletedDeviceGroupsList(slice, prevSlice)
-	for _, dgname := range dgnames {
-		devGroupConfig := getDeviceGroupByName(dgname)
-		if devGroupConfig != nil {
-			for _, imsi := range devGroupConfig.Imsis {
-				err := removeSubscriberEntriesRelatedToDeviceGroups(prevSlice.SiteInfo.Plmn.Mcc, prevSlice.SiteInfo.Plmn.Mnc, imsi, sessionRunner)
-				if err != nil {
-					logger.ConfigLog.Errorln(err)
-					return err
-				}
+	for _, dgName := range dgnames {
+		devGroupConfig := getDeviceGroupByName(dgName)
+		if devGroupConfig == nil {
+			logger.ConfigLog.Warnf("Device group not found during cleanup: %s", dgName)
+			continue
+		}
+
+		for _, imsi := range devGroupConfig.Imsis {
+			mcc := prevSlice.SiteInfo.Plmn.Mcc
+			mnc := prevSlice.SiteInfo.Plmn.Mnc
+			if err := removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi, sessionRunner); err != nil {
+				logger.ConfigLog.Errorf("Failed to remove subscriber for IMSI %s: %v", imsi, err)
+				return err
 			}
 		}
 	}

@@ -105,6 +105,7 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 	}
 
 	slices := []configmodels.Slice{}
+
 	for _, rawSlice := range rawSlices {
 		var s configmodels.Slice
 		if err := json.Unmarshal(configmodels.MapToByte(rawSlice), &s); err != nil {
@@ -113,7 +114,7 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 		}
 		slices = append(slices, s)
 	}
-
+	logger.NfConfigLog.Debugf("Retrieved %d network slices", len(slices))
 	n.inMemoryConfig.syncPlmn(slices)
 	n.inMemoryConfig.syncPlmnSnssai(slices)
 	n.inMemoryConfig.syncAccessAndMobility()

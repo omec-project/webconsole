@@ -181,8 +181,12 @@ func (webui *WEBUI) triggerNFConfigSyncMiddleware() gin.HandlerFunc {
 			if webui.TriggerSyncNFConfigFunc != nil {
 				logger.WebUILog.Infof("Triggered synchronization of NF config")
 				webui.TriggerSyncNFConfigFunc()
+			} else {
+				logger.WebUILog.Warnln("NF configuration synchronization function has not been initialized")
 			}
+			return
 		}
+		logger.WebUILog.Debugln("WebUI operation does not require NF configuration synchronization")
 	}
 }
 

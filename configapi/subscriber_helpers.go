@@ -82,7 +82,7 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string, session
 	return nil
 }
 
-func handleSubscriberDelete(imsi string) error {
+func handleSubscriberDelete(imsi string, subscriberAuthData SubscriberAuthenticationData) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	err := subscriberAuthData.SubscriberAuthenticationDataDelete(imsi)
@@ -94,7 +94,7 @@ func handleSubscriberDelete(imsi string) error {
 	return nil
 }
 
-func handleSubscriberPut(imsi string, authSubData *models.AuthenticationSubscription) error {
+func handleSubscriberPut(imsi string, authSubData *models.AuthenticationSubscription, subscriberAuthData SubscriberAuthenticationData) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	err := subscriberAuthData.SubscriberAuthenticationDataUpdate(imsi, authSubData)
@@ -106,7 +106,7 @@ func handleSubscriberPut(imsi string, authSubData *models.AuthenticationSubscrip
 	return nil
 }
 
-func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscription) error {
+func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscription, subscriberAuthData SubscriberAuthenticationData) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	err := subscriberAuthData.SubscriberAuthenticationDataCreate(imsi, authSubData)

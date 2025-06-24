@@ -3,11 +3,11 @@ package configapi
 import (
 	"encoding/json"
 	"fmt"
+	"go.mongodb.org/mongo-driver/mongo"
 	"os/exec"
 	"strconv"
 
 	"github.com/omec-project/openapi/models"
-	"github.com/omec-project/util/mongoapi"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -54,9 +54,17 @@ var syncSliceDeviceGroupSubscribers = func(slice *configmodels.Slice, prevSlice 
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	logger.WebUILog.Debugln("insert/update Network Slice")
-	mongoClient := dbadapter.CommonDBClient.(*mongoapi.MongoClient)
-	sessionRunner := dbadapter.RealSessionRunner(mongoClient.Client)
 
+	type ClientProvider interface {
+		Client() *mongo.Client
+	}
+
+	provider, ok := dbadapter.CommonDBClient.(ClientProvider)
+	if !ok {
+		return fmt.Errorf("db does not support Client() access")
+	}
+
+	sessionRunner := dbadapter.RealSessionRunner(provider.Client())
 	if slice == nil && prevSlice != nil {
 		logger.WebUILog.Debugf("Deleted slice: %s", prevSlice.SliceName)
 		return cleanupDeviceGroups(nil, prevSlice, sessionRunner)

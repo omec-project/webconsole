@@ -66,7 +66,29 @@ func TestSubscriberAuthenticationDataCreate_Success(t *testing.T) {
 	dbadapter.CommonDBClient = commonDB
 
 	sub := DatabaseSubscriberAuthenticationData{}
-	err := sub.SubscriberAuthenticationDataCreate("imsi-1", &models.AuthenticationSubscription{})
+	subsData := models.AuthenticationSubscription{
+		AuthenticationManagementField: "8000",
+		AuthenticationMethod:          "5G_AKA",
+		Milenage: &models.Milenage{
+			Op: &models.Op{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				OpValue:             "c9e8763286b5b9ffbdf56e1297d0887b",
+			},
+		},
+		Opc: &models.Opc{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			OpcValue:            "981d464c7c52eb6e5036234984ad0bcf",
+		},
+		PermanentKey: &models.PermanentKey{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			PermanentKeyValue:   "5122250214c33e723a5dd523fc145fc0",
+		},
+		SequenceNumber: "16f3b3f70fc2",
+	}
+	err := sub.SubscriberAuthenticationDataCreate("imsi-1", &subsData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -77,7 +99,6 @@ func TestSubscriberAuthenticationDataCreate_Success(t *testing.T) {
 
 func TestSubscriberAuthenticationDataCreate_CommonDBFails_RollsBack(t *testing.T) {
 	rollbackCalled := false
-
 	authDB := &mockDB{
 		postFunc: func(coll string, filter bson.M, data map[string]interface{}) (bool, error) {
 			return true, nil
@@ -87,7 +108,6 @@ func TestSubscriberAuthenticationDataCreate_CommonDBFails_RollsBack(t *testing.T
 			return nil
 		},
 	}
-
 	commonDB := &mockDB{
 		postFunc: func(coll string, filter bson.M, data map[string]interface{}) (bool, error) {
 			return false, fmt.Errorf("common db failure")
@@ -106,7 +126,29 @@ func TestSubscriberAuthenticationDataCreate_CommonDBFails_RollsBack(t *testing.T
 	dbadapter.CommonDBClient = commonDB
 
 	sub := DatabaseSubscriberAuthenticationData{}
-	err := sub.SubscriberAuthenticationDataCreate("imsi-1", &models.AuthenticationSubscription{})
+	subsData := models.AuthenticationSubscription{
+		AuthenticationManagementField: "8000",
+		AuthenticationMethod:          "5G_AKA",
+		Milenage: &models.Milenage{
+			Op: &models.Op{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				OpValue:             "c9e8763286b5b9ffbdf56e1297d0887b",
+			},
+		},
+		Opc: &models.Opc{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			OpcValue:            "981d464c7c52eb6e5036234984ad0bcf",
+		},
+		PermanentKey: &models.PermanentKey{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			PermanentKeyValue:   "5122250214c33e723a5dd523fc145fc0",
+		},
+		SequenceNumber: "16f3b3f70fc2",
+	}
+	err := sub.SubscriberAuthenticationDataCreate("imsi-1", &subsData)
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}

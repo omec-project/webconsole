@@ -7,11 +7,11 @@ package configapi
 import (
 	"encoding/json"
 	"fmt"
+	"go.mongodb.org/mongo-driver/mongo"
 	"strconv"
 	"sync"
 
 	"github.com/omec-project/openapi/models"
-	"github.com/omec-project/util/mongoapi"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
@@ -72,8 +72,17 @@ func syncDeviceGroupSubscriber(devGroup configmodels.DeviceGroups, prevDevGroup 
 		Sd:  slice.SliceId.Sd,
 		Sst: int32(sVal),
 	}
-	mongoClient := dbadapter.CommonDBClient.(*mongoapi.MongoClient)
-	sessRunner := dbadapter.RealSessionRunner(mongoClient.Client)
+
+	type ClientProvider interface {
+		Client() *mongo.Client
+	}
+
+	provider, ok := dbadapter.CommonDBClient.(ClientProvider)
+	if !ok {
+		return fmt.Errorf("db does not support Client() access")
+	}
+
+	sessionRunner := dbadapter.RealSessionRunner(provider.Client())
 
 	var errorOccured bool
 	for _, imsi := range devGroup.Imsis {
@@ -97,7 +106,7 @@ func syncDeviceGroupSubscriber(devGroup configmodels.DeviceGroups, prevDevGroup 
 	// delete IMSI's that are removed
 	dimsis := getDeletedImsisList(&devGroup, prevDevGroup)
 	for _, imsi := range dimsis {
-		err = removeSubscriberEntriesRelatedToDeviceGroups(slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi, sessRunner)
+		err = removeSubscriberEntriesRelatedToDeviceGroups(slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi, sessionRunner)
 		if err != nil {
 			logger.ConfigLog.Errorln(err)
 			errorOccured = true

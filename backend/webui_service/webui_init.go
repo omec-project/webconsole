@@ -29,15 +29,13 @@ import (
 	gServ "github.com/omec-project/webconsole/proto/server"
 )
 
-type WEBUI struct {
-	TriggerSyncNFConfigFunc func()
-}
+type WEBUI struct{}
 
 type WebUIInterface interface {
-	Start(ctx context.Context)
+	Start(ctx context.Context, syncChan chan<- struct{})
 }
 
-func (webui *WEBUI) setupAuthenticationFeature(subconfig_router *gin.Engine) {
+func (webui *WEBUI) setupAuthenticationFeature(subconfig_router *gin.Engine, syncChan chan<- struct{}) {
 	jwtSecret, err := auth.GenerateJWTSecret()
 	if err != nil {
 		logger.InitLog.Error(err)
@@ -47,16 +45,16 @@ func (webui *WEBUI) setupAuthenticationFeature(subconfig_router *gin.Engine) {
 	auth.AddAuthenticationService(subconfig_router, jwtSecret)
 	authMiddleware := auth.AdminOrUserAuthMiddleware(jwtSecret)
 	configapi.AddApiService(subconfig_router, authMiddleware)
-	configapi.AddConfigV1Service(subconfig_router, webui.triggerNFConfigSyncMiddleware(), authMiddleware)
+	configapi.AddConfigV1Service(subconfig_router, webui.triggerNFConfigSyncMiddleware(syncChan), authMiddleware)
 }
 
-func (webui *WEBUI) Start(ctx context.Context) {
+func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 	subconfig_router := utilLogger.NewGinWithZap(logger.GinLog)
 	if factory.WebUIConfig.Configuration.EnableAuthentication {
-		webui.setupAuthenticationFeature(subconfig_router)
+		webui.setupAuthenticationFeature(subconfig_router, syncChan)
 	} else {
 		configapi.AddApiService(subconfig_router)
-		configapi.AddConfigV1Service(subconfig_router, webui.triggerNFConfigSyncMiddleware())
+		configapi.AddConfigV1Service(subconfig_router, webui.triggerNFConfigSyncMiddleware(syncChan))
 	}
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
@@ -174,19 +172,15 @@ func fetchConfigAdapater() {
 	}
 }
 
-func (webui *WEBUI) triggerNFConfigSyncMiddleware() gin.HandlerFunc {
+func (webui *WEBUI) triggerNFConfigSyncMiddleware(syncChan chan<- struct{}) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 		if isWritingMethod(c.Request.Method) && isStatusSuccess(c.Writer.Status()) {
-			if webui.TriggerSyncNFConfigFunc != nil {
-				logger.WebUILog.Infof("Triggered synchronization of NF config")
-				webui.TriggerSyncNFConfigFunc()
-			} else {
-				logger.WebUILog.Warnln("NF configuration synchronization function has not been initialized")
-			}
-			return
+			syncChan <- struct{}{}
+			logger.WebUILog.Infoln("NF config sync triggered via middleware")
+		} else {
+			logger.WebUILog.Debugln("WebUI operation does not require NF configuration synchronization")
 		}
-		logger.WebUILog.Debugln("WebUI operation does not require NF configuration synchronization")
 	}
 }
 

@@ -35,8 +35,7 @@ type Route struct {
 }
 
 type NFConfigInterface interface {
-	Start(ctx context.Context) error
-	TriggerSync()
+	Start(ctx context.Context, syncChan <-chan struct{}) error
 }
 
 func (n *NFConfigServer) router() *gin.Engine {
@@ -65,66 +64,8 @@ func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 	return nfconfigServer, nil
 }
 
-func (n *NFConfigServer) TriggerSync() {
-	n.syncMutex.Lock()
-	defer n.syncMutex.Unlock()
-
-	if n.syncCancelFunc != nil {
-		n.syncCancelFunc()
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	n.syncCancelFunc = cancel
-	logger.NfConfigLog.Debugln("Starting in-memory NF configuration synchronization with new context")
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				logger.NfConfigLog.Infoln("No-op. Sync in-memory configuration was cancelled")
-				return
-			default:
-				err := syncInMemoryConfigFunc(n)
-				if err == nil {
-					return
-				}
-				logger.NfConfigLog.Warnf("Sync in-memory configuration failed, retrying: %v", err)
-				time.Sleep(3 * time.Second)
-			}
-		}
-	}()
-}
-
-var syncInMemoryConfigFunc = func(n *NFConfigServer) error {
-	return n.syncInMemoryConfig()
-}
-
-func (n *NFConfigServer) syncInMemoryConfig() error {
-	sliceDataColl := "webconsoleData.snapshots.sliceData"
-	rawSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, bson.M{})
-	if err != nil {
-		return err
-	}
-
-	slices := []configmodels.Slice{}
-
-	for _, rawSlice := range rawSlices {
-		var s configmodels.Slice
-		if err := json.Unmarshal(configmodels.MapToByte(rawSlice), &s); err != nil {
-			logger.NfConfigLog.Warnf("Failed to unmarshal slice: %v. Network slice `%s` will be ignored", err, s.SliceName)
-			continue
-		}
-		slices = append(slices, s)
-	}
-	logger.NfConfigLog.Debugf("Retrieved %d network slices", len(slices))
-	n.inMemoryConfig.syncPlmn(slices)
-	n.inMemoryConfig.syncPlmnSnssai(slices)
-	n.inMemoryConfig.syncAccessAndMobility()
-	n.inMemoryConfig.syncSessionManagement()
-	n.inMemoryConfig.syncPolicyControl()
-	logger.NfConfigLog.Infoln("Updated NF in-memory configuration")
-	return nil
-}
-
-func (n *NFConfigServer) Start(ctx context.Context) error {
+func (n *NFConfigServer) Start(ctx context.Context, syncChan <-chan struct{}) error {
+	n.startSyncWorker(ctx, syncChan)
 	addr := ":5001"
 	srv := &http.Server{
 		Addr:    addr,
@@ -150,6 +91,84 @@ func (n *NFConfigServer) Start(ctx context.Context) error {
 	case err := <-serverErrChan:
 		return err
 	}
+}
+
+func (n *NFConfigServer) startSyncWorker(ctx context.Context, syncChan <-chan struct{}) {
+	go func() {
+		var currentCancel context.CancelFunc
+
+		for {
+			select {
+			case <-ctx.Done():
+				if currentCancel != nil {
+					currentCancel()
+				}
+				return
+
+			case <-syncChan:
+				// Cancel current sync if running
+				if currentCancel != nil {
+					logger.NfConfigLog.Infoln("Cancelling ongoing sync due to new trigger")
+					currentCancel()
+				}
+
+				var syncCtx context.Context
+				syncCtx, currentCancel = context.WithCancel(context.Background())
+				go n.syncWithRetry(syncCtx)
+			}
+		}
+	}()
+}
+
+func (n *NFConfigServer) syncWithRetry(ctx context.Context) {
+	n.syncMutex.Lock()
+	defer n.syncMutex.Unlock()
+	logger.NfConfigLog.Debugln("Starting in-memory NF configuration synchronization with new context")
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.NfConfigLog.Infoln("No-op. Sync in-memory configuration was cancelled")
+			return
+		default:
+			err := syncInMemoryConfigFunc(n)
+			if err == nil {
+				return
+			}
+			logger.NfConfigLog.Warnf("Sync in-memory configuration failed, retrying: %v", err)
+			time.Sleep(3 * time.Second)
+		}
+	}
+}
+
+var syncInMemoryConfigFunc = func(n *NFConfigServer) error {
+	return n.syncInMemoryConfig()
+}
+
+func (n *NFConfigServer) syncInMemoryConfig() error {
+	sliceDataColl := "webconsoleData.snapshots.sliceData"
+	rawSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, bson.M{})
+	if err != nil {
+		return err
+	}
+
+	slices := []configmodels.Slice{}
+	for _, rawSlice := range rawSlices {
+		var s configmodels.Slice
+		if err := json.Unmarshal(configmodels.MapToByte(rawSlice), &s); err != nil {
+			logger.NfConfigLog.Warnf("Failed to unmarshal slice: %v. Network slice `%s` will be ignored", err, s.SliceName)
+			continue
+		}
+		slices = append(slices, s)
+	}
+	logger.NfConfigLog.Debugf("Retrieved %d network slices", len(slices))
+	n.inMemoryConfig.syncPlmn(slices)
+	n.inMemoryConfig.syncPlmnSnssai(slices)
+	n.inMemoryConfig.syncAccessAndMobility()
+	n.inMemoryConfig.syncSessionManagement()
+	n.inMemoryConfig.syncPolicyControl()
+	logger.NfConfigLog.Infoln("Updated NF in-memory configuration")
+	return nil
 }
 
 func (n *NFConfigServer) setupRoutes() {

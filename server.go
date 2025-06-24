@@ -72,25 +72,23 @@ func startApplication(config *factory.Config) error {
 		logger.InitLog.Errorf("failed to initialize MongoDB: %v", err)
 		return err
 	}
-
+	webui := &webui_service.WEBUI{}
 	nfConfigServer, err := newNFConfigServer(config)
 	if err != nil {
 		return fmt.Errorf("failed to initialize NFConfig: %w", err)
 	}
-	webui := &webui_service.WEBUI{
-		TriggerSyncNFConfigFunc: nfConfigServer.TriggerSync,
-	}
+
 	return runServer(webui, nfConfigServer)
 }
 
 func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nfConf nfconfig.NFConfigInterface) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	go webui.Start(ctx)
+	syncChan := make(chan struct{}, 1)
+	go webui.Start(ctx, syncChan)
 	logger.InitLog.Infoln("WebUI started")
 
-	err := nfConf.Start(ctx)
+	err := nfConf.Start(ctx, syncChan)
 	if err != nil {
 		cancel()
 		return fmt.Errorf("NFConfig failed: %w", err)

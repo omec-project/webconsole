@@ -365,10 +365,10 @@ func TestNFConfigStart(t *testing.T) {
 			defer cancel()
 
 			errChan := make(chan error, 1)
-
+			syncChan := make(chan struct{}, 1)
 			go func() {
 				t.Logf("starting server")
-				err := nfconf.Start(ctx)
+				err := nfconf.Start(ctx, syncChan)
 				t.Logf("server stopped with error: %v", err)
 				errChan <- err
 			}()
@@ -406,13 +406,14 @@ func TestNFConfig_Start_ServerError(t *testing.T) {
 	defer cancel1()
 
 	errChan := make(chan error, 1)
+	syncChan := make(chan struct{}, 1)
 	go func() {
-		errChan <- nfc1.Start(ctx1)
+		errChan <- nfc1.Start(ctx1, syncChan)
 	}()
 	time.Sleep(10 * time.Millisecond)
 
 	ctx2 := context.Background()
-	err := nfc2.Start(ctx2)
+	err := nfc2.Start(ctx2, syncChan)
 	if err == nil {
 		t.Error("expected error when starting server on same port, got nil")
 	}
@@ -428,8 +429,9 @@ func TestNFConfig_Start_ContextCancellation(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	errChan := make(chan error)
+	syncChan := make(chan struct{}, 1)
 	go func() {
-		errChan <- nfc.Start(ctx)
+		errChan <- nfc.Start(ctx, syncChan)
 	}()
 	time.Sleep(100 * time.Millisecond)
 	t.Logf("triggering context cancellation")
@@ -440,7 +442,7 @@ func TestNFConfig_Start_ContextCancellation(t *testing.T) {
 	}
 }
 
-func TestTriggerSync_Success(t *testing.T) {
+func TestSyncWithRetry_Success_CallsSyncInMemoryConfig(t *testing.T) {
 	n := &NFConfigServer{}
 
 	called := false
@@ -450,16 +452,17 @@ func TestTriggerSync_Success(t *testing.T) {
 		called = true
 		return nil
 	}
-
-	n.TriggerSync()
+	ctx, cancel := context.WithCancel(context.Background())
+	n.syncWithRetry(ctx)
 	time.Sleep(100 * time.Millisecond)
 
 	if !called {
 		t.Fatal("expected syncInMemoryConfig to be called")
 	}
+	cancel()
 }
 
-func TestTriggerSync_RetryAndThenSuccess(t *testing.T) {
+func TestSyncWithRetry_RetryInCaseOfFailure(t *testing.T) {
 	n := &NFConfigServer{}
 
 	callCount := 0
@@ -472,13 +475,14 @@ func TestTriggerSync_RetryAndThenSuccess(t *testing.T) {
 		}
 		return nil
 	}
-
-	n.TriggerSync()
+	ctx, cancel := context.WithCancel(context.Background())
+	n.syncWithRetry(ctx)
 
 	time.Sleep(10 * time.Second)
 	if callCount != 3 {
 		t.Fatalf("expected 3 calls to syncInMemoryConfigFunc, got %d", callCount)
 	}
+	cancel()
 }
 
 func TestSyncInMemoryConfig_Success(t *testing.T) {

@@ -28,7 +28,15 @@ func handleNetworkSlicePost(slice *configmodels.Slice, prevSlice *configmodels.S
 		return err
 	}
 	logger.DbLog.Debugf("succeeded to post slice data for %v", slice.SliceName)
-	err = syncSliceDeviceGroupSubscribers(slice, prevSlice)
+
+	provider, ok := dbadapter.CommonDBClient.(interface {
+		Client() *mongo.Client
+	})
+	if !ok {
+		return fmt.Errorf("db does not support Client() access")
+	}
+	sessionRunner := dbadapter.RealSessionRunner(provider.Client())
+	err = syncSliceDeviceGroupSubscribers(slice, prevSlice, sessionRunner)
 	if err != nil {
 		return err
 	}
@@ -50,21 +58,10 @@ func sendPebbleNotification(key string) error {
 	return nil
 }
 
-var syncSliceDeviceGroupSubscribers = func(slice *configmodels.Slice, prevSlice *configmodels.Slice) error {
+var syncSliceDeviceGroupSubscribers = func(slice *configmodels.Slice, prevSlice *configmodels.Slice, sessionRunner dbadapter.SessionRunner) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	logger.WebUILog.Debugln("insert/update Network Slice")
-
-	type ClientProvider interface {
-		Client() *mongo.Client
-	}
-
-	provider, ok := dbadapter.CommonDBClient.(ClientProvider)
-	if !ok {
-		return fmt.Errorf("db does not support Client() access")
-	}
-
-	sessionRunner := dbadapter.RealSessionRunner(provider.Client())
 	if slice == nil && prevSlice != nil {
 		logger.WebUILog.Debugf("Deleted slice: %s", prevSlice.SliceName)
 		return cleanupDeviceGroups(nil, prevSlice, sessionRunner)
@@ -368,8 +365,15 @@ func handleNetworkSliceDelete(sliceName string) error {
 		logger.DbLog.Errorf("failed to delete slice data for %v: %v", sliceName, err)
 		return err
 	}
+	provider, ok := dbadapter.CommonDBClient.(interface {
+		Client() *mongo.Client
+	})
+	if !ok {
+		return fmt.Errorf("db does not support Client() access")
+	}
+	sessionRunner := dbadapter.RealSessionRunner(provider.Client())
 	// slice is nil as it is deleted
-	if err = syncSliceDeviceGroupSubscribers(nil, &prevSlice); err != nil {
+	if err = syncSliceDeviceGroupSubscribers(nil, &prevSlice, sessionRunner); err != nil {
 		logger.WebUILog.Errorf("failed to sync slice %v: %v", sliceName, err)
 		return err
 	}

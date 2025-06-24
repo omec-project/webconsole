@@ -120,6 +120,14 @@ func (m *MockMongoClientEmptyDB) StartSession() (mongo.Session, error) {
 	return &MockSession{}, nil
 }
 
+func (m *MockMongoClientEmptyDB) RestfulAPIDeleteOne(coll string, filter bson.M) error {
+	return nil
+}
+
+func (m *MockMongoClientEmptyDB) Client() *mongo.Client {
+	return nil
+}
+
 type MockMongoClientDuplicateCreation struct {
 	dbadapter.DBInterface
 }

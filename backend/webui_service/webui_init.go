@@ -35,7 +35,7 @@ type WebUIInterface interface {
 	Start(ctx context.Context, syncChan chan<- struct{})
 }
 
-func (webui *WEBUI) setupAuthenticationFeature(subconfig_router *gin.Engine, syncChan chan<- struct{}) {
+func setupAuthenticationFeature(subconfig_router *gin.Engine, nfSyncMiddelware gin.HandlerFunc) {
 	jwtSecret, err := auth.GenerateJWTSecret()
 	if err != nil {
 		logger.InitLog.Error(err)
@@ -45,16 +45,16 @@ func (webui *WEBUI) setupAuthenticationFeature(subconfig_router *gin.Engine, syn
 	auth.AddAuthenticationService(subconfig_router, jwtSecret)
 	authMiddleware := auth.AdminOrUserAuthMiddleware(jwtSecret)
 	configapi.AddApiService(subconfig_router, authMiddleware)
-	configapi.AddConfigV1Service(subconfig_router, webui.triggerNFConfigSyncMiddleware(syncChan), authMiddleware)
+	configapi.AddConfigV1Service(subconfig_router, nfSyncMiddelware, authMiddleware)
 }
 
 func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 	subconfig_router := utilLogger.NewGinWithZap(logger.GinLog)
 	if factory.WebUIConfig.Configuration.EnableAuthentication {
-		webui.setupAuthenticationFeature(subconfig_router, syncChan)
+		setupAuthenticationFeature(subconfig_router, triggerNFConfigSyncMiddleware(syncChan))
 	} else {
 		configapi.AddApiService(subconfig_router)
-		configapi.AddConfigV1Service(subconfig_router, webui.triggerNFConfigSyncMiddleware(syncChan))
+		configapi.AddConfigV1Service(subconfig_router, triggerNFConfigSyncMiddleware(syncChan))
 	}
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
@@ -172,7 +172,7 @@ func fetchConfigAdapater() {
 	}
 }
 
-func (webui *WEBUI) triggerNFConfigSyncMiddleware(syncChan chan<- struct{}) gin.HandlerFunc {
+func triggerNFConfigSyncMiddleware(syncChan chan<- struct{}) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 		if isWritingMethod(c.Request.Method) && isStatusSuccess(c.Writer.Status()) {

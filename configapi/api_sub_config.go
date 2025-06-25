@@ -469,6 +469,7 @@ func PostSubscriberByID(c *gin.Context) {
 	}
 
 	logger.WebUILog.Infoln("Received Post Subscriber Data from Roc/Simapp: ", ueId)
+	logger.WebUILog.Debugf("Override Data: %+v", subsOverrideData)
 
 	// Check if the IMSI already exists in the database
 	filter := bson.M{"ueId": ueId}
@@ -500,11 +501,9 @@ func PostSubscriberByID(c *gin.Context) {
 			EncryptionAlgorithm: 0,
 			EncryptionKey:       0,
 		},
+		SequenceNumber: subsOverrideData.SequenceNumber,
 	}
 
-	if subsOverrideData.SequenceNumber != "" {
-		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
-	}
 	logger.WebUILog.Infof("%+v", authSubsData)
 	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	logger.WebUILog.Infof("Using OPc: %s, Key: %s, SeqNo: %s", subsOverrideData.OPc, subsOverrideData.Key, subsOverrideData.SequenceNumber)

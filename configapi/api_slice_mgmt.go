@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"slices"
 	"strings"
 
@@ -175,7 +176,7 @@ func networkSliceDeleteHelper(sliceName string) error {
 	return nil
 }
 
-func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) error {
+func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, error) {
 	logger.ConfigLog.Infof("received slice: %v", sliceName)
 	var request configmodels.Slice
 
@@ -183,12 +184,12 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) error {
 	if ct != "application/json" {
 		err := fmt.Errorf("unsupported content-type: %s", ct)
 		logger.ConfigLog.Errorln(err)
-		return err
+		return http.StatusInternalServerError, err
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		logger.ConfigLog.Errorf("JSON bind error: %v", err)
-		return err
+		return http.StatusInternalServerError, err
 	}
 
 	logger.ConfigLog.Infof("printing Slice: [%v] received from Roc/Simapp: %+v", sliceName, request)
@@ -197,12 +198,12 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) error {
 		if !isValidName(gnb.Name) {
 			err := fmt.Errorf("invalid gNB name `%s` in Network Slice %s. Name needs to match the following regular expression: %s", gnb.Name, sliceName, NAME_PATTERN)
 			logger.ConfigLog.Errorln(err.Error())
-			return err
+			return http.StatusBadRequest, err
 		}
 		if !isValidGnbTac(gnb.Tac) {
 			err := fmt.Errorf("invalid TAC %d for gNB %s in Network Slice %s. TAC must be an integer within the range [1, 16777215]", gnb.Tac, gnb.Name, sliceName)
 			logger.ConfigLog.Errorln(err.Error())
-			return err
+			return http.StatusBadRequest, err
 		}
 	}
 	slice := request.SliceId
@@ -260,7 +261,7 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) error {
 	request.SliceName = sliceName
 	if err := handleNetworkSlicePost(&request, &prevSlice); err != nil {
 		logger.ConfigLog.Errorf("Error posting slice %v: %v", sliceName, err)
-		return err
+		return http.StatusInternalServerError, err
 	}
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = msgOp
@@ -270,5 +271,5 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) error {
 	msg.SliceName = sliceName
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully Added Slice [%v] to config channel", sliceName)
-	return nil
+	return http.StatusOK, nil
 }

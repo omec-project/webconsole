@@ -22,7 +22,7 @@ type mockWebUI struct {
 	startedChan chan struct{}
 }
 
-func (m *mockWebUI) Start(ctx context.Context) {
+func (m *mockWebUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 	select {
 	case <-ctx.Done():
 		return
@@ -36,15 +36,21 @@ func (m *mockWebUI) Start(ctx context.Context) {
 
 type mockNFConfigSuccess struct{}
 
-func (m *mockNFConfigSuccess) Start(ctx context.Context) error {
+func (m *mockNFConfigSuccess) Start(ctx context.Context, syncChan <-chan struct{}) error {
 	time.Sleep(50 * time.Millisecond)
 	return nil
 }
 
 type mockNFConfigFail struct{}
 
-func (m *mockNFConfigFail) Start(ctx context.Context) error {
+func (m *mockNFConfigFail) Start(ctx context.Context, syncChan <-chan struct{}) error {
 	return errors.New("NFConfig start failed")
+}
+
+type MockNFConfig struct{}
+
+func (m *MockNFConfig) Start(ctx context.Context, syncChan <-chan struct{}) error {
+	return nil
 }
 
 func TestRunWebUIAndNFConfig_Success(t *testing.T) {
@@ -137,12 +143,6 @@ func TestMainValidateCLIFlags(t *testing.T) {
 			}
 		})
 	}
-}
-
-type MockNFConfig struct{}
-
-func (m *MockNFConfig) Start(ctx context.Context) error {
-	return nil
 }
 
 func TestStartApplication(t *testing.T) {

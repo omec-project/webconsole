@@ -32,10 +32,10 @@ import (
 type WEBUI struct{}
 
 type WebUIInterface interface {
-	Start(ctx context.Context)
+	Start(ctx context.Context, syncChan chan<- struct{})
 }
 
-func setupAuthenticationFeature(subconfig_router *gin.Engine) {
+func setupAuthenticationFeature(subconfig_router *gin.Engine, nfSyncMiddelware gin.HandlerFunc) {
 	jwtSecret, err := auth.GenerateJWTSecret()
 	if err != nil {
 		logger.InitLog.Error(err)
@@ -43,17 +43,19 @@ func setupAuthenticationFeature(subconfig_router *gin.Engine) {
 	}
 	configapi.AddUserAccountService(subconfig_router, jwtSecret)
 	auth.AddAuthenticationService(subconfig_router, jwtSecret)
-	configapi.AddApiServiceWithAuthorization(subconfig_router, jwtSecret)
-	configapi.AddConfigV1ServiceWithAuthorization(subconfig_router, jwtSecret)
+	authMiddleware := auth.AdminOrUserAuthMiddleware(jwtSecret)
+	configapi.AddApiService(subconfig_router, authMiddleware)
+	configapi.AddConfigV1Service(subconfig_router, nfSyncMiddelware, authMiddleware)
 }
 
-func (webui *WEBUI) Start(ctx context.Context) {
+func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 	subconfig_router := utilLogger.NewGinWithZap(logger.GinLog)
+	nFConfigSyncMiddleware := triggerNFConfigSyncMiddleware(syncChan)
 	if factory.WebUIConfig.Configuration.EnableAuthentication {
-		setupAuthenticationFeature(subconfig_router)
+		setupAuthenticationFeature(subconfig_router, nFConfigSyncMiddleware)
 	} else {
 		configapi.AddApiService(subconfig_router)
-		configapi.AddConfigV1Service(subconfig_router)
+		configapi.AddConfigV1Service(subconfig_router, nFConfigSyncMiddleware)
 	}
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
@@ -169,4 +171,25 @@ func fetchConfigAdapater() {
 		logger.InitLog.Infof("fetching config from simapp/roc. Response code = %d", resp.StatusCode)
 		break
 	}
+}
+
+func triggerNFConfigSyncMiddleware(syncChan chan<- struct{}) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+		if isWritingMethod(c.Request.Method) && isStatusSuccess(c.Writer.Status()) {
+			syncChan <- struct{}{}
+			logger.WebUILog.Infoln("NF config sync triggered via middleware")
+		} else {
+			logger.WebUILog.Debugln("WebUI operation does not require NF configuration synchronization")
+		}
+	}
+}
+
+func isWritingMethod(method string) bool {
+	return method == http.MethodPost || method == http.MethodPut ||
+		method == http.MethodDelete || method == http.MethodPatch
+}
+
+func isStatusSuccess(status int) bool {
+	return status/100 == 2
 }

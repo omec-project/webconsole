@@ -73,6 +73,10 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		t.Run(dg.DeviceGroupName, func(t *testing.T) {
 			postData = make([]map[string]interface{}, 0)
 			mockDB := &MockMongoDGPost{}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() {
+				dbadapter.CommonDBClient = originalDBClient
+			}()
 			dbadapter.CommonDBClient = mockDB
 
 			err := handleDeviceGroupPost(dg, nil)
@@ -165,6 +169,10 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 			postData = make([]map[string]interface{}, 0)
 
 			mock := &MockMongoDeviceGroupCombined{testGroup: dg}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() {
+				dbadapter.CommonDBClient = originalDBClient
+			}()
 			dbadapter.CommonDBClient = mock
 
 			err := handleDeviceGroupPost(dg, &dg)
@@ -207,7 +215,10 @@ func Test_handleDeviceGroupDelete(t *testing.T) {
 	for _, testGroup := range deviceGroups {
 		t.Run(testGroup.DeviceGroupName, func(t *testing.T) {
 			deleteData = make([]map[string]interface{}, 0)
-
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() {
+				dbadapter.CommonDBClient = originalDBClient
+			}()
 			dbadapter.CommonDBClient = &MockMongoDeleteOne{}
 
 			err := handleDeviceGroupDelete(testGroup.DeviceGroupName)
@@ -291,7 +302,8 @@ func TestDeviceGroupPostHandler_DeviceGroupNameValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			origChannel := configChannel
 			configChannel = make(chan *configmodels.ConfigMessage, 1)
-			defer func() { configChannel = origChannel }()
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { configChannel = origChannel; dbadapter.CommonDBClient = originalDBClient }()
 			if tc.expectedCode == http.StatusOK {
 				dbadapter.CommonDBClient = &MockMongoClientEmptyDB{}
 			}

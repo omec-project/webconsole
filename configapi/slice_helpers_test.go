@@ -98,6 +98,10 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 	var prevSlice *configmodels.Slice = nil
 
 	factory.WebUIConfig.Configuration.SendPebbleNotifications = true
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() {
+		dbadapter.CommonDBClient = originalDBClient
+	}()
 	dbadapter.CommonDBClient = &MockMongoPost{}
 
 	err := handleNetworkSlicePost(&slice, prevSlice)
@@ -128,7 +132,10 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 
 	slice := &configmodels.Slice{SliceName: "slice1"}
 	prevSlice := &configmodels.Slice{}
-
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() {
+		dbadapter.CommonDBClient = originalDBClient
+	}()
 	dbadapter.CommonDBClient = &MockMongoPost{}
 
 	err := handleNetworkSlicePost(slice, prevSlice)
@@ -219,6 +226,10 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 			mock := &MockCombinedDB{
 				testSlice: ts,
 			}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() {
+				dbadapter.CommonDBClient = originalDBClient
+			}()
 			dbadapter.CommonDBClient = mock
 
 			postErr := handleNetworkSlicePost(&testSlice, nil)
@@ -291,6 +302,10 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 			postData = make([]map[string]interface{}, 0)
 
 			mock := &MockCombinedDB{testSlice: ts}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() {
+				dbadapter.CommonDBClient = originalDBClient
+			}()
 			dbadapter.CommonDBClient = mock
 
 			err := handleNetworkSlicePost(&ts, &ts)
@@ -427,7 +442,8 @@ func TestNetworkSlicePostHandler_NetworkSliceNameValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			origChannel := configChannel
 			configChannel = make(chan *configmodels.ConfigMessage, 1)
-			defer func() { configChannel = origChannel }()
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { configChannel = origChannel; dbadapter.CommonDBClient = originalDBClient }()
 			if tc.expectedCode == http.StatusOK {
 				dbadapter.CommonDBClient = &MockMongoClientEmptyDB{}
 			}

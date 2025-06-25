@@ -1282,11 +1282,9 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 	if prevGroup == nil {
 		return
 	}
-
 	if group == nil {
 		return prevGroup.Imsis
 	}
-
 	for _, pimsi := range prevGroup.Imsis {
 		var found bool
 		for _, imsi := range group.Imsis {
@@ -1294,11 +1292,9 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 				found = true
 			}
 		}
-
 		if !found {
 			dimsis = append(dimsis, pimsi)
 		}
 	}
-
 	return
 }

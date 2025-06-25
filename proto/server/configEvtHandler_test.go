@@ -237,7 +237,6 @@ func Test_handleSubscriberGet4G(t *testing.T) {
 	}
 
 	imsi := "imsi-208930100007487"
-
 	orig := subscriberAuthData
 	defer func() { subscriberAuthData = orig }()
 

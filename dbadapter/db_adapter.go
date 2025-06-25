@@ -91,10 +91,10 @@ type PatchOperation struct {
 
 func setDBClient(url, dbname string) (DBInterface, error) {
 	mClient, errConnect := mongoapi.NewMongoClient(url, dbname)
-	if mClient.Client != nil {
-		return mClient, nil
+	if errConnect != nil {
+		return nil, errConnect
 	}
-	return nil, errConnect
+	return &MongoDBClient{MongoClient: *mClient}, nil
 }
 
 func ConnectMongo(url string, dbname string, client *DBInterface) {

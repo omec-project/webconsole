@@ -161,8 +161,8 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 		return fmt.Errorf("failed to update amData: %w", err)
 	}
 	logger.WebUILog.Debugf("successfully inserted/updated authentication subscription in amData collection: %v", imsi)
-	logger.WebUILog.Debugf("insert/update authentication subscription in memory: %v", imsi)
 	ImsiData[imsi] = authSubData
+	logger.WebUILog.Debugf("insert/update authentication subscription in memory: %v", imsi)
 	return nil
 }
 
@@ -172,8 +172,8 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 		return fmt.Errorf("failed to delete from amData collection: %w", err)
 	}
 	logger.WebUILog.Debugf("successfully deleted authentication subscription from amData collection: %v", imsi)
-	logger.WebUILog.Debugf("delete authentication subscription from memory: %v", imsi)
 	delete(ImsiData, imsi)
+	logger.WebUILog.Debugf("delete authentication subscription from memory: %v", imsi)
 	return nil
 }
 

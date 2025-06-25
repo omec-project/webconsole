@@ -332,8 +332,9 @@ func NetworkSliceSliceNamePost(c *gin.Context) {
 		})
 		return
 	}
-	if err := networkSlicePostHelper(c, configmodels.Post_op, sliceName); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create network slice %s. Please check the log for details.", sliceName)})
+	statusCode, err := networkSlicePostHelper(c, configmodels.Post_op, sliceName)
+	if err != nil {
+		c.JSON(statusCode, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{})
@@ -357,8 +358,9 @@ func NetworkSliceSliceNamePut(c *gin.Context) {
 		})
 		return
 	}
-	if err := networkSlicePostHelper(c, configmodels.Put_op, sliceName); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update network slice %s. Please check the log for details.", sliceName)})
+	statusCode, err := networkSlicePostHelper(c, configmodels.Put_op, sliceName)
+	if err != nil {
+		c.JSON(statusCode, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{})

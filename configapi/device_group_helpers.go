@@ -73,15 +73,12 @@ func syncDeviceGroupSubscriber(devGroup configmodels.DeviceGroups, prevDevGroup 
 		Sst: int32(sVal),
 	}
 
-	type ClientProvider interface {
+	provider, ok := dbadapter.CommonDBClient.(interface {
 		Client() *mongo.Client
-	}
-
-	provider, ok := dbadapter.CommonDBClient.(ClientProvider)
+	})
 	if !ok {
 		return fmt.Errorf("db does not support Client() access")
 	}
-
 	sessionRunner := dbadapter.RealSessionRunner(provider.Client())
 
 	var errorOccured bool

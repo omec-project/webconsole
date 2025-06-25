@@ -219,25 +219,25 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 	AddConfigV1Service(router)
 
 	testCases := []struct {
-		name         string
-		route        string
-		inputData    string
-		expectedCode int
-		expectedBody string
+		name          string
+		route         string
+		inputData     string
+		expectedCode  int
+		expectedError string
 	}{
 		{
-			name:         "Network Slice invalid gNB name",
-			route:        "/config/v1/network-slice/slice-1",
-			inputData:    networkSliceWithGnbParams("", 3),
-			expectedCode: http.StatusInternalServerError,
-			expectedBody: `{"error":"Failed to create network slice slice-1. Please check the log for details."}`,
+			name:          "Network Slice invalid gNB name",
+			route:         "/config/v1/network-slice/slice-1",
+			inputData:     networkSliceWithGnbParams("", 3),
+			expectedCode:  http.StatusBadRequest,
+			expectedError: "invalid gNB name",
 		},
 		{
-			name:         "Network Slice invalid gNB TAC",
-			route:        "/config/v1/network-slice/slice-1",
-			inputData:    networkSliceWithGnbParams("valid-gnb", 0),
-			expectedCode: http.StatusInternalServerError,
-			expectedBody: `{"error":"Failed to create network slice slice-1. Please check the log for details."}`,
+			name:          "Network Slice invalid gNB TAC",
+			route:         "/config/v1/network-slice/slice-1",
+			inputData:     networkSliceWithGnbParams("valid-gnb", 0),
+			expectedCode:  http.StatusBadRequest,
+			expectedError: "invalid TAC",
 		},
 	}
 
@@ -257,8 +257,8 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 			if tc.expectedCode != w.Code {
 				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
-			if tc.expectedBody != w.Body.String() {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+			if !strings.Contains(w.Body.String(), tc.expectedError) {
+				t.Errorf("Expected body to contain error about  `%v`, got `%v`", tc.expectedError, w.Body.String())
 			}
 		})
 	}

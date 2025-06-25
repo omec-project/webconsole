@@ -2,17 +2,22 @@ package configapi
 
 import (
 	"encoding/json"
-	"go.mongodb.org/mongo-driver/mongo"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
@@ -186,6 +191,7 @@ func structToMap(obj interface{}) (map[string]interface{}, error) {
 	}
 	return result, nil
 }
+
 func (m *MockCombinedDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
 	return structToMap(m.testSlice)
 }
@@ -195,8 +201,10 @@ func (m *MockCombinedDB) Client() *mongo.Client {
 }
 
 func Test_handleNetworkSlicePost(t *testing.T) {
-	networkSlices := []configmodels.Slice{networkSlice("slice1"), networkSlice("slice2"),
-		networkSlice("slice_no_gnodeb"), networkSlice("slice_no_device_groups")}
+	networkSlices := []configmodels.Slice{
+		networkSlice("slice1"), networkSlice("slice2"),
+		networkSlice("slice_no_gnodeb"), networkSlice("slice_no_device_groups"),
+	}
 	networkSlices[2].SiteInfo.GNodeBs = []configmodels.SliceSiteInfoGNodeBs{}
 	networkSlices[3].SiteDeviceGroup = []string{}
 	factory.WebUIConfig.Configuration.Mode5G = true
@@ -265,8 +273,10 @@ func (m *MockMongoDeleteOne) RestfulAPIGetOne(coll string, filter bson.M) (map[s
 }
 
 func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
-	networkSlices := []configmodels.Slice{networkSlice("slice1"), networkSlice("slice2"),
-		networkSlice("slice_no_gnodeb"), networkSlice("slice_no_device_groups")}
+	networkSlices := []configmodels.Slice{
+		networkSlice("slice1"), networkSlice("slice2"),
+		networkSlice("slice_no_gnodeb"), networkSlice("slice_no_device_groups"),
+	}
 	networkSlices[2].SiteInfo.GNodeBs = []configmodels.SliceSiteInfoGNodeBs{}
 	networkSlices[3].SiteDeviceGroup = []string{}
 	factory.WebUIConfig.Configuration.Mode5G = true
@@ -281,7 +291,6 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 			dbadapter.CommonDBClient = mock
 
 			err := handleNetworkSlicePost(&ts, &ts)
-
 			if err != nil {
 				t.Fatalf("handleNetworkSlicePost returned error: %v", err)
 			}
@@ -310,6 +319,176 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 			}
 			if !reflect.DeepEqual(resultSlice, ts) {
 				t.Errorf("Expected slice %v, got %v", ts, resultSlice)
+			}
+		})
+	}
+}
+
+const NETWORK_SLICE_CONFIG = `{
+  "application-filtering-rules": [
+    {
+      "action": "string",
+      "app-mbr-downlink": 0,
+      "app-mbr-uplink": 0,
+      "bitrate-unit": "string",
+      "dest-port-end": 0,
+      "dest-port-start": 0,
+      "endpoint": "string",
+      "priority": 0,
+      "protocol": 0,
+      "rule-name": "string",
+      "rule-trigger": "string",
+      "traffic-class": {
+        "arp": 0,
+        "name": "string",
+        "pdb": 0,
+        "pelr": 0,
+        "qci": 0
+      }
+    }
+  ],
+  "site-device-group": [
+    "string"
+  ],
+  "site-info": {
+    "gNodeBs": [
+      {
+        "name": "string",
+        "tac": 1
+      }
+    ],
+    "plmn": {
+      "mcc": "string",
+      "mnc": "string"
+    },
+    "site-name": "string",
+    "upf": {
+      "additionalProp1": {}
+    }
+  },
+  "slice-id": {
+    "sd": "1",
+    "sst": "001"
+  },
+  "sliceName": "string"
+}`
+
+func networkSliceWithGnbParams(gnbName string, gnbTac int32) string {
+	gnb := configmodels.SliceSiteInfoGNodeBs{
+		Name: gnbName,
+		Tac:  gnbTac,
+	}
+	siteInfo := configmodels.SliceSiteInfo{
+		SiteName: "demo",
+		GNodeBs:  []configmodels.SliceSiteInfoGNodeBs{gnb},
+	}
+	slice := configmodels.Slice{
+		SliceName: "slice-1",
+		SiteInfo:  siteInfo,
+	}
+	sliceTmp, err := json.Marshal(slice)
+	if err != nil {
+		panic(fmt.Sprintf("failed to marshal network slice: %v", err))
+	}
+	return string(sliceTmp[:])
+}
+
+func TestNetworkSlicePostHandler_NetworkSliceNameValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	testCases := []struct {
+		name         string
+		route        string
+		expectedCode int
+	}{
+		{
+			name:         "Network Slice invalid name (invalid token)",
+			route:        "/config/v1/network-slice/invalid&name",
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "Network Slice invalid name (invalid length)",
+			route:        "/config/v1/network-slice/" + genLongString(257),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "Network Slice valid name",
+			route:        "/config/v1/network-slice/slice1",
+			expectedCode: http.StatusOK,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			origChannel := configChannel
+			configChannel = make(chan *configmodels.ConfigMessage, 1)
+			defer func() { configChannel = origChannel }()
+			if tc.expectedCode == http.StatusOK {
+				dbadapter.CommonDBClient = &MockMongoClientEmptyDB{}
+			}
+			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(NETWORK_SLICE_CONFIG))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+			}
+		})
+	}
+}
+
+func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	testCases := []struct {
+		name          string
+		route         string
+		inputData     string
+		expectedCode  int
+		expectedError string
+	}{
+		{
+			name:          "Network Slice invalid gNB name",
+			route:         "/config/v1/network-slice/slice-1",
+			inputData:     networkSliceWithGnbParams("", 3),
+			expectedCode:  http.StatusBadRequest,
+			expectedError: "invalid gNB name",
+		},
+		{
+			name:          "Network Slice invalid gNB TAC",
+			route:         "/config/v1/network-slice/slice-1",
+			inputData:     networkSliceWithGnbParams("valid-gnb", 0),
+			expectedCode:  http.StatusBadRequest,
+			expectedError: "invalid TAC",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			origChannel := configChannel
+			configChannel = make(chan *configmodels.ConfigMessage, 1)
+			defer func() { configChannel = origChannel }()
+			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+			}
+			if !strings.Contains(w.Body.String(), tc.expectedError) {
+				t.Errorf("Expected body to contain error about  `%v`, got `%v`", tc.expectedError, w.Body.String())
 			}
 		})
 	}

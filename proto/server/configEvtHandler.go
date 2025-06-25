@@ -15,8 +15,6 @@ import (
 )
 
 const (
-	authSubsDataColl = "subscriptionData.authenticationData.authenticationSubscription"
-	amDataColl       = "subscriptionData.provisionedData.amData"
 	devGroupDataColl = "webconsoleData.snapshots.devGroupData"
 	sliceDataColl    = "webconsoleData.snapshots.sliceData"
 )

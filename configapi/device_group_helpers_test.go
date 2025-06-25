@@ -2,15 +2,20 @@ package configapi
 
 import (
 	"encoding/json"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type MockMongoDGPost struct {
@@ -50,8 +55,10 @@ func (m *MockMongoDeviceGroupGetOne) RestfulAPIGetOne(collName string, filter bs
 }
 
 func Test_handleDeviceGroupPost(t *testing.T) {
-	deviceGroups := []configmodels.DeviceGroups{deviceGroup("group1"), deviceGroup("group2"),
-		deviceGroup("group_no_imsis"), deviceGroup("group_no_traf_class"), deviceGroup("group_no_qos")}
+	deviceGroups := []configmodels.DeviceGroups{
+		deviceGroup("group1"), deviceGroup("group2"),
+		deviceGroup("group_no_imsis"), deviceGroup("group_no_traf_class"), deviceGroup("group_no_qos"),
+	}
 	deviceGroups[2].Imsis = []string{}
 	deviceGroups[3].IpDomainExpanded.UeDnnQos.TrafficClass = nil
 	deviceGroups[4].IpDomainExpanded.UeDnnQos = nil
@@ -115,9 +122,14 @@ func (m *MockMongoDeviceGroupCombined) RestfulAPIPost(coll string, filter bson.M
 }
 
 func (m *MockMongoDeviceGroupCombined) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
-	bytes, _ := json.Marshal(m.testGroup)
+	bytes, err := json.Marshal(m.testGroup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal: %v", err)
+	}
 	var result map[string]interface{}
-	_ = json.Unmarshal(bytes, &result)
+	if err := json.Unmarshal(bytes, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal: %v", err)
+	}
 	return result, nil
 }
 
@@ -191,7 +203,6 @@ func Test_handleDeviceGroupDelete(t *testing.T) {
 
 	for _, testGroup := range deviceGroups {
 		t.Run(testGroup.DeviceGroupName, func(t *testing.T) {
-
 			deleteData = make([]map[string]interface{}, 0)
 
 			dbadapter.CommonDBClient = &MockMongoDeleteOne{}
@@ -213,6 +224,84 @@ func Test_handleDeviceGroupDelete(t *testing.T) {
 			expectedFilter := bson.M{"group-name": testGroup.DeviceGroupName}
 			if !reflect.DeepEqual(deleteData[0]["filter"], expectedFilter) {
 				t.Errorf("Expected filter %v, got %v", expectedFilter, deleteData[0]["filter"])
+			}
+		})
+	}
+}
+
+const DEVICE_GROUP_CONFIG = `{
+  "group-name": "string",
+  "imsis": [
+    "string"
+  ],
+  "ip-domain-expanded": {
+    "dnn": "string",
+    "dns-primary": "string",
+    "dns-secondary": "string",
+    "mtu": 0,
+    "ue-dnn-qos": {
+      "bitrate-unit": "string",
+      "dnn-mbr-downlink": 0,
+      "dnn-mbr-uplink": 0,
+      "traffic-class": {
+        "arp": 0,
+        "name": "string",
+        "pdb": 0,
+        "pelr": 0,
+        "qci": 0
+      }
+    },
+    "ue-ip-pool": "string"
+  },
+  "ip-domain-name": "string",
+  "site-info": "string"
+}`
+
+func TestDeviceGroupPostHandler_DeviceGroupNameValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	testCases := []struct {
+		name         string
+		route        string
+		expectedCode int
+	}{
+		{
+			name:         "Device Group invalid name (invalid token)",
+			route:        "/config/v1/device-group/invalid&name",
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "Device Group invalid name (invalid length)",
+			route:        "/config/v1/device-group/" + genLongString(257),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "Device Group valid name",
+			route:        "/config/v1/device-group/valid-devicegroup",
+			expectedCode: http.StatusOK,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			origChannel := configChannel
+			configChannel = make(chan *configmodels.ConfigMessage, 1)
+			defer func() { configChannel = origChannel }()
+			if tc.expectedCode == http.StatusOK {
+				dbadapter.CommonDBClient = &MockMongoClientEmptyDB{}
+			}
+			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(DEVICE_GROUP_CONFIG))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+			if tc.expectedCode != w.Code {
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 		})
 	}

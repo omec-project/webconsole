@@ -7,21 +7,157 @@ package configapi
 import (
 	"encoding/json"
 	"fmt"
-	"go.mongodb.org/mongo-driver/mongo"
+	"math"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
 	rwLock             sync.RWMutex
 	subscriberAuthData SubscriberAuthenticationData
 )
+
+const (
+	KPS = 1000
+	MPS = 1000000
+	GPS = 1000000000
+)
+
+func deviceGroupDeleteHelper(groupName string) error {
+	logger.ConfigLog.Infof("received Delete Group %v request", groupName)
+	if err := updateDeviceGroupInNetworkSlices(groupName); err != nil {
+		return fmt.Errorf("error updating device group: %v in network slices: %v", groupName, err)
+	}
+	if err := handleDeviceGroupDelete(groupName); err != nil {
+		return fmt.Errorf("error deleting device group %v: %v", groupName, err)
+	}
+	var msg configmodels.ConfigMessage
+	msg.MsgType = configmodels.Device_group
+	msg.MsgMethod = configmodels.Delete_op
+	msg.DevGroupName = groupName
+	configChannel <- &msg
+
+	logger.ConfigLog.Infof("successfully Added Device Group [%v] with delete_op to config channel", groupName)
+	return nil
+}
+
+func updateDeviceGroupInNetworkSlices(groupName string) error {
+	filterByDeviceGroup := bson.M{"site-device-group": groupName}
+	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filterByDeviceGroup)
+	if err != nil {
+		logger.DbLog.Errorw("failed to retrieve network slices", "error", err)
+		return err
+	}
+	var errorOccurred bool
+	for _, rawNetworkSlice := range rawNetworkSlices {
+		var networkSlice configmodels.Slice
+		if err = json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
+			logger.DbLog.Errorf("could not unmarshal network slice %v", rawNetworkSlice)
+			errorOccurred = true
+			continue
+		}
+		prevSlice := getSliceByName(networkSlice.SliceName)
+		networkSlice.SiteDeviceGroup = slices.DeleteFunc(networkSlice.SiteDeviceGroup, func(existingDG string) bool {
+			return groupName == existingDG
+		})
+		if err = handleNetworkSlicePost(&networkSlice, &prevSlice); err != nil {
+			logger.ConfigLog.Errorf("Error posting slice %v: %v", networkSlice.SliceName, err)
+			errorOccurred = true
+			continue
+		}
+		msg := &configmodels.ConfigMessage{
+			MsgMethod: configmodels.Post_op,
+			MsgType:   configmodels.Network_slice,
+			Slice:     &networkSlice,
+			SliceName: networkSlice.SliceName,
+		}
+		configChannel <- msg
+		logger.ConfigLog.Infof("network slice [%v] update sent to config channel", networkSlice.SliceName)
+	}
+	if errorOccurred {
+		return fmt.Errorf("one or more network slice updates failed (see logs)")
+	}
+	return nil
+}
+
+func deviceGroupPostHelper(c *gin.Context, msgOp int, groupName string) error {
+	logger.ConfigLog.Infof("received device group: %v", groupName)
+	var request configmodels.DeviceGroups
+
+	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
+	if ct != "application/json" {
+		err := fmt.Errorf("unsupported content-type: %s", ct)
+		logger.ConfigLog.Errorln(err)
+		return err
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		logger.ConfigLog.Errorf("JSON bind error: %v", err)
+		return err
+	}
+
+	ipdomain := &request.IpDomainExpanded
+	logger.ConfigLog.Infof("imsis.size: %v, Imsis: %v", len(request.Imsis), request.Imsis)
+	logger.ConfigLog.Infof("IP Domain Name: %v", request.IpDomainName)
+	logger.ConfigLog.Infof("IP Domain details: %v", ipdomain)
+	logger.ConfigLog.Infof("dnn name: %v", ipdomain.Dnn)
+	logger.ConfigLog.Infof("ue pool: %v", ipdomain.UeIpPool)
+	logger.ConfigLog.Infof("dns Primary: %v", ipdomain.DnsPrimary)
+	logger.ConfigLog.Infof("dns Secondary: %v", ipdomain.DnsSecondary)
+	logger.ConfigLog.Infof("ip mtu: %v", ipdomain.Mtu)
+	logger.ConfigLog.Infof("device Group Name: %v", groupName)
+
+	if ipdomain.UeDnnQos != nil {
+		ipdomain.UeDnnQos.DnnMbrDownlink = convertToBps(ipdomain.UeDnnQos.DnnMbrDownlink, ipdomain.UeDnnQos.BitrateUnit)
+		if ipdomain.UeDnnQos.DnnMbrDownlink < 0 {
+			ipdomain.UeDnnQos.DnnMbrDownlink = math.MaxInt64
+		}
+		logger.ConfigLog.Infof("MbrDownLink: %v", ipdomain.UeDnnQos.DnnMbrDownlink)
+		ipdomain.UeDnnQos.DnnMbrUplink = convertToBps(ipdomain.UeDnnQos.DnnMbrUplink, ipdomain.UeDnnQos.BitrateUnit)
+		if ipdomain.UeDnnQos.DnnMbrUplink < 0 {
+			ipdomain.UeDnnQos.DnnMbrUplink = math.MaxInt64
+		}
+		logger.ConfigLog.Infof("MbrUpLink: %v", ipdomain.UeDnnQos.DnnMbrUplink)
+	}
+	prevDevGroup := getDeviceGroupByName(groupName)
+	request.DeviceGroupName = groupName
+	if err := handleDeviceGroupPost(request, prevDevGroup); err != nil {
+		logger.ConfigLog.Errorf("error posting device group %v: %v", request, err)
+		return err
+	}
+	var msg configmodels.ConfigMessage
+	msg.MsgType = configmodels.Device_group
+	msg.MsgMethod = msgOp
+	msg.DevGroup = &request
+	msg.DevGroupName = groupName
+	configChannel <- &msg
+	logger.ConfigLog.Infof("successfully added Device Group [%v] to config channel", groupName)
+	return nil
+}
+
+func convertToBps(val int64, unit string) (bitrate int64) {
+	if strings.EqualFold(unit, "bps") {
+		bitrate = val
+	} else if strings.EqualFold(unit, "kbps") {
+		bitrate = val * KPS
+	} else if strings.EqualFold(unit, "mbps") {
+		bitrate = val * MPS
+	} else if strings.EqualFold(unit, "gbps") {
+		bitrate = val * GPS
+	}
+	// default consider it as bps
+	return bitrate
+}
 
 func handleDeviceGroupPost(devGroup configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) error {
 	if devGroup.DeviceGroupName == "" {

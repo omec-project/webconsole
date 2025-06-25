@@ -3,21 +3,136 @@ package configapi
 import (
 	"encoding/json"
 	"fmt"
-	"go.mongodb.org/mongo-driver/mongo"
+	"math"
+	"net/http"
 	"os/exec"
+	"slices"
 	"strconv"
+	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var (
-	execCommand = exec.Command
-)
+var execCommand = exec.Command
+
+func networkSliceDeleteHelper(sliceName string) error {
+	if err := handleNetworkSliceDelete(sliceName); err != nil {
+		logger.ConfigLog.Errorf("Error deleting slice %v: %v", sliceName, err)
+		return err
+	}
+	var msg configmodels.ConfigMessage
+	msg.MsgMethod = configmodels.Delete_op
+	msg.MsgType = configmodels.Network_slice
+	msg.SliceName = sliceName
+	configChannel <- &msg
+	logger.ConfigLog.Infof("successfully Added Network Slice [%v] with delete_op to config channel", sliceName)
+	return nil
+}
+
+func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, error) {
+	logger.ConfigLog.Infof("received slice: %v", sliceName)
+	var request configmodels.Slice
+
+	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
+	if ct != "application/json" {
+		err := fmt.Errorf("unsupported content-type: %s", ct)
+		logger.ConfigLog.Errorln(err)
+		return http.StatusInternalServerError, err
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		logger.ConfigLog.Errorf("JSON bind error: %v", err)
+		return http.StatusInternalServerError, err
+	}
+
+	logger.ConfigLog.Infof("printing Slice: [%v] received from Roc/Simapp: %+v", sliceName, request)
+
+	for _, gnb := range request.SiteInfo.GNodeBs {
+		if !isValidName(gnb.Name) {
+			err := fmt.Errorf("invalid gNB name `%s` in Network Slice %s. Name needs to match the following regular expression: %s", gnb.Name, sliceName, NAME_PATTERN)
+			logger.ConfigLog.Errorln(err.Error())
+			return http.StatusBadRequest, err
+		}
+		if !isValidGnbTac(gnb.Tac) {
+			err := fmt.Errorf("invalid TAC %d for gNB %s in Network Slice %s. TAC must be an integer within the range [1, 16777215]", gnb.Tac, gnb.Name, sliceName)
+			logger.ConfigLog.Errorln(err.Error())
+			return http.StatusBadRequest, err
+		}
+	}
+	slice := request.SliceId
+	logger.ConfigLog.Infof("network slice: sst: %v, sd: %v", slice.Sst, slice.Sd)
+
+	slices.Sort(request.SiteDeviceGroup)
+	request.SiteDeviceGroup = slices.Compact(request.SiteDeviceGroup)
+	logger.ConfigLog.Infof("number of device groups %v", len(request.SiteDeviceGroup))
+	for i, g := range request.SiteDeviceGroup {
+		logger.ConfigLog.Infof("device groups(%v) - %v", i+1, g)
+	}
+
+	for index, filter := range request.ApplicationFilteringRules {
+		logger.ConfigLog.Infof("\tRule Name    : %v", filter.RuleName)
+		logger.ConfigLog.Infof("\tRule Priority: %v", filter.Priority)
+		logger.ConfigLog.Infof("\tRule Action  : %v", filter.Action)
+		logger.ConfigLog.Infof("\tEndpoint     : %v", filter.Endpoint)
+		logger.ConfigLog.Infof("\tProtocol     : %v", filter.Protocol)
+		logger.ConfigLog.Infof("\tStart Port   : %v", filter.StartPort)
+		logger.ConfigLog.Infof("\tEnd   Port   : %v", filter.EndPort)
+		ul := request.ApplicationFilteringRules[index].AppMbrUplink
+		dl := request.ApplicationFilteringRules[index].AppMbrDownlink
+		unit := request.ApplicationFilteringRules[index].BitrateUnit
+
+		bitrate := convertToBps(int64(ul), unit)
+		if bitrate < 0 || bitrate > math.MaxInt32 {
+			request.ApplicationFilteringRules[index].AppMbrUplink = math.MaxInt32
+		} else {
+			request.ApplicationFilteringRules[index].AppMbrUplink = int32(bitrate)
+		}
+
+		bitrate = convertToBps(int64(dl), unit)
+		if bitrate < 0 || bitrate > math.MaxInt32 {
+			request.ApplicationFilteringRules[index].AppMbrDownlink = math.MaxInt32
+		} else {
+			request.ApplicationFilteringRules[index].AppMbrDownlink = int32(bitrate)
+		}
+
+		logger.ConfigLog.Infof("app MBR Uplink: %v", request.ApplicationFilteringRules[index].AppMbrUplink)
+		logger.ConfigLog.Infof("app MBR Downlink: %v", request.ApplicationFilteringRules[index].AppMbrDownlink)
+		if filter.TrafficClass != nil {
+			logger.ConfigLog.Infof("traffic class: %v", filter.TrafficClass)
+		}
+	}
+	site := request.SiteInfo
+	logger.ConfigLog.Infof("site name: %v", site.SiteName)
+	logger.ConfigLog.Infof("site PLMN: mcc: %v, mnc: %v", site.Plmn.Mcc, site.Plmn.Mnc)
+	logger.ConfigLog.Infof("site gNBs: %v", site.GNodeBs)
+	for i, gnb := range site.GNodeBs {
+		logger.ConfigLog.Infof("gNB (%v): name=%v, tac=%v", i+1, gnb.Name, gnb.Tac)
+	}
+	logger.ConfigLog.Infof("site UPF: %v", site.Upf)
+
+	prevSlice := getSliceByName(sliceName)
+	request.SliceName = sliceName
+	if err := handleNetworkSlicePost(&request, &prevSlice); err != nil {
+		logger.ConfigLog.Errorf("Error posting slice %v: %v", sliceName, err)
+		return http.StatusInternalServerError, err
+	}
+	var msg configmodels.ConfigMessage
+	msg.MsgMethod = msgOp
+	request.SliceName = sliceName
+	msg.MsgType = configmodels.Network_slice
+	msg.Slice = &request
+	msg.SliceName = sliceName
+	configChannel <- &msg
+	logger.ConfigLog.Infof("successfully Added Slice [%v] to config channel", sliceName)
+	return http.StatusOK, nil
+}
 
 func handleNetworkSlicePost(slice *configmodels.Slice, prevSlice *configmodels.Slice) error {
 	filter := bson.M{"slice-name": slice.SliceName}

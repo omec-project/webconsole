@@ -670,49 +670,6 @@ func DeleteSubscriberByID(c *gin.Context) {
 	c.JSON(http.StatusNoContent, gin.H{})
 }
 
-func updateSubscriberInDeviceGroups(imsi string) error {
-	filterByImsi := bson.M{
-		"imsis": imsi,
-	}
-	rawDeviceGroups, err := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, filterByImsi)
-	if err != nil {
-		logger.DbLog.Errorf("failed to fetch device groups: %v", err)
-		return err
-	}
-	var deviceGroupUpdateMessages []configmodels.ConfigMessage
-	for _, rawDeviceGroup := range rawDeviceGroups {
-		var deviceGroup configmodels.DeviceGroups
-		if err = json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup); err != nil {
-			logger.DbLog.Errorf("error unmarshaling device group: %v", err)
-			return err
-		}
-		filteredImsis := []string{}
-		for _, currImsi := range deviceGroup.Imsis {
-			if currImsi != imsi {
-				filteredImsis = append(filteredImsis, currImsi)
-			}
-		}
-		deviceGroup.Imsis = filteredImsis
-		prevDevGroup := getDeviceGroupByName(deviceGroup.DeviceGroupName)
-		if err = handleDeviceGroupPost(deviceGroup, prevDevGroup); err != nil {
-			logger.ConfigLog.Errorf("error posting device group %v: %v", deviceGroup, err)
-			return err
-		}
-		deviceGroupUpdateMessage := configmodels.ConfigMessage{
-			MsgType:      configmodels.Device_group,
-			MsgMethod:    configmodels.Post_op,
-			DevGroupName: deviceGroup.DeviceGroupName,
-			DevGroup:     &deviceGroup,
-		}
-		deviceGroupUpdateMessages = append(deviceGroupUpdateMessages, deviceGroupUpdateMessage)
-	}
-	for _, msg := range deviceGroupUpdateMessages {
-		configChannel <- &msg
-		logger.WebUILog.Infof("device group [%v] update sent to config channel", msg.DevGroupName)
-	}
-	return nil
-}
-
 func GetRegisteredUEContext(c *gin.Context) {
 	setCorsHeader(c)
 

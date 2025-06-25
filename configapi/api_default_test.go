@@ -60,7 +60,6 @@ type MockMongoClientManyNetworkSlices struct {
 }
 
 func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	// The filter likely uses "slice-name" instead of "name"
 	if sliceName, ok := filter["slice-name"].(string); ok {
 		ns := configmodels.ToBsonM(networkSlice(sliceName))
 		if ns == nil {

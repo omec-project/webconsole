@@ -151,7 +151,7 @@ func handleNetworkSlicePost(slice *configmodels.Slice, prevSlice *configmodels.S
 		Client() *mongo.Client
 	})
 	if !ok {
-		return fmt.Errorf("db does not support Client() access")
+		return fmt.Errorf("the database adapter does not implement the required Client() method for MongoDB access")
 	}
 	sessionRunner := dbadapter.RealSessionRunner(provider.Client())
 	err = syncSliceDeviceGroupSubscribers(slice, prevSlice, sessionRunner)

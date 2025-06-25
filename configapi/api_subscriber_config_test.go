@@ -701,8 +701,8 @@ func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
 		if msg.MsgMethod != expectedMessage.MsgMethod {
 			t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
 		}
-		if !reflect.DeepEqual(*expectedMessage.AuthSubData, *msg.AuthSubData) {
-			t.Errorf("expected AuthSubData %+v, but got %+v", *expectedMessage.AuthSubData, *msg.AuthSubData)
+		if !reflect.DeepEqual(expectedMessage.AuthSubData, msg.AuthSubData) {
+			t.Errorf("expected AuthSubData %+v, but got %+v", expectedMessage.AuthSubData, msg.AuthSubData)
 		}
 		if expectedMessage.Imsi != msg.Imsi {
 			t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)

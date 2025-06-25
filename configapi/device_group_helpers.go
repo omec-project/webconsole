@@ -155,7 +155,7 @@ func convertToBps(val int64, unit string) (bitrate int64) {
 	} else if strings.EqualFold(unit, "gbps") {
 		bitrate = val * GPS
 	}
-	// default consider it as bps
+	// default, consider it as bps
 	return bitrate
 }
 
@@ -213,7 +213,7 @@ func syncDeviceGroupSubscriber(devGroup configmodels.DeviceGroups, prevDevGroup 
 		Client() *mongo.Client
 	})
 	if !ok {
-		return fmt.Errorf("db does not support Client() access")
+		return fmt.Errorf("the database adapter does not implement the required Client() method for MongoDB access")
 	}
 	sessionRunner := dbadapter.RealSessionRunner(provider.Client())
 

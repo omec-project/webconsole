@@ -36,6 +36,13 @@ const (
 	authSubsDataColl = "subscriptionData.authenticationData.authenticationSubscription"
 )
 
+var configChannel chan *configmodels.ConfigMessage
+
+func SetChannel(cfgChannel chan *configmodels.ConfigMessage) {
+	logger.ConfigLog.Infoln("setting configChannel")
+	configChannel = cfgChannel
+}
+
 // GetDeviceGroups godoc
 //
 // @Description  Return the list of device groups

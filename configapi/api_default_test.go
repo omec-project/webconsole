@@ -6,7 +6,6 @@
 package configapi
 
 import (
-	"go.mongodb.org/mongo-driver/mongo"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +16,7 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type MockMongoClientNoDeviceGroups struct {

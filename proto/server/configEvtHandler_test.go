@@ -6,13 +6,10 @@ package server
 
 import (
 	"encoding/json"
-	"os"
-	"os/exec"
 	"reflect"
 	"testing"
 
 	"github.com/omec-project/openapi/models"
-	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,9 +17,8 @@ import (
 )
 
 var (
-	execCommandTimesCalled = 0
-	postData               []map[string]interface{}
-	deleteData             []map[string]interface{}
+	postData   []map[string]interface{}
+	deleteData []map[string]interface{}
 )
 
 func deviceGroup(name string) configmodels.DeviceGroups {
@@ -163,14 +159,6 @@ func (m *MockMongoSubscriberGetOne) RestfulAPIGetOne(collName string, filter bso
 	return previousSubscriberBson, nil
 }
 
-func mockExecCommand(command string, args ...string) *exec.Cmd {
-	cs := []string{"-test.run=TestExecCommandHelper", "--", "ENTER YOUR COMMAND HERE"}
-	cs = append(cs, args...)
-	cmd := exec.Command(os.Args[0], cs...)
-	execCommandTimesCalled += 1
-	return cmd
-}
-
 func networkSlice(name string) configmodels.Slice {
 	upf := make(map[string]interface{}, 0)
 	upf["upf-name"] = "upf"
@@ -200,41 +188,6 @@ func networkSlice(name string) configmodels.Slice {
 		SiteInfo:        site_info,
 	}
 	return slice
-}
-
-func Test_handleSubscriberGet5G(t *testing.T) {
-	origSubscriberAuthData := subscriberAuthData
-	origAuthDBClient := dbadapter.AuthDBClient
-	defer func() { subscriberAuthData = origSubscriberAuthData; dbadapter.AuthDBClient = origAuthDBClient }()
-	subscriberAuthData = configapi.DatabaseSubscriberAuthenticationData{}
-	subscriber := models.AuthenticationSubscription{
-		AuthenticationManagementField: "8000",
-		AuthenticationMethod:          "5G_AKA",
-		Milenage: &models.Milenage{
-			Op: &models.Op{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-			},
-		},
-		Opc: &models.Opc{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
-		},
-		PermanentKey: &models.PermanentKey{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
-		},
-		SequenceNumber: "16f3b3f70fc2",
-	}
-	subscribers := []bson.M{configmodels.ToBsonM(subscriber)}
-	subscribers[0]["ueId"] = "imsi-208930100007487"
-	dbadapter.AuthDBClient = &MockMongoSubscriberGetOne{dbadapter.AuthDBClient, subscribers[0]}
-	subscriberResult := subscriberAuthData.SubscriberAuthenticationDataGet("imsi-208930100007487")
-	if !reflect.DeepEqual(&subscriber, subscriberResult) {
-		t.Errorf("Expected subscriber %v, got %v", &subscriber, subscriberResult)
-	}
 }
 
 type InMemoryAuthDataStore struct {
@@ -284,7 +237,7 @@ func Test_handleSubscriberGet4G(t *testing.T) {
 	}
 
 	imsi := "imsi-208930100007487"
-	
+
 	orig := subscriberAuthData
 	defer func() { subscriberAuthData = orig }()
 

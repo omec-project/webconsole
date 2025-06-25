@@ -38,8 +38,6 @@ var kasp = keepalive.ServerParameters{
 	Timeout: 5 * time.Second,  // Wait 1 second for the ping ack before assuming the connection is dead
 }
 
-var imsiData map[string]*models.AuthenticationSubscription
-
 func StartServer(host string, confServ *ConfigServer, configMsgChan chan *configmodels.ConfigMessage) {
 	// add 4G endpoints in the client list. 4G endpoints are configured in the
 	// yaml file
@@ -62,7 +60,7 @@ func StartServer(host string, confServ *ConfigServer, configMsgChan chan *config
 		subscriberAuthData = configapi.DatabaseSubscriberAuthenticationData{}
 	} else {
 		logger.WebUILog.Debugln("instantiating in-memory subscriber authentication")
-		imsiData = make(map[string]*models.AuthenticationSubscription)
+		configapi.ImsiData = make(map[string]*models.AuthenticationSubscription)
 		subscriberAuthData = configapi.MemorySubscriberAuthenticationData{}
 	}
 	go configHandler(configMsgChan, configReady)

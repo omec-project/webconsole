@@ -50,11 +50,12 @@ func setupAuthenticationFeature(subconfig_router *gin.Engine, nfSyncMiddelware g
 
 func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 	subconfig_router := utilLogger.NewGinWithZap(logger.GinLog)
+	nFConfigSyncMiddleware := triggerNFConfigSyncMiddleware(syncChan)
 	if factory.WebUIConfig.Configuration.EnableAuthentication {
-		setupAuthenticationFeature(subconfig_router, triggerNFConfigSyncMiddleware(syncChan))
+		setupAuthenticationFeature(subconfig_router, nFConfigSyncMiddleware)
 	} else {
 		configapi.AddApiService(subconfig_router)
-		configapi.AddConfigV1Service(subconfig_router, triggerNFConfigSyncMiddleware(syncChan))
+		configapi.AddConfigV1Service(subconfig_router, nFConfigSyncMiddleware)
 	}
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
@@ -190,5 +191,5 @@ func isWritingMethod(method string) bool {
 }
 
 func isStatusSuccess(status int) bool {
-	return status >= 200 && status <= 299
+	return status/100 == 2
 }

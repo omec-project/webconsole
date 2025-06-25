@@ -28,8 +28,8 @@ type MockDBClient struct {
 	err    error
 }
 
-func (m *MockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (m *MockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	for _, s := range m.Slices {
 		ns := configmodels.ToBsonM(s)
 		if ns == nil {
@@ -41,7 +41,7 @@ func (m *MockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[stri
 }
 
 func makeNetworkSlice(mcc, mnc, sst, sd string) configmodels.Slice {
-	upf := make(map[string]interface{}, 0)
+	upf := make(map[string]any, 0)
 	upf["upf-name"] = "upf"
 	upf["upf-port"] = "8805"
 	plmn := configmodels.SliceSiteInfoPlmn{

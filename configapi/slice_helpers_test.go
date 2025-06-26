@@ -87,7 +87,7 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 	defer func() { execCommand = exec.Command }()
 
 	origSync := syncSubscribersOnSliceCreateOrUpdate
-	syncSubscribersOnSliceCreateOrUpdate = func(_, _ *configmodels.Slice, _ dbadapter.SessionRunner) error {
+	syncSubscribersOnSliceCreateOrUpdate = func(_, _ *configmodels.Slice) error {
 		return nil
 	}
 	defer func() { syncSubscribersOnSliceCreateOrUpdate = origSync }()
@@ -119,7 +119,7 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 	execCommandTimesCalled = 0
 
 	origSync := syncSubscribersOnSliceCreateOrUpdate
-	syncSubscribersOnSliceCreateOrUpdate = func(_, _ *configmodels.Slice, _ dbadapter.SessionRunner) error {
+	syncSubscribersOnSliceCreateOrUpdate = func(_, _ *configmodels.Slice) error {
 		return nil
 	}
 	defer func() { syncSubscribersOnSliceCreateOrUpdate = origSync }()

@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gin-gonic/gin"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -21,10 +20,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-var (
-	rwLock             sync.RWMutex
-	subscriberAuthData SubscriberAuthenticationData
-)
+var rwLock sync.RWMutex
 
 const (
 	KPS = 1000
@@ -90,21 +86,8 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 	return nil
 }
 
-func deviceGroupPostHelper(c *gin.Context, msgOp int, groupName string) error {
+func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, msgOp int, groupName string) error {
 	logger.ConfigLog.Infof("received device group: %v", groupName)
-	var requestDeviceGroup configmodels.DeviceGroups
-
-	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
-	if ct != "application/json" {
-		err := fmt.Errorf("unsupported content-type: %s", ct)
-		logger.ConfigLog.Errorln(err)
-		return err
-	}
-
-	if err := c.ShouldBindJSON(&requestDeviceGroup); err != nil {
-		logger.ConfigLog.Errorf("JSON bind error: %v", err)
-		return err
-	}
 
 	ipdomain := &requestDeviceGroup.IpDomainExpanded
 	logger.ConfigLog.Infof("imsis.size: %v, Imsis: %v", len(requestDeviceGroup.Imsis), requestDeviceGroup.Imsis)
@@ -230,7 +213,6 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 		Sd:  slice.SliceId.Sd,
 		Sst: int32(sVal),
 	}
-	sessionRunner := dbadapter.RealSessionRunner(dbadapter.CommonDBClient)
 	var errorOccured bool
 	for _, imsi := range devGroup.Imsis {
 		/* update all current IMSIs */
@@ -253,7 +235,7 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 	// delete IMSI's that are removed
 	dimsis := getDeletedImsisList(devGroup, prevDevGroup)
 	for _, imsi := range dimsis {
-		err = removeSubscriberEntriesRelatedToDeviceGroups(slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi, sessionRunner)
+		err = removeSubscriberEntriesRelatedToDeviceGroups(slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
 		if err != nil {
 			logger.ConfigLog.Errorln(err)
 			errorOccured = true

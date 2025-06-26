@@ -483,7 +483,7 @@ func PostSubscriberByID(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("subscriber %s already exists", ueId)})
 		return
 	}
-	if subsOverrideData.OPc == "" || subsOverrideData.Key == "" {
+	if subsOverrideData.OPc == "" || subsOverrideData.Key == "" || subsOverrideData.SequenceNumber == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required authentication data: OPc and Key must be provided"})
 		return
 	}
@@ -505,9 +505,9 @@ func PostSubscriberByID(c *gin.Context) {
 	}
 
 	logger.WebUILog.Infof("%+v", authSubsData)
-	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	logger.WebUILog.Infof("Using OPc: %s, Key: %s, SeqNo: %s", subsOverrideData.OPc, subsOverrideData.Key, subsOverrideData.SequenceNumber)
-	err = handleSubscriberPost(ueId, &authSubsData, subscriberAuthData)
+
+	err = handleSubscriberPost(ueId, &authSubsData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create subscriber %s. Please check the log for details.", ueId)})
 		return
@@ -567,44 +567,27 @@ func PutSubscriberByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("subscriber %s does not exist", ueId)})
 		return
 	}
+	if subsOverrideData.OPc == "" || subsOverrideData.Key == "" || subsOverrideData.SequenceNumber == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required authentication data: OPc and Key must be provided"})
+		return
+	}
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
-		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
-		Milenage: &models.Milenage{
-			Op: &models.Op{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-				OpValue:             "", // Required
-			},
-		},
+		AuthenticationMethod:          "5G_AKA",
 		Opc: &models.Opc{
 			EncryptionAlgorithm: 0,
 			EncryptionKey:       0,
-			// OpcValue:            "8e27b6af0e692e750f32667a3b14605d", // Required
+			OpcValue:            subsOverrideData.OPc,
 		},
 		PermanentKey: &models.PermanentKey{
 			EncryptionAlgorithm: 0,
 			EncryptionKey:       0,
-			// PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862", // Required
+			PermanentKeyValue:   subsOverrideData.Key,
 		},
-		// SequenceNumber: "16f3b3f70fc2",
+		SequenceNumber: subsOverrideData.SequenceNumber,
 	}
 
-	// override values
-	/*if subsOverrideData.PlmnID != "" {
-		servingPlmnId = subsOverrideData.PlmnID
-	}*/
-	if subsOverrideData.OPc != "" {
-		authSubsData.Opc.OpcValue = subsOverrideData.OPc
-	}
-	if subsOverrideData.Key != "" {
-		authSubsData.PermanentKey.PermanentKeyValue = subsOverrideData.Key
-	}
-	if subsOverrideData.SequenceNumber != "" {
-		authSubsData.SequenceNumber = subsOverrideData.SequenceNumber
-	}
-	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
-	err = handleSubscriberPut(ueId, &authSubsData, subscriberAuthData)
+	err = handleSubscriberPut(ueId, &authSubsData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update subscriber %s. Please check the log for details.", ueId)})
 		return
@@ -652,8 +635,7 @@ func DeleteSubscriberByID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error deleting subscriber. Please check the log for details."})
 		return
 	}
-	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
-	if err = handleSubscriberDelete(imsi, subscriberAuthData); err != nil {
+	if err = handleSubscriberDelete(imsi); err != nil {
 		logger.WebUILog.Errorf("Error deleting subscriber: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error deleting subscriber. Please check the log for details."})
 		return

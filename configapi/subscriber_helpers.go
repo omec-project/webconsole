@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -27,7 +28,29 @@ type DatabaseSubscriberAuthenticationData struct {
 	SubscriberAuthenticationData
 }
 
-var ImsiData map[string]*models.AuthenticationSubscription
+var subscriberAuthData SubscriberAuthenticationData
+
+var imsiDataLock sync.RWMutex
+var ImsiData = make(map[string]*models.AuthenticationSubscription)
+
+func addSubscriber(imsi string, data *models.AuthenticationSubscription) {
+	imsiDataLock.Lock()
+	defer imsiDataLock.Unlock()
+	ImsiData[imsi] = data
+}
+
+func removeSubscriber(imsi string) {
+	imsiDataLock.Lock()
+	defer imsiDataLock.Unlock()
+	delete(ImsiData, imsi)
+}
+
+func getSubscriber(imsi string) *models.AuthenticationSubscription {
+	imsiDataLock.RLock()
+	defer imsiDataLock.RUnlock()
+	data := ImsiData[imsi]
+	return data
+}
 
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
 	filter := bson.M{"ueId": imsi}
@@ -47,15 +70,6 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
 	filter := bson.M{"ueId": imsi}
 	logger.WebUILog.Infof("%+v", authSubData)
-	if authSubData == nil {
-		return fmt.Errorf("authentication subscription data is nil")
-	}
-	if authSubData.Opc == nil || authSubData.PermanentKey == nil {
-		return fmt.Errorf("authentication data incomplete: Opc or PermanentKey is nil")
-	}
-	if authSubData.Opc.OpcValue == "" || authSubData.PermanentKey.PermanentKeyValue == "" {
-		return fmt.Errorf("authentication data incomplete: OpcValue or PermanentKeyValue is empty")
-	}
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
 	// write to AuthDB
@@ -84,6 +98,8 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	filter := bson.M{"ueId": imsi}
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
+	// get backup
+	backup, _ := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
 	// write to AuthDB
 	if _, err := dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, authDataBsonA); err != nil {
 		logger.DbLog.Errorw("failed to update authentication subscription", "error", err)
@@ -95,10 +111,9 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	basicDataBson := configmodels.ToBsonM(basicAmData)
 	if _, err := dbadapter.CommonDBClient.RestfulAPIPutOne(amDataColl, filter, basicDataBson); err != nil {
 		logger.DbLog.Errorw("failed to update amData", "error", err)
-		// rollback AuthDB operation
-		if cleanupErr := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter); cleanupErr != nil {
-			logger.DbLog.Errorw("rollback failed after authData op", "error", cleanupErr)
-			return fmt.Errorf("authData update failed: %v, rollback failed: %w", err, cleanupErr)
+		// restore old auth data if any
+		if backup != nil {
+			_, _ = dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, backup)
 		}
 		return fmt.Errorf("authData update failed, rolled back AuthDB change: %w", err)
 	}
@@ -147,7 +162,7 @@ type MemorySubscriberAuthenticationData struct {
 }
 
 func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
-	return ImsiData[imsi]
+	return getSubscriber(imsi)
 }
 
 func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
@@ -161,7 +176,7 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 		return fmt.Errorf("failed to update amData: %w", err)
 	}
 	logger.WebUILog.Debugf("successfully inserted/updated authentication subscription in amData collection: %v", imsi)
-	ImsiData[imsi] = authSubData
+	addSubscriber(imsi, authSubData)
 	logger.WebUILog.Debugf("insert/update authentication subscription in memory: %v", imsi)
 	return nil
 }
@@ -172,7 +187,7 @@ func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthentic
 		return fmt.Errorf("failed to delete from amData collection: %w", err)
 	}
 	logger.WebUILog.Debugf("successfully deleted authentication subscription from amData collection: %v", imsi)
-	delete(ImsiData, imsi)
+	removeSubscriber(imsi)
 	logger.WebUILog.Debugf("delete authentication subscription from memory: %v", imsi)
 	return nil
 }
@@ -200,38 +215,38 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 	return
 }
 
-func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string, sessionRunner dbadapter.SessionRunner) error {
+func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string) error {
 	filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
+	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
 
-	ctx := context.TODO()
-	err := sessionRunner(ctx, func(sc mongo.SessionContext) error {
+	err := sessionRunner(context.TODO(), func(sc mongo.SessionContext) error {
 		// AM policy
-		err := dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(ctx, amPolicyDataColl, filterImsiOnly)
+		err := dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, amPolicyDataColl, filterImsiOnly)
 		if err != nil {
 			logger.DbLog.Errorf("failed to delete AM policy data for IMSI %s: %v", imsi, err)
 			return err
 		}
 		// SM policy
-		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(ctx, smPolicyDataColl, filterImsiOnly)
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, smPolicyDataColl, filterImsiOnly)
 		if err != nil {
 			logger.DbLog.Errorf("failed to delete SM policy data for IMSI %s: %v", imsi, err)
 			return err
 		}
 		// AM data
-		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(ctx, amDataColl, filter)
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, amDataColl, filter)
 		if err != nil {
 			logger.DbLog.Errorf("failed to delete AM data for IMSI %s: %v", imsi, err)
 			return err
 		}
 		// SM data
-		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(ctx, smDataColl, filter)
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, smDataColl, filter)
 		if err != nil {
 			logger.DbLog.Errorf("failed to delete SM data for IMSI %s: %v", imsi, err)
 			return err
 		}
 		// SMF selection
-		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(ctx, smfSelDataColl, filter)
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, smfSelDataColl, filter)
 		if err != nil {
 			logger.DbLog.Errorf("failed to delete SMF selection data for IMSI %s: %v", imsi, err)
 			return err
@@ -246,9 +261,10 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string, session
 	return nil
 }
 
-func handleSubscriberDelete(imsi string, subscriberAuthData SubscriberAuthenticationData) error {
+func handleSubscriberDelete(imsi string) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
+	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	err := subscriberAuthData.SubscriberAuthenticationDataDelete(imsi)
 	if err != nil {
 		logger.DbLog.Errorln("SubscriberAuthDataDelete error:", err)
@@ -258,9 +274,10 @@ func handleSubscriberDelete(imsi string, subscriberAuthData SubscriberAuthentica
 	return nil
 }
 
-func handleSubscriberPut(imsi string, authSubData *models.AuthenticationSubscription, subscriberAuthData SubscriberAuthenticationData) error {
+func handleSubscriberPut(imsi string, authSubData *models.AuthenticationSubscription) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
+	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	err := subscriberAuthData.SubscriberAuthenticationDataUpdate(imsi, authSubData)
 	if err != nil {
 		logger.DbLog.Errorln("Subscriber Authentication Data Update Error:", err)
@@ -270,9 +287,10 @@ func handleSubscriberPut(imsi string, authSubData *models.AuthenticationSubscrip
 	return nil
 }
 
-func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscription, subscriberAuthData SubscriberAuthenticationData) error {
+func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscription) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
+	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	err := subscriberAuthData.SubscriberAuthenticationDataCreate(imsi, authSubData)
 	if err != nil {
 		logger.DbLog.Errorln("Subscriber Authentication Data Create Error:", err)

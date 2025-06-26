@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -144,7 +145,24 @@ func DeviceGroupGroupNamePut(c *gin.Context) {
 		})
 		return
 	}
-	if err := deviceGroupPostHelper(c, configmodels.Put_op, groupName); err != nil {
+	var requestDeviceGroup configmodels.DeviceGroups
+
+	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
+	if ct != "application/json" {
+		err := fmt.Errorf("unsupported content-type: %s", ct)
+		logger.ConfigLog.Errorln(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := c.ShouldBindJSON(&requestDeviceGroup); err != nil {
+		err = fmt.Errorf("JSON bind error: %v", err)
+		logger.ConfigLog.Errorln(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := deviceGroupPostHelper(requestDeviceGroup, configmodels.Put_op, groupName); err != nil {
 		logger.ConfigLog.Errorf("Device group update failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Device group update failed. Please check the log for details"})
 		return
@@ -183,7 +201,24 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 		})
 		return
 	}
-	if err := deviceGroupPostHelper(c, configmodels.Post_op, groupName); err != nil {
+	var requestDeviceGroup configmodels.DeviceGroups
+
+	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
+	if ct != "application/json" {
+		err := fmt.Errorf("unsupported content-type: %s", ct)
+		logger.ConfigLog.Errorln(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := c.ShouldBindJSON(&requestDeviceGroup); err != nil {
+		err = fmt.Errorf("JSON bind error: %v", err)
+		logger.ConfigLog.Errorln(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := deviceGroupPostHelper(requestDeviceGroup, configmodels.Post_op, groupName); err != nil {
 		logger.ConfigLog.Errorf("Device group create failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Device group create failed. Please check the log for details"})
 		return

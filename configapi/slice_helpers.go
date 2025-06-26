@@ -41,7 +41,7 @@ func networkSliceDeleteHelper(sliceName string) error {
 
 func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, error) {
 	logger.ConfigLog.Infof("received slice: %v", sliceName)
-	var request configmodels.Slice
+	var requestSlice configmodels.Slice
 
 	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
 	if ct != "application/json" {
@@ -50,14 +50,14 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, e
 		return http.StatusInternalServerError, err
 	}
 
-	if err := c.ShouldBindJSON(&request); err != nil {
+	if err := c.ShouldBindJSON(&requestSlice); err != nil {
 		logger.ConfigLog.Errorf("JSON bind error: %v", err)
 		return http.StatusInternalServerError, err
 	}
 
-	logger.ConfigLog.Infof("printing Slice: [%v] received from Roc/Simapp: %+v", sliceName, request)
+	logger.ConfigLog.Infof("printing Slice: [%v] received from Roc/Simapp: %+v", sliceName, requestSlice)
 
-	for _, gnb := range request.SiteInfo.GNodeBs {
+	for _, gnb := range requestSlice.SiteInfo.GNodeBs {
 		if !isValidName(gnb.Name) {
 			err := fmt.Errorf("invalid gNB name `%s` in Network Slice %s. Name needs to match the following regular expression: %s", gnb.Name, sliceName, NAME_PATTERN)
 			logger.ConfigLog.Errorln(err.Error())
@@ -69,17 +69,17 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, e
 			return http.StatusBadRequest, err
 		}
 	}
-	slice := request.SliceId
+	slice := requestSlice.SliceId
 	logger.ConfigLog.Infof("network slice: sst: %v, sd: %v", slice.Sst, slice.Sd)
 
-	slices.Sort(request.SiteDeviceGroup)
-	request.SiteDeviceGroup = slices.Compact(request.SiteDeviceGroup)
-	logger.ConfigLog.Infof("number of device groups %v", len(request.SiteDeviceGroup))
-	for i, g := range request.SiteDeviceGroup {
+	slices.Sort(requestSlice.SiteDeviceGroup)
+	requestSlice.SiteDeviceGroup = slices.Compact(requestSlice.SiteDeviceGroup)
+	logger.ConfigLog.Infof("number of device groups %v", len(requestSlice.SiteDeviceGroup))
+	for i, g := range requestSlice.SiteDeviceGroup {
 		logger.ConfigLog.Infof("device groups(%v) - %v", i+1, g)
 	}
 
-	for index, filter := range request.ApplicationFilteringRules {
+	for index, filter := range requestSlice.ApplicationFilteringRules {
 		logger.ConfigLog.Infof("\tRule Name    : %v", filter.RuleName)
 		logger.ConfigLog.Infof("\tRule Priority: %v", filter.Priority)
 		logger.ConfigLog.Infof("\tRule Action  : %v", filter.Action)
@@ -87,31 +87,31 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, e
 		logger.ConfigLog.Infof("\tProtocol     : %v", filter.Protocol)
 		logger.ConfigLog.Infof("\tStart Port   : %v", filter.StartPort)
 		logger.ConfigLog.Infof("\tEnd   Port   : %v", filter.EndPort)
-		ul := request.ApplicationFilteringRules[index].AppMbrUplink
-		dl := request.ApplicationFilteringRules[index].AppMbrDownlink
-		unit := request.ApplicationFilteringRules[index].BitrateUnit
+		ul := requestSlice.ApplicationFilteringRules[index].AppMbrUplink
+		dl := requestSlice.ApplicationFilteringRules[index].AppMbrDownlink
+		unit := requestSlice.ApplicationFilteringRules[index].BitrateUnit
 
 		bitrate := convertToBps(int64(ul), unit)
 		if bitrate < 0 || bitrate > math.MaxInt32 {
-			request.ApplicationFilteringRules[index].AppMbrUplink = math.MaxInt32
+			requestSlice.ApplicationFilteringRules[index].AppMbrUplink = math.MaxInt32
 		} else {
-			request.ApplicationFilteringRules[index].AppMbrUplink = int32(bitrate)
+			requestSlice.ApplicationFilteringRules[index].AppMbrUplink = int32(bitrate)
 		}
 
 		bitrate = convertToBps(int64(dl), unit)
 		if bitrate < 0 || bitrate > math.MaxInt32 {
-			request.ApplicationFilteringRules[index].AppMbrDownlink = math.MaxInt32
+			requestSlice.ApplicationFilteringRules[index].AppMbrDownlink = math.MaxInt32
 		} else {
-			request.ApplicationFilteringRules[index].AppMbrDownlink = int32(bitrate)
+			requestSlice.ApplicationFilteringRules[index].AppMbrDownlink = int32(bitrate)
 		}
 
-		logger.ConfigLog.Infof("app MBR Uplink: %v", request.ApplicationFilteringRules[index].AppMbrUplink)
-		logger.ConfigLog.Infof("app MBR Downlink: %v", request.ApplicationFilteringRules[index].AppMbrDownlink)
+		logger.ConfigLog.Infof("app MBR Uplink: %v", requestSlice.ApplicationFilteringRules[index].AppMbrUplink)
+		logger.ConfigLog.Infof("app MBR Downlink: %v", requestSlice.ApplicationFilteringRules[index].AppMbrDownlink)
 		if filter.TrafficClass != nil {
 			logger.ConfigLog.Infof("traffic class: %v", filter.TrafficClass)
 		}
 	}
-	site := request.SiteInfo
+	site := requestSlice.SiteInfo
 	logger.ConfigLog.Infof("site name: %v", site.SiteName)
 	logger.ConfigLog.Infof("site PLMN: mcc: %v, mnc: %v", site.Plmn.Mcc, site.Plmn.Mnc)
 	logger.ConfigLog.Infof("site gNBs: %v", site.GNodeBs)
@@ -121,16 +121,16 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, e
 	logger.ConfigLog.Infof("site UPF: %v", site.Upf)
 
 	prevSlice := getSliceByName(sliceName)
-	request.SliceName = sliceName
-	if err := handleNetworkSlicePost(&request, &prevSlice); err != nil {
+	requestSlice.SliceName = sliceName
+	if err := handleNetworkSlicePost(&requestSlice, &prevSlice); err != nil {
 		logger.ConfigLog.Errorf("Error posting slice %v: %v", sliceName, err)
 		return http.StatusInternalServerError, err
 	}
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = msgOp
-	request.SliceName = sliceName
+	requestSlice.SliceName = sliceName
 	msg.MsgType = configmodels.Network_slice
-	msg.Slice = &request
+	msg.Slice = &requestSlice
 	msg.SliceName = sliceName
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully Added Slice [%v] to config channel", sliceName)

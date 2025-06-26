@@ -163,10 +163,10 @@ func DeviceGroupGroupNamePut(c *gin.Context) {
 // @Failure      400  {object}  nil  "Invalid device group content"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
-// @Failure      409  {object}  nil  "Device group exists"
 // @Failure      500  {object}  nil  "Error creating device group"
 // @Router       /config/v1/device-group/{deviceGroupName}  [post]
 func DeviceGroupGroupNamePost(c *gin.Context) {
+	// TODO: Return 409 if device group already exists
 	logger.ConfigLog.Debugf("DeviceGroupGroupNamePost")
 	groupName := c.Param("group-name")
 	if groupName == "" {
@@ -312,10 +312,10 @@ func NetworkSliceSliceNameDelete(c *gin.Context) {
 // @Failure      400  {object}  nil  "Invalid network slice content"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
-// @Failure      409  {object}  nil  "Resource Conflict"
 // @Failure      500  {object}  nil  "Error creating network slice"
 // @Router       /config/v1/network-slice/{sliceName}  [post]
 func NetworkSliceSliceNamePost(c *gin.Context) {
+	// TODO: Return 409 if network slices already exist
 	logger.ConfigLog.Debugf("Received NetworkSliceSliceNamePost ")
 	sliceName, _ := c.Params.Get("slice-name")
 	if sliceName == "" {

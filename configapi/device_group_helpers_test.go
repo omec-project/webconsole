@@ -79,7 +79,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 			}()
 			dbadapter.CommonDBClient = mockDB
 
-			err := handleDeviceGroupPost(dg, nil)
+			err := handleDeviceGroupPost(&dg, nil)
 			if err != nil {
 				t.Fatalf("Could not handle device group post: %v", err)
 			}
@@ -175,7 +175,7 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 			}()
 			dbadapter.CommonDBClient = mock
 
-			err := handleDeviceGroupPost(dg, &dg)
+			err := handleDeviceGroupPost(&dg, &dg)
 			if err != nil {
 				t.Fatalf("handleDeviceGroupPost returned error: %v", err)
 			}

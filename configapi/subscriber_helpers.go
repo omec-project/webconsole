@@ -306,7 +306,7 @@ func updateSubscriberInDeviceGroups(imsi string) error {
 		}
 		deviceGroup.Imsis = filteredImsis
 		prevDevGroup := getDeviceGroupByName(deviceGroup.DeviceGroupName)
-		if err = handleDeviceGroupPost(deviceGroup, prevDevGroup); err != nil {
+		if err = handleDeviceGroupPost(&deviceGroup, prevDevGroup); err != nil {
 			logger.ConfigLog.Errorf("error posting device group %v: %v", deviceGroup, err)
 			return err
 		}

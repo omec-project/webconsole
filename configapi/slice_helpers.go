@@ -20,7 +20,6 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var execCommand = exec.Command
@@ -41,90 +40,27 @@ func networkSliceDeleteHelper(sliceName string) error {
 
 func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, error) {
 	logger.ConfigLog.Infof("received slice: %v", sliceName)
-	var requestSlice configmodels.Slice
-
-	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
-	if ct != "application/json" {
-		err := fmt.Errorf("unsupported content-type: %s", ct)
-		logger.ConfigLog.Errorln(err)
-		return http.StatusInternalServerError, err
+	requestSlice, err := parseAndValidateSliceRequest(c, sliceName)
+	if err != nil {
+		return http.StatusBadRequest, err
 	}
 
-	if err := c.ShouldBindJSON(&requestSlice); err != nil {
-		logger.ConfigLog.Errorf("JSON bind error: %v", err)
-		return http.StatusInternalServerError, err
-	}
-
-	logger.ConfigLog.Infof("printing Slice: [%v] received from Roc/Simapp: %+v", sliceName, requestSlice)
-
-	for _, gnb := range requestSlice.SiteInfo.GNodeBs {
-		if !isValidName(gnb.Name) {
-			err := fmt.Errorf("invalid gNB name `%s` in Network Slice %s. Name needs to match the following regular expression: %s", gnb.Name, sliceName, NAME_PATTERN)
-			logger.ConfigLog.Errorln(err.Error())
-			return http.StatusBadRequest, err
-		}
-		if !isValidGnbTac(gnb.Tac) {
-			err := fmt.Errorf("invalid TAC %d for gNB %s in Network Slice %s. TAC must be an integer within the range [1, 16777215]", gnb.Tac, gnb.Name, sliceName)
-			logger.ConfigLog.Errorln(err.Error())
-			return http.StatusBadRequest, err
-		}
-	}
-	slice := requestSlice.SliceId
-	logger.ConfigLog.Infof("network slice: sst: %v, sd: %v", slice.Sst, slice.Sd)
-
-	slices.Sort(requestSlice.SiteDeviceGroup)
-	requestSlice.SiteDeviceGroup = slices.Compact(requestSlice.SiteDeviceGroup)
-	logger.ConfigLog.Infof("number of device groups %v", len(requestSlice.SiteDeviceGroup))
-	for i, g := range requestSlice.SiteDeviceGroup {
-		logger.ConfigLog.Infof("device groups(%v) - %v", i+1, g)
-	}
-
-	for index, filter := range requestSlice.ApplicationFilteringRules {
-		logger.ConfigLog.Infof("\tRule Name    : %v", filter.RuleName)
-		logger.ConfigLog.Infof("\tRule Priority: %v", filter.Priority)
-		logger.ConfigLog.Infof("\tRule Action  : %v", filter.Action)
-		logger.ConfigLog.Infof("\tEndpoint     : %v", filter.Endpoint)
-		logger.ConfigLog.Infof("\tProtocol     : %v", filter.Protocol)
-		logger.ConfigLog.Infof("\tStart Port   : %v", filter.StartPort)
-		logger.ConfigLog.Infof("\tEnd   Port   : %v", filter.EndPort)
-		ul := requestSlice.ApplicationFilteringRules[index].AppMbrUplink
-		dl := requestSlice.ApplicationFilteringRules[index].AppMbrDownlink
-		unit := requestSlice.ApplicationFilteringRules[index].BitrateUnit
-
-		bitrate := convertToBps(int64(ul), unit)
-		if bitrate < 0 || bitrate > math.MaxInt32 {
-			requestSlice.ApplicationFilteringRules[index].AppMbrUplink = math.MaxInt32
-		} else {
-			requestSlice.ApplicationFilteringRules[index].AppMbrUplink = int32(bitrate)
-		}
-
-		bitrate = convertToBps(int64(dl), unit)
-		if bitrate < 0 || bitrate > math.MaxInt32 {
-			requestSlice.ApplicationFilteringRules[index].AppMbrDownlink = math.MaxInt32
-		} else {
-			requestSlice.ApplicationFilteringRules[index].AppMbrDownlink = int32(bitrate)
-		}
-
-		logger.ConfigLog.Infof("app MBR Uplink: %v", requestSlice.ApplicationFilteringRules[index].AppMbrUplink)
-		logger.ConfigLog.Infof("app MBR Downlink: %v", requestSlice.ApplicationFilteringRules[index].AppMbrDownlink)
-		if filter.TrafficClass != nil {
-			logger.ConfigLog.Infof("traffic class: %v", filter.TrafficClass)
-		}
-	}
-	site := requestSlice.SiteInfo
-	logger.ConfigLog.Infof("site name: %v", site.SiteName)
-	logger.ConfigLog.Infof("site PLMN: mcc: %v, mnc: %v", site.Plmn.Mcc, site.Plmn.Mnc)
-	logger.ConfigLog.Infof("site gNBs: %v", site.GNodeBs)
-	for i, gnb := range site.GNodeBs {
-		logger.ConfigLog.Infof("gNB (%v): name=%v, tac=%v", i+1, gnb.Name, gnb.Tac)
-	}
-	logger.ConfigLog.Infof("site UPF: %v", site.Upf)
-
-	prevSlice := getSliceByName(sliceName)
+	logSliceMetadata(requestSlice)
+	normalizeApplicationFilteringRules(&requestSlice)
 	requestSlice.SliceName = sliceName
-	if err := handleNetworkSlicePost(&requestSlice, &prevSlice); err != nil {
-		logger.ConfigLog.Errorf("Error posting slice %v: %v", sliceName, err)
-		return http.StatusInternalServerError, err
+	prevSlice := getSliceByName(sliceName)
+
+	if prevSlice == nil {
+		logger.ConfigLog.Infof("Adding new slice [%v]", sliceName)
+		if err := createNS(&requestSlice); err != nil {
+			logger.ConfigLog.Errorf("Error creating slice %v: %v", sliceName, err)
+			return http.StatusInternalServerError, err
+		}
+	} else {
+		if err := updateNS(&requestSlice, prevSlice); err != nil {
+			logger.ConfigLog.Errorf("Error updating slice %v: %v", sliceName, err)
+			return http.StatusInternalServerError, err
+		}
 	}
 	var msg configmodels.ConfigMessage
 	msg.MsgMethod = msgOp
@@ -137,6 +73,90 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, e
 	return http.StatusOK, nil
 }
 
+func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodels.Slice, error) {
+	var request configmodels.Slice
+
+	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
+	if ct != "application/json" {
+		return request, fmt.Errorf("unsupported content-type: %s", ct)
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		return request, fmt.Errorf("JSON bind error: %v", err)
+	}
+
+	for _, gnb := range request.SiteInfo.GNodeBs {
+		if !isValidName(gnb.Name) {
+			return request, fmt.Errorf("invalid gNB name `%s` in Network Slice %s", gnb.Name, sliceName)
+		}
+		if !isValidGnbTac(gnb.Tac) {
+			return request, fmt.Errorf("invalid TAC %d for gNB %s in Network Slice %s", gnb.Tac, gnb.Name, sliceName)
+		}
+	}
+
+	slices.Sort(request.SiteDeviceGroup)
+	request.SiteDeviceGroup = slices.Compact(request.SiteDeviceGroup)
+
+	return request, nil
+}
+
+func logSliceMetadata(slice configmodels.Slice) {
+	logger.ConfigLog.Infof("network slice: sst: %v, sd: %v", slice.SliceId.Sst, slice.SliceId.Sd)
+	logger.ConfigLog.Infof("number of device groups %v", len(slice.SiteDeviceGroup))
+	for i, g := range slice.SiteDeviceGroup {
+		logger.ConfigLog.Infof("device groups(%v) - %v", i+1, g)
+	}
+
+	site := slice.SiteInfo
+	logger.ConfigLog.Infof("site name: %v", site.SiteName)
+	logger.ConfigLog.Infof("site PLMN: mcc: %v, mnc: %v", site.Plmn.Mcc, site.Plmn.Mnc)
+	for i, gnb := range site.GNodeBs {
+		logger.ConfigLog.Infof("gNB (%v): name=%v, tac=%v", i+1, gnb.Name, gnb.Tac)
+	}
+	logger.ConfigLog.Infof("site UPF: %v", site.Upf)
+}
+
+func normalizeApplicationFilteringRules(slice *configmodels.Slice) {
+	for i := range slice.ApplicationFilteringRules {
+		rule := &slice.ApplicationFilteringRules[i]
+		logger.ConfigLog.Infof("Rule [%d] Name: %s, Action: %s, Endpoint: %s", i, rule.RuleName, rule.Action, rule.Endpoint)
+
+		ul := convertToBps(int64(rule.AppMbrUplink), rule.BitrateUnit)
+		rule.AppMbrUplink = convertBitrateToInt32(ul)
+
+		dl := convertToBps(int64(rule.AppMbrDownlink), rule.BitrateUnit)
+		rule.AppMbrDownlink = convertBitrateToInt32(dl)
+
+		logger.ConfigLog.Infof("Normalized MBR Uplink: %v, Downlink: %v", rule.AppMbrUplink, rule.AppMbrDownlink)
+		if rule.TrafficClass != nil {
+			logger.ConfigLog.Infof("Traffic class: %v", rule.TrafficClass)
+		}
+	}
+}
+
+func convertBitrateToInt32(bitrate int64) int32 {
+	if bitrate < 0 || bitrate > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	return int32(bitrate)
+}
+
+func createNS(slice *configmodels.Slice) error {
+	if err := handleNetworkSlicePost(slice, nil); err != nil {
+		logger.ConfigLog.Errorf("Error creating slice %v: %v", slice.SliceName, err)
+		return err
+	}
+	return nil
+}
+
+func updateNS(slice *configmodels.Slice, prevSlice *configmodels.Slice) error {
+	if err := handleNetworkSlicePost(slice, prevSlice); err != nil {
+		logger.ConfigLog.Errorf("Error updating slice %v: %v", slice.SliceName, err)
+		return err
+	}
+	return nil
+}
+
 func handleNetworkSlicePost(slice *configmodels.Slice, prevSlice *configmodels.Slice) error {
 	filter := bson.M{"slice-name": slice.SliceName}
 	sliceDataBsonA := configmodels.ToBsonM(slice)
@@ -147,14 +167,8 @@ func handleNetworkSlicePost(slice *configmodels.Slice, prevSlice *configmodels.S
 	}
 	logger.DbLog.Debugf("succeeded to post slice data for %v", slice.SliceName)
 
-	provider, ok := dbadapter.CommonDBClient.(interface {
-		Client() *mongo.Client
-	})
-	if !ok {
-		return fmt.Errorf("the database adapter does not implement the required Client() method for MongoDB access")
-	}
-	sessionRunner := dbadapter.RealSessionRunner(provider.Client())
-	err = syncSliceDeviceGroupSubscribers(slice, prevSlice, sessionRunner)
+	sessionRunner := dbadapter.RealSessionRunner(dbadapter.CommonDBClient)
+	err = syncSubscribersOnSliceCreateOrUpdate(slice, prevSlice, sessionRunner)
 	if err != nil {
 		return err
 	}
@@ -176,54 +190,57 @@ func sendPebbleNotification(key string) error {
 	return nil
 }
 
-var syncSliceDeviceGroupSubscribers = func(slice *configmodels.Slice, prevSlice *configmodels.Slice, sessionRunner dbadapter.SessionRunner) error {
+var syncSubscribersOnSliceDelete = func(slice *configmodels.Slice, prevSlice *configmodels.Slice, sessionRunner dbadapter.SessionRunner) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
-	logger.WebUILog.Debugln("insert/update Network Slice")
 	if slice == nil && prevSlice != nil {
 		logger.WebUILog.Debugf("Deleted slice: %s", prevSlice.SliceName)
-		return cleanupDeviceGroups(nil, prevSlice, sessionRunner)
+		return cleanupDeviceGroups(slice, prevSlice, sessionRunner)
 	}
-	if slice != nil {
-		logger.WebUILog.Debugln("insert/update Slice:", slice)
-		if slice.SliceId.Sst == "" {
-			err := fmt.Errorf("missing SST in slice %s", slice.SliceName)
-			logger.DbLog.Error(err)
-			return err
-		}
-		sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
-		if err != nil {
-			logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
-			return err
-		}
-		snssai := &models.Snssai{
-			Sd:  slice.SliceId.Sd,
-			Sst: int32(sVal),
-		}
-		for _, dgName := range slice.SiteDeviceGroup {
-			logger.ConfigLog.Debugf("dgName:", dgName)
-			devGroupConfig := getDeviceGroupByName(dgName)
-			if devGroupConfig == nil {
-				logger.ConfigLog.Warnf("Device group not found: %s", dgName)
-				continue
-			}
+	return nil
+}
 
-			for _, imsi := range devGroupConfig.Imsis {
-				dnn := devGroupConfig.IpDomainExpanded.Dnn
-				mcc := slice.SiteInfo.Plmn.Mcc
-				mnc := slice.SiteInfo.Plmn.Mnc
-				err = updatePolicyAndProvisionedData(
-					imsi,
-					mcc,
-					mnc,
-					snssai,
-					dnn,
-					devGroupConfig.IpDomainExpanded.UeDnnQos,
-				)
-				if err != nil {
-					logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %v", imsi, err)
-					return err
-				}
+var syncSubscribersOnSliceCreateOrUpdate = func(slice *configmodels.Slice, prevSlice *configmodels.Slice, sessionRunner dbadapter.SessionRunner) error {
+	rwLock.Lock()
+	defer rwLock.Unlock()
+	logger.WebUILog.Debugln("insert/update Slice:", slice)
+	if slice.SliceId.Sst == "" {
+		err := fmt.Errorf("missing SST in slice %s", slice.SliceName)
+		logger.DbLog.Error(err)
+		return err
+	}
+	sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
+	if err != nil {
+		logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
+		return err
+	}
+	snssai := &models.Snssai{
+		Sd:  slice.SliceId.Sd,
+		Sst: int32(sVal),
+	}
+	for _, dgName := range slice.SiteDeviceGroup {
+		logger.ConfigLog.Debugf("dgName:", dgName)
+		devGroupConfig := getDeviceGroupByName(dgName)
+		if devGroupConfig == nil {
+			logger.ConfigLog.Warnf("Device group not found: %s", dgName)
+			continue
+		}
+
+		for _, imsi := range devGroupConfig.Imsis {
+			dnn := devGroupConfig.IpDomainExpanded.Dnn
+			mcc := slice.SiteInfo.Plmn.Mcc
+			mnc := slice.SiteInfo.Plmn.Mnc
+			err = updatePolicyAndProvisionedData(
+				imsi,
+				mcc,
+				mnc,
+				snssai,
+				dnn,
+				devGroupConfig.IpDomainExpanded.UeDnnQos,
+			)
+			if err != nil {
+				logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %v", imsi, err)
+				return err
 			}
 		}
 	}
@@ -461,18 +478,20 @@ func getSlices() []*configmodels.Slice {
 	return slices
 }
 
-func getSliceByName(name string) configmodels.Slice {
+func getSliceByName(name string) *configmodels.Slice {
 	filter := bson.M{"slice-name": name}
 	sliceDataInterface, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(sliceDataColl, filter)
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)
+		return nil
 	}
 	var sliceData configmodels.Slice
 	err := json.Unmarshal(configmodels.MapToByte(sliceDataInterface), &sliceData)
 	if err != nil {
 		logger.DbLog.Errorf("could not unmarshall slice %v", sliceDataInterface)
+		return nil
 	}
-	return sliceData
+	return &sliceData
 }
 
 func handleNetworkSliceDelete(sliceName string) error {
@@ -483,16 +502,10 @@ func handleNetworkSliceDelete(sliceName string) error {
 		logger.DbLog.Errorf("failed to delete slice data for %v: %v", sliceName, err)
 		return err
 	}
-	provider, ok := dbadapter.CommonDBClient.(interface {
-		Client() *mongo.Client
-	})
-	if !ok {
-		return fmt.Errorf("db does not support Client() access")
-	}
-	sessionRunner := dbadapter.RealSessionRunner(provider.Client())
+	sessionRunner := dbadapter.RealSessionRunner(dbadapter.CommonDBClient)
 	// slice is nil as it is deleted
-	if err = syncSliceDeviceGroupSubscribers(nil, &prevSlice, sessionRunner); err != nil {
-		logger.WebUILog.Errorf("failed to sync slice %v: %v", sliceName, err)
+	if err = syncSubscribersOnSliceDelete(nil, prevSlice, sessionRunner); err != nil {
+		logger.WebUILog.Errorf("failed to cleanup subscriber entries related to device groups %v: %v", sliceName, err)
 		return err
 	}
 	logger.DbLog.Debugf("succeeded to delete slice data for %v", sliceName)
@@ -505,27 +518,19 @@ func handleNetworkSliceDelete(sliceName string) error {
 	return nil
 }
 
-func getDeletedDeviceGroupsList(slice, prevSlice *configmodels.Slice) (names []string) {
-	for prevSlice == nil {
-		return
+func getDeletedDeviceGroupsList(slice, prevSlice *configmodels.Slice) []string {
+	if prevSlice == nil {
+		return nil
+	}
+	if slice == nil {
+		return append([]string(nil), prevSlice.SiteDeviceGroup...)
 	}
 
-	if slice != nil {
-		for _, pdgName := range prevSlice.SiteDeviceGroup {
-			var found bool
-			for _, dgName := range slice.SiteDeviceGroup {
-				if dgName == pdgName {
-					found = true
-					break
-				}
-			}
-			if !found {
-				names = append(names, pdgName)
-			}
+	var deleted []string
+	for _, pdgName := range prevSlice.SiteDeviceGroup {
+		if !slices.Contains(slice.SiteDeviceGroup, pdgName) {
+			deleted = append(deleted, pdgName)
 		}
-	} else {
-		names = append(names, prevSlice.SiteDeviceGroup...)
 	}
-
-	return
+	return deleted
 }

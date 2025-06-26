@@ -529,9 +529,9 @@ func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels
 		}
 		prevSlice := getSliceByName(networkSlice.SliceName)
 		updateFunc(&networkSlice)
-		if err = handleNetworkSlicePost(&networkSlice, &prevSlice); err != nil {
-			logger.ConfigLog.Errorf("Error posting slice %v: %v", networkSlice.SliceName, err)
-			return fmt.Errorf("error posting slice %v: %w", networkSlice.SliceName, err)
+		if err = updateNS(&networkSlice, prevSlice); err != nil {
+			logger.ConfigLog.Errorf("Error updating slice %v: %v", networkSlice.SliceName, err)
+			return err
 		}
 		msg := &configmodels.ConfigMessage{
 			MsgMethod: configmodels.Post_op,

@@ -86,11 +86,11 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 	execCommand = mockExecCommand
 	defer func() { execCommand = exec.Command }()
 
-	origSync := syncSliceDeviceGroupSubscribers
-	syncSliceDeviceGroupSubscribers = func(_, _ *configmodels.Slice, _ dbadapter.SessionRunner) error {
+	origSync := syncSubscribersOnSliceCreateOrUpdate
+	syncSubscribersOnSliceCreateOrUpdate = func(_, _ *configmodels.Slice, _ dbadapter.SessionRunner) error {
 		return nil
 	}
-	defer func() { syncSliceDeviceGroupSubscribers = origSync }()
+	defer func() { syncSubscribersOnSliceCreateOrUpdate = origSync }()
 
 	numPebbleNotificationsSent := execCommandTimesCalled
 
@@ -118,11 +118,11 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 	defer func() { execCommand = exec.Command }()
 	execCommandTimesCalled = 0
 
-	origSync := syncSliceDeviceGroupSubscribers
-	syncSliceDeviceGroupSubscribers = func(_, _ *configmodels.Slice, _ dbadapter.SessionRunner) error {
+	origSync := syncSubscribersOnSliceCreateOrUpdate
+	syncSubscribersOnSliceCreateOrUpdate = func(_, _ *configmodels.Slice, _ dbadapter.SessionRunner) error {
 		return nil
 	}
-	defer func() { syncSliceDeviceGroupSubscribers = origSync }()
+	defer func() { syncSubscribersOnSliceCreateOrUpdate = origSync }()
 
 	factory.WebUIConfig = &factory.Config{
 		Configuration: &factory.Configuration{

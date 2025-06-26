@@ -92,7 +92,7 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 
 func deviceGroupPostHelper(c *gin.Context, msgOp int, groupName string) error {
 	logger.ConfigLog.Infof("received device group: %v", groupName)
-	var request configmodels.DeviceGroups
+	var requestDeviceGroup configmodels.DeviceGroups
 
 	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
 	if ct != "application/json" {
@@ -101,14 +101,14 @@ func deviceGroupPostHelper(c *gin.Context, msgOp int, groupName string) error {
 		return err
 	}
 
-	if err := c.ShouldBindJSON(&request); err != nil {
+	if err := c.ShouldBindJSON(&requestDeviceGroup); err != nil {
 		logger.ConfigLog.Errorf("JSON bind error: %v", err)
 		return err
 	}
 
-	ipdomain := &request.IpDomainExpanded
-	logger.ConfigLog.Infof("imsis.size: %v, Imsis: %v", len(request.Imsis), request.Imsis)
-	logger.ConfigLog.Infof("IP Domain Name: %v", request.IpDomainName)
+	ipdomain := &requestDeviceGroup.IpDomainExpanded
+	logger.ConfigLog.Infof("imsis.size: %v, Imsis: %v", len(requestDeviceGroup.Imsis), requestDeviceGroup.Imsis)
+	logger.ConfigLog.Infof("IP Domain Name: %v", requestDeviceGroup.IpDomainName)
 	logger.ConfigLog.Infof("IP Domain details: %v", ipdomain)
 	logger.ConfigLog.Infof("dnn name: %v", ipdomain.Dnn)
 	logger.ConfigLog.Infof("ue pool: %v", ipdomain.UeIpPool)
@@ -130,15 +130,15 @@ func deviceGroupPostHelper(c *gin.Context, msgOp int, groupName string) error {
 		logger.ConfigLog.Infof("MbrUpLink: %v", ipdomain.UeDnnQos.DnnMbrUplink)
 	}
 	prevDevGroup := getDeviceGroupByName(groupName)
-	request.DeviceGroupName = groupName
-	if err := handleDeviceGroupPost(request, prevDevGroup); err != nil {
-		logger.ConfigLog.Errorf("error posting device group %v: %v", request, err)
+	requestDeviceGroup.DeviceGroupName = groupName
+	if err := handleDeviceGroupPost(requestDeviceGroup, prevDevGroup); err != nil {
+		logger.ConfigLog.Errorf("error posting device group %v: %v", requestDeviceGroup, err)
 		return err
 	}
 	var msg configmodels.ConfigMessage
 	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = msgOp
-	msg.DevGroup = &request
+	msg.DevGroup = &requestDeviceGroup
 	msg.DevGroupName = groupName
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully added Device Group [%v] to config channel", groupName)
@@ -160,12 +160,6 @@ func convertToBps(val int64, unit string) (bitrate int64) {
 }
 
 func handleDeviceGroupPost(devGroup configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) error {
-	if devGroup.DeviceGroupName == "" {
-		err := fmt.Errorf("device group name is empty")
-		logger.DbLog.Errorw("device group name is required for posting device group data", "error", err)
-		return err
-	}
-
 	filter := bson.M{"group-name": devGroup.DeviceGroupName}
 	devGroupDataBsonA := configmodels.ToBsonM(devGroup)
 	result, err := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)

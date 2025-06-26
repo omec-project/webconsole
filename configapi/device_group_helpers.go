@@ -19,7 +19,6 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
@@ -70,11 +69,12 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 		networkSlice.SiteDeviceGroup = slices.DeleteFunc(networkSlice.SiteDeviceGroup, func(existingDG string) bool {
 			return groupName == existingDG
 		})
-		if err = handleNetworkSlicePost(&networkSlice, &prevSlice); err != nil {
-			logger.ConfigLog.Errorf("Error posting slice %v: %v", networkSlice.SliceName, err)
+		if err = updateNS(&networkSlice, prevSlice); err != nil {
+			logger.ConfigLog.Errorf("Error updating slice %v: %v", networkSlice.SliceName, err)
 			errorOccurred = true
 			continue
 		}
+
 		msg := &configmodels.ConfigMessage{
 			MsgMethod: configmodels.Post_op,
 			MsgType:   configmodels.Network_slice,
@@ -129,12 +129,22 @@ func deviceGroupPostHelper(c *gin.Context, msgOp int, groupName string) error {
 		}
 		logger.ConfigLog.Infof("MbrUpLink: %v", ipdomain.UeDnnQos.DnnMbrUplink)
 	}
+
 	prevDevGroup := getDeviceGroupByName(groupName)
 	requestDeviceGroup.DeviceGroupName = groupName
-	if err := handleDeviceGroupPost(requestDeviceGroup, prevDevGroup); err != nil {
-		logger.ConfigLog.Errorf("error posting device group %v: %v", requestDeviceGroup, err)
-		return err
+	if prevDevGroup == nil {
+		logger.ConfigLog.Infof("creating new device group %v", groupName)
+		err := createDG(&requestDeviceGroup)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := updateDG(&requestDeviceGroup, prevDevGroup)
+		if err != nil {
+			return err
+		}
 	}
+
 	var msg configmodels.ConfigMessage
 	msg.MsgType = configmodels.Device_group
 	msg.MsgMethod = msgOp
@@ -145,21 +155,39 @@ func deviceGroupPostHelper(c *gin.Context, msgOp int, groupName string) error {
 	return nil
 }
 
-func convertToBps(val int64, unit string) (bitrate int64) {
-	if strings.EqualFold(unit, "bps") {
-		bitrate = val
-	} else if strings.EqualFold(unit, "kbps") {
-		bitrate = val * KPS
-	} else if strings.EqualFold(unit, "mbps") {
-		bitrate = val * MPS
-	} else if strings.EqualFold(unit, "gbps") {
-		bitrate = val * GPS
+func createDG(devGroup *configmodels.DeviceGroups) error {
+	if err := handleDeviceGroupPost(devGroup, nil); err != nil {
+		logger.ConfigLog.Errorf("error creating device group %v: %v", devGroup, err)
+		return err
 	}
-	// default, consider it as bps
-	return bitrate
+	return nil
 }
 
-func handleDeviceGroupPost(devGroup configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) error {
+func updateDG(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) error {
+	if err := handleDeviceGroupPost(devGroup, prevDevGroup); err != nil {
+		logger.ConfigLog.Errorf("error updating device group %v: %v", devGroup, err)
+		return err
+	}
+	return nil
+}
+
+func convertToBps(val int64, unit string) int64 {
+	switch strings.ToLower(unit) {
+	case "bps":
+		return val
+	case "kbps":
+		return val * KPS
+	case "mbps":
+		return val * MPS
+	case "gbps":
+		return val * GPS
+	default:
+		logger.ConfigLog.Warnf("unknown bitrate unit: %s, defaulting to bps", unit)
+		return val
+	}
+}
+
+func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) error {
 	filter := bson.M{"group-name": devGroup.DeviceGroupName}
 	devGroupDataBsonA := configmodels.ToBsonM(devGroup)
 	result, err := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
@@ -179,10 +207,10 @@ func handleDeviceGroupPost(devGroup configmodels.DeviceGroups, prevDevGroup *con
 	return nil
 }
 
-func syncDeviceGroupSubscriber(devGroup configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) error {
+func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
-	slice := isDeviceGroupExistInSlice(devGroup.DeviceGroupName)
+	slice := findSliceByDeviceGroup(devGroup.DeviceGroupName)
 	if slice == nil {
 		logger.WebUILog.Infof("Device group %s not associated with any slice — skipping sync", devGroup.DeviceGroupName)
 		return nil
@@ -202,15 +230,7 @@ func syncDeviceGroupSubscriber(devGroup configmodels.DeviceGroups, prevDevGroup 
 		Sd:  slice.SliceId.Sd,
 		Sst: int32(sVal),
 	}
-
-	provider, ok := dbadapter.CommonDBClient.(interface {
-		Client() *mongo.Client
-	})
-	if !ok {
-		return fmt.Errorf("the database adapter does not implement the required Client() method for MongoDB access")
-	}
-	sessionRunner := dbadapter.RealSessionRunner(provider.Client())
-
+	sessionRunner := dbadapter.RealSessionRunner(dbadapter.CommonDBClient)
 	var errorOccured bool
 	for _, imsi := range devGroup.Imsis {
 		/* update all current IMSIs */
@@ -231,7 +251,7 @@ func syncDeviceGroupSubscriber(devGroup configmodels.DeviceGroups, prevDevGroup 
 		}
 	}
 	// delete IMSI's that are removed
-	dimsis := getDeletedImsisList(&devGroup, prevDevGroup)
+	dimsis := getDeletedImsisList(devGroup, prevDevGroup)
 	for _, imsi := range dimsis {
 		err = removeSubscriberEntriesRelatedToDeviceGroups(slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi, sessionRunner)
 		if err != nil {
@@ -262,19 +282,21 @@ func handleDeviceGroupDelete(groupName string) error {
 
 func getDeviceGroupByName(name string) *configmodels.DeviceGroups {
 	filter := bson.M{"group-name": name}
-	devGroupDataInterface, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(devGroupDataColl, filter)
-	if errGetOne != nil {
-		logger.DbLog.Warnln(errGetOne)
+	devGroupDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(devGroupDataColl, filter)
+	if err != nil {
+		logger.DbLog.Warnln(err)
+		return nil
 	}
 	var devGroupData configmodels.DeviceGroups
-	err := json.Unmarshal(configmodels.MapToByte(devGroupDataInterface), &devGroupData)
+	err = json.Unmarshal(configmodels.MapToByte(devGroupDataInterface), &devGroupData)
 	if err != nil {
 		logger.DbLog.Errorf("could not unmarshall device group %v", devGroupDataInterface)
+		return nil
 	}
 	return &devGroupData
 }
 
-func isDeviceGroupExistInSlice(DevGroupName string) *configmodels.Slice {
+func findSliceByDeviceGroup(DevGroupName string) *configmodels.Slice {
 	for name, slice := range getSlices() {
 		for _, dgName := range slice.SiteDeviceGroup {
 			if dgName == DevGroupName {

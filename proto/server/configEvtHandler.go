@@ -53,7 +53,6 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 			logger.ConfigLog.Infoln("push config for client:", client.id)
 			client.outStandingPushConfig <- configMsg
 		}
-
 	}
 }
 

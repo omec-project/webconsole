@@ -326,7 +326,7 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 	ImsiData = make(map[string]*models.AuthenticationSubscription)
 	dbadapter.AuthDBClient = &MockMongoPost{}
 	dbadapter.CommonDBClient = &MockMongoPost{}
-	postErr := handleSubscriberPost(ueId, configMsg.AuthSubData, subscriberAuthData)
+	postErr := handleSubscriberPost(ueId, configMsg.AuthSubData)
 	if postErr != nil {
 		t.Errorf("Could not handle subscriber post: %v", postErr)
 	}
@@ -365,70 +365,6 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 	}
 }
 
-func Test_handleSubscriberPost4G(t *testing.T) {
-	origSubscriberAuthData := subscriberAuthData
-	origImsiData := ImsiData
-	origCommonDBClient := dbadapter.CommonDBClient
-	origPostData := postData
-	defer func() {
-		subscriberAuthData = origSubscriberAuthData
-		ImsiData = origImsiData
-		postData = origPostData
-		dbadapter.CommonDBClient = origCommonDBClient
-	}()
-	ueId := "imsi-208930100007487"
-	subscriberAuthData = MemorySubscriberAuthenticationData{}
-	configMsg := configmodels.ConfigMessage{
-		AuthSubData: &models.AuthenticationSubscription{
-			AuthenticationManagementField: "8000",
-			AuthenticationMethod:          "5G_AKA",
-			Milenage: &models.Milenage{
-				Op: &models.Op{
-					EncryptionAlgorithm: 0,
-					EncryptionKey:       0,
-				},
-			},
-			Opc: &models.Opc{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-				OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
-			},
-			PermanentKey: &models.PermanentKey{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-				PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
-			},
-			SequenceNumber: "16f3b3f70fc2",
-		},
-	}
-
-	postData = make([]map[string]interface{}, 0)
-	ImsiData = make(map[string]*models.AuthenticationSubscription)
-	dbadapter.CommonDBClient = &MockMongoPost{}
-	postErr := handleSubscriberPost(ueId, configMsg.AuthSubData, subscriberAuthData)
-	if postErr != nil {
-		t.Errorf("Could not handle subscriber post: %v", postErr)
-	}
-
-	expectedAmDataCollection := amDataColl
-	if postData[0]["coll"] != expectedAmDataCollection {
-		t.Errorf("Expected collection %v, got %v", expectedAmDataCollection, postData[0]["coll"])
-	}
-
-	expected_filter := bson.M{"ueId": ueId}
-	if !reflect.DeepEqual(postData[0]["filter"], expected_filter) {
-		t.Errorf("Expected filter %v, got %v", expected_filter, postData[0]["filter"])
-	}
-
-	AmDataResult := postData[0]["data"].(map[string]interface{})
-	if AmDataResult["ueId"] != ueId {
-		t.Errorf("Expected ueId %v, got %v", ueId, AmDataResult["ueId"])
-	}
-	if !reflect.DeepEqual(ImsiData[ueId], configMsg.AuthSubData) {
-		t.Errorf("Expected authSubData %v in memory, got %v ", configMsg.AuthSubData, ImsiData[ueId])
-	}
-}
-
 func Test_handleSubscriberDelete5G(t *testing.T) {
 	origSubscriberAuthData := subscriberAuthData
 	origAuthDBClient := dbadapter.AuthDBClient
@@ -446,7 +382,7 @@ func Test_handleSubscriberDelete5G(t *testing.T) {
 	deleteData = make([]map[string]interface{}, 0)
 	dbadapter.AuthDBClient = &MockMongoDeleteOne{}
 	dbadapter.CommonDBClient = &MockMongoDeleteOne{}
-	delErr := handleSubscriberDelete(ueId, subscriberAuthData)
+	delErr := handleSubscriberDelete(ueId)
 	if delErr != nil {
 		t.Errorf("Could not handle subscriber delete: %v", delErr)
 	}
@@ -465,64 +401,6 @@ func Test_handleSubscriberDelete5G(t *testing.T) {
 	}
 	if !reflect.DeepEqual(deleteData[1]["filter"], expectedFilter) {
 		t.Errorf("Expected filter %v, got %v", expectedFilter, deleteData[1]["filter"])
-	}
-}
-
-func Test_handleSubscriberDelete4G(t *testing.T) {
-	origSubscriberAuthData := subscriberAuthData
-	origImsiData := ImsiData
-	origCommonDBClient := dbadapter.CommonDBClient
-	origDeleteData := deleteData
-	defer func() {
-		subscriberAuthData = origSubscriberAuthData
-		ImsiData = origImsiData
-		deleteData = origDeleteData
-		dbadapter.CommonDBClient = origCommonDBClient
-	}()
-	ueId := "imsi-208930100007487"
-	subscriberAuthData = MemorySubscriberAuthenticationData{}
-
-	deleteData = make([]map[string]interface{}, 0)
-	ImsiData = make(map[string]*models.AuthenticationSubscription)
-	ImsiData[ueId] = &models.AuthenticationSubscription{
-		AuthenticationManagementField: "8000",
-		AuthenticationMethod:          "5G_AKA",
-		Milenage: &models.Milenage{
-			Op: &models.Op{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-			},
-		},
-		Opc: &models.Opc{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
-		},
-		PermanentKey: &models.PermanentKey{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
-		},
-		SequenceNumber: "16f3b3f70fc2",
-	}
-	dbadapter.CommonDBClient = &MockMongoDeleteOne{}
-	delErr := handleSubscriberDelete(ueId, subscriberAuthData)
-	if delErr != nil {
-		t.Errorf("Could not handle subscriber delete: %v", delErr)
-	}
-
-	expectedAmDataCollection := "subscriptionData.provisionedData.amData"
-	if deleteData[0]["coll"] != expectedAmDataCollection {
-		t.Errorf("Expected collection %v, got %v", expectedAmDataCollection, deleteData[0]["coll"])
-	}
-
-	expected_filter := bson.M{"ueId": ueId}
-	if !reflect.DeepEqual(deleteData[0]["filter"], expected_filter) {
-		t.Errorf("Expected filter %v, got %v", expected_filter, deleteData[0]["filter"])
-	}
-
-	if ImsiData[ueId] != nil {
-		t.Errorf("Expected no ueId in memory, got %v", ImsiData[ueId])
 	}
 }
 

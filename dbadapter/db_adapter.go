@@ -57,7 +57,7 @@ type MongoDBClient struct {
 }
 type SessionRunner func(ctx context.Context, fn func(sc mongo.SessionContext) error) error
 
-func RealSessionRunner(client DBInterface) SessionRunner {
+func GetSessionRunner(client DBInterface) SessionRunner {
 	return func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
 		session, err := client.StartSession()
 		if err != nil {

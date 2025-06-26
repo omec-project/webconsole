@@ -167,8 +167,7 @@ func handleNetworkSlicePost(slice *configmodels.Slice, prevSlice *configmodels.S
 	}
 	logger.DbLog.Debugf("succeeded to post slice data for %v", slice.SliceName)
 
-	sessionRunner := dbadapter.RealSessionRunner(dbadapter.CommonDBClient)
-	err = syncSubscribersOnSliceCreateOrUpdate(slice, prevSlice, sessionRunner)
+	err = syncSubscribersOnSliceCreateOrUpdate(slice, prevSlice)
 	if err != nil {
 		return err
 	}
@@ -190,17 +189,17 @@ func sendPebbleNotification(key string) error {
 	return nil
 }
 
-var syncSubscribersOnSliceDelete = func(slice *configmodels.Slice, prevSlice *configmodels.Slice, sessionRunner dbadapter.SessionRunner) error {
+var syncSubscribersOnSliceDelete = func(slice *configmodels.Slice, prevSlice *configmodels.Slice) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	if slice == nil && prevSlice != nil {
 		logger.WebUILog.Debugf("Deleted slice: %s", prevSlice.SliceName)
-		return cleanupDeviceGroups(slice, prevSlice, sessionRunner)
+		return cleanupDeviceGroups(slice, prevSlice)
 	}
 	return nil
 }
 
-var syncSubscribersOnSliceCreateOrUpdate = func(slice *configmodels.Slice, prevSlice *configmodels.Slice, sessionRunner dbadapter.SessionRunner) error {
+var syncSubscribersOnSliceCreateOrUpdate = func(slice *configmodels.Slice, prevSlice *configmodels.Slice) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	logger.WebUILog.Debugln("insert/update Slice:", slice)
@@ -219,7 +218,7 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice *configmodels.Slice, prevS
 		Sst: int32(sVal),
 	}
 	for _, dgName := range slice.SiteDeviceGroup {
-		logger.ConfigLog.Debugf("dgName:", dgName)
+		logger.ConfigLog.Debugf("dgName: %v", dgName)
 		devGroupConfig := getDeviceGroupByName(dgName)
 		if devGroupConfig == nil {
 			logger.ConfigLog.Warnf("Device group not found: %s", dgName)
@@ -245,13 +244,13 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice *configmodels.Slice, prevS
 		}
 	}
 
-	if err := cleanupDeviceGroups(slice, prevSlice, sessionRunner); err != nil {
+	if err := cleanupDeviceGroups(slice, prevSlice); err != nil {
 		return err
 	}
 	return nil
 }
 
-func cleanupDeviceGroups(slice, prevSlice *configmodels.Slice, sessionRunner dbadapter.SessionRunner) error {
+func cleanupDeviceGroups(slice, prevSlice *configmodels.Slice) error {
 	dgnames := getDeletedDeviceGroupsList(slice, prevSlice)
 	for _, dgName := range dgnames {
 		devGroupConfig := getDeviceGroupByName(dgName)
@@ -263,7 +262,7 @@ func cleanupDeviceGroups(slice, prevSlice *configmodels.Slice, sessionRunner dba
 		for _, imsi := range devGroupConfig.Imsis {
 			mcc := prevSlice.SiteInfo.Plmn.Mcc
 			mnc := prevSlice.SiteInfo.Plmn.Mnc
-			if err := removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi, sessionRunner); err != nil {
+			if err := removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi); err != nil {
 				logger.ConfigLog.Errorf("Failed to remove subscriber for IMSI %s: %v", imsi, err)
 				return err
 			}
@@ -502,9 +501,8 @@ func handleNetworkSliceDelete(sliceName string) error {
 		logger.DbLog.Errorf("failed to delete slice data for %v: %v", sliceName, err)
 		return err
 	}
-	sessionRunner := dbadapter.RealSessionRunner(dbadapter.CommonDBClient)
 	// slice is nil as it is deleted
-	if err = syncSubscribersOnSliceDelete(nil, prevSlice, sessionRunner); err != nil {
+	if err = syncSubscribersOnSliceDelete(nil, prevSlice); err != nil {
 		logger.WebUILog.Errorf("failed to cleanup subscriber entries related to device groups %v: %v", sliceName, err)
 		return err
 	}

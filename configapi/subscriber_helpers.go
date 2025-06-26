@@ -30,8 +30,10 @@ type DatabaseSubscriberAuthenticationData struct {
 
 var subscriberAuthData SubscriberAuthenticationData
 
-var imsiDataLock sync.RWMutex
-var ImsiData = make(map[string]*models.AuthenticationSubscription)
+var (
+	imsiDataLock sync.RWMutex
+	ImsiData     = make(map[string]*models.AuthenticationSubscription)
+)
 
 func addSubscriber(imsi string, data *models.AuthenticationSubscription) {
 	imsiDataLock.Lock()
@@ -99,9 +101,12 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
 	// get backup
-	backup, _ := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
+	backup, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
+	if err != nil {
+		logger.DbLog.Errorln("failed to get backup data for authentication subscription: %v", err)
+	}
 	// write to AuthDB
-	if _, err := dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, authDataBsonA); err != nil {
+	if _, err = dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, authDataBsonA); err != nil {
 		logger.DbLog.Errorw("failed to update authentication subscription", "error", err)
 		return err
 	}
@@ -109,11 +114,14 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	// write to CommonDB
 	basicAmData := map[string]interface{}{"ueId": imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
-	if _, err := dbadapter.CommonDBClient.RestfulAPIPutOne(amDataColl, filter, basicDataBson); err != nil {
+	if _, err = dbadapter.CommonDBClient.RestfulAPIPutOne(amDataColl, filter, basicDataBson); err != nil {
 		logger.DbLog.Errorw("failed to update amData", "error", err)
 		// restore old auth data if any
 		if backup != nil {
-			_, _ = dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, backup)
+			_, err = dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, backup)
+			if err != nil {
+				logger.DbLog.Errorw("failed to restore backup data for authentication subscription", "error", err)
+			}
 		}
 		return fmt.Errorf("authData update failed, rolled back AuthDB change: %w", err)
 	}

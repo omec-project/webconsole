@@ -45,14 +45,15 @@ func configHandler(configMsgChan chan *configmodels.ConfigMessage, configReceive
 				firstConfigRcvd = true
 				configReceived <- true
 			}
-			if len(clientNFPool) == 0 {
-				logger.ConfigLog.Infoln("no client available. No need to send config")
-			}
-			for _, client := range clientNFPool {
-				logger.ConfigLog.Infoln("push config for client:", client.id)
-				client.outStandingPushConfig <- configMsg
-			}
 		}
+		if len(clientNFPool) == 0 {
+			logger.ConfigLog.Infoln("no client available. No need to send config")
+		}
+		for _, client := range clientNFPool {
+			logger.ConfigLog.Infoln("push config for client:", client.id)
+			client.outStandingPushConfig <- configMsg
+		}
+
 	}
 }
 

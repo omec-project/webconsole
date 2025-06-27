@@ -123,19 +123,19 @@ func (n *NFConfigServer) syncWithRetry(ctx context.Context) {
 	n.syncMutex.Lock()
 	defer n.syncMutex.Unlock()
 	logger.NfConfigLog.Debugln("Starting in-memory NF configuration synchronization with new context")
-
+	interval := 0 * time.Second
 	for {
 		select {
 		case <-ctx.Done():
 			logger.NfConfigLog.Infoln("No-op. Sync in-memory configuration was cancelled")
 			return
-		default:
+		case <-time.After(interval):
 			err := syncInMemoryConfigFunc(n)
 			if err == nil {
 				return
 			}
 			logger.NfConfigLog.Warnf("Sync in-memory configuration failed, retrying: %v", err)
-			time.Sleep(3 * time.Second)
+			interval = 3 * time.Second
 		}
 	}
 }

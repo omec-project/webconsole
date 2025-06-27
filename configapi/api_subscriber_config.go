@@ -629,10 +629,10 @@ func DeleteSubscriberByID(c *gin.Context) {
 	ueId := c.Param("ueId")
 
 	imsi := strings.TrimPrefix(ueId, "imsi-")
-	err := updateSubscriberInDeviceGroups(imsi)
+	statusCode, err := updateSubscriberInDeviceGroups(imsi)
 	if err != nil {
 		logger.WebUILog.Errorf("Failed to update subscriber: %s.", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "error deleting subscriber. Please check the log for details."})
+		c.JSON(statusCode, gin.H{"error": "error deleting subscriber. Please check the log for details."})
 		return
 	}
 	if err = handleSubscriberDelete(imsi); err != nil {

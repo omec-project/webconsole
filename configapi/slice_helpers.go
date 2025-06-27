@@ -52,14 +52,14 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, e
 
 	if prevSlice == nil {
 		logger.ConfigLog.Infof("Adding new slice [%v]", sliceName)
-		if err := createNS(&requestSlice); err != nil {
+		if statusCode, err := createNS(&requestSlice); err != nil {
 			logger.ConfigLog.Errorf("Error creating slice %v: %v", sliceName, err)
-			return http.StatusInternalServerError, err
+			return statusCode, err
 		}
 	} else {
-		if err := updateNS(&requestSlice, prevSlice); err != nil {
+		if statusCode, err := updateNS(&requestSlice, prevSlice); err != nil {
 			logger.ConfigLog.Errorf("Error updating slice %v: %v", sliceName, err)
-			return http.StatusInternalServerError, err
+			return statusCode, err
 		}
 	}
 	var msg configmodels.ConfigMessage
@@ -141,35 +141,35 @@ func convertBitrateToInt32(bitrate int64) int32 {
 	return int32(bitrate)
 }
 
-func createNS(slice *configmodels.Slice) error {
-	if err := handleNetworkSlicePost(slice, nil); err != nil {
+func createNS(slice *configmodels.Slice) (int, error) {
+	if statusCode, err := handleNetworkSlicePost(slice, nil); err != nil {
 		logger.ConfigLog.Errorf("Error creating slice %v: %v", slice.SliceName, err)
-		return err
+		return statusCode, err
 	}
-	return nil
+	return http.StatusOK, nil
 }
 
-func updateNS(slice *configmodels.Slice, prevSlice *configmodels.Slice) error {
-	if err := handleNetworkSlicePost(slice, prevSlice); err != nil {
+func updateNS(slice *configmodels.Slice, prevSlice *configmodels.Slice) (int, error) {
+	if statusCode, err := handleNetworkSlicePost(slice, prevSlice); err != nil {
 		logger.ConfigLog.Errorf("Error updating slice %v: %v", slice.SliceName, err)
-		return err
+		return statusCode, err
 	}
-	return nil
+	return http.StatusOK, nil
 }
 
-func handleNetworkSlicePost(slice *configmodels.Slice, prevSlice *configmodels.Slice) error {
+func handleNetworkSlicePost(slice *configmodels.Slice, prevSlice *configmodels.Slice) (int, error) {
 	filter := bson.M{"slice-name": slice.SliceName}
 	sliceDataBsonA := configmodels.ToBsonM(slice)
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
 	if err != nil {
 		logger.DbLog.Errorf("failed to post slice data for %v: %v", slice.SliceName, err)
-		return err
+		return http.StatusInternalServerError, err
 	}
 	logger.DbLog.Debugf("succeeded to post slice data for %v", slice.SliceName)
 
-	err = syncSubscribersOnSliceCreateOrUpdate(slice, prevSlice)
+	statusCode, err := syncSubscribersOnSliceCreateOrUpdate(slice, prevSlice)
 	if err != nil {
-		return err
+		return statusCode, err
 	}
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
 		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/create")
@@ -177,7 +177,7 @@ func handleNetworkSlicePost(slice *configmodels.Slice, prevSlice *configmodels.S
 			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
 	}
-	return nil
+	return http.StatusOK, nil
 }
 
 func sendPebbleNotification(key string) error {
@@ -199,19 +199,19 @@ var syncSubscribersOnSliceDelete = func(slice *configmodels.Slice, prevSlice *co
 	return nil
 }
 
-var syncSubscribersOnSliceCreateOrUpdate = func(slice *configmodels.Slice, prevSlice *configmodels.Slice) error {
+var syncSubscribersOnSliceCreateOrUpdate = func(slice *configmodels.Slice, prevSlice *configmodels.Slice) (int, error) {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	logger.WebUILog.Debugln("insert/update Slice:", slice)
 	if slice.SliceId.Sst == "" {
 		err := fmt.Errorf("missing SST in slice %s", slice.SliceName)
 		logger.DbLog.Error(err)
-		return err
+		return http.StatusBadRequest, err
 	}
 	sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 	if err != nil {
 		logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
-		return err
+		return http.StatusBadRequest, err
 	}
 	snssai := &models.Snssai{
 		Sd:  slice.SliceId.Sd,
@@ -239,15 +239,15 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice *configmodels.Slice, prevS
 			)
 			if err != nil {
 				logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %v", imsi, err)
-				return err
+				return http.StatusInternalServerError, err
 			}
 		}
 	}
 
 	if err := cleanupDeviceGroups(slice, prevSlice); err != nil {
-		return err
+		return http.StatusInternalServerError, err
 	}
-	return nil
+	return http.StatusOK, nil
 }
 
 func cleanupDeviceGroups(slice, prevSlice *configmodels.Slice) error {

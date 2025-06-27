@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"slices"
 	"strconv"
 	"strings"
@@ -65,8 +66,8 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 		networkSlice.SiteDeviceGroup = slices.DeleteFunc(networkSlice.SiteDeviceGroup, func(existingDG string) bool {
 			return groupName == existingDG
 		})
-		if err = updateNS(&networkSlice, prevSlice); err != nil {
-			logger.ConfigLog.Errorf("Error updating slice %v: %v", networkSlice.SliceName, err)
+		if statusCode, err := updateNS(&networkSlice, prevSlice); err != nil {
+			logger.ConfigLog.Errorf("Error updating slice: %v error type: %v error: %v", networkSlice.SliceName, statusCode, err)
 			errorOccurred = true
 			continue
 		}
@@ -86,7 +87,7 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 	return nil
 }
 
-func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, msgOp int, groupName string) error {
+func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, msgOp int, groupName string) (int, error) {
 	logger.ConfigLog.Infof("received device group: %v", groupName)
 
 	ipdomain := &requestDeviceGroup.IpDomainExpanded
@@ -117,14 +118,14 @@ func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, msgOp i
 	requestDeviceGroup.DeviceGroupName = groupName
 	if prevDevGroup == nil {
 		logger.ConfigLog.Infof("creating new device group %v", groupName)
-		err := createDG(&requestDeviceGroup)
+		statusCode, err := createDG(&requestDeviceGroup)
 		if err != nil {
-			return err
+			return statusCode, err
 		}
 	} else {
-		err := updateDG(&requestDeviceGroup, prevDevGroup)
+		statusCode, err := updateDG(&requestDeviceGroup, prevDevGroup)
 		if err != nil {
-			return err
+			return statusCode, err
 		}
 	}
 
@@ -135,23 +136,23 @@ func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, msgOp i
 	msg.DevGroupName = groupName
 	configChannel <- &msg
 	logger.ConfigLog.Infof("successfully added Device Group [%v] to config channel", groupName)
-	return nil
+	return http.StatusOK, nil
 }
 
-func createDG(devGroup *configmodels.DeviceGroups) error {
-	if err := handleDeviceGroupPost(devGroup, nil); err != nil {
+func createDG(devGroup *configmodels.DeviceGroups) (int, error) {
+	if statusCode, err := handleDeviceGroupPost(devGroup, nil); err != nil {
 		logger.ConfigLog.Errorf("error creating device group %v: %v", devGroup, err)
-		return err
+		return statusCode, err
 	}
-	return nil
+	return http.StatusOK, nil
 }
 
-func updateDG(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) error {
-	if err := handleDeviceGroupPost(devGroup, prevDevGroup); err != nil {
+func updateDG(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
+	if statusCode, err := handleDeviceGroupPost(devGroup, prevDevGroup); err != nil {
 		logger.ConfigLog.Errorf("error updating device group %v: %v", devGroup, err)
-		return err
+		return statusCode, err
 	}
-	return nil
+	return http.StatusOK, nil
 }
 
 func convertToBps(val int64, unit string) int64 {
@@ -170,44 +171,44 @@ func convertToBps(val int64, unit string) int64 {
 	}
 }
 
-func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) error {
+func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
 	filter := bson.M{"group-name": devGroup.DeviceGroupName}
 	devGroupDataBsonA := configmodels.ToBsonM(devGroup)
 	result, err := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
 	if err != nil {
 		logger.DbLog.Errorw("failed to post device group data for %v: %v", devGroup.DeviceGroupName, err)
-		return err
+		return http.StatusInternalServerError, err
 	}
 	logger.DbLog.Infof("DB operation result for device group %s: %v",
 		devGroup.DeviceGroupName, result)
 
-	err = syncDeviceGroupSubscriber(devGroup, prevDevGroup)
+	statusCode, err := syncDeviceGroupSubscriber(devGroup, prevDevGroup)
 	if err != nil {
 		logger.WebUILog.Error(err.Error())
-		return err
+		return statusCode, err
 	}
 	logger.DbLog.Debugf("succeeded to post device group data for %v", devGroup.DeviceGroupName)
-	return nil
+	return http.StatusOK, nil
 }
 
-func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) error {
+func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	slice := findSliceByDeviceGroup(devGroup.DeviceGroupName)
 	if slice == nil {
 		logger.WebUILog.Infof("Device group %s not associated with any slice — skipping sync", devGroup.DeviceGroupName)
-		return nil
+		return http.StatusOK, nil
 	}
 	logger.WebUILog.Infof("Device group %s is part of slice %s", devGroup.DeviceGroupName, slice.SliceName)
 	if slice.SliceId.Sst == "" {
 		err := fmt.Errorf("missing SST in slice %s", slice.SliceName)
 		logger.DbLog.Error(err)
-		return err
+		return http.StatusBadRequest, err
 	}
 	sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 	if err != nil {
 		logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
-		return err
+		return http.StatusBadRequest, err
 	}
 	snssai := &models.Snssai{
 		Sd:  slice.SliceId.Sd,
@@ -243,9 +244,9 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 	}
 
 	if errorOccured {
-		return fmt.Errorf("syncDeviceGroupSubscriber failed, please check logs")
+		return http.StatusInternalServerError, fmt.Errorf("syncDeviceGroupSubscriber failed, please check logs")
 	} else {
-		return nil
+		return http.StatusOK, nil
 	}
 }
 

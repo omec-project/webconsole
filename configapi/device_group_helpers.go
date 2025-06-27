@@ -66,12 +66,11 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 		networkSlice.SiteDeviceGroup = slices.DeleteFunc(networkSlice.SiteDeviceGroup, func(existingDG string) bool {
 			return groupName == existingDG
 		})
-		if statusCode, err := updateNS(&networkSlice, prevSlice); err != nil {
+		if statusCode, err := updateNS(networkSlice, *prevSlice); err != nil {
 			logger.ConfigLog.Errorf("Error updating slice: %v status code: %v error: %v", networkSlice.SliceName, statusCode, err)
 			errorOccurred = true
 			continue
 		}
-
 		msg := &configmodels.ConfigMessage{
 			MsgMethod: configmodels.Post_op,
 			MsgType:   configmodels.Network_slice,

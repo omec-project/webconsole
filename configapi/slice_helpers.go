@@ -52,12 +52,12 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, e
 
 	if prevSlice == nil {
 		logger.ConfigLog.Infof("Adding new slice [%v]", sliceName)
-		if statusCode, err := createNS(&requestSlice); err != nil {
+		if statusCode, err := createNS(requestSlice); err != nil {
 			logger.ConfigLog.Errorf("Error creating slice %v: %v", sliceName, err)
 			return statusCode, err
 		}
 	} else {
-		if statusCode, err := updateNS(&requestSlice, prevSlice); err != nil {
+		if statusCode, err := updateNS(requestSlice, *prevSlice); err != nil {
 			logger.ConfigLog.Errorf("Error updating slice %v: %v", sliceName, err)
 			return statusCode, err
 		}
@@ -141,15 +141,15 @@ func convertBitrateToInt32(bitrate int64) int32 {
 	return int32(bitrate)
 }
 
-func createNS(slice *configmodels.Slice) (int, error) {
-	if statusCode, err := handleNetworkSlicePost(slice, nil); err != nil {
+func createNS(slice configmodels.Slice) (int, error) {
+	if statusCode, err := handleNetworkSlicePost(slice, configmodels.Slice{}); err != nil {
 		logger.ConfigLog.Errorf("Error creating slice %v: %v", slice.SliceName, err)
 		return statusCode, err
 	}
 	return http.StatusOK, nil
 }
 
-func updateNS(slice *configmodels.Slice, prevSlice *configmodels.Slice) (int, error) {
+func updateNS(slice, prevSlice configmodels.Slice) (int, error) {
 	if statusCode, err := handleNetworkSlicePost(slice, prevSlice); err != nil {
 		logger.ConfigLog.Errorf("Error updating slice %v: %v", slice.SliceName, err)
 		return statusCode, err
@@ -157,7 +157,7 @@ func updateNS(slice *configmodels.Slice, prevSlice *configmodels.Slice) (int, er
 	return http.StatusOK, nil
 }
 
-func handleNetworkSlicePost(slice *configmodels.Slice, prevSlice *configmodels.Slice) (int, error) {
+func handleNetworkSlicePost(slice configmodels.Slice, prevSlice configmodels.Slice) (int, error) {
 	filter := bson.M{"slice-name": slice.SliceName}
 	sliceDataBsonA := configmodels.ToBsonM(slice)
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
@@ -194,12 +194,12 @@ var syncSubscribersOnSliceDelete = func(slice *configmodels.Slice, prevSlice *co
 	defer rwLock.Unlock()
 	if slice == nil && prevSlice != nil {
 		logger.WebUILog.Debugf("Deleted slice: %s", prevSlice.SliceName)
-		return cleanupDeviceGroups(slice, prevSlice)
+		return cleanupDeviceGroups(configmodels.Slice{}, *prevSlice)
 	}
 	return nil
 }
 
-var syncSubscribersOnSliceCreateOrUpdate = func(slice *configmodels.Slice, prevSlice *configmodels.Slice) (int, error) {
+var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSlice configmodels.Slice) (int, error) {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	logger.WebUILog.Debugln("insert/update Slice:", slice)
@@ -250,7 +250,7 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice *configmodels.Slice, prevS
 	return http.StatusOK, nil
 }
 
-func cleanupDeviceGroups(slice, prevSlice *configmodels.Slice) error {
+func cleanupDeviceGroups(slice, prevSlice configmodels.Slice) error {
 	dgnames := getDeletedDeviceGroupsList(slice, prevSlice)
 	for _, dgName := range dgnames {
 		devGroupConfig := getDeviceGroupByName(dgName)
@@ -516,12 +516,12 @@ func handleNetworkSliceDelete(sliceName string) error {
 	return nil
 }
 
-func getDeletedDeviceGroupsList(slice, prevSlice *configmodels.Slice) []string {
-	if prevSlice == nil {
+func getDeletedDeviceGroupsList(slice, prevSlice configmodels.Slice) []string {
+	if len(prevSlice.SiteDeviceGroup) == 0 {
 		return nil
 	}
-	if slice == nil {
-		return append([]string(nil), prevSlice.SiteDeviceGroup...)
+	if len(slice.SiteDeviceGroup) == 0 {
+		return slices.Clone(prevSlice.SiteDeviceGroup)
 	}
 
 	var deleted []string

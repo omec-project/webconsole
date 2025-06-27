@@ -84,7 +84,7 @@ func startApplication(config *factory.Config) error {
 func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nfConf nfconfig.NFConfigInterface) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	syncChan := make(chan struct{}, 1)
+	syncChan := make(chan struct{}, 5)
 	go webui.Start(ctx, syncChan)
 	logger.InitLog.Infoln("WebUI started")
 

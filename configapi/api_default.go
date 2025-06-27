@@ -147,7 +147,15 @@ func DeviceGroupGroupNamePut(c *gin.Context) {
 	}
 	var requestDeviceGroup configmodels.DeviceGroups
 
-	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
+	ct := c.GetHeader("Content-Type")
+	if ct == "" {
+		err := fmt.Errorf("missing Content-Type header")
+		logger.ConfigLog.Errorln(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ct = strings.Split(ct, ";")[0]
 	if ct != "application/json" {
 		err := fmt.Errorf("unsupported content-type: %s", ct)
 		logger.ConfigLog.Errorln(err)
@@ -203,7 +211,15 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 	}
 	var requestDeviceGroup configmodels.DeviceGroups
 
-	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
+	ct := c.GetHeader("Content-Type")
+	if ct == "" {
+		err := fmt.Errorf("missing Content-Type header")
+		logger.ConfigLog.Errorln(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ct = strings.Split(ct, ";")[0]
 	if ct != "application/json" {
 		err := fmt.Errorf("unsupported content-type: %s", ct)
 		logger.ConfigLog.Errorln(err)

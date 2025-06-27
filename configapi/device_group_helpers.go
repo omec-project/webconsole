@@ -24,9 +24,9 @@ import (
 var rwLock sync.RWMutex
 
 const (
-	KPS = 1000
-	MPS = 1000000
-	GPS = 1000000000
+	KBPS = 1000
+	MBPS = 1000000
+	GBPS = 1000000000
 )
 
 func deviceGroupDeleteHelper(groupName string) error {
@@ -159,11 +159,11 @@ func convertToBps(val int64, unit string) int64 {
 	case "bps":
 		return val
 	case "kbps":
-		return val * KPS
+		return val * KBPS
 	case "mbps":
-		return val * MPS
+		return val * MBPS
 	case "gbps":
-		return val * GPS
+		return val * GBPS
 	default:
 		logger.ConfigLog.Warnf("unknown bitrate unit: %s, defaulting to bps", unit)
 		return val

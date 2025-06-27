@@ -120,6 +120,14 @@ func (m *MockMongoClientEmptyDB) StartSession() (mongo.Session, error) {
 	return &MockSession{}, nil
 }
 
+func (m *MockMongoClientEmptyDB) RestfulAPIDeleteOne(coll string, filter bson.M) error {
+	return nil
+}
+
+func (m *MockMongoClientEmptyDB) Client() *mongo.Client {
+	return nil
+}
+
 type MockMongoClientDuplicateCreation struct {
 	dbadapter.DBInterface
 }
@@ -146,16 +154,18 @@ func (m *MockMongoClientDuplicateCreation) StartSession() (mongo.Session, error)
 }
 
 type MockMongoClientNoSubscriberInDB struct {
-	dbadapter.DBInterface
+	*MockMongoClientEmptyDB
 	PostDataCommon *[]map[string]interface{}
 }
 
-func (db *MockMongoClientNoSubscriberInDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
-	if db.PostDataCommon != nil {
-		*db.PostDataCommon = append(*db.PostDataCommon, map[string]interface{}{
-			"coll":   collName,
-			"filter": filter,
-		})
-	}
+func (m *MockMongoClientNoSubscriberInDB) RestfulAPIPost(coll string, filter bson.M, postData map[string]interface{}) (bool, error) {
+	*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+	})
+	return true, nil
+}
+
+func (m *MockMongoClientNoSubscriberInDB) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	return nil, nil
 }

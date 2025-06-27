@@ -19,6 +19,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+var configChannel chan *configmodels.ConfigMessage
+
+func SetChannel(cfgChannel chan *configmodels.ConfigMessage) {
+	logger.ConfigLog.Infoln("setting configChannel")
+	configChannel = cfgChannel
+}
+
 func setInventoryCorsHeader(c *gin.Context) {
 	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -69,6 +76,7 @@ func GetGnbs(c *gin.Context) {
 // @Param       gnb    body    configmodels.PostGnbRequest    true    "Name and TAC of the gNB"
 // @Security    BearerAuth
 // @Success     201  {object}  nil  "gNB successfully created"
+// @Failure     409  {object}  nil  "Resource Conflict"
 // @Failure     400  {object}  nil  "Bad request"
 // @Failure     401  {object}  nil  "Authorization failed"
 // @Failure     403  {object}  nil  "Forbidden"
@@ -178,13 +186,18 @@ func updateGnbInNetworkSlices(gnb configmodels.Gnb) error {
 	filterByGnb := bson.M{
 		"site-info.gNodeBs.name": gnb.Name,
 	}
-	return updateInventoryInNetworkSlices(filterByGnb, func(networkSlice *configmodels.Slice) {
+	statusCode, err := updateInventoryInNetworkSlices(filterByGnb, func(networkSlice *configmodels.Slice) {
 		for i := range networkSlice.SiteInfo.GNodeBs {
 			if networkSlice.SiteInfo.GNodeBs[i].Name == gnb.Name {
 				networkSlice.SiteInfo.GNodeBs[i].Tac = *gnb.Tac
 			}
 		}
 	})
+	if err != nil {
+		logger.ConfigLog.Errorf("failed to update gNB in network slices: %v", err)
+	}
+	logger.ConfigLog.Infof("update gNB result statusCode: %d", statusCode)
+	return err
 }
 
 // DeleteGnb godoc
@@ -232,11 +245,16 @@ func removeGnbFromNetworkSlices(gnb configmodels.Gnb) error {
 	filterByGnb := bson.M{
 		"site-info.gNodeBs.name": gnb.Name,
 	}
-	return updateInventoryInNetworkSlices(filterByGnb, func(networkSlice *configmodels.Slice) {
+	statusCode, err := updateInventoryInNetworkSlices(filterByGnb, func(networkSlice *configmodels.Slice) {
 		networkSlice.SiteInfo.GNodeBs = slices.DeleteFunc(networkSlice.SiteInfo.GNodeBs, func(existingGnb configmodels.SliceSiteInfoGNodeBs) bool {
 			return gnb.Name == existingGnb.Name
 		})
 	})
+	if err != nil {
+		logger.ConfigLog.Errorf("failed to remove gNB from network slices: %v", err)
+	}
+	logger.ConfigLog.Infof("remove gNB result statusCode: %d", statusCode)
+	return err
 }
 
 func executeGnbTransaction(ctx context.Context, gnb configmodels.Gnb, nsOperation func(configmodels.Gnb) error, gnbOperation func(mongo.SessionContext, configmodels.Gnb) error) error {
@@ -313,6 +331,7 @@ func GetUpfs(c *gin.Context) {
 // @Failure      400  {object}  nil  "Bad request"
 // @Failure      401  {object}  nil  "Authorization failed"
 // @Failure      403  {object}  nil  "Forbidden"
+// @Failure      409  {object}  nil  "Resource Conflict"
 // @Failure      500  {object}  nil  "Error creating UPF"
 // @Router       /config/v1/inventory/upf/  [post]
 func PostUpf(c *gin.Context) {
@@ -423,12 +442,17 @@ func putUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
 
 func updateUpfInNetworkSlices(upf configmodels.Upf) error {
 	filterByUpf := bson.M{"site-info.upf.upf-name": upf.Hostname}
-	return updateInventoryInNetworkSlices(filterByUpf, func(networkSlice *configmodels.Slice) {
+	statusCode, err := updateInventoryInNetworkSlices(filterByUpf, func(networkSlice *configmodels.Slice) {
 		networkSlice.SiteInfo.Upf = map[string]interface{}{
 			"upf-name": upf.Hostname,
 			"upf-port": upf.Port,
 		}
 	})
+	if err != nil {
+		logger.ConfigLog.Errorf("failed to update UPF in network slices: %v", err)
+	}
+	logger.ConfigLog.Infof("update UPF result statusCode: %d", statusCode)
+	return err
 }
 
 // DeleteUpf godoc
@@ -473,9 +497,14 @@ func deleteUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
 
 func removeUpfFromNetworkSlices(upf configmodels.Upf) error {
 	filterByUpf := bson.M{"site-info.upf.upf-name": upf.Hostname}
-	return updateInventoryInNetworkSlices(filterByUpf, func(networkSlice *configmodels.Slice) {
+	statusCode, err := updateInventoryInNetworkSlices(filterByUpf, func(networkSlice *configmodels.Slice) {
 		networkSlice.SiteInfo.Upf = nil
 	})
+	if err != nil {
+		logger.ConfigLog.Errorf("failed to remove UPF from network slices: %v", err)
+	}
+	logger.ConfigLog.Infof("remove UPF result statusCode: %d", statusCode)
+	return err
 }
 
 func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, nsOperation func(configmodels.Upf) error, upfOperation func(mongo.SessionContext, configmodels.Upf) error) error {
@@ -506,21 +535,24 @@ func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, nsOperatio
 	})
 }
 
-func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels.Slice)) error {
+func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels.Slice)) (int, error) {
 	rawNetworkSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, filter)
 	if err != nil {
-		return fmt.Errorf("failed to fetch network slices: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to fetch network slices: %w", err)
 	}
 
 	var messages []*configmodels.ConfigMessage
 	for _, rawNetworkSlice := range rawNetworkSlices {
 		var networkSlice configmodels.Slice
 		if err = json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
-			return fmt.Errorf("error unmarshaling network slice: %v", err)
+			return http.StatusInternalServerError, fmt.Errorf("error unmarshaling network slice: %v", err)
 		}
-
+		prevSlice := getSliceByName(networkSlice.SliceName)
 		updateFunc(&networkSlice)
-
+		if statusCode, err := updateNS(networkSlice, *prevSlice); err != nil {
+			logger.ConfigLog.Errorf("Error updating slice %v: %v", networkSlice.SliceName, err)
+			return statusCode, err
+		}
 		msg := &configmodels.ConfigMessage{
 			MsgMethod: configmodels.Post_op,
 			MsgType:   configmodels.Network_slice,
@@ -533,5 +565,5 @@ func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels
 		configChannel <- msg
 		logger.ConfigLog.Infof("network slice [%v] update sent to config channel", msg.SliceName)
 	}
-	return nil
+	return http.StatusOK, nil
 }

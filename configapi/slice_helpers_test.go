@@ -87,8 +87,8 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 	defer func() { execCommand = exec.Command }()
 
 	origSync := syncSubscribersOnSliceCreateOrUpdate
-	syncSubscribersOnSliceCreateOrUpdate = func(_, _ *configmodels.Slice) error {
-		return nil
+	syncSubscribersOnSliceCreateOrUpdate = func(_, _ *configmodels.Slice) (int, error) {
+		return http.StatusOK, nil
 	}
 	defer func() { syncSubscribersOnSliceCreateOrUpdate = origSync }()
 
@@ -104,9 +104,9 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 	}()
 	dbadapter.CommonDBClient = &MockMongoPost{}
 
-	err := handleNetworkSlicePost(&slice, prevSlice)
+	statusCode, err := handleNetworkSlicePost(&slice, prevSlice)
 	if err != nil {
-		t.Errorf("Could not handle network slice post: %v", err)
+		t.Errorf("Could not handle network slice post: %v statusCode: %v", err, statusCode)
 	}
 	if execCommandTimesCalled != numPebbleNotificationsSent+1 {
 		t.Errorf("Unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent+1)
@@ -119,8 +119,8 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 	execCommandTimesCalled = 0
 
 	origSync := syncSubscribersOnSliceCreateOrUpdate
-	syncSubscribersOnSliceCreateOrUpdate = func(_, _ *configmodels.Slice) error {
-		return nil
+	syncSubscribersOnSliceCreateOrUpdate = func(_, _ *configmodels.Slice) (int, error) {
+		return http.StatusOK, nil
 	}
 	defer func() { syncSubscribersOnSliceCreateOrUpdate = origSync }()
 
@@ -138,9 +138,9 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 	}()
 	dbadapter.CommonDBClient = &MockMongoPost{}
 
-	err := handleNetworkSlicePost(slice, prevSlice)
+	statusCode, err := handleNetworkSlicePost(slice, prevSlice)
 	if err != nil {
-		t.Errorf("handleNetworkSlicePost returned error: %v", err)
+		t.Errorf("handleNetworkSlicePost returned error: %v statusCode: %v", err, statusCode)
 	}
 
 	if execCommandTimesCalled != 0 {
@@ -232,10 +232,10 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 			}()
 			dbadapter.CommonDBClient = mock
 
-			postErr := handleNetworkSlicePost(&testSlice, nil)
+			statusCode, postErr := handleNetworkSlicePost(&testSlice, nil)
 
 			if postErr != nil {
-				t.Errorf("Could not handle network slice post: %v", postErr)
+				t.Errorf("Could not handle network slice post: %v status code: %v", postErr, statusCode)
 			}
 
 			if len(postData) == 0 {
@@ -308,9 +308,9 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 			}()
 			dbadapter.CommonDBClient = mock
 
-			err := handleNetworkSlicePost(&ts, &ts)
+			statusCode, err := handleNetworkSlicePost(&ts, &ts)
 			if err != nil {
-				t.Fatalf("handleNetworkSlicePost returned error: %v", err)
+				t.Fatalf("handleNetworkSlicePost returned error: %v status code: %v", err, statusCode)
 			}
 
 			if len(postData) == 0 {

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/omec-project/openapi/models"
@@ -308,21 +309,21 @@ func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscri
 	return nil
 }
 
-func updateSubscriberInDeviceGroups(imsi string) error {
+func updateSubscriberInDeviceGroups(imsi string) (int, error) {
 	filterByImsi := bson.M{
 		"imsis": imsi,
 	}
 	rawDeviceGroups, err := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, filterByImsi)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch device groups: %v", err)
-		return err
+		return http.StatusInternalServerError, err
 	}
 	var deviceGroupUpdateMessages []configmodels.ConfigMessage
 	for _, rawDeviceGroup := range rawDeviceGroups {
 		var deviceGroup configmodels.DeviceGroups
 		if err = json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup); err != nil {
 			logger.DbLog.Errorf("error unmarshaling device group: %v", err)
-			return err
+			return http.StatusInternalServerError, err
 		}
 		filteredImsis := []string{}
 		for _, currImsi := range deviceGroup.Imsis {
@@ -332,9 +333,9 @@ func updateSubscriberInDeviceGroups(imsi string) error {
 		}
 		deviceGroup.Imsis = filteredImsis
 		prevDevGroup := getDeviceGroupByName(deviceGroup.DeviceGroupName)
-		if err = handleDeviceGroupPost(&deviceGroup, prevDevGroup); err != nil {
+		if statusCode, err := handleDeviceGroupPost(&deviceGroup, prevDevGroup); err != nil {
 			logger.ConfigLog.Errorf("error posting device group %v: %v", deviceGroup, err)
-			return err
+			return statusCode, err
 		}
 		deviceGroupUpdateMessage := configmodels.ConfigMessage{
 			MsgType:      configmodels.Device_group,
@@ -348,5 +349,5 @@ func updateSubscriberInDeviceGroups(imsi string) error {
 		configChannel <- &msg
 		logger.WebUILog.Infof("device group [%v] update sent to config channel", msg.DevGroupName)
 	}
-	return nil
+	return http.StatusOK, nil
 }

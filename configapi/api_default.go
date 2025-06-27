@@ -162,9 +162,9 @@ func DeviceGroupGroupNamePut(c *gin.Context) {
 		return
 	}
 
-	if err := deviceGroupPostHelper(requestDeviceGroup, configmodels.Put_op, groupName); err != nil {
+	if statusCode, err := deviceGroupPostHelper(requestDeviceGroup, configmodels.Put_op, groupName); err != nil {
 		logger.ConfigLog.Errorf("Device group update failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Device group update failed. Please check the log for details"})
+		c.JSON(statusCode, gin.H{"error": "Device group update failed. Please check the log for details"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{})
@@ -218,9 +218,9 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 		return
 	}
 
-	if err := deviceGroupPostHelper(requestDeviceGroup, configmodels.Post_op, groupName); err != nil {
+	if statusCode, err := deviceGroupPostHelper(requestDeviceGroup, configmodels.Post_op, groupName); err != nil {
 		logger.ConfigLog.Errorf("Device group create failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Device group create failed. Please check the log for details"})
+		c.JSON(statusCode, gin.H{"error": "Device group create failed. Please check the log for details"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{})

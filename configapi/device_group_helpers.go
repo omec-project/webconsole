@@ -67,7 +67,7 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 			return groupName == existingDG
 		})
 		if statusCode, err := updateNS(&networkSlice, prevSlice); err != nil {
-			logger.ConfigLog.Errorf("Error updating slice: %v error type: %v error: %v", networkSlice.SliceName, statusCode, err)
+			logger.ConfigLog.Errorf("Error updating slice: %v status code: %v error: %v", networkSlice.SliceName, statusCode, err)
 			errorOccurred = true
 			continue
 		}

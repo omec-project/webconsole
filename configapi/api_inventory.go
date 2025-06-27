@@ -549,7 +549,7 @@ func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels
 		}
 		prevSlice := getSliceByName(networkSlice.SliceName)
 		updateFunc(&networkSlice)
-		if statusCode, err := updateNS(&networkSlice, prevSlice); err != nil {
+		if statusCode, err := updateNS(networkSlice, *prevSlice); err != nil {
 			logger.ConfigLog.Errorf("Error updating slice %v: %v", networkSlice.SliceName, err)
 			return statusCode, err
 		}

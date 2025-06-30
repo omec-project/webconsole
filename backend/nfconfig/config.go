@@ -126,26 +126,26 @@ func sortPlmnSnssaiConfig(plmnSnssai []nfConfigApi.PlmnSnssai) {
 }
 
 func (c *inMemoryConfig) syncAccessAndMobility(networkSlices []configmodels.Slice) {
-	plmnSnssaiMap := make(map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId][]string)
+	plmnSnssaiTacsMap := make(map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId][]string)
 	for _, s := range networkSlices {
 		plmn := s.SiteInfo.Plmn
-		if plmnSnssaiMap[plmn] == nil {
-			plmnSnssaiMap[plmn] = map[configmodels.SliceSliceId][]string{}
+		if plmnSnssaiTacsMap[plmn] == nil {
+			plmnSnssaiTacsMap[plmn] = map[configmodels.SliceSliceId][]string{}
 		}
 		for _, g := range s.SiteInfo.GNodeBs {
-			if !slices.Contains(plmnSnssaiMap[plmn][s.SliceId], strconv.Itoa(int(g.Tac))) {
-				plmnSnssaiMap[plmn][s.SliceId] = append(plmnSnssaiMap[plmn][s.SliceId], strconv.Itoa(int(g.Tac)))
+			if !slices.Contains(plmnSnssaiTacsMap[plmn][s.SliceId], strconv.Itoa(int(g.Tac))) {
+				plmnSnssaiTacsMap[plmn][s.SliceId] = append(plmnSnssaiTacsMap[plmn][s.SliceId], strconv.Itoa(int(g.Tac)))
 			}
 		}
 	}
-	c.accessAndMobility = convertPlmnSnssaiMapToSortedList(plmnSnssaiMap)
+	c.accessAndMobility = convertPlmnSnssaiTacsMapToSortedList(plmnSnssaiTacsMap)
 	logger.NfConfigLog.Debugln("Updated Access and Mobility in-memory configuration. New configuration:", c.accessAndMobility)
 }
 
-func convertPlmnSnssaiMapToSortedList(plmnSnssaiMap map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId][]string) []nfConfigApi.AccessAndMobility {
+func convertPlmnSnssaiTacsMapToSortedList(plmnSnssaiMap map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId][]string) []nfConfigApi.AccessAndMobility {
 	newAccessAndMobilityConfig := []nfConfigApi.AccessAndMobility{}
-	for plmn, snssaiMap := range plmnSnssaiMap {
-		for snssai, tacList := range snssaiMap {
+	for plmn, snssaiTacsMap := range plmnSnssaiMap {
+		for snssai, tacList := range snssaiTacsMap {
 			plmnId := nfConfigApi.NewPlmnId(plmn.Mcc, plmn.Mnc)
 			parsedSnssai, err := parseSnssaiFromSlice(snssai)
 			if err != nil {

@@ -26,7 +26,7 @@ var execCommand = exec.Command
 
 func networkSliceDeleteHelper(sliceName string) error {
 	if err := handleNetworkSliceDelete(sliceName); err != nil {
-		logger.ConfigLog.Errorf("Error deleting slice %+v: %+v", sliceName, err)
+		logger.ConfigLog.Errorf("Error deleting slice %s: %+v", sliceName, err)
 		return err
 	}
 	var msg configmodels.ConfigMessage
@@ -104,14 +104,14 @@ func logSliceMetadata(slice configmodels.Slice) {
 	logger.ConfigLog.Infof("network slice: sst: %s, sd: %s", slice.SliceId.Sst, slice.SliceId.Sd)
 	logger.ConfigLog.Infof("number of device groups %v", len(slice.SiteDeviceGroup))
 	for i, g := range slice.SiteDeviceGroup {
-		logger.ConfigLog.Infof("device groups(%v) - %v", i+1, g)
+		logger.ConfigLog.Infof("device groups(%d) - %s", i+1, g)
 	}
 
 	site := slice.SiteInfo
 	logger.ConfigLog.Infof("site name: %s", site.SiteName)
 	logger.ConfigLog.Infof("site PLMN: mcc: %s, mnc: %s", site.Plmn.Mcc, site.Plmn.Mnc)
 	for i, gnb := range site.GNodeBs {
-		logger.ConfigLog.Infof("gNB (%v): name=%s, tac=%v", i+1, gnb.Name, gnb.Tac)
+		logger.ConfigLog.Infof("gNB (%d): name=%s, tac=%d", i+1, gnb.Name, gnb.Tac)
 	}
 	logger.ConfigLog.Infof("site UPF: %s", site.Upf)
 }

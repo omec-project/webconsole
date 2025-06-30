@@ -1285,14 +1285,12 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 	if group == nil {
 		return prevGroup.Imsis
 	}
+	groupImsi := make(map[string]struct{}, len(group.Imsis))
+	for _, imsi := range group.Imsis {
+		groupImsi[imsi] = struct{}{}
+	}
 	for _, pimsi := range prevGroup.Imsis {
-		var found bool
-		for _, imsi := range group.Imsis {
-			if pimsi == imsi {
-				found = true
-			}
-		}
-		if !found {
+		if _, found := groupImsi[pimsi]; !found {
 			dimsis = append(dimsis, pimsi)
 		}
 	}

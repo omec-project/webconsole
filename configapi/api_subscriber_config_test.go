@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -739,7 +740,7 @@ func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
 	dbadapter.CommonDBClient = commonDbAdapter
 
 	expectedCode := http.StatusConflict
-	expectedBody := `{"error":"subscriber imsi-208930100007487 already exists"}`
+	expectedBody := "subscriber imsi-208930100007487 already exists"
 	expectedCommonPostDataDetails := []map[string]interface{}{
 		{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-208930100007487"}},
 	}
@@ -755,7 +756,7 @@ func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
 	if w.Code != expectedCode {
 		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
 	}
-	if w.Body.String() != expectedBody {
+	if !strings.Contains(w.Body.String(), expectedBody) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 
@@ -821,7 +822,7 @@ func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 	if expectedCode != w.Code {
 		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
 	}
-	if expectedBody != w.Body.String() {
+	if !strings.Contains(w.Body.String(), expectedBody) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 	select {
@@ -854,7 +855,7 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	dbadapter.CommonDBClient = dbAdapter
 	route := "/api/subscriber/imsi-208930100007487"
 	expectedCode := http.StatusInternalServerError
-	expectedBody := `{"error":"error deleting subscriber. Please check the log for details."}`
+	expectedBody := "error deleting subscriber. Please check the log for details"
 
 	origChannel := configChannel
 	configChannel = make(chan *configmodels.ConfigMessage, 1)
@@ -871,7 +872,7 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	if expectedCode != w.Code {
 		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
 	}
-	if expectedBody != w.Body.String() {
+	if !strings.Contains(w.Body.String(), expectedBody) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 	select {

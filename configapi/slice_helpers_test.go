@@ -106,7 +106,7 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 
 	statusCode, err := handleNetworkSlicePost(slice, prevSlice)
 	if err != nil {
-		t.Errorf("Could not handle network slice post: %v statusCode: %v", err, statusCode)
+		t.Errorf("Could not handle network slice post: %+v statusCode: %d", err, statusCode)
 	}
 	if execCommandTimesCalled != numPebbleNotificationsSent+1 {
 		t.Errorf("Unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent+1)
@@ -140,7 +140,7 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 
 	statusCode, err := handleNetworkSlicePost(slice, prevSlice)
 	if err != nil {
-		t.Errorf("handleNetworkSlicePost returned error: %v statusCode: %v", err, statusCode)
+		t.Errorf("handleNetworkSlicePost returned error: %+v statusCode: %d", err, statusCode)
 	}
 
 	if execCommandTimesCalled != 0 {
@@ -235,7 +235,7 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 			statusCode, postErr := handleNetworkSlicePost(testSlice, configmodels.Slice{})
 
 			if postErr != nil {
-				t.Errorf("Could not handle network slice post: %v status code: %v", postErr, statusCode)
+				t.Errorf("Could not handle network slice post: %+v status code: %d", postErr, statusCode)
 			}
 
 			if len(postData) == 0 {
@@ -310,7 +310,7 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 
 			statusCode, err := handleNetworkSlicePost(ts, ts)
 			if err != nil {
-				t.Fatalf("handleNetworkSlicePost returned error: %v status code: %v", err, statusCode)
+				t.Fatalf("handleNetworkSlicePost returned error: %+v status code: %d", err, statusCode)
 			}
 
 			if len(postData) == 0 {

@@ -59,7 +59,7 @@ type MockMongoClientManyNetworkSlices struct {
 	dbadapter.DBInterface
 }
 
-func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	if sliceName, ok := filter["slice-name"].(string); ok {
 		ns := configmodels.ToBsonM(networkSlice(sliceName))
 		if ns == nil {
@@ -70,8 +70,8 @@ func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetOne(coll string, filter 
 	return nil, nil
 }
 
-func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	names := []string{"slice1", "slice2", "slice3"}
 	for _, name := range names {
 		ns := configmodels.ToBsonM(networkSlice(name))
@@ -83,7 +83,7 @@ func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetMany(coll string, filter
 	return results, nil
 }
 
-func (m *MockMongoClientManyNetworkSlices) RestfulAPIPost(coll string, filter bson.M, data map[string]interface{}) (bool, error) {
+func (m *MockMongoClientManyNetworkSlices) RestfulAPIPost(coll string, filter bson.M, data map[string]any) (bool, error) {
 	return true, nil
 }
 
@@ -95,13 +95,13 @@ func (m *MockMongoClientManyNetworkSlices) Client() *mongo.Client {
 	return nil
 }
 
-func (m *MockMongoClientNoDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (m *MockMongoClientNoDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	return results, nil
 }
 
-func (m *MockMongoClientOneDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (m *MockMongoClientOneDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	dg := configmodels.ToBsonM(deviceGroup("group1"))
 	if dg == nil {
 		panic("failed to convert device group to BsonM")
@@ -110,8 +110,8 @@ func (m *MockMongoClientOneDeviceGroups) RestfulAPIGetMany(coll string, filter b
 	return results, nil
 }
 
-func (m *MockMongoClientManyDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (m *MockMongoClientManyDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	names := []string{"group1", "group2", "group3"}
 	for _, name := range names {
 		dg := configmodels.ToBsonM(deviceGroup(name))
@@ -123,11 +123,11 @@ func (m *MockMongoClientManyDeviceGroups) RestfulAPIGetMany(coll string, filter 
 	return results, nil
 }
 
-func (m *MockMongoClientNotFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (m *MockMongoClientNotFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	return nil, nil
 }
 
-func (m *MockMongoClientFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (m *MockMongoClientFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	dg := configmodels.ToBsonM(deviceGroup("group1"))
 	if dg == nil {
 		panic("failed to convert device group to BsonM")
@@ -135,13 +135,13 @@ func (m *MockMongoClientFoundDeviceGroup) RestfulAPIGetOne(coll string, filter b
 	return dg, nil
 }
 
-func (m *MockMongoClientNoNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (m *MockMongoClientNoNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	return results, nil
 }
 
-func (m *MockMongoClientOneNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (m *MockMongoClientOneNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	ns := configmodels.ToBsonM(networkSlice("slice1"))
 	if ns == nil {
 		panic("failed to convert network slice to BsonM")
@@ -150,11 +150,11 @@ func (m *MockMongoClientOneNetworkSlice) RestfulAPIGetMany(coll string, filter b
 	return results, nil
 }
 
-func (m *MockMongoClientNotFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (m *MockMongoClientNotFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	return nil, nil
 }
 
-func (m *MockMongoClientFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (m *MockMongoClientFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	ns := configmodels.ToBsonM(networkSlice("slice1"))
 	if ns == nil {
 		panic("failed to convert network slice to BsonM")

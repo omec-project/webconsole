@@ -26,7 +26,7 @@ var execCommand = exec.Command
 
 func networkSliceDeleteHelper(sliceName string) error {
 	if err := handleNetworkSliceDelete(sliceName); err != nil {
-		logger.ConfigLog.Errorf("Error deleting slice %v: %v", sliceName, err)
+		logger.ConfigLog.Errorf("Error deleting slice %+v: %+v", sliceName, err)
 		return err
 	}
 	var msg configmodels.ConfigMessage
@@ -34,12 +34,12 @@ func networkSliceDeleteHelper(sliceName string) error {
 	msg.MsgType = configmodels.Network_slice
 	msg.SliceName = sliceName
 	configChannel <- &msg
-	logger.ConfigLog.Infof("successfully Added Network Slice [%v] with delete_op to config channel", sliceName)
+	logger.ConfigLog.Infof("successfully Added Network Slice [%s] with delete_op to config channel", sliceName)
 	return nil
 }
 
 func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, error) {
-	logger.ConfigLog.Infof("received slice: %v", sliceName)
+	logger.ConfigLog.Infof("received slice: %s", sliceName)
 	requestSlice, err := parseAndValidateSliceRequest(c, sliceName)
 	if err != nil {
 		return http.StatusBadRequest, err
@@ -51,14 +51,14 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, e
 	prevSlice := getSliceByName(sliceName)
 
 	if prevSlice == nil {
-		logger.ConfigLog.Infof("Adding new slice [%v]", sliceName)
+		logger.ConfigLog.Infof("Adding new slice [%s]", sliceName)
 		if statusCode, err := createNS(requestSlice); err != nil {
-			logger.ConfigLog.Errorf("Error creating slice %v: %v", sliceName, err)
+			logger.ConfigLog.Errorf("Error creating slice %s: %+v", sliceName, err)
 			return statusCode, err
 		}
 	} else {
 		if statusCode, err := updateNS(requestSlice, *prevSlice); err != nil {
-			logger.ConfigLog.Errorf("Error updating slice %v: %v", sliceName, err)
+			logger.ConfigLog.Errorf("Error updating slice %s: %+v", sliceName, err)
 			return statusCode, err
 		}
 	}
@@ -69,7 +69,7 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, e
 	msg.Slice = &requestSlice
 	msg.SliceName = sliceName
 	configChannel <- &msg
-	logger.ConfigLog.Infof("successfully Added Slice [%v] to config channel", sliceName)
+	logger.ConfigLog.Infof("successfully Added Slice [%s] to config channel", sliceName)
 	return http.StatusOK, nil
 }
 
@@ -82,7 +82,7 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		return request, fmt.Errorf("JSON bind error: %v", err)
+		return request, fmt.Errorf("JSON bind error: %+v", err)
 	}
 
 	for _, gnb := range request.SiteInfo.GNodeBs {
@@ -101,19 +101,19 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 }
 
 func logSliceMetadata(slice configmodels.Slice) {
-	logger.ConfigLog.Infof("network slice: sst: %v, sd: %v", slice.SliceId.Sst, slice.SliceId.Sd)
+	logger.ConfigLog.Infof("network slice: sst: %s, sd: %s", slice.SliceId.Sst, slice.SliceId.Sd)
 	logger.ConfigLog.Infof("number of device groups %v", len(slice.SiteDeviceGroup))
 	for i, g := range slice.SiteDeviceGroup {
 		logger.ConfigLog.Infof("device groups(%v) - %v", i+1, g)
 	}
 
 	site := slice.SiteInfo
-	logger.ConfigLog.Infof("site name: %v", site.SiteName)
-	logger.ConfigLog.Infof("site PLMN: mcc: %v, mnc: %v", site.Plmn.Mcc, site.Plmn.Mnc)
+	logger.ConfigLog.Infof("site name: %s", site.SiteName)
+	logger.ConfigLog.Infof("site PLMN: mcc: %s, mnc: %s", site.Plmn.Mcc, site.Plmn.Mnc)
 	for i, gnb := range site.GNodeBs {
-		logger.ConfigLog.Infof("gNB (%v): name=%v, tac=%v", i+1, gnb.Name, gnb.Tac)
+		logger.ConfigLog.Infof("gNB (%v): name=%s, tac=%v", i+1, gnb.Name, gnb.Tac)
 	}
-	logger.ConfigLog.Infof("site UPF: %v", site.Upf)
+	logger.ConfigLog.Infof("site UPF: %s", site.Upf)
 }
 
 func normalizeApplicationFilteringRules(slice *configmodels.Slice) {
@@ -143,7 +143,7 @@ func convertBitrateToInt32(bitrate int64) int32 {
 
 func createNS(slice configmodels.Slice) (int, error) {
 	if statusCode, err := handleNetworkSlicePost(slice, configmodels.Slice{}); err != nil {
-		logger.ConfigLog.Errorf("Error creating slice %v: %v", slice.SliceName, err)
+		logger.ConfigLog.Errorf("Error creating slice %s: %+v", slice.SliceName, err)
 		return statusCode, err
 	}
 	return http.StatusOK, nil
@@ -151,7 +151,7 @@ func createNS(slice configmodels.Slice) (int, error) {
 
 func updateNS(slice, prevSlice configmodels.Slice) (int, error) {
 	if statusCode, err := handleNetworkSlicePost(slice, prevSlice); err != nil {
-		logger.ConfigLog.Errorf("Error updating slice %v: %v", slice.SliceName, err)
+		logger.ConfigLog.Errorf("Error updating slice %s: %+v", slice.SliceName, err)
 		return statusCode, err
 	}
 	return http.StatusOK, nil
@@ -162,17 +162,17 @@ func handleNetworkSlicePost(slice configmodels.Slice, prevSlice configmodels.Sli
 	sliceDataBsonA := configmodels.ToBsonM(slice)
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
 	if err != nil {
-		logger.DbLog.Errorf("failed to post slice data for %v: %v", slice.SliceName, err)
+		logger.DbLog.Errorf("failed to post slice data for %s: %+v", slice.SliceName, err)
 		return http.StatusInternalServerError, err
 	}
-	logger.DbLog.Debugf("succeeded to post slice data for %v", slice.SliceName)
+	logger.DbLog.Debugf("succeeded to post slice data for %s", slice.SliceName)
 
 	statusCode, err := syncSubscribersOnSliceCreateOrUpdate(slice, prevSlice)
 	if err != nil {
 		return statusCode, err
 	}
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
-		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/create")
+		err = sendPebbleNotification("aetherproject.org/webconsole/networkslice/create")
 		if err != nil {
 			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}
@@ -183,7 +183,7 @@ func handleNetworkSlicePost(slice configmodels.Slice, prevSlice configmodels.Sli
 func sendPebbleNotification(key string) error {
 	cmd := execCommand("pebble", "notify", key)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("couldn't execute a pebble notify: %w", err)
+		return fmt.Errorf("couldn't execute a pebble notify: %+v", err)
 	}
 	logger.ConfigLog.Infoln("custom Pebble notification sent")
 	return nil
@@ -210,7 +210,7 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 	}
 	sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 	if err != nil {
-		logger.DbLog.Errorf("could not parse SST %v", slice.SliceId.Sst)
+		logger.DbLog.Errorf("could not parse SST %s", slice.SliceId.Sst)
 		return http.StatusBadRequest, err
 	}
 	snssai := &models.Snssai{
@@ -218,7 +218,7 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 		Sst: int32(sVal),
 	}
 	for _, dgName := range slice.SiteDeviceGroup {
-		logger.ConfigLog.Debugf("dgName: %v", dgName)
+		logger.ConfigLog.Debugf("dgName: %s", dgName)
 		devGroupConfig := getDeviceGroupByName(dgName)
 		if devGroupConfig == nil {
 			logger.ConfigLog.Warnf("Device group not found: %s", dgName)
@@ -238,7 +238,7 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 				devGroupConfig.IpDomainExpanded.UeDnnQos,
 			)
 			if err != nil {
-				logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %v", imsi, err)
+				logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %+v", imsi, err)
 				return http.StatusInternalServerError, err
 			}
 		}
@@ -263,7 +263,7 @@ func cleanupDeviceGroups(slice, prevSlice configmodels.Slice) error {
 			mcc := prevSlice.SiteInfo.Plmn.Mcc
 			mnc := prevSlice.SiteInfo.Plmn.Mnc
 			if err := removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi); err != nil {
-				logger.ConfigLog.Errorf("Failed to remove subscriber for IMSI %s: %v", imsi, err)
+				logger.ConfigLog.Errorf("Failed to remove subscriber for IMSI %s: %+v", imsi, err)
 				return err
 			}
 		}
@@ -303,7 +303,7 @@ func updateAmPolicyData(imsi string) error {
 	filter := bson.M{"ueId": "imsi-" + imsi}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amPolicyDataColl, filter, amPolicyDatBsonA)
 	if err != nil {
-		logger.DbLog.Errorf("failed to update AM Policy Data for IMSI %s: %v", imsi, err)
+		logger.DbLog.Errorf("failed to update AM Policy Data for IMSI %s: %+v", imsi, err)
 		return err
 	}
 	logger.DbLog.Debugf("succeeded to update AM Policy Data for IMSI %s", imsi)
@@ -328,7 +328,7 @@ func updateSmPolicyData(snssai *models.Snssai, dnn string, imsi string) error {
 	filter := bson.M{"ueId": "imsi-" + imsi}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(smPolicyDataColl, filter, smPolicyDatBsonA)
 	if err != nil {
-		logger.DbLog.Errorf("failed to update SM Policy Data for IMSI %s: %v", imsi, err)
+		logger.DbLog.Errorf("failed to update SM Policy Data for IMSI %s: %+v", imsi, err)
 		return err
 	}
 	logger.DbLog.Debugf("succeeded to update SM Policy Data for IMSI %s", imsi)
@@ -361,7 +361,7 @@ func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 	}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, amDataBsonA)
 	if err != nil {
-		logger.DbLog.Errorf("failed to update AM provisioned Data for IMSI %s: %v", imsi, err)
+		logger.DbLog.Errorf("failed to update AM provisioned Data for IMSI %s: %+v", imsi, err)
 		return err
 	}
 	logger.DbLog.Debugf("succeeded to update AM provisioned Data for IMSI %s", imsi)
@@ -404,7 +404,7 @@ func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(smDataColl, filter, smDataBsonA)
 	if err != nil {
-		logger.DbLog.Errorf("failed to update SM provisioned Data for IMSI %s: %v", imsi, err)
+		logger.DbLog.Errorf("failed to update SM provisioned Data for IMSI %s: %+v", imsi, err)
 		return err
 	}
 	logger.DbLog.Debugf("updated SM provisioned Data for IMSI %s", imsi)
@@ -429,7 +429,7 @@ func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc, dnn, ims
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(smfSelDataColl, filter, smfSelecDataBsonA)
 	if err != nil {
-		logger.DbLog.Errorf("failed to update SMF selection provisioned data for IMSI %s: %v", imsi, err)
+		logger.DbLog.Errorf("failed to update SMF selection provisioned data for IMSI %s: %+v", imsi, err)
 		return err
 	}
 	logger.DbLog.Debugf("updated SMF selection provisioned data for IMSI %s", imsi)
@@ -470,7 +470,7 @@ func getSlices() []*configmodels.Slice {
 		var sliceData configmodels.Slice
 		err := json.Unmarshal(configmodels.MapToByte(rawSlice), &sliceData)
 		if err != nil {
-			logger.DbLog.Errorf("could not unmarshall slice %v", rawSlice)
+			logger.DbLog.Errorf("could not unmarshall slice %+v", rawSlice)
 		}
 		slices = append(slices, &sliceData)
 	}
@@ -487,7 +487,7 @@ func getSliceByName(name string) *configmodels.Slice {
 	var sliceData configmodels.Slice
 	err := json.Unmarshal(configmodels.MapToByte(sliceDataInterface), &sliceData)
 	if err != nil {
-		logger.DbLog.Errorf("could not unmarshall slice %v", sliceDataInterface)
+		logger.DbLog.Errorf("could not unmarshall slice %+v", sliceDataInterface)
 		return nil
 	}
 	return &sliceData
@@ -498,17 +498,17 @@ func handleNetworkSliceDelete(sliceName string) error {
 	filter := bson.M{"slice-name": sliceName}
 	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
 	if err != nil {
-		logger.DbLog.Errorf("failed to delete slice data for %v: %v", sliceName, err)
+		logger.DbLog.Errorf("failed to delete slice data for %+v: %+v", sliceName, err)
 		return err
 	}
 	// slice is nil as it is deleted
 	if err = syncSubscribersOnSliceDelete(nil, prevSlice); err != nil {
-		logger.WebUILog.Errorf("failed to cleanup subscriber entries related to device groups %v: %v", sliceName, err)
+		logger.WebUILog.Errorf("failed to cleanup subscriber entries related to device groups %+v: %+v", sliceName, err)
 		return err
 	}
-	logger.DbLog.Debugf("succeeded to delete slice data for %v", sliceName)
+	logger.DbLog.Debugf("succeeded to delete slice data for %s", sliceName)
 	if factory.WebUIConfig.Configuration.SendPebbleNotifications {
-		err := sendPebbleNotification("aetherproject.org/webconsole/networkslice/delete")
+		err = sendPebbleNotification("aetherproject.org/webconsole/networkslice/delete")
 		if err != nil {
 			logger.ConfigLog.Warnf("sending Pebble notification failed: %s. continuing silently", err.Error())
 		}

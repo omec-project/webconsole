@@ -89,7 +89,7 @@ func setDBClient(url, dbname string) (DBInterface, error) {
 	if errConnect != nil {
 		return nil, errConnect
 	}
-	return &MongoDBClient{MongoClient: *mClient}, nil
+	return &MongoDBClient{*mClient}, nil
 }
 
 func ConnectMongo(url string, dbname string, client *DBInterface) {

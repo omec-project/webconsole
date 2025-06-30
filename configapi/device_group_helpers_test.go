@@ -81,7 +81,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 
 			statusCode, err := handleDeviceGroupPost(&dg, nil)
 			if err != nil {
-				t.Fatalf("Could not handle device group post: %v status code: %v", err, statusCode)
+				t.Fatalf("Could not handle device group post: %+v status code: %d", err, statusCode)
 			}
 
 			if len(postData) == 0 {
@@ -177,7 +177,7 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 
 			statusCode, err := handleDeviceGroupPost(&dg, &dg)
 			if err != nil {
-				t.Fatalf("handleDeviceGroupPost returned error: %v statusCode: %v", err, statusCode)
+				t.Fatalf("handleDeviceGroupPost returned error: %+v statusCode: %d", err, statusCode)
 			}
 
 			if len(postData) == 0 {

@@ -6,6 +6,7 @@ package nfconfig
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/omec-project/webconsole/configmodels"
@@ -51,30 +52,39 @@ func TestTwoSlicesSamePlmnSnssaiTacsIntersection(t *testing.T) {
 		t.Errorf("expected AccessAndMobility of length 1, got: %v", len(c.accessAndMobility))
 	}
 	if len(c.accessAndMobility[0].Tacs) != 3 {
-		t.Errorf("expected Tacs of length 3, got: %v", len(c.accessAndMobility[0].Tacs))
+		t.Errorf("expected TACs of length 3, got: %v", len(c.accessAndMobility[0].Tacs))
+	}
+	if !slices.IsSorted(c.accessAndMobility[0].Tacs) {
+		t.Errorf("expected TACs to be sorted, got: %v", c.accessAndMobility[0].Tacs)
 	}
 }
 
 // Two slices with same PLMN and different SNSSAI
 // Expected: two AccessAndMobility objects
 func TestTwoSlicesSamePlmnDifferentSnssai(t *testing.T) {
-	ns1 := generateNetworkSlice("001", "01", "01", "1", []int32{1})
-	ns2 := generateNetworkSlice("001", "01", "02", "2", []int32{2})
+	ns1 := generateNetworkSlice("001", "01", "02", "2", []int32{1})
+	ns2 := generateNetworkSlice("001", "01", "01", "1", []int32{2})
 	c := inMemoryConfig{}
 	c.syncAccessAndMobility([]configmodels.Slice{ns1, ns2})
 	if len(c.accessAndMobility) != 2 {
 		t.Errorf("expected AccessAndMobility of length 2, got: %v", len(c.accessAndMobility))
+	}
+	if c.accessAndMobility[0].Snssai.GetSst() > c.accessAndMobility[1].Snssai.GetSst() {
+		t.Errorf("expected objects with same PLMN to be ordered by SNSSAI")
 	}
 }
 
 // Two slices with different PLMN and same SNSSAI
 // Expected: two AccessAndMobility objects
 func TestTwoSlicesDifferentPlmnSameSnssai(t *testing.T) {
-	ns1 := generateNetworkSlice("001", "01", "01", "1", []int32{1})
-	ns2 := generateNetworkSlice("002", "02", "01", "1", []int32{1})
+	ns1 := generateNetworkSlice("002", "02", "01", "1", []int32{1})
+	ns2 := generateNetworkSlice("001", "01", "01", "1", []int32{1})
 	c := inMemoryConfig{}
 	c.syncAccessAndMobility([]configmodels.Slice{ns1, ns2})
 	if len(c.accessAndMobility) != 2 {
 		t.Errorf("expected AccessAndMobility of length 2, got: %v", len(c.accessAndMobility))
+	}
+	if c.accessAndMobility[0].GetPlmnId().Mcc > c.accessAndMobility[1].GetPlmnId().Mcc {
+		t.Errorf("expected objects to be ordered by PLMN")
 	}
 }

@@ -143,7 +143,7 @@ func (c *inMemoryConfig) syncAccessAndMobility(networkSlices []configmodels.Slic
 }
 
 func convertPlmnSnssaiMapToSortedList(plmnSnssaiMap map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId][]string) []nfConfigApi.AccessAndMobility {
-	newPlmnSnssaiConfig := []nfConfigApi.AccessAndMobility{}
+	newAccessAndMobilityConfig := []nfConfigApi.AccessAndMobility{}
 	for plmn, snssaiMap := range plmnSnssaiMap {
 		for snssai, tacList := range snssaiMap {
 			plmnId := nfConfigApi.NewPlmnId(plmn.Mcc, plmn.Mnc)
@@ -152,13 +152,13 @@ func convertPlmnSnssaiMapToSortedList(plmnSnssaiMap map[configmodels.SliceSiteIn
 				logger.NfConfigLog.Warnf("Error in parsing SST: %v. Network slice `%s` will be ignored", err, snssai)
 				continue
 			}
-			aam := nfConfigApi.NewAccessAndMobility(*plmnId, parsedSnssai)
-			aam.Tacs = tacList
-			newPlmnSnssaiConfig = append(newPlmnSnssaiConfig, *aam)
+			accessAndMobility := nfConfigApi.NewAccessAndMobility(*plmnId, parsedSnssai)
+			accessAndMobility.Tacs = tacList
+			newAccessAndMobilityConfig = append(newAccessAndMobilityConfig, *accessAndMobility)
 		}
 	}
-	sortAccessAndMobilityConfig(newPlmnSnssaiConfig)
-	return newPlmnSnssaiConfig
+	sortAccessAndMobilityConfig(newAccessAndMobilityConfig)
+	return newAccessAndMobilityConfig
 }
 
 func sortAccessAndMobilityConfig(accessAndMobility []nfConfigApi.AccessAndMobility) {

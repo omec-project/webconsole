@@ -51,7 +51,7 @@ func TestTwoSlicesSamePlmnSnssaiTacsIntersection(t *testing.T) {
 		t.Errorf("expected AccessAndMobility of length 1, got: %v", len(c.accessAndMobility))
 	}
 	if len(c.accessAndMobility[0].Tacs) != 3 {
-		t.Errorf("expected Tacs of length 4, got: %v", len(c.accessAndMobility[0].Tacs))
+		t.Errorf("expected Tacs of length 3, got: %v", len(c.accessAndMobility[0].Tacs))
 	}
 }
 

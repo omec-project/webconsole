@@ -457,7 +457,7 @@ func PostSubscriberByID(c *gin.Context) {
 	requestID := uuid.New().String()
 	var subsOverrideData configmodels.SubsOverrideData
 	if err := c.ShouldBindJSON(&subsOverrideData); err != nil {
-		logger.WebUILog.Errorln("Post One Subscriber Data - ShouldBindJSON failed ", err)
+		logger.WebUILog.Errorf("Post One Subscriber Data - ShouldBindJSON failed: %+v request ID: %s", err, requestID)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: failed to parse JSON.", "request_id": requestID})
 		return
 	}
@@ -551,7 +551,7 @@ func PutSubscriberByID(c *gin.Context) {
 	requestID := uuid.New().String()
 	var subsOverrideData configmodels.SubsOverrideData
 	if err := c.ShouldBindJSON(&subsOverrideData); err != nil {
-		logger.WebUILog.Errorln("Put One Subscriber Data - ShouldBindJSON failed ", err)
+		logger.WebUILog.Errorf("Put One Subscriber Data - ShouldBindJSON failed: %+v request ID: %s", err, requestID)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: failed to parse JSON.", "request_id": requestID})
 		return
 	}
@@ -640,7 +640,7 @@ func DeleteSubscriberByID(c *gin.Context) {
 	imsi := strings.TrimPrefix(ueId, "imsi-")
 	statusCode, err := updateSubscriberInDeviceGroups(imsi)
 	if err != nil {
-		logger.WebUILog.Errorf("Failed to update subscriber: %s.", err)
+		logger.WebUILog.Errorf("Failed to update subscriber: %+v request ID: %s", err, requestID)
 		c.JSON(statusCode, gin.H{"error": "error deleting subscriber. Please check the log for details.", "request_id": requestID})
 		return
 	}

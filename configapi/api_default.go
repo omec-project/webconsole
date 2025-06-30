@@ -118,7 +118,7 @@ func DeviceGroupGroupNameDelete(c *gin.Context) {
 	logger.WebUILog.Debugln("DeviceGroupGroupNameDelete")
 	groupName, ok := c.Params.Get("group-name")
 	if !ok {
-		logger.ConfigLog.Debugf("group-name parameter is missing in the request: %s", requestID)
+		logger.ConfigLog.Errorf("group-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":      "group-name parameter is missing",
 			"request_id": requestID,
@@ -144,7 +144,7 @@ func DeviceGroupGroupNamePut(c *gin.Context) {
 	logger.WebUILog.Debugln("DeviceGroupGroupNamePut")
 	groupName, ok := c.Params.Get("group-name")
 	if !ok {
-		logger.ConfigLog.Debugf("group-name parameter is missing in the request: %s", requestID)
+		logger.ConfigLog.Errorf("group-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":      "group-name parameter is missing",
 			"request_id": requestID,
@@ -218,7 +218,7 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 	logger.WebUILog.Debugln("DeviceGroupGroupNamePost")
 	groupName, ok := c.Params.Get("group-name")
 	if !ok {
-		logger.ConfigLog.Debugf("group-name parameter is missing in the request: %s", requestID)
+		logger.ConfigLog.Errorf("group-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":      "group-name parameter is missing",
 			"request_id": requestID,
@@ -360,7 +360,7 @@ func NetworkSliceSliceNameDelete(c *gin.Context) {
 	requestID := uuid.New().String()
 	sliceName, ok := c.Params.Get("slice-name")
 	if !ok {
-		logger.ConfigLog.Debugf("slice-name parameter is missing in the request: %s", requestID)
+		logger.ConfigLog.Errorf("slice-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":      "slice-name parameter is missing",
 			"request_id": requestID,
@@ -409,7 +409,7 @@ func NetworkSliceSliceNamePost(c *gin.Context) {
 	requestID := uuid.New().String()
 	sliceName, ok := c.Params.Get("slice-name")
 	if !ok {
-		logger.ConfigLog.Debugf("slice-name parameter is missing in the request: %s", requestID)
+		logger.ConfigLog.Errorf("slice-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":      "slice-name parameter is missing",
 			"request_id": requestID,
@@ -445,7 +445,7 @@ func NetworkSliceSliceNamePut(c *gin.Context) {
 	requestID := uuid.New().String()
 	sliceName, ok := c.Params.Get("slice-name")
 	if !ok {
-		logger.ConfigLog.Debugf("slice-name parameter is missing in the request: %s", requestID)
+		logger.ConfigLog.Errorf("slice-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":      "slice-name parameter is missing",
 			"request_id": requestID,

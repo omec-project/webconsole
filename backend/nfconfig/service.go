@@ -163,7 +163,7 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 	logger.NfConfigLog.Debugf("Retrieved %d network slices", len(slices))
 	n.inMemoryConfig.syncPlmn(slices)
 	n.inMemoryConfig.syncPlmnSnssai(slices)
-	n.inMemoryConfig.syncAccessAndMobility()
+	n.inMemoryConfig.syncAccessAndMobility(slices)
 	n.inMemoryConfig.syncSessionManagement()
 	n.inMemoryConfig.syncPolicyControl()
 	logger.NfConfigLog.Infoln("Updated NF in-memory configuration")

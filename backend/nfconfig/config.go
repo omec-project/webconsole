@@ -6,6 +6,7 @@
 package nfconfig
 
 import (
+	"slices"
 	"sort"
 	"strconv"
 
@@ -124,9 +125,67 @@ func sortPlmnSnssaiConfig(plmnSnssai []nfConfigApi.PlmnSnssai) {
 	}
 }
 
-func (c *inMemoryConfig) syncAccessAndMobility() {
-	c.accessAndMobility = []nfConfigApi.AccessAndMobility{}
+func (c *inMemoryConfig) syncAccessAndMobility(networkSlices []configmodels.Slice) {
+	plmnSnssaiMap := make(map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId][]string)
+	for _, s := range networkSlices {
+		plmn := s.SiteInfo.Plmn
+		if plmnSnssaiMap[plmn] == nil {
+			plmnSnssaiMap[plmn] = map[configmodels.SliceSliceId][]string{}
+		}
+		for _, g := range s.SiteInfo.GNodeBs {
+			if !slices.Contains(plmnSnssaiMap[plmn][s.SliceId], strconv.Itoa(int(g.Tac))) {
+				plmnSnssaiMap[plmn][s.SliceId] = append(plmnSnssaiMap[plmn][s.SliceId], strconv.Itoa(int(g.Tac)))
+			}
+		}
+	}
+	c.accessAndMobility = convertPlmnSnssaiMapToSortedList(plmnSnssaiMap)
 	logger.NfConfigLog.Debugln("Updated Access and Mobility in-memory configuration. New configuration:", c.accessAndMobility)
+}
+
+func convertPlmnSnssaiMapToSortedList(plmnSnssaiMap map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId][]string) []nfConfigApi.AccessAndMobility {
+	newPlmnSnssaiConfig := []nfConfigApi.AccessAndMobility{}
+	for plmn, snssaiMap := range plmnSnssaiMap {
+		for snssai, tacList := range snssaiMap {
+			plmnId := nfConfigApi.NewPlmnId(plmn.Mcc, plmn.Mnc)
+			parsedSnssai, err := parseSnssaiFromSlice(snssai)
+			if err != nil {
+				logger.NfConfigLog.Warnf("Error in parsing SST: %v. Network slice `%s` will be ignored", err, snssai)
+				continue
+			}
+			aam := nfConfigApi.NewAccessAndMobility(*plmnId, parsedSnssai)
+			aam.Tacs = tacList
+			newPlmnSnssaiConfig = append(newPlmnSnssaiConfig, *aam)
+		}
+	}
+	sortAccessAndMobilityConfig(newPlmnSnssaiConfig)
+	return newPlmnSnssaiConfig
+}
+
+func sortAccessAndMobilityConfig(accessAndMobility []nfConfigApi.AccessAndMobility) {
+	sort.Slice(accessAndMobility, func(i, j int) bool {
+		if accessAndMobility[i].PlmnId.GetMcc() != accessAndMobility[j].PlmnId.GetMcc() {
+			return accessAndMobility[i].PlmnId.GetMcc() < accessAndMobility[j].PlmnId.GetMcc()
+		}
+		return accessAndMobility[i].PlmnId.GetMnc() < accessAndMobility[j].PlmnId.GetMnc()
+	})
+	sort.Slice(accessAndMobility, func(i, j int) bool {
+		if accessAndMobility[i].Snssai.GetSst() != accessAndMobility[j].Snssai.GetSst() {
+			return accessAndMobility[i].Snssai.GetSst() < accessAndMobility[j].Snssai.GetSst()
+		}
+		if !accessAndMobility[i].Snssai.HasSd() && accessAndMobility[j].Snssai.HasSd() {
+			return true
+		}
+		if accessAndMobility[i].Snssai.HasSd() && !accessAndMobility[j].Snssai.HasSd() {
+			return false
+		}
+		if accessAndMobility[i].Snssai.HasSd() && accessAndMobility[j].Snssai.HasSd() {
+			return accessAndMobility[i].Snssai.GetSd() < accessAndMobility[j].Snssai.GetSd()
+		}
+		return false
+	})
+	for i := range accessAndMobility {
+		slices.Sort(accessAndMobility[i].Tacs)
+	}
 }
 
 func (c *inMemoryConfig) syncSessionManagement() {

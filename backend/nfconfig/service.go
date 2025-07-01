@@ -164,7 +164,7 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 	for _, rawSlice := range rawSlices {
 		var s configmodels.Slice
 		if err = json.Unmarshal(configmodels.MapToByte(rawSlice), &s); err != nil {
-			logger.NfConfigLog.Warnf("Failed to unmarshal slice: %v. Network slice `%s` will be ignored", err, s.SliceName)
+			logger.NfConfigLog.Warnf("Failed to unmarshal slice: %+v. Network slice `%s` will be ignored", err, s.SliceName)
 			continue
 		}
 		slices = append(slices, s)
@@ -180,7 +180,7 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 	for _, rawDG := range rawDeviceGroups {
 		var dg configmodels.DeviceGroups
 		if err := json.Unmarshal(configmodels.MapToByte(rawDG), &dg); err != nil {
-			logger.NfConfigLog.Warnf("Failed to unmarshal device group: %v", err)
+			logger.NfConfigLog.Warnf("Failed to unmarshal device group: %s error: %+v", dg.DeviceGroupName, err)
 			continue
 		}
 		if dg.DeviceGroupName == "" {

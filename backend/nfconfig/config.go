@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/omec-project/openapi/nfConfigApi"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -192,9 +193,125 @@ func sortAccessAndMobilityConfig(accessAndMobility []nfConfigApi.AccessAndMobili
 	}
 }
 
-func (c *inMemoryConfig) syncSessionManagement() {
-	c.sessionManagement = []nfConfigApi.SessionManagement{}
-	logger.NfConfigLog.Debugf("Updated Session Management in-memory configuration. New configuration: %+v", c.sessionManagement)
+func (c *inMemoryConfig) syncSessionManagement(slices []configmodels.Slice, deviceGroupMap map[string]configmodels.DeviceGroups) {
+	var sessionConfigs []nfConfigApi.SessionManagement
+
+	for _, slice := range slices {
+		session, ok := buildSessionManagementConfig(slice, deviceGroupMap)
+		if ok {
+			sessionConfigs = append(sessionConfigs, *session)
+		}
+	}
+
+	sort.Slice(sessionConfigs, func(i, j int) bool {
+		return sessionConfigs[i].GetSliceName() < sessionConfigs[j].GetSliceName()
+	})
+
+	c.sessionManagement = sessionConfigs
+	logger.NfConfigLog.Debugln("Updated Session Management in-memory configuration. New configuration:", c.sessionManagement)
+}
+
+func buildSessionManagementConfig(s configmodels.Slice, deviceGroupMap map[string]configmodels.DeviceGroups) (*nfConfigApi.SessionManagement, bool) {
+	plmn := nfConfigApi.NewPlmnId(s.SiteInfo.Plmn.Mcc, s.SiteInfo.Plmn.Mnc)
+
+	snssai, err := parseSnssaiFromSlice(s.SliceId)
+	if err != nil {
+		logger.NfConfigLog.Warnf("Invalid S-NSSAI for slice %s: %v", s.SliceName, err)
+		return nil, false
+	}
+
+	session := nfConfigApi.NewSessionManagement(s.SliceName, *plmn, snssai)
+
+	if ipDomains := extractIpDomains(s.SiteDeviceGroup, deviceGroupMap); len(ipDomains) > 0 {
+		session.SetIpDomain(ipDomains)
+	}
+
+	if upf := extractUpf(s); upf != nil {
+		session.SetUpf(*upf)
+	}
+
+	if gnbNames := extractGnbNames(s); len(gnbNames) > 0 {
+		session.SetGnbNames(gnbNames)
+	}
+
+	return session, true
+}
+
+func extractIpDomains(groupNames []string, deviceGroupMap map[string]configmodels.DeviceGroups) []nfConfigApi.IpDomain {
+	var ipDomains []nfConfigApi.IpDomain
+
+	for _, name := range groupNames {
+		dg, exists := deviceGroupMap[name]
+		if !exists {
+			logger.NfConfigLog.Warnf("Device group %s not found", name)
+			continue
+		}
+		ip := nfConfigApi.NewIpDomain(
+			dg.IpDomainExpanded.Dnn,
+			dg.IpDomainExpanded.DnsPrimary,
+			dg.IpDomainExpanded.UeIpPool,
+			dg.IpDomainExpanded.Mtu,
+		)
+		ipDomains = append(ipDomains, *ip)
+	}
+
+	return ipDomains
+}
+
+func extractUpf(s configmodels.Slice) *nfConfigApi.Upf {
+	upfMap := s.SiteInfo.Upf
+	if upfMap == nil {
+		logger.NfConfigLog.Debugf("No UPF defined for slice %s", s.SliceName)
+		return nil
+	}
+
+	// extract UPF hostname
+	hostnameRaw, ok := upfMap["hostname"]
+	if !ok {
+		logger.NfConfigLog.Warnf("Missing hostname in UPF for slice %s", s.SliceName)
+		return nil
+	}
+
+	hostname, ok := hostnameRaw.(string)
+	if !ok || hostname == "" || strings.Contains(hostname, ":") {
+		logger.NfConfigLog.Warnf("Invalid UPF hostname for slice %s: %v", s.SliceName, hostnameRaw)
+		return nil
+	}
+
+	upf := nfConfigApi.NewUpf(hostname)
+
+	// extract UPF port optional
+	if portRaw, ok := upfMap["port"]; ok {
+		switch portVal := portRaw.(type) {
+		case string:
+			port, err := strconv.ParseUint(portVal, 10, 16)
+			if err == nil {
+				upf.SetPort(int32(port))
+			} else {
+				logger.NfConfigLog.Warnf("Invalid port (string) in UPF for slice %s: %v", s.SliceName, err)
+			}
+		case float64:
+			if portVal >= 0 && portVal <= 65535 {
+				upf.SetPort(int32(portVal))
+			} else {
+				logger.NfConfigLog.Warnf("UPF port out of range for slice %s: %v", s.SliceName, portVal)
+			}
+		default:
+			logger.NfConfigLog.Warnf("Unsupported UPF port format for slice %s: %v", s.SliceName, portRaw)
+		}
+	}
+
+	return upf
+}
+
+func extractGnbNames(s configmodels.Slice) []string {
+	var names []string
+	for _, gnb := range s.SiteInfo.GNodeBs {
+		names = append(names, gnb.Name)
+	}
+	// we only need gnb names, tac is not needed
+	slices.Sort(names)
+	return names
 }
 
 func (c *inMemoryConfig) syncPolicyControl() {

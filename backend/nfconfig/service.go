@@ -29,6 +29,11 @@ type NFConfigServer struct {
 	syncMutex      sync.Mutex
 }
 
+const (
+	devGroupDataColl = "webconsoleData.snapshots.devGroupData"
+	sliceDataColl    = "webconsoleData.snapshots.sliceData"
+)
+
 type Route struct {
 	Pattern     string
 	HandlerFunc gin.HandlerFunc
@@ -150,7 +155,6 @@ var syncInMemoryConfigFunc = func(n *NFConfigServer) error {
 }
 
 func (n *NFConfigServer) syncInMemoryConfig() error {
-	sliceDataColl := "webconsoleData.snapshots.sliceData"
 	rawSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, bson.M{})
 	if err != nil {
 		return err
@@ -159,17 +163,38 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 	slices := []configmodels.Slice{}
 	for _, rawSlice := range rawSlices {
 		var s configmodels.Slice
-		if err := json.Unmarshal(configmodels.MapToByte(rawSlice), &s); err != nil {
+		if err = json.Unmarshal(configmodels.MapToByte(rawSlice), &s); err != nil {
 			logger.NfConfigLog.Warnf("Failed to unmarshal slice: %v. Network slice `%s` will be ignored", err, s.SliceName)
 			continue
 		}
 		slices = append(slices, s)
 	}
 	logger.NfConfigLog.Debugf("Retrieved %d network slices", len(slices))
+
+	rawDeviceGroups, err := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, bson.M{})
+	if err != nil {
+		return fmt.Errorf("failed to fetch device groups: %w", err)
+	}
+
+	deviceGroups := make(map[string]configmodels.DeviceGroups)
+	for _, rawDG := range rawDeviceGroups {
+		var dg configmodels.DeviceGroups
+		if err := json.Unmarshal(configmodels.MapToByte(rawDG), &dg); err != nil {
+			logger.NfConfigLog.Warnf("Failed to unmarshal device group: %v", err)
+			continue
+		}
+		if dg.DeviceGroupName == "" {
+			logger.NfConfigLog.Warnf("Skipping device group with empty name")
+			continue
+		}
+		deviceGroups[dg.DeviceGroupName] = dg
+	}
+	logger.NfConfigLog.Debugf("Parsed %d device groups", len(deviceGroups))
+
 	n.inMemoryConfig.syncPlmn(slices)
 	n.inMemoryConfig.syncPlmnSnssai(slices)
 	n.inMemoryConfig.syncAccessAndMobility(slices)
-	n.inMemoryConfig.syncSessionManagement()
+	n.inMemoryConfig.syncSessionManagement(slices, deviceGroups)
 	n.inMemoryConfig.syncPolicyControl()
 	logger.NfConfigLog.Infoln("Updated NF in-memory configuration")
 	return nil

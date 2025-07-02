@@ -41,7 +41,7 @@ func (c *inMemoryConfig) syncPlmn(slices []configmodels.Slice) {
 	})
 
 	c.plmn = newPlmnConfig
-	logger.NfConfigLog.Debugln("Updated PLMN in-memory configuration. New configuration:", c.plmn)
+	logger.NfConfigLog.Debugf("Updated PLMN in-memory configuration. New configuration: %+v", c.plmn)
 }
 
 func (c *inMemoryConfig) syncPlmnSnssai(slices []configmodels.Slice) {
@@ -55,11 +55,10 @@ func (c *inMemoryConfig) syncPlmnSnssai(slices []configmodels.Slice) {
 	}
 
 	c.plmnSnssai = convertPlmnMapToSortedList(plmnMap)
-	logger.NfConfigLog.Debugln("Updated PLMN S-NSSAI in-memory configuration. New configuration:", c.plmnSnssai)
+	logger.NfConfigLog.Debugf("Updated PLMN S-NSSAI in-memory configuration. New configuration: %+v", c.plmnSnssai)
 }
 
 func parseSnssaiFromSlice(sliceId configmodels.SliceSliceId) (nfConfigApi.Snssai, error) {
-	logger.NfConfigLog.Debugln("Parsing slice ID:", sliceId)
 	val, err := strconv.ParseInt(sliceId.Sst, 10, 64)
 	if err != nil {
 		return *nfConfigApi.NewSnssaiWithDefaults(), err
@@ -79,7 +78,7 @@ func convertPlmnMapToSortedList(plmnMap map[configmodels.SliceSiteInfoPlmn]map[c
 		for snssai := range snssaiSet {
 			newSnssai, err := parseSnssaiFromSlice(snssai)
 			if err != nil {
-				logger.NfConfigLog.Warnf("Error in parsing SST: %v. Network slice `%s` will be ignored", err, snssai)
+				logger.NfConfigLog.Warnf("Error in parsing SST: %+v. Network slice `%+v` will be ignored", err, snssai)
 				continue
 			}
 			snssaiList = append(snssaiList, newSnssai)
@@ -126,15 +125,15 @@ func sortPlmnSnssaiConfig(plmnSnssai []nfConfigApi.PlmnSnssai) {
 
 func (c *inMemoryConfig) syncAccessAndMobility() {
 	c.accessAndMobility = []nfConfigApi.AccessAndMobility{}
-	logger.NfConfigLog.Debugln("Updated Access and Mobility in-memory configuration. New configuration:", c.accessAndMobility)
+	logger.NfConfigLog.Debugf("Updated Access and Mobility in-memory configuration. New configuration: %+v", c.accessAndMobility)
 }
 
 func (c *inMemoryConfig) syncSessionManagement() {
 	c.sessionManagement = []nfConfigApi.SessionManagement{}
-	logger.NfConfigLog.Debugln("Updated Session Management in-memory configuration. New configuration:", c.sessionManagement)
+	logger.NfConfigLog.Debugf("Updated Session Management in-memory configuration. New configuration: %+v", c.sessionManagement)
 }
 
 func (c *inMemoryConfig) syncPolicyControl() {
 	c.policyControl = []nfConfigApi.PolicyControl{}
-	logger.NfConfigLog.Debugln("Updated Policy Control in-memory configuration. New configuration:", c.policyControl)
+	logger.NfConfigLog.Debugf("Updated Policy Control in-memory configuration. New configuration: %+v", c.policyControl)
 }

@@ -283,7 +283,7 @@ func findSliceByDeviceGroup(DevGroupName string) *configmodels.Slice {
 	for _, slice := range getSlices() {
 		for _, dgName := range slice.SiteDeviceGroup {
 			if dgName == DevGroupName {
-				logger.WebUILog.Infof("device Group [%s] is part of slice: %+v", dgName, slice.SliceName)
+				logger.WebUILog.Infof("device Group [%s] is part of slice: %s", dgName, slice.SliceName)
 				return slice
 			}
 		}

@@ -228,15 +228,12 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 		for _, imsi := range devGroupConfig.Imsis {
 			subscriberAuthData := DatabaseSubscriberAuthenticationData{}
 			if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-"+imsi) != nil {
-				dnn := devGroupConfig.IpDomainExpanded.Dnn
-				mcc := slice.SiteInfo.Plmn.Mcc
-				mnc := slice.SiteInfo.Plmn.Mnc
-				err = updatePolicyAndProvisionedData(
+				err := updatePolicyAndProvisionedData(
 					imsi,
-					mcc,
-					mnc,
+					slice.SiteInfo.Plmn.Mcc,
+					slice.SiteInfo.Plmn.Mnc,
 					snssai,
-					dnn,
+					devGroupConfig.IpDomainExpanded.Dnn,
 					devGroupConfig.IpDomainExpanded.UeDnnQos,
 				)
 				if err != nil {
@@ -246,7 +243,6 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 			}
 		}
 	}
-
 	if err := cleanupDeviceGroups(slice, prevSlice); err != nil {
 		return http.StatusInternalServerError, err
 	}

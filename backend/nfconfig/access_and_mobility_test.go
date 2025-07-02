@@ -5,86 +5,101 @@
 package nfconfig
 
 import (
-	"fmt"
-	"slices"
+	"reflect"
 	"testing"
 
+	"github.com/omec-project/openapi/nfConfigApi"
 	"github.com/omec-project/webconsole/configmodels"
 )
 
-func generateNetworkSlice(mcc, mnc, sst, sd string, tacs []int32) configmodels.Slice {
-	plmnId := configmodels.SliceSiteInfoPlmn{
-		Mcc: mcc,
-		Mnc: mnc,
+func TestAccessAndMobilityConfig(t *testing.T) {
+	var c inMemoryConfig
+	testCases := []struct {
+		name                      string
+		networkSlices             []configmodels.Slice
+		expectedAccessAndMobility []nfConfigApi.AccessAndMobility
+	}{
+		{
+			name: "Two network slices with different PLMNs",
+			networkSlices: []configmodels.Slice{
+				makeNetworkSlice("002", "01", "001", "01", []int32{1, 2}),
+				makeNetworkSlice("001", "01", "001", "02", []int32{3, 2}),
+			},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
+				{
+					PlmnId: nfConfigApi.PlmnId{Mcc: "001", Mnc: "01"},
+					Snssai: makeSnssaiWithSd(1, "02"),
+					Tacs:   []string{"2", "3"},
+				},
+				{
+					PlmnId: nfConfigApi.PlmnId{Mcc: "002", Mnc: "01"},
+					Snssai: makeSnssaiWithSd(1, "01"),
+					Tacs:   []string{"1", "2"},
+				},
+			},
+		},
+		{
+			name: "Two network slices with same PLMN and different SNSSAI (SST and SD populated)",
+			networkSlices: []configmodels.Slice{
+				makeNetworkSlice("001", "01", "001", "02", []int32{}),
+				makeNetworkSlice("001", "01", "001", "01", []int32{}),
+			},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
+				{
+					PlmnId: nfConfigApi.PlmnId{Mcc: "001", Mnc: "01"},
+					Snssai: makeSnssaiWithSd(1, "01"),
+					Tacs:   []string{},
+				},
+				{
+					PlmnId: nfConfigApi.PlmnId{Mcc: "001", Mnc: "01"},
+					Snssai: makeSnssaiWithSd(1, "02"),
+					Tacs:   []string{},
+				},
+			},
+		},
+		{
+			name: "Two network slices with same PLMN and different SNSSAI (only SST populated)",
+			networkSlices: []configmodels.Slice{
+				makeNetworkSlice("001", "01", "001", "01", []int32{}),
+				makeNetworkSlice("001", "01", "001", "", []int32{}),
+			},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
+				{
+					PlmnId: nfConfigApi.PlmnId{Mcc: "001", Mnc: "01"},
+					Snssai: nfConfigApi.Snssai{Sst: 1},
+					Tacs:   []string{},
+				},
+				{
+					PlmnId: nfConfigApi.PlmnId{Mcc: "001", Mnc: "01"},
+					Snssai: makeSnssaiWithSd(1, "01"),
+					Tacs:   []string{},
+				},
+			},
+		},
+		{
+			name: "Two network slices with same PLMN and same SNSSAI",
+			networkSlices: []configmodels.Slice{
+				makeNetworkSlice("001", "01", "001", "01", []int32{1, 2}),
+				makeNetworkSlice("001", "01", "001", "01", []int32{2, 3}),
+			},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
+				{
+					PlmnId: nfConfigApi.PlmnId{Mcc: "001", Mnc: "01"},
+					Snssai: makeSnssaiWithSd(1, "01"),
+					Tacs:   []string{"1", "2", "3"},
+				},
+			},
+		},
 	}
-	siteInfo := configmodels.SliceSiteInfo{
-		SiteName: "test",
-		Plmn:     plmnId,
-		GNodeBs:  []configmodels.SliceSiteInfoGNodeBs{},
-	}
-	for _, tac := range tacs {
-		gNodeB := configmodels.SliceSiteInfoGNodeBs{
-			Name: fmt.Sprintf("test-gnb-%d", tac),
-			Tac:  tac,
-		}
-		siteInfo.GNodeBs = append(siteInfo.GNodeBs, gNodeB)
-	}
-	sliceId := configmodels.SliceSliceId{
-		Sst: sst,
-		Sd:  sd,
-	}
-	networkSlice := configmodels.Slice{
-		SliceName: "slice1",
-		SliceId:   sliceId,
-		SiteInfo:  siteInfo,
-	}
-	return networkSlice
-}
-
-// Two slices with same PLMN and SNSSAI but intersection TACs (one TAC is common)
-// Expected: one AccessAndMobility object with set of TACs
-func TestTwoSlicesSamePlmnSnssaiTacsIntersection(t *testing.T) {
-	ns1 := generateNetworkSlice("001", "01", "01", "1", []int32{3, 4})
-	ns2 := generateNetworkSlice("001", "01", "01", "1", []int32{4, 6})
-	c := inMemoryConfig{}
-	c.syncAccessAndMobility([]configmodels.Slice{ns1, ns2})
-	if len(c.accessAndMobility) != 1 {
-		t.Errorf("expected AccessAndMobility of length 1, got: %v", len(c.accessAndMobility))
-	}
-	if len(c.accessAndMobility[0].Tacs) != 3 {
-		t.Errorf("expected TACs of length 3, got: %v", len(c.accessAndMobility[0].Tacs))
-	}
-	if !slices.IsSorted(c.accessAndMobility[0].Tacs) {
-		t.Errorf("expected TACs to be sorted, got: %v", c.accessAndMobility[0].Tacs)
-	}
-}
-
-// Two slices with same PLMN and different SNSSAI
-// Expected: two AccessAndMobility objects
-func TestTwoSlicesSamePlmnDifferentSnssai(t *testing.T) {
-	ns1 := generateNetworkSlice("001", "01", "02", "2", []int32{1})
-	ns2 := generateNetworkSlice("001", "01", "01", "1", []int32{2})
-	c := inMemoryConfig{}
-	c.syncAccessAndMobility([]configmodels.Slice{ns1, ns2})
-	if len(c.accessAndMobility) != 2 {
-		t.Errorf("expected AccessAndMobility of length 2, got: %v", len(c.accessAndMobility))
-	}
-	if c.accessAndMobility[0].Snssai.GetSst() > c.accessAndMobility[1].Snssai.GetSst() {
-		t.Errorf("expected objects with same PLMN to be ordered by SNSSAI")
-	}
-}
-
-// Two slices with different PLMN and same SNSSAI
-// Expected: two AccessAndMobility objects
-func TestTwoSlicesDifferentPlmnSameSnssai(t *testing.T) {
-	ns1 := generateNetworkSlice("002", "02", "01", "1", []int32{1})
-	ns2 := generateNetworkSlice("001", "01", "01", "1", []int32{1})
-	c := inMemoryConfig{}
-	c.syncAccessAndMobility([]configmodels.Slice{ns1, ns2})
-	if len(c.accessAndMobility) != 2 {
-		t.Errorf("expected AccessAndMobility of length 2, got: %v", len(c.accessAndMobility))
-	}
-	if c.accessAndMobility[0].GetPlmnId().Mcc > c.accessAndMobility[1].GetPlmnId().Mcc {
-		t.Errorf("expected objects to be ordered by PLMN")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalInMemoryConfig := c
+			defer func() { c = originalInMemoryConfig }()
+			c = inMemoryConfig{}
+			c.syncAccessAndMobility(tc.networkSlices)
+			if !reflect.DeepEqual(tc.expectedAccessAndMobility, c.accessAndMobility) {
+				t.Errorf("expected Access and Mobility: %#v, got: %#v", tc.expectedAccessAndMobility, c.accessAndMobility)
+			}
+		})
 	}
 }

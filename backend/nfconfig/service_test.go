@@ -40,35 +40,33 @@ func (m *MockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[stri
 	return results, m.err
 }
 
-func makeNetworkSlice(mcc, mnc, sst, sd string) configmodels.Slice {
-	upf := make(map[string]any, 0)
-	upf["upf-name"] = "upf"
-	upf["upf-port"] = "8805"
-	plmn := configmodels.SliceSiteInfoPlmn{
+func makeNetworkSlice(mcc, mnc, sst string, sd string, tacs []int32) configmodels.Slice {
+	plmnId := configmodels.SliceSiteInfoPlmn{
 		Mcc: mcc,
 		Mnc: mnc,
 	}
-	gnodeb := configmodels.SliceSiteInfoGNodeBs{
-		Name: "demo-gnb1",
-		Tac:  1,
+	siteInfo := configmodels.SliceSiteInfo{
+		SiteName: "test",
+		Plmn:     plmnId,
+		GNodeBs:  []configmodels.SliceSiteInfoGNodeBs{},
 	}
-	slice_id := configmodels.SliceSliceId{
+	for _, tac := range tacs {
+		gNodeB := configmodels.SliceSiteInfoGNodeBs{
+			Name: fmt.Sprintf("test-gnb-%d", tac),
+			Tac:  tac,
+		}
+		siteInfo.GNodeBs = append(siteInfo.GNodeBs, gNodeB)
+	}
+	sliceId := configmodels.SliceSliceId{
 		Sst: sst,
 		Sd:  sd,
 	}
-	site_info := configmodels.SliceSiteInfo{
-		SiteName: "demo",
-		Plmn:     plmn,
-		GNodeBs:  []configmodels.SliceSiteInfoGNodeBs{gnodeb},
-		Upf:      upf,
+	networkSlice := configmodels.Slice{
+		SliceName: "slice1",
+		SliceId:   sliceId,
+		SiteInfo:  siteInfo,
 	}
-	slice := configmodels.Slice{
-		SliceName:       "slice1",
-		SliceId:         slice_id,
-		SiteDeviceGroup: []string{"group1", "group2"},
-		SiteInfo:        site_info,
-	}
-	return slice
+	return networkSlice
 }
 
 func makeSnssaiWithSd(sst int32, sd string) nfConfigApi.Snssai {
@@ -487,16 +485,17 @@ func TestSyncWithRetry_RetryInCaseOfFailure(t *testing.T) {
 
 func TestSyncInMemoryConfig_Success(t *testing.T) {
 	tests := []struct {
-		name               string
-		slices             []configmodels.Slice
-		expectedPlmn       []nfConfigApi.PlmnId
-		expectedPlmnSnssai []nfConfigApi.PlmnSnssai
+		name                      string
+		slices                    []configmodels.Slice
+		expectedPlmn              []nfConfigApi.PlmnId
+		expectedPlmnSnssai        []nfConfigApi.PlmnSnssai
+		expectedAccessAndMobility []nfConfigApi.AccessAndMobility
 	}{
 		{
 			name: "Two slices same PLMN different S-NSSAI",
 			slices: []configmodels.Slice{
-				makeNetworkSlice("123", "23", "2", "abcd"),
-				makeNetworkSlice("123", "23", "1", "01234"),
+				makeNetworkSlice("123", "23", "2", "abcd", []int32{1}),
+				makeNetworkSlice("123", "23", "1", "01234", []int32{2}),
 			},
 			expectedPlmn: []nfConfigApi.PlmnId{
 				*nfConfigApi.NewPlmnId("123", "23"),
@@ -510,12 +509,24 @@ func TestSyncInMemoryConfig_Success(t *testing.T) {
 					},
 				},
 			},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai: makeSnssaiWithSd(1, "01234"),
+					Tacs:   []string{"2"},
+				},
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai: makeSnssaiWithSd(2, "abcd"),
+					Tacs:   []string{"1"},
+				},
+			},
 		},
 		{
 			name: "Two slices same PLMN duplicate S-NSSAI",
 			slices: []configmodels.Slice{
-				makeNetworkSlice("123", "23", "1", "01234"),
-				makeNetworkSlice("123", "23", "1", "01234"),
+				makeNetworkSlice("123", "23", "1", "01234", []int32{1}),
+				makeNetworkSlice("123", "23", "1", "01234", []int32{2}),
 			},
 			expectedPlmn: []nfConfigApi.PlmnId{
 				*nfConfigApi.NewPlmnId("123", "23"),
@@ -528,14 +539,21 @@ func TestSyncInMemoryConfig_Success(t *testing.T) {
 					},
 				},
 			},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai: makeSnssaiWithSd(1, "01234"),
+					Tacs:   []string{"1", "2"},
+				},
+			},
 		},
 		{
-			name: "Sereral slices different PLMN are ordered",
+			name: "Several slices different PLMN are ordered",
 			slices: []configmodels.Slice{
-				makeNetworkSlice("999", "455", "2", "abcd"),
-				makeNetworkSlice("123", "23", "3", "3333"),
-				makeNetworkSlice("999", "455", "2", ""),
-				makeNetworkSlice("123", "23", "3", "123"),
+				makeNetworkSlice("999", "455", "2", "abcd", []int32{1}),
+				makeNetworkSlice("123", "23", "3", "3333", []int32{1}),
+				makeNetworkSlice("999", "455", "2", "", []int32{1}),
+				makeNetworkSlice("123", "23", "3", "123", []int32{1}),
 			},
 			expectedPlmn: []nfConfigApi.PlmnId{
 				*nfConfigApi.NewPlmnId("123", "23"),
@@ -557,11 +575,33 @@ func TestSyncInMemoryConfig_Success(t *testing.T) {
 					},
 				},
 			},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai: makeSnssaiWithSd(3, "123"),
+					Tacs:   []string{"1"},
+				},
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai: makeSnssaiWithSd(3, "3333"),
+					Tacs:   []string{"1"},
+				},
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("999", "455"),
+					Snssai: *nfConfigApi.NewSnssai(2),
+					Tacs:   []string{"1"},
+				},
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("999", "455"),
+					Snssai: makeSnssaiWithSd(2, "abcd"),
+					Tacs:   []string{"1"},
+				},
+			},
 		},
 		{
 			name: "One slice no SD",
 			slices: []configmodels.Slice{
-				makeNetworkSlice("123", "23", "1", ""),
+				makeNetworkSlice("123", "23", "1", "", []int32{1}),
 			},
 			expectedPlmn: []nfConfigApi.PlmnId{
 				*nfConfigApi.NewPlmnId("123", "23"),
@@ -574,12 +614,20 @@ func TestSyncInMemoryConfig_Success(t *testing.T) {
 					},
 				},
 			},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai: *nfConfigApi.NewSnssai(1),
+					Tacs:   []string{"1"},
+				},
+			},
 		},
 		{
-			name:               "Empty slices",
-			slices:             []configmodels.Slice{},
-			expectedPlmn:       []nfConfigApi.PlmnId{},
-			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{},
+			name:                      "Empty slices",
+			slices:                    []configmodels.Slice{},
+			expectedPlmn:              []nfConfigApi.PlmnId{},
+			expectedPlmnSnssai:        []nfConfigApi.PlmnSnssai{},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{},
 		},
 	}
 	for _, tc := range tests {
@@ -604,20 +652,25 @@ func TestSyncInMemoryConfig_Success(t *testing.T) {
 			if !reflect.DeepEqual(tc.expectedPlmnSnssai, n.inMemoryConfig.plmnSnssai) {
 				t.Errorf("Expected PLMN-SNSSAI %v, got %v", tc.expectedPlmnSnssai, n.inMemoryConfig.plmnSnssai)
 			}
+			if !reflect.DeepEqual(tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility) {
+				t.Errorf("Expected Access and Mobility %v, got %v", tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility)
+			}
 		})
 	}
 }
 
 func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 	tests := []struct {
-		name               string
-		expectedPlmn       []nfConfigApi.PlmnId
-		expectedPlmnSnssai []nfConfigApi.PlmnSnssai
+		name                      string
+		expectedPlmn              []nfConfigApi.PlmnId
+		expectedPlmnSnssai        []nfConfigApi.PlmnSnssai
+		expectedAccessAndMobility []nfConfigApi.AccessAndMobility
 	}{
 		{
-			name:               "Initial empty PLMN S-NSSAI config",
-			expectedPlmn:       []nfConfigApi.PlmnId{},
-			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{},
+			name:                      "Initial empty PLMN S-NSSAI config",
+			expectedPlmn:              []nfConfigApi.PlmnId{},
+			expectedPlmnSnssai:        []nfConfigApi.PlmnSnssai{},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{},
 		},
 		{
 			name: "Initial not empty PLMN S-NSSAI config",
@@ -634,12 +687,19 @@ func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 					},
 				},
 			},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai: makeSnssaiWithSd(1, "01234"),
+					Tacs:   []string{"1", "2"},
+				},
+			},
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := &MockDBClient{
-				Slices: []configmodels.Slice{makeNetworkSlice("999", "99", "9", "999")},
+				Slices: []configmodels.Slice{makeNetworkSlice("999", "99", "9", "999", []int32{1})},
 				err:    fmt.Errorf("mock error"),
 			}
 			originalDBClient := dbadapter.CommonDBClient
@@ -647,8 +707,9 @@ func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 			dbadapter.CommonDBClient = mockDB
 			n := &NFConfigServer{
 				inMemoryConfig: inMemoryConfig{
-					plmn:       tc.expectedPlmn,
-					plmnSnssai: tc.expectedPlmnSnssai,
+					plmn:              tc.expectedPlmn,
+					plmnSnssai:        tc.expectedPlmnSnssai,
+					accessAndMobility: tc.expectedAccessAndMobility,
 				},
 			}
 
@@ -663,38 +724,49 @@ func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 			if !reflect.DeepEqual(tc.expectedPlmnSnssai, n.inMemoryConfig.plmnSnssai) {
 				t.Errorf("Expected PLMN-SNSSAI %v, got %v", tc.expectedPlmnSnssai, n.inMemoryConfig.plmnSnssai)
 			}
+			if !reflect.DeepEqual(tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility) {
+				t.Errorf("Expected Access and Mobility %v, got %v", tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility)
+			}
 		})
 	}
 }
 
 func TestSyncInMemoryConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T) {
 	tests := []struct {
-		name           string
-		slices         []configmodels.Slice
-		expectedResult []nfConfigApi.PlmnSnssai
+		name                      string
+		slices                    []configmodels.Slice
+		expectedPlmnSnssai        []nfConfigApi.PlmnSnssai
+		expectedAccessAndMobility []nfConfigApi.AccessAndMobility
 	}{
 		{
 			name: "Invalid SST is ignored",
 			slices: []configmodels.Slice{
-				makeNetworkSlice("123", "23", "1", "01234"),
-				makeNetworkSlice("123", "455", "a", "56789"),
+				makeNetworkSlice("123", "23", "1", "01234", []int32{1}),
+				makeNetworkSlice("123", "455", "a", "56789", []int32{1}),
 			},
-			expectedResult: []nfConfigApi.PlmnSnssai{
+			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{
 				{
 					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
 					SNssaiList: []nfConfigApi.Snssai{
 						makeSnssaiWithSd(1, "01234"),
 					},
+				},
+			},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai: makeSnssaiWithSd(1, "01234"),
+					Tacs:   []string{"1"},
 				},
 			},
 		},
 		{
 			name: "Empty SST is ignored",
 			slices: []configmodels.Slice{
-				makeNetworkSlice("123", "23", "1", "01234"),
-				makeNetworkSlice("123", "455", "", "56789"),
+				makeNetworkSlice("123", "23", "1", "01234", []int32{1}),
+				makeNetworkSlice("123", "455", "", "56789", []int32{1}),
 			},
-			expectedResult: []nfConfigApi.PlmnSnssai{
+			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{
 				{
 					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
 					SNssaiList: []nfConfigApi.Snssai{
@@ -702,13 +774,21 @@ func TestSyncInMemoryConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T) {
 					},
 				},
 			},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai: makeSnssaiWithSd(1, "01234"),
+					Tacs:   []string{"1"},
+				},
+			},
 		},
 		{
 			name: "Invalid SST final list is empty",
 			slices: []configmodels.Slice{
-				makeNetworkSlice("123", "455", "a", "56789"),
+				makeNetworkSlice("123", "455", "a", "56789", []int32{1}),
 			},
-			expectedResult: []nfConfigApi.PlmnSnssai{},
+			expectedPlmnSnssai:        []nfConfigApi.PlmnSnssai{},
+			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{},
 		},
 	}
 	for _, tc := range tests {
@@ -727,8 +807,11 @@ func TestSyncInMemoryConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T) {
 			if err != nil {
 				t.Errorf("expected no error. Got %s", err)
 			}
-			if !reflect.DeepEqual(tc.expectedResult, n.inMemoryConfig.plmnSnssai) {
-				t.Errorf("Expected PLMN-SNSSAI %v, got %v", tc.expectedResult, n.inMemoryConfig.plmnSnssai)
+			if !reflect.DeepEqual(tc.expectedPlmnSnssai, n.inMemoryConfig.plmnSnssai) {
+				t.Errorf("Expected PLMN-SNSSAI %v, got %v", tc.expectedPlmnSnssai, n.inMemoryConfig.plmnSnssai)
+			}
+			if !reflect.DeepEqual(tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility) {
+				t.Errorf("Expected Access and Mobility %v, got %v", tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility)
 			}
 		})
 	}

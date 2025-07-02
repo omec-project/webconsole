@@ -15,6 +15,11 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 )
 
+type accessAndMobilityKey struct {
+	plmn    configmodels.SliceSiteInfoPlmn
+	sliceId configmodels.SliceSliceId
+}
+
 type inMemoryConfig struct {
 	plmn              []nfConfigApi.PlmnId
 	plmnSnssai        []nfConfigApi.PlmnSnssai
@@ -126,15 +131,19 @@ func sortPlmnSnssaiConfig(plmnSnssai []nfConfigApi.PlmnSnssai) {
 }
 
 func (c *inMemoryConfig) syncAccessAndMobility(networkSlices []configmodels.Slice) {
-	plmnSnssaiTacsMap := make(map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId][]string)
+	plmnSnssaiTacsMap := map[accessAndMobilityKey][]string{}
 	for _, s := range networkSlices {
-		plmn := s.SiteInfo.Plmn
-		if plmnSnssaiTacsMap[plmn] == nil {
-			plmnSnssaiTacsMap[plmn] = map[configmodels.SliceSliceId][]string{}
+		accessAndMobilityTmp := accessAndMobilityKey{
+			plmn:    s.SiteInfo.Plmn,
+			sliceId: s.SliceId,
+		}
+		if plmnSnssaiTacsMap[accessAndMobilityTmp] == nil {
+			plmnSnssaiTacsMap[accessAndMobilityTmp] = []string{}
 		}
 		for _, g := range s.SiteInfo.GNodeBs {
-			if !slices.Contains(plmnSnssaiTacsMap[plmn][s.SliceId], strconv.Itoa(int(g.Tac))) {
-				plmnSnssaiTacsMap[plmn][s.SliceId] = append(plmnSnssaiTacsMap[plmn][s.SliceId], strconv.Itoa(int(g.Tac)))
+			tac := strconv.Itoa(int(g.Tac))
+			if !slices.Contains(plmnSnssaiTacsMap[accessAndMobilityTmp], tac) {
+				plmnSnssaiTacsMap[accessAndMobilityTmp] = append(plmnSnssaiTacsMap[accessAndMobilityTmp], tac)
 			}
 		}
 	}
@@ -142,20 +151,18 @@ func (c *inMemoryConfig) syncAccessAndMobility(networkSlices []configmodels.Slic
 	logger.NfConfigLog.Debugln("Updated Access and Mobility in-memory configuration. New configuration:", c.accessAndMobility)
 }
 
-func convertPlmnSnssaiTacsMapToSortedList(plmnSnssaiMap map[configmodels.SliceSiteInfoPlmn]map[configmodels.SliceSliceId][]string) []nfConfigApi.AccessAndMobility {
+func convertPlmnSnssaiTacsMapToSortedList(plmnSnssaiMap map[accessAndMobilityKey][]string) []nfConfigApi.AccessAndMobility {
 	newAccessAndMobilityConfig := []nfConfigApi.AccessAndMobility{}
-	for plmn, snssaiTacsMap := range plmnSnssaiMap {
-		for snssai, tacList := range snssaiTacsMap {
-			plmnId := nfConfigApi.NewPlmnId(plmn.Mcc, plmn.Mnc)
-			parsedSnssai, err := parseSnssaiFromSlice(snssai)
-			if err != nil {
-				logger.NfConfigLog.Warnf("Error in parsing SST: %v. Network slice `%s` will be ignored", err, snssai)
-				continue
-			}
-			accessAndMobility := nfConfigApi.NewAccessAndMobility(*plmnId, parsedSnssai)
-			accessAndMobility.Tacs = tacList
-			newAccessAndMobilityConfig = append(newAccessAndMobilityConfig, *accessAndMobility)
+	for plmnSliceId, tacList := range plmnSnssaiMap {
+		plmnId := nfConfigApi.NewPlmnId(plmnSliceId.plmn.Mcc, plmnSliceId.plmn.Mnc)
+		parsedSnssai, err := parseSnssaiFromSlice(plmnSliceId.sliceId)
+		if err != nil {
+			logger.NfConfigLog.Warnf("Error in parsing SNSSAI: %v. Network slice `%+v` will be ignored", err, plmnSliceId.sliceId)
+			continue
 		}
+		accessAndMobility := nfConfigApi.NewAccessAndMobility(*plmnId, parsedSnssai)
+		accessAndMobility.Tacs = tacList
+		newAccessAndMobilityConfig = append(newAccessAndMobilityConfig, *accessAndMobility)
 	}
 	sortAccessAndMobilityConfig(newAccessAndMobilityConfig)
 	return newAccessAndMobilityConfig
@@ -166,9 +173,9 @@ func sortAccessAndMobilityConfig(accessAndMobility []nfConfigApi.AccessAndMobili
 		if accessAndMobility[i].PlmnId.GetMcc() != accessAndMobility[j].PlmnId.GetMcc() {
 			return accessAndMobility[i].PlmnId.GetMcc() < accessAndMobility[j].PlmnId.GetMcc()
 		}
-		return accessAndMobility[i].PlmnId.GetMnc() < accessAndMobility[j].PlmnId.GetMnc()
-	})
-	sort.Slice(accessAndMobility, func(i, j int) bool {
+		if accessAndMobility[i].PlmnId.GetMnc() != accessAndMobility[j].PlmnId.GetMnc() {
+			return accessAndMobility[i].PlmnId.GetMnc() < accessAndMobility[j].PlmnId.GetMnc()
+		}
 		if accessAndMobility[i].Snssai.GetSst() != accessAndMobility[j].Snssai.GetSst() {
 			return accessAndMobility[i].Snssai.GetSst() < accessAndMobility[j].Snssai.GetSst()
 		}

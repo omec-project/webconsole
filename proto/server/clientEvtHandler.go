@@ -1277,3 +1277,22 @@ func postConfigSpgw(client *clientNF) {
 		client.clientLog.Infof("spgw Message POST %v %v Success\n", reqMsgBody, resp.StatusCode)
 	}
 }
+
+func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []string) {
+	if prevGroup == nil {
+		return
+	}
+	if group == nil {
+		return prevGroup.Imsis
+	}
+	groupImsi := make(map[string]struct{}, len(group.Imsis))
+	for _, imsi := range group.Imsis {
+		groupImsi[imsi] = struct{}{}
+	}
+	for _, pimsi := range prevGroup.Imsis {
+		if _, found := groupImsi[pimsi]; !found {
+			dimsis = append(dimsis, pimsi)
+		}
+	}
+	return
+}

@@ -585,6 +585,13 @@ func PutSubscriberByID(c *gin.Context) {
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",
+		Milenage: &models.Milenage{
+			Op: &models.Op{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				OpValue:             "",
+			},
+		},
 		Opc: &models.Opc{
 			EncryptionAlgorithm: 0,
 			EncryptionKey:       0,
@@ -607,7 +614,7 @@ func PutSubscriberByID(c *gin.Context) {
 		})
 		return
 	}
-	logger.WebUILog.Infoln("Subscriber %s updated successfully", ueId)
+	logger.WebUILog.Infof("Subscriber %s updated successfully", ueId)
 
 	msg := configmodels.ConfigMessage{
 		MsgType:     configmodels.Sub_data,
@@ -651,7 +658,7 @@ func DeleteSubscriberByID(c *gin.Context) {
 		c.JSON(statusCode, gin.H{"error": "error deleting subscriber. Please check the log for details.", "request_id": requestID})
 		return
 	}
-	if err = handleSubscriberDelete(imsi); err != nil {
+	if err = handleSubscriberDelete(ueId); err != nil {
 		logger.WebUILog.Errorf("Error deleting subscriber: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":      fmt.Sprintf("Failed to delete subscriber %s", ueId),
@@ -660,7 +667,7 @@ func DeleteSubscriberByID(c *gin.Context) {
 		})
 		return
 	}
-	logger.WebUILog.Infoln("Subscriber %s deleted successfully", imsi)
+	logger.WebUILog.Infof("Subscriber %s deleted successfully", ueId)
 
 	msg := configmodels.ConfigMessage{
 		MsgType:   configmodels.Sub_data,

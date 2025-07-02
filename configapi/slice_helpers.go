@@ -226,20 +226,23 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 		}
 
 		for _, imsi := range devGroupConfig.Imsis {
-			dnn := devGroupConfig.IpDomainExpanded.Dnn
-			mcc := slice.SiteInfo.Plmn.Mcc
-			mnc := slice.SiteInfo.Plmn.Mnc
-			err = updatePolicyAndProvisionedData(
-				imsi,
-				mcc,
-				mnc,
-				snssai,
-				dnn,
-				devGroupConfig.IpDomainExpanded.UeDnnQos,
-			)
-			if err != nil {
-				logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %+v", imsi, err)
-				return http.StatusInternalServerError, err
+			subscriberAuthData := DatabaseSubscriberAuthenticationData{}
+			if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-"+imsi) != nil {
+				dnn := devGroupConfig.IpDomainExpanded.Dnn
+				mcc := slice.SiteInfo.Plmn.Mcc
+				mnc := slice.SiteInfo.Plmn.Mnc
+				err = updatePolicyAndProvisionedData(
+					imsi,
+					mcc,
+					mnc,
+					snssai,
+					dnn,
+					devGroupConfig.IpDomainExpanded.UeDnnQos,
+				)
+				if err != nil {
+					logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %+v", imsi, err)
+					return http.StatusInternalServerError, err
+				}
 			}
 		}
 	}

@@ -492,6 +492,13 @@ func PostSubscriberByID(c *gin.Context) {
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",
+		Milenage: &models.Milenage{
+			Op: &models.Op{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				OpValue:             "",
+			},
+		},
 		Opc: &models.Opc{
 			OpcValue:            subsOverrideData.OPc,
 			EncryptionAlgorithm: 0,

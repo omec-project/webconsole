@@ -55,6 +55,28 @@ var (
 type MongoDBClient struct {
 	mongoapi.MongoClient
 }
+type SessionRunner func(ctx context.Context, fn func(sc mongo.SessionContext) error) error
+
+func GetSessionRunner(client DBInterface) SessionRunner {
+	return func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+		session, err := client.StartSession()
+		if err != nil {
+			return err
+		}
+		defer session.EndSession(ctx)
+		return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+			if err := session.StartTransaction(); err != nil {
+				return err
+			}
+			if err := fn(sc); err != nil {
+				abortErr := session.AbortTransaction(sc)
+				logger.DbLog.Warnf("failed to abort transaction: %v", abortErr)
+				return err
+			}
+			return session.CommitTransaction(sc)
+		})
+	}
+}
 
 type PatchOperation struct {
 	Value interface{} `json:"value,omitempty"`
@@ -64,10 +86,10 @@ type PatchOperation struct {
 
 func setDBClient(url, dbname string) (DBInterface, error) {
 	mClient, errConnect := mongoapi.NewMongoClient(url, dbname)
-	if mClient.Client != nil {
-		return mClient, nil
+	if errConnect != nil {
+		return nil, errConnect
 	}
-	return nil, errConnect
+	return &MongoDBClient{*mClient}, nil
 }
 
 func ConnectMongo(url string, dbname string, client *DBInterface) {

@@ -10,11 +10,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type MockMongoClientNoDeviceGroups struct {
@@ -57,63 +59,19 @@ type MockMongoClientManyNetworkSlices struct {
 	dbadapter.DBInterface
 }
 
-func (m *MockMongoClientNoDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	return results, nil
-}
-
-func (m *MockMongoClientOneDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	dg := configmodels.ToBsonM(deviceGroup("group1"))
-	if dg == nil {
-		panic("failed to convert device group to BsonM")
-	}
-	results = append(results, dg)
-	return results, nil
-}
-
-func (m *MockMongoClientManyDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	names := []string{"group1", "group2", "group3"}
-	for _, name := range names {
-		dg := configmodels.ToBsonM(deviceGroup(name))
-		if dg == nil {
-			panic("failed to convert device group to BsonM")
+func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	if sliceName, ok := filter["slice-name"].(string); ok {
+		ns := configmodels.ToBsonM(networkSlice(sliceName))
+		if ns == nil {
+			return nil, nil
 		}
-		results = append(results, dg)
+		return ns, nil
 	}
-	return results, nil
-}
-
-func (m *MockMongoClientNotFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
 	return nil, nil
 }
 
-func (m *MockMongoClientFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	dg := configmodels.ToBsonM(deviceGroup("group1"))
-	if dg == nil {
-		panic("failed to convert device group to BsonM")
-	}
-	return dg, nil
-}
-
-func (m *MockMongoClientNoNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	return results, nil
-}
-
-func (m *MockMongoClientOneNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	ns := configmodels.ToBsonM(networkSlice("slice1"))
-	if ns == nil {
-		panic("failed to convert network slice to BsonM")
-	}
-	results = append(results, ns)
-	return results, nil
-}
-
-func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	names := []string{"slice1", "slice2", "slice3"}
 	for _, name := range names {
 		ns := configmodels.ToBsonM(networkSlice(name))
@@ -125,11 +83,78 @@ func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetMany(coll string, filter
 	return results, nil
 }
 
-func (m *MockMongoClientNotFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (m *MockMongoClientManyNetworkSlices) RestfulAPIPost(coll string, filter bson.M, data map[string]any) (bool, error) {
+	return true, nil
+}
+
+func (m *MockMongoClientManyNetworkSlices) RestfulAPIDeleteOne(coll string, filter bson.M) error {
+	return nil
+}
+
+func (m *MockMongoClientManyNetworkSlices) Client() *mongo.Client {
+	return nil
+}
+
+func (m *MockMongoClientNoDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
+	return results, nil
+}
+
+func (m *MockMongoClientOneDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
+	dg := configmodels.ToBsonM(deviceGroup("group1"))
+	if dg == nil {
+		panic("failed to convert device group to BsonM")
+	}
+	results = append(results, dg)
+	return results, nil
+}
+
+func (m *MockMongoClientManyDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
+	names := []string{"group1", "group2", "group3"}
+	for _, name := range names {
+		dg := configmodels.ToBsonM(deviceGroup(name))
+		if dg == nil {
+			panic("failed to convert device group to BsonM")
+		}
+		results = append(results, dg)
+	}
+	return results, nil
+}
+
+func (m *MockMongoClientNotFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	return nil, nil
 }
 
-func (m *MockMongoClientFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (m *MockMongoClientFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	dg := configmodels.ToBsonM(deviceGroup("group1"))
+	if dg == nil {
+		panic("failed to convert device group to BsonM")
+	}
+	return dg, nil
+}
+
+func (m *MockMongoClientNoNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
+	return results, nil
+}
+
+func (m *MockMongoClientOneNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
+	ns := configmodels.ToBsonM(networkSlice("slice1"))
+	if ns == nil {
+		panic("failed to convert network slice to BsonM")
+	}
+	results = append(results, ns)
+	return results, nil
+}
+
+func (m *MockMongoClientNotFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	return nil, nil
+}
+
+func (m *MockMongoClientFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	ns := configmodels.ToBsonM(networkSlice("slice1"))
 	if ns == nil {
 		panic("failed to convert network slice to BsonM")
@@ -282,6 +307,7 @@ func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T)
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddConfigV1Service(router)
+	mock := &MockMongoClientManyNetworkSlices{}
 
 	testCases := []struct {
 		name         string
@@ -292,7 +318,7 @@ func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T)
 		{
 			name:         "Delete DG associated with NSs expects config messages sent for NSs and DG",
 			route:        "/config/v1/device-group/group1",
-			dbAdapter:    &MockMongoClientManyNetworkSlices{},
+			dbAdapter:    mock,
 			expectedCode: http.StatusOK,
 		},
 	}
@@ -314,48 +340,68 @@ func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
+
 			if tc.expectedCode != w.Code {
 				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
+			timeout := time.After(2 * time.Second)
 			expectedGroupName := "group1"
-			var msg *configmodels.ConfigMessage
 			expectedSliceNames := []string{"slice1", "slice2", "slice3"}
 			for _, expectedSliceName := range expectedSliceNames {
 				select {
-				case msg = <-configChannel:
-					if msg.MsgType != configmodels.Network_slice {
-						t.Errorf("Expected message type %v, got %v", configmodels.Network_slice, msg.MsgType)
-					}
-					if msg.MsgMethod != configmodels.Post_op {
-						t.Errorf("Expected message method %v, got %v", configmodels.Post_op, msg.MsgMethod)
-					}
-					if msg.SliceName != expectedSliceName {
-						t.Errorf("Expected slice name %v, got %v", expectedSliceName, msg.SliceName)
-					}
-					for _, group := range msg.Slice.SiteDeviceGroup {
-						if group == expectedGroupName {
-							t.Errorf("Expected %v to be removed from SiteDeviceGroup in slice %s, but it was found", expectedGroupName, msg.SliceName)
-						}
-					}
-				default:
-					t.Error("Expected updated network slice message in config channel but got none")
+				case msg := <-configChannel:
+					verifyNetworkSliceMessage(t, msg, expectedSliceName, expectedGroupName)
+				case <-timeout:
+					t.Fatalf("Timeout waiting for network slice message for %s", expectedSliceName)
 				}
 			}
+
 			select {
-			case msg = <-configChannel:
-				if msg.MsgType != configmodels.Device_group {
-					t.Errorf("Expected message type %v, got %v", configmodels.Device_group, msg.MsgType)
-				}
-				if msg.MsgMethod != configmodels.Delete_op {
-					t.Errorf("Expected message method %v, got %v", configmodels.Delete_op, msg.MsgMethod)
-				}
-				if msg.DevGroupName != expectedGroupName {
-					t.Errorf("Expected device group name %v, got %v", expectedGroupName, msg.DevGroupName)
-				}
-			default:
-				t.Error("Expected message in config channel but got none")
+			case msg := <-configChannel:
+				verifyDeviceGroupMessage(t, msg, expectedGroupName)
+			case <-timeout:
+				t.Fatal("Timeout waiting for device group deletion message")
+			}
+
+			select {
+			case msg := <-configChannel:
+				t.Errorf("Unexpected extra message in channel: %+v", msg)
+			case <-time.After(100 * time.Millisecond):
+				// OK - no more messages
 			}
 		})
+	}
+}
+
+func verifyNetworkSliceMessage(t *testing.T, msg *configmodels.ConfigMessage, expectedSliceName, expectedGroupName string) {
+	t.Helper()
+	if msg.MsgType != configmodels.Network_slice {
+		t.Errorf("Expected message type %v, got %v", configmodels.Network_slice, msg.MsgType)
+	}
+	if msg.MsgMethod != configmodels.Post_op {
+		t.Errorf("Expected message method %v, got %v", configmodels.Post_op, msg.MsgMethod)
+	}
+	if msg.SliceName != expectedSliceName {
+		t.Errorf("Expected slice name %v, got %v", expectedSliceName, msg.SliceName)
+	}
+	for _, group := range msg.Slice.SiteDeviceGroup {
+		if group == expectedGroupName {
+			t.Errorf("Expected %v to be removed from SiteDeviceGroup in slice %s, but it was found",
+				expectedGroupName, msg.SliceName)
+		}
+	}
+}
+
+func verifyDeviceGroupMessage(t *testing.T, msg *configmodels.ConfigMessage, expectedGroupName string) {
+	t.Helper()
+	if msg.MsgType != configmodels.Device_group {
+		t.Errorf("Expected message type %v, got %v", configmodels.Device_group, msg.MsgType)
+	}
+	if msg.MsgMethod != configmodels.Delete_op {
+		t.Errorf("Expected message method %v, got %v", configmodels.Delete_op, msg.MsgMethod)
+	}
+	if msg.DevGroupName != expectedGroupName {
+		t.Errorf("Expected device group name %v, got %v", expectedGroupName, msg.DevGroupName)
 	}
 }
 
@@ -399,27 +445,19 @@ func TestDeviceGroupDeleteHandler_DeviceGroupDoesNotExistInNetworkSlices(t *test
 				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			expectedGroupName := "group1"
-			var msg *configmodels.ConfigMessage
+			timeout := time.After(2 * time.Second)
 			select {
-			case msg = <-configChannel:
-				if msg.MsgType != configmodels.Device_group {
-					t.Errorf("Expected message type %v, got %v", configmodels.Device_group, msg.MsgType)
-				}
-				if msg.MsgMethod != configmodels.Delete_op {
-					t.Errorf("Expected message method %v, got %v", configmodels.Delete_op, msg.MsgMethod)
-				}
-				if msg.DevGroupName != expectedGroupName {
-					t.Errorf("Expected device group name %v, got %v", expectedGroupName, msg.DevGroupName)
-				}
-			default:
-				t.Error("Expected message in config channel but got none")
+			case msg := <-configChannel:
+				verifyDeviceGroupMessage(t, msg, expectedGroupName)
+			case <-timeout:
+				t.Fatal("Timeout waiting for device group deletion message")
 			}
 
 			select {
 			case msg := <-configChannel:
-				t.Errorf("Unexpected message in config channel: %+v", msg)
-			default:
-				// No more messages, test passes
+				t.Errorf("Unexpected extra message in channel: %+v", msg)
+			case <-time.After(100 * time.Millisecond):
+				// OK - no more messages
 			}
 		})
 	}

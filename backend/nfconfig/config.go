@@ -137,7 +137,9 @@ func (c *inMemoryConfig) syncAccessAndMobility(networkSlices []configmodels.Slic
 			plmn:    s.SiteInfo.Plmn,
 			sliceId: s.SliceId,
 		}
-		if plmnSnssaiTacsMap[accessAndMobilityTmp] == nil {
+		if plmnSnssaiTacsMap[accessAndMobilityTmp] != nil {
+			logger.NfConfigLog.Warnf("Found duplicate Network slice `%+v` for PLMN `%+v`, merging TACs for Access and Mobility", s.SliceId, s.SiteInfo.Plmn)
+		} else {
 			plmnSnssaiTacsMap[accessAndMobilityTmp] = []string{}
 		}
 		for _, g := range s.SiteInfo.GNodeBs {

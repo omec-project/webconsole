@@ -285,20 +285,17 @@ func TestSubscriberAuthenticationDataDelete_NoDataInAuthDB_Exits(t *testing.T) {
 }
 
 func Test_handleSubscriberPost5G(t *testing.T) {
-	origSubscriberAuthData := subscriberAuthData
 	origImsiData := ImsiData
 	origAuthDBClient := dbadapter.AuthDBClient
 	origCommonDBClient := dbadapter.CommonDBClient
 	origPostData := postData
 	defer func() {
-		subscriberAuthData = origSubscriberAuthData
 		ImsiData = origImsiData
 		postData = origPostData
 		dbadapter.AuthDBClient = origAuthDBClient
 		dbadapter.CommonDBClient = origCommonDBClient
 	}()
 	ueId := "imsi-208930100007487"
-	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 	configMsg := configmodels.ConfigMessage{
 		AuthSubData: &models.AuthenticationSubscription{
 			AuthenticationManagementField: "8000",
@@ -366,18 +363,15 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 }
 
 func Test_handleSubscriberDelete5G(t *testing.T) {
-	origSubscriberAuthData := subscriberAuthData
 	origAuthDBClient := dbadapter.AuthDBClient
 	origCommonDBClient := dbadapter.CommonDBClient
 	origDeleteData := deleteData
 	defer func() {
-		subscriberAuthData = origSubscriberAuthData
 		deleteData = origDeleteData
 		dbadapter.AuthDBClient = origAuthDBClient
 		dbadapter.CommonDBClient = origCommonDBClient
 	}()
 	ueId := "imsi-208930100007487"
-	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
 
 	deleteData = make([]map[string]interface{}, 0)
 	dbadapter.AuthDBClient = &MockMongoDeleteOne{}
@@ -405,10 +399,9 @@ func Test_handleSubscriberDelete5G(t *testing.T) {
 }
 
 func Test_handleSubscriberGet5G(t *testing.T) {
-	origSubscriberAuthData := subscriberAuthData
 	origAuthDBClient := dbadapter.AuthDBClient
-	defer func() { subscriberAuthData = origSubscriberAuthData; dbadapter.AuthDBClient = origAuthDBClient }()
-	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
+	defer func() { dbadapter.AuthDBClient = origAuthDBClient }()
+	subscriberAuthData := DatabaseSubscriberAuthenticationData{}
 	subscriber := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",

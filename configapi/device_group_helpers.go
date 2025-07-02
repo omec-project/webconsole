@@ -216,6 +216,7 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 	var errorOccured bool
 	for _, imsi := range devGroup.Imsis {
 		/* update all current IMSIs */
+		subscriberAuthData := DatabaseSubscriberAuthenticationData{}
 		if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-"+imsi) != nil {
 			dnn := devGroup.IpDomainExpanded.Dnn
 			err = updatePolicyAndProvisionedData(

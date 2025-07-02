@@ -29,8 +29,6 @@ type DatabaseSubscriberAuthenticationData struct {
 	SubscriberAuthenticationData
 }
 
-var subscriberAuthData SubscriberAuthenticationData
-
 var (
 	imsiDataLock sync.RWMutex
 	ImsiData     = make(map[string]*models.AuthenticationSubscription)
@@ -273,7 +271,7 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string) error {
 func handleSubscriberDelete(imsi string) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
-	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
+	subscriberAuthData := DatabaseSubscriberAuthenticationData{}
 	err := subscriberAuthData.SubscriberAuthenticationDataDelete(imsi)
 	if err != nil {
 		logger.DbLog.Errorln("SubscriberAuthDataDelete error:", err)
@@ -286,7 +284,7 @@ func handleSubscriberDelete(imsi string) error {
 func handleSubscriberPut(imsi string, authSubData *models.AuthenticationSubscription) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
-	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
+	subscriberAuthData := DatabaseSubscriberAuthenticationData{}
 	err := subscriberAuthData.SubscriberAuthenticationDataUpdate(imsi, authSubData)
 	if err != nil {
 		logger.DbLog.Errorln("Subscriber Authentication Data Update Error:", err)
@@ -299,7 +297,7 @@ func handleSubscriberPut(imsi string, authSubData *models.AuthenticationSubscrip
 func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscription) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
-	subscriberAuthData = DatabaseSubscriberAuthenticationData{}
+	subscriberAuthData := DatabaseSubscriberAuthenticationData{}
 	err := subscriberAuthData.SubscriberAuthenticationDataCreate(imsi, authSubData)
 	if err != nil {
 		logger.DbLog.Errorln("Subscriber Authentication Data Create Error:", err)

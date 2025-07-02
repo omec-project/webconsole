@@ -46,13 +46,11 @@ func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}
 	gin.SetMode(gin.ReleaseMode)
-	var router *gin.Engine
+	router := gin.New()
 	if config.Logger.WEBUI.DebugLevel == "debug" {
-		router = gin.Default()
-	} else {
-		router = gin.New()
-		router.Use(gin.Recovery())
+		router.Use(gin.Logger())
 	}
+	router.Use(gin.Recovery())
 	router.Use(enforceAcceptJSON())
 
 	nfconfigServer := &NFConfigServer{

@@ -13,7 +13,6 @@ import (
 )
 
 func TestAccessAndMobilityConfig(t *testing.T) {
-	var c inMemoryConfig
 	testCases := []struct {
 		name                      string
 		networkSlices             []configmodels.Slice
@@ -93,9 +92,7 @@ func TestAccessAndMobilityConfig(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			originalInMemoryConfig := c
-			defer func() { c = originalInMemoryConfig }()
-			c = inMemoryConfig{}
+			c := inMemoryConfig{}
 			c.syncAccessAndMobility(tc.networkSlices)
 			if !reflect.DeepEqual(tc.expectedAccessAndMobility, c.accessAndMobility) {
 				t.Errorf("expected Access and Mobility: %#v, got: %#v", tc.expectedAccessAndMobility, c.accessAndMobility)

@@ -49,6 +49,7 @@ func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 	router := gin.New()
 	if config.Logger.WEBUI.DebugLevel == "debug" {
 		router.Use(gin.Logger())
+
 	}
 	router.Use(gin.Recovery())
 	router.Use(enforceAcceptJSON())
@@ -170,7 +171,7 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 	n.inMemoryConfig.syncAccessAndMobility()
 	n.inMemoryConfig.syncSessionManagement()
 	n.inMemoryConfig.syncPolicyControl()
-	logger.NfConfigLog.Infoln("Updated NF in-memory configuration")
+	logger.NfConfigLog.Infof("Updated NF in-memory configuration %+v", n.inMemoryConfig)
 	return nil
 }
 

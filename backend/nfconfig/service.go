@@ -170,7 +170,7 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 	n.inMemoryConfig.syncAccessAndMobility()
 	n.inMemoryConfig.syncSessionManagement()
 	n.inMemoryConfig.syncPolicyControl()
-	logger.NfConfigLog.Infof("Updated NF in-memory configuration %+v", n.inMemoryConfig)
+	logger.NfConfigLog.Infoln("Updated NF in-memory configuration")
 	return nil
 }
 

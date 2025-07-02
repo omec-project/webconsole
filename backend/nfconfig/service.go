@@ -49,7 +49,6 @@ func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 	router := gin.New()
 	if config.Logger.WEBUI.DebugLevel == "debug" {
 		router.Use(gin.Logger())
-
 	}
 	router.Use(gin.Recovery())
 	router.Use(enforceAcceptJSON())

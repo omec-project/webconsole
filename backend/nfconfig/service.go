@@ -19,6 +19,7 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.uber.org/zap"
 )
 
 type NFConfigServer struct {
@@ -47,7 +48,7 @@ func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
-	if config.Logger.WEBUI.DebugLevel == "debug" {
+	if logger.GetLogger().Level() == zap.DebugLevel {
 		router.Use(gin.Logger())
 	}
 	router.Use(gin.Recovery())

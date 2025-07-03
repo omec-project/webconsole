@@ -78,7 +78,7 @@ func convertPlmnMapToSortedList(plmnMap map[configmodels.SliceSiteInfoPlmn]map[c
 		for snssai := range snssaiSet {
 			newSnssai, err := parseSnssaiFromSlice(snssai)
 			if err != nil {
-				logger.NfConfigLog.Warnf("Error in parsing SST: %+v. Network slice `%+v` will be ignored", err, snssai)
+				logger.NfConfigLog.Warnf("Error parsing Snssai: %+v. Network slice `%+v` will be ignored", err, snssai)
 				continue
 			}
 			snssaiList = append(snssaiList, newSnssai)

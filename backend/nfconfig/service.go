@@ -164,7 +164,7 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 	for _, rawSlice := range rawSlices {
 		var s configmodels.Slice
 		if err = json.Unmarshal(configmodels.MapToByte(rawSlice), &s); err != nil {
-			logger.NfConfigLog.Warnf("Failed to unmarshal slice: %+v. Network slice `%s` will be ignored", err, s.SliceName)
+			logger.NfConfigLog.Warnf("Failed to unmarshal slice: %+v. Raw slice will be ignored", err)
 			continue
 		}
 		slices = append(slices, s)
@@ -179,12 +179,12 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 	deviceGroups := make(map[string]configmodels.DeviceGroups)
 	for _, rawDG := range rawDeviceGroups {
 		var dg configmodels.DeviceGroups
-		if err := json.Unmarshal(configmodels.MapToByte(rawDG), &dg); err != nil {
-			logger.NfConfigLog.Warnf("Failed to unmarshal device group: %s error: %+v", dg.DeviceGroupName, err)
+		if err = json.Unmarshal(configmodels.MapToByte(rawDG), &dg); err != nil {
+			logger.NfConfigLog.Warnf("Failed to unmarshal device group: raw=%+v, error=%v", rawDG, err)
 			continue
 		}
 		if dg.DeviceGroupName == "" {
-			logger.NfConfigLog.Warnf("Skipping device group with empty name")
+			logger.NfConfigLog.Warnf("Skipping device group: %+v with empty name", dg)
 			continue
 		}
 		deviceGroups[dg.DeviceGroupName] = dg

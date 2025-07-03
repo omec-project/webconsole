@@ -264,7 +264,6 @@ func extractUpf(slice configmodels.Slice) *nfConfigApi.Upf {
 		return nil
 	}
 
-	// extract UPF hostname
 	hostnameRaw, ok := upfMap["upf-name"]
 	if !ok {
 		logger.NfConfigLog.Errorf("missing UPF hostname for slice %s", slice.SliceName)
@@ -279,7 +278,6 @@ func extractUpf(slice configmodels.Slice) *nfConfigApi.Upf {
 
 	upf := nfConfigApi.NewUpf(hostname)
 
-	// extract UPF port optional
 	if portRaw, ok := upfMap["upf-port"]; ok {
 		if portStr, ok := portRaw.(string); ok {
 			if port, err := strconv.ParseUint(portStr, 10, 16); err == nil {

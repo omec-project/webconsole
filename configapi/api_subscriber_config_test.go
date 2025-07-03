@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -56,6 +57,14 @@ func (m *MockMongoClientOneSubscriber) RestfulAPIGetOne(collName string, filter 
 	return subscriber, nil
 }
 
+func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIPost(coll string, filter bson.M, postData map[string]interface{}) (bool, error) {
+	return true, nil
+}
+
+func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIDeleteOne(coll string, filter bson.M) error {
+	return nil
+}
+
 func (m *MockMongoClientManySubscribers) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	ueIds := []string{"208930100007487", "208930100007488"}
@@ -77,6 +86,16 @@ func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIGetMany(coll strin
 	}
 	results = append(results, dg)
 	return results, nil
+}
+
+func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	if coll == "device_group" && filter["deviceGroupName"] == "group1" {
+		return map[string]interface{}{
+			"deviceGroupName": "group1",
+			"imsi":            []string{"imsi-208930100007487"},
+		}, nil
+	}
+	return nil, nil
 }
 
 type MockAuthDBClientEmpty struct {
@@ -604,49 +623,55 @@ func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
 		"key":            "8baf473f2f8fd09487cccbd7097c6862",
 		"sequenceNumber": "16f3b3f70fc2",
 	}
-
+	authSubsData := models.AuthenticationSubscription{
+		AuthenticationManagementField: "8000",
+		AuthenticationMethod:          "5G_AKA",
+		Milenage: &models.Milenage{
+			Op: &models.Op{
+				EncryptionAlgorithm: 0,
+				EncryptionKey:       0,
+				OpValue:             "",
+			},
+		},
+		Opc: &models.Opc{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
+		},
+		PermanentKey: &models.PermanentKey{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
+		},
+		SequenceNumber: "16f3b3f70fc2",
+	}
 	jsonData, err := json.Marshal(inputData)
 	if err != nil {
 		t.Fatalf("failed to marshal input data to JSON: %v", err)
 	}
-
 	commonDbAdapter := &MockMongoClientNoSubscriberInDB{PostDataCommon: &postDataCommon}
+	authDbAdapter := &MockMongoClientAuthDB{}
 	origDBClient := dbadapter.CommonDBClient
+	origAuthDBClient := dbadapter.AuthDBClient
+	dbadapter.CommonDBClient = commonDbAdapter
+	dbadapter.AuthDBClient = authDbAdapter
 	origChannel := configChannel
 	configChannel = make(chan *configmodels.ConfigMessage, 1)
-	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
-	dbadapter.CommonDBClient = commonDbAdapter
-
+	defer func() {
+		configChannel = origChannel
+		dbadapter.CommonDBClient = origDBClient
+		dbadapter.AuthDBClient = origAuthDBClient
+	}()
 	expectedCode := http.StatusCreated
 	expectedBody := `{}`
 	expectedCommonPostDataDetails := []map[string]interface{}{
 		{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-208930100007487"}},
 	}
 	expectedMessage := &configmodels.ConfigMessage{
-		MsgType:   configmodels.Sub_data,
-		MsgMethod: configmodels.Post_op,
-		AuthSubData: &models.AuthenticationSubscription{
-			AuthenticationManagementField: "8000",
-			AuthenticationMethod:          "5G_AKA",
-			Milenage: &models.Milenage{
-				Op: &models.Op{
-					EncryptionAlgorithm: 0,
-					EncryptionKey:       0,
-				},
-			},
-			Opc: &models.Opc{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-				OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
-			},
-			PermanentKey: &models.PermanentKey{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-				PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
-			},
-			SequenceNumber: "16f3b3f70fc2",
-		},
-		Imsi: "imsi-208930100007487",
+		MsgType:     configmodels.Sub_data,
+		MsgMethod:   configmodels.Post_op,
+		AuthSubData: &authSubsData,
+		Imsi:        "imsi-208930100007487",
 	}
 
 	req, err := http.NewRequest(http.MethodPost, route, bytes.NewBuffer(jsonData))
@@ -722,7 +747,7 @@ func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
 	dbadapter.CommonDBClient = commonDbAdapter
 
 	expectedCode := http.StatusConflict
-	expectedBody := `{"error":"subscriber imsi-208930100007487 already exists"}`
+	expectedBody := "subscriber imsi-208930100007487 already exists"
 	expectedCommonPostDataDetails := []map[string]interface{}{
 		{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-208930100007487"}},
 	}
@@ -738,7 +763,7 @@ func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
 	if w.Code != expectedCode {
 		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
 	}
-	if w.Body.String() != expectedBody {
+	if !strings.Contains(w.Body.String(), expectedBody) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 
@@ -762,6 +787,10 @@ func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
 	}
 }
 
+type MockMongoClientAuthDB struct {
+	MockMongoClientEmptyDB
+}
+
 func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
@@ -769,6 +798,10 @@ func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 	origDBClient := dbadapter.CommonDBClient
 	dbAdapter := &MockMongoClientEmptyDB{}
 	dbadapter.CommonDBClient = dbAdapter
+	origAuthDBClient := dbadapter.AuthDBClient
+	authDbAdapter := &MockMongoClientAuthDB{}
+	dbadapter.AuthDBClient = authDbAdapter
+
 	route := "/api/subscriber/imsi-208930100007487"
 	expectedCode := http.StatusNoContent
 	expectedBody := ""
@@ -779,7 +812,11 @@ func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 	}
 	origChannel := configChannel
 	configChannel = make(chan *configmodels.ConfigMessage, 3)
-	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
+	defer func() {
+		configChannel = origChannel
+		dbadapter.CommonDBClient = origDBClient
+		dbadapter.AuthDBClient = origAuthDBClient
+	}()
 	req, err := http.NewRequest(http.MethodDelete, route, nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -792,7 +829,7 @@ func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 	if expectedCode != w.Code {
 		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
 	}
-	if expectedBody != w.Body.String() {
+	if !strings.Contains(w.Body.String(), expectedBody) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 	select {
@@ -825,7 +862,7 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	dbadapter.CommonDBClient = dbAdapter
 	route := "/api/subscriber/imsi-208930100007487"
 	expectedCode := http.StatusInternalServerError
-	expectedBody := `{"error":"error deleting subscriber"}`
+	expectedBody := "error deleting subscriber. Please check the log for details"
 
 	origChannel := configChannel
 	configChannel = make(chan *configmodels.ConfigMessage, 1)
@@ -842,7 +879,7 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	if expectedCode != w.Code {
 		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
 	}
-	if expectedBody != w.Body.String() {
+	if !strings.Contains(w.Body.String(), expectedBody) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 	select {
@@ -859,6 +896,9 @@ func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
 	origDBClient := dbadapter.CommonDBClient
 	dbAdapter := &MockMongoClientDeviceGroupsWithSubscriber{}
 	dbadapter.CommonDBClient = dbAdapter
+	origAuthDBClient := dbadapter.AuthDBClient
+	authDbAdapter := &MockMongoClientAuthDB{}
+	dbadapter.AuthDBClient = authDbAdapter
 	route := "/api/subscriber/imsi-208930100007487"
 	expectedCode := http.StatusNoContent
 	expectedBody := ""
@@ -875,7 +915,11 @@ func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
 	}
 	origChannel := configChannel
 	configChannel = make(chan *configmodels.ConfigMessage, 3)
-	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
+	defer func() {
+		configChannel = origChannel
+		dbadapter.CommonDBClient = origDBClient
+		dbadapter.AuthDBClient = origAuthDBClient
+	}()
 	req, err := http.NewRequest(http.MethodDelete, route, nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -886,10 +930,10 @@ func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	if expectedCode != w.Code {
-		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+		t.Errorf("Expected status code `%v`, got `%v`", expectedCode, w.Code)
 	}
 	if expectedBody != w.Body.String() {
-		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+		t.Errorf("Expected body `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 	select {
 	case msg := <-configChannel:

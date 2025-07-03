@@ -28,7 +28,7 @@ func TestSyncSessionManagement_ValidSlice(t *testing.T) {
 				Mnc: "01",
 			},
 			Upf: map[string]interface{}{
-				"hostname": "upf.local",
+				"upf-name": "upf.local",
 			},
 			GNodeBs: []configmodels.SliceSiteInfoGNodeBs{
 				{Name: "gnb-1"},
@@ -104,7 +104,7 @@ func TestSyncSessionManagement_InvalidSst(t *testing.T) {
 		SliceId:   configmodels.SliceSliceId{Sst: "", Sd: "010203"},
 		SiteInfo: configmodels.SliceSiteInfo{
 			Plmn: configmodels.SliceSiteInfoPlmn{Mcc: "001", Mnc: "01"},
-			Upf:  map[string]interface{}{"hostname": "upf.local"},
+			Upf:  map[string]interface{}{"upf-name": "upf.local"},
 		},
 	}
 
@@ -158,7 +158,7 @@ func TestSyncSessionManagement_InvalidUpfHostname(t *testing.T) {
 		SiteDeviceGroup: []string{"dg-1"},
 		SiteInfo: configmodels.SliceSiteInfo{
 			Plmn: configmodels.SliceSiteInfoPlmn{Mcc: "001", Mnc: "01"},
-			Upf:  map[string]interface{}{"hostname": 123}, // Invalid type
+			Upf:  map[string]interface{}{"upf-name": 123}, // Invalid type
 		},
 	}
 
@@ -189,7 +189,7 @@ func TestSyncSessionManagement_MissingDeviceGroup(t *testing.T) {
 		SiteDeviceGroup: []string{"dg-x"}, // not in deviceGroupMap
 		SiteInfo: configmodels.SliceSiteInfo{
 			Plmn: configmodels.SliceSiteInfoPlmn{Mcc: "001", Mnc: "01"},
-			Upf:  map[string]interface{}{"hostname": "upf.local"},
+			Upf:  map[string]interface{}{"upf-name": "upf.local"},
 		},
 	}
 
@@ -208,8 +208,8 @@ func TestSyncSessionManagement_MissingDeviceGroup(t *testing.T) {
 func TestSyncSessionManagement_SortedBySliceName(t *testing.T) {
 	// The session management gets a config sorted by slice name in ascending order.
 	slices := []configmodels.Slice{
-		{SliceName: "slice-b", SliceId: configmodels.SliceSliceId{Sst: "1", Sd: "010203"}, SiteInfo: configmodels.SliceSiteInfo{Plmn: configmodels.SliceSiteInfoPlmn{Mcc: "001", Mnc: "01"}, Upf: map[string]interface{}{"hostname": "upf.local"}}},
-		{SliceName: "slice-a", SliceId: configmodels.SliceSliceId{Sst: "1", Sd: "010203"}, SiteInfo: configmodels.SliceSiteInfo{Plmn: configmodels.SliceSiteInfoPlmn{Mcc: "001", Mnc: "01"}, Upf: map[string]interface{}{"hostname": "upf.local"}}},
+		{SliceName: "slice-b", SliceId: configmodels.SliceSliceId{Sst: "1", Sd: "010203"}, SiteInfo: configmodels.SliceSiteInfo{Plmn: configmodels.SliceSiteInfoPlmn{Mcc: "001", Mnc: "01"}, Upf: map[string]interface{}{"upf-name": "upf.local"}}},
+		{SliceName: "slice-a", SliceId: configmodels.SliceSliceId{Sst: "1", Sd: "010203"}, SiteInfo: configmodels.SliceSiteInfo{Plmn: configmodels.SliceSiteInfoPlmn{Mcc: "001", Mnc: "01"}, Upf: map[string]interface{}{"upf-name": "upf.local"}}},
 	}
 
 	cfg := &inMemoryConfig{}

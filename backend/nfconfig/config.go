@@ -131,7 +131,7 @@ func sortPlmnSnssaiConfig(plmnSnssai []nfConfigApi.PlmnSnssai) {
 }
 
 func (c *inMemoryConfig) syncAccessAndMobility(networkSlices []configmodels.Slice) {
-	plmnSnssaiTacsMap := map[accessAndMobilityKey][]string{}
+	plmnSnssaiTacsMap := map[accessAndMobilityKey]map[string]struct{}{}
 	for _, s := range networkSlices {
 		accessAndMobilityTmp := accessAndMobilityKey{
 			plmn:    s.SiteInfo.Plmn,
@@ -140,22 +140,20 @@ func (c *inMemoryConfig) syncAccessAndMobility(networkSlices []configmodels.Slic
 		if plmnSnssaiTacsMap[accessAndMobilityTmp] != nil {
 			logger.NfConfigLog.Warnf("Found duplicate Network slice `%+v` for PLMN `%+v`, merging TACs for Access and Mobility", s.SliceId, s.SiteInfo.Plmn)
 		} else {
-			plmnSnssaiTacsMap[accessAndMobilityTmp] = []string{}
+			plmnSnssaiTacsMap[accessAndMobilityTmp] = map[string]struct{}{}
 		}
 		for _, g := range s.SiteInfo.GNodeBs {
 			tac := strconv.Itoa(int(g.Tac))
-			if !slices.Contains(plmnSnssaiTacsMap[accessAndMobilityTmp], tac) {
-				plmnSnssaiTacsMap[accessAndMobilityTmp] = append(plmnSnssaiTacsMap[accessAndMobilityTmp], tac)
-			}
+			plmnSnssaiTacsMap[accessAndMobilityTmp][tac] = struct{}{}
 		}
 	}
 	c.accessAndMobility = convertPlmnSnssaiTacsMapToSortedList(plmnSnssaiTacsMap)
 	logger.NfConfigLog.Debugln("Updated Access and Mobility in-memory configuration. New configuration:", c.accessAndMobility)
 }
 
-func convertPlmnSnssaiTacsMapToSortedList(plmnSnssaiMap map[accessAndMobilityKey][]string) []nfConfigApi.AccessAndMobility {
+func convertPlmnSnssaiTacsMapToSortedList(plmnSnssaiMap map[accessAndMobilityKey]map[string]struct{}) []nfConfigApi.AccessAndMobility {
 	newAccessAndMobilityConfig := []nfConfigApi.AccessAndMobility{}
-	for plmnSliceId, tacList := range plmnSnssaiMap {
+	for plmnSliceId, tacSet := range plmnSnssaiMap {
 		plmnId := nfConfigApi.NewPlmnId(plmnSliceId.plmn.Mcc, plmnSliceId.plmn.Mnc)
 		parsedSnssai, err := parseSnssaiFromSlice(plmnSliceId.sliceId)
 		if err != nil {
@@ -163,6 +161,10 @@ func convertPlmnSnssaiTacsMapToSortedList(plmnSnssaiMap map[accessAndMobilityKey
 			continue
 		}
 		accessAndMobility := nfConfigApi.NewAccessAndMobility(*plmnId, parsedSnssai)
+		tacList := make([]string, 0, len(tacSet))
+		for tac := range tacSet {
+			tacList = append(tacList, tac)
+		}
 		accessAndMobility.Tacs = tacList
 		newAccessAndMobilityConfig = append(newAccessAndMobilityConfig, *accessAndMobility)
 	}

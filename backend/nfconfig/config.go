@@ -207,7 +207,7 @@ func (c *inMemoryConfig) syncSessionManagement(slices []configmodels.Slice, devi
 	})
 
 	c.sessionManagement = sessionConfigs
-	logger.NfConfigLog.Debugln("Updated Session Management in-memory configuration. New configuration:", c.sessionManagement)
+	logger.NfConfigLog.Debugf("Updated Session Management in-memory configuration. New configuration: %+v", c.sessionManagement)
 }
 
 func buildSessionManagementConfig(slice configmodels.Slice, deviceGroupMap map[string]configmodels.DeviceGroups) (*nfConfigApi.SessionManagement, bool) {

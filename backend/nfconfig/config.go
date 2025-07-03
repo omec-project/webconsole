@@ -181,16 +181,10 @@ func sortAccessAndMobilityConfig(accessAndMobility []nfConfigApi.AccessAndMobili
 		if accessAndMobility[i].Snssai.GetSst() != accessAndMobility[j].Snssai.GetSst() {
 			return accessAndMobility[i].Snssai.GetSst() < accessAndMobility[j].Snssai.GetSst()
 		}
-		if !accessAndMobility[i].Snssai.HasSd() && accessAndMobility[j].Snssai.HasSd() {
-			return true
+		if accessAndMobility[i].Snssai.HasSd() != accessAndMobility[j].Snssai.HasSd() {
+			return !accessAndMobility[i].Snssai.HasSd()
 		}
-		if accessAndMobility[i].Snssai.HasSd() && !accessAndMobility[j].Snssai.HasSd() {
-			return false
-		}
-		if accessAndMobility[i].Snssai.HasSd() && accessAndMobility[j].Snssai.HasSd() {
-			return accessAndMobility[i].Snssai.GetSd() < accessAndMobility[j].Snssai.GetSd()
-		}
-		return false
+		return accessAndMobility[i].Snssai.GetSd() < accessAndMobility[j].Snssai.GetSd()
 	})
 	for i := range accessAndMobility {
 		slices.Sort(accessAndMobility[i].Tacs)

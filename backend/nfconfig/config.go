@@ -252,7 +252,6 @@ func extractIpDomains(groupNames []string, deviceGroupMap map[string]configmodel
 		)
 		ipDomains = append(ipDomains, *ip)
 	}
-
 	return ipDomains
 }
 
@@ -262,19 +261,16 @@ func extractUpf(slice configmodels.Slice) *nfConfigApi.Upf {
 		logger.NfConfigLog.Errorf("no UPF defined for slice %s", slice.SliceName)
 		return nil
 	}
-
 	hostnameRaw, ok := upfMap["upf-name"]
 	if !ok {
 		logger.NfConfigLog.Errorf("missing UPF hostname for slice %s", slice.SliceName)
 		return nil
 	}
-
 	hostname, ok := hostnameRaw.(string)
 	if !ok || hostname == "" {
 		logger.NfConfigLog.Errorf("invalid UPF hostname for slice %s: %v", slice.SliceName, hostnameRaw)
 		return nil
 	}
-
 	upf := nfConfigApi.NewUpf(hostname)
 
 	if portRaw, ok := upfMap["upf-port"]; ok {

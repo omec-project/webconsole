@@ -193,7 +193,7 @@ func sortAccessAndMobilityConfig(accessAndMobility []nfConfigApi.AccessAndMobili
 }
 
 func (c *inMemoryConfig) syncSessionManagement(slices []configmodels.Slice, deviceGroupMap map[string]configmodels.DeviceGroups) {
-	var sessionConfigs []nfConfigApi.SessionManagement
+	sessionConfigs := make([]nfConfigApi.SessionManagement, 0, len(slices))
 
 	for _, slice := range slices {
 		session, ok := buildSessionManagementConfig(slice, deviceGroupMap)
@@ -236,7 +236,7 @@ func buildSessionManagementConfig(slice configmodels.Slice, deviceGroupMap map[s
 }
 
 func extractIpDomains(groupNames []string, deviceGroupMap map[string]configmodels.DeviceGroups) []nfConfigApi.IpDomain {
-	var ipDomains []nfConfigApi.IpDomain
+	ipDomains := make([]nfConfigApi.IpDomain, 0, len(groupNames))
 
 	for _, name := range groupNames {
 		dg, exists := deviceGroupMap[name]
@@ -288,7 +288,7 @@ func extractUpf(slice configmodels.Slice) *nfConfigApi.Upf {
 }
 
 func extractGnbNames(slice configmodels.Slice) []string {
-	var names []string
+	names := make([]string, 0, len(slice.SiteInfo.GNodeBs))
 	for _, gnb := range slice.SiteInfo.GNodeBs {
 		names = append(names, gnb.Name)
 	}

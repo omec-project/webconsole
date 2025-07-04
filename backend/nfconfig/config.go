@@ -6,6 +6,7 @@
 package nfconfig
 
 import (
+	"slices"
 	"sort"
 	"strconv"
 
@@ -13,6 +14,11 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 )
+
+type accessAndMobilityKey struct {
+	plmn    configmodels.SliceSiteInfoPlmn
+	sliceId configmodels.SliceSliceId
+}
 
 type inMemoryConfig struct {
 	plmn              []nfConfigApi.PlmnId
@@ -123,9 +129,67 @@ func sortPlmnSnssaiConfig(plmnSnssai []nfConfigApi.PlmnSnssai) {
 	}
 }
 
-func (c *inMemoryConfig) syncAccessAndMobility() {
-	c.accessAndMobility = []nfConfigApi.AccessAndMobility{}
+func (c *inMemoryConfig) syncAccessAndMobility(networkSlices []configmodels.Slice) {
+	plmnSnssaiTacsMap := map[accessAndMobilityKey]map[string]struct{}{}
+	for _, s := range networkSlices {
+		accessAndMobilityTmp := accessAndMobilityKey{
+			plmn:    s.SiteInfo.Plmn,
+			sliceId: s.SliceId,
+		}
+		if plmnSnssaiTacsMap[accessAndMobilityTmp] != nil {
+			logger.NfConfigLog.Warnf("Found duplicate Network slice `%+v` for PLMN `%+v`, merging TACs for Access and Mobility", s.SliceId, s.SiteInfo.Plmn)
+		} else {
+			plmnSnssaiTacsMap[accessAndMobilityTmp] = map[string]struct{}{}
+		}
+		for _, g := range s.SiteInfo.GNodeBs {
+			tac := strconv.Itoa(int(g.Tac))
+			plmnSnssaiTacsMap[accessAndMobilityTmp][tac] = struct{}{}
+		}
+	}
+	c.accessAndMobility = convertPlmnSnssaiTacsMapToSortedList(plmnSnssaiTacsMap)
 	logger.NfConfigLog.Debugf("Updated Access and Mobility in-memory configuration. New configuration: %+v", c.accessAndMobility)
+}
+
+func convertPlmnSnssaiTacsMapToSortedList(plmnSnssaiMap map[accessAndMobilityKey]map[string]struct{}) []nfConfigApi.AccessAndMobility {
+	newAccessAndMobilityConfig := []nfConfigApi.AccessAndMobility{}
+	for plmnSliceId, tacSet := range plmnSnssaiMap {
+		plmnId := nfConfigApi.NewPlmnId(plmnSliceId.plmn.Mcc, plmnSliceId.plmn.Mnc)
+		parsedSnssai, err := parseSnssaiFromSlice(plmnSliceId.sliceId)
+		if err != nil {
+			logger.NfConfigLog.Warnf("Error in parsing SNSSAI: %v. Network slice `%+v` will be ignored", err, plmnSliceId.sliceId)
+			continue
+		}
+		accessAndMobility := nfConfigApi.NewAccessAndMobility(*plmnId, parsedSnssai)
+		tacList := make([]string, 0, len(tacSet))
+		for tac := range tacSet {
+			tacList = append(tacList, tac)
+		}
+		accessAndMobility.Tacs = tacList
+		newAccessAndMobilityConfig = append(newAccessAndMobilityConfig, *accessAndMobility)
+	}
+	sortAccessAndMobilityConfig(newAccessAndMobilityConfig)
+	return newAccessAndMobilityConfig
+}
+
+func sortAccessAndMobilityConfig(accessAndMobility []nfConfigApi.AccessAndMobility) {
+	sort.Slice(accessAndMobility, func(i, j int) bool {
+		if accessAndMobility[i].PlmnId.GetMcc() != accessAndMobility[j].PlmnId.GetMcc() {
+			return accessAndMobility[i].PlmnId.GetMcc() < accessAndMobility[j].PlmnId.GetMcc()
+		}
+		if accessAndMobility[i].PlmnId.GetMnc() != accessAndMobility[j].PlmnId.GetMnc() {
+			return accessAndMobility[i].PlmnId.GetMnc() < accessAndMobility[j].PlmnId.GetMnc()
+		}
+		if accessAndMobility[i].Snssai.GetSst() != accessAndMobility[j].Snssai.GetSst() {
+			return accessAndMobility[i].Snssai.GetSst() < accessAndMobility[j].Snssai.GetSst()
+		}
+		if accessAndMobility[i].Snssai.HasSd() != accessAndMobility[j].Snssai.HasSd() {
+			return !accessAndMobility[i].Snssai.HasSd()
+		}
+		return accessAndMobility[i].Snssai.GetSd() < accessAndMobility[j].Snssai.GetSd()
+	})
+	for i := range accessAndMobility {
+		slices.Sort(accessAndMobility[i].Tacs)
+	}
 }
 
 func (c *inMemoryConfig) syncSessionManagement() {

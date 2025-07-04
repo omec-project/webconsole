@@ -26,7 +26,7 @@ type networkSliceParams struct {
 }
 
 func prepareNetworkSlice(p networkSliceParams) configmodels.Slice {
-	upf := map[string]interface{}{
+	upf := map[string]any{
 		"upf-name": p.upfHostname,
 	}
 	if p.upfPort != "" {

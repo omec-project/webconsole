@@ -19,6 +19,7 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.uber.org/zap"
 )
 
 type NFConfigServer struct {
@@ -46,7 +47,11 @@ func NewNFConfigServer(config *factory.Config) (NFConfigInterface, error) {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}
 	gin.SetMode(gin.ReleaseMode)
-	router := gin.Default()
+	router := gin.New()
+	if logger.GetLogger().Level() == zap.DebugLevel {
+		router.Use(gin.Logger())
+	}
+	router.Use(gin.Recovery())
 	router.Use(enforceAcceptJSON())
 
 	nfconfigServer := &NFConfigServer{

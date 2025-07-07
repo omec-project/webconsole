@@ -87,13 +87,19 @@ func makeDeviceGroup(p deviceGroupParams) (string, configmodels.DeviceGroups) {
 	}
 }
 
+func ptr[T any](v T) *T {
+	return &v
+}
+
+var sharedSd = ptr("010203")
+
 func TestSyncSessionManagement(t *testing.T) {
 	tests := []struct {
 		name          string
 		sliceParams   []networkSliceParams
 		deviceGroups  []deviceGroupParams
 		expectedError bool
-		validateFunc  func(*testing.T, []nfConfigApi.SessionManagement)
+		expected      []nfConfigApi.SessionManagement
 	}{
 		{
 			name: "valid slice with all fields",
@@ -119,53 +125,31 @@ func TestSyncSessionManagement(t *testing.T) {
 					mtu:        1500,
 				},
 			},
-			validateFunc: func(t *testing.T, sessions []nfConfigApi.SessionManagement) {
-				if len(sessions) != 1 {
-					t.Fatalf("expected 1 session, got %d", len(sessions))
-				}
-				s := sessions[0]
-				if s.GetSliceName() != "slice-1" {
-					t.Errorf("expected slice name 'slice-1', got %s", s.GetSliceName())
-				}
-
-				expectedPlmn := nfConfigApi.PlmnId{
-					Mcc: "001",
-					Mnc: "01",
-				}
-
-				if got := s.GetPlmnId(); got != expectedPlmn {
-					t.Errorf("unexpected PLMN: got %+v, expected %+v", got, expectedPlmn)
-				}
-
-				sd := "010203"
-				expectedSnssai := nfConfigApi.Snssai{
-					Sst: 1,
-					Sd:  &sd,
-				}
-				if got := s.GetSnssai(); !reflect.DeepEqual(got, expectedSnssai) {
-					t.Errorf("unexpected SNSSAI: got %+v, expected %+v", got, expectedSnssai)
-				}
-
-				expectedUpf := nfConfigApi.Upf{Hostname: "upf.local"}
-				expectedUpf.SetPort(8805)
-				gotUpf := s.GetUpf()
-
-				if gotUpf.GetHostname() != expectedUpf.GetHostname() || gotUpf.GetPort() != expectedUpf.GetPort() {
-					t.Errorf("unexpected UPF: got %+v, expected %+v", gotUpf, expectedUpf)
-				}
-				expectedIpDomain := nfConfigApi.IpDomain{
-					DnnName:  "internet",
-					DnsIpv4:  "8.8.8.8",
-					UeSubnet: "10.1.1.0/24",
-					Mtu:      1500,
-				}
-				if got := s.GetIpDomain(); len(got) == 0 || got[0] != expectedIpDomain {
-					t.Errorf("unexpected IP domain: got %+v, expected %+v", got, []nfConfigApi.IpDomain{expectedIpDomain})
-				}
-
-				if got := s.GetGnbNames(); !reflect.DeepEqual(got, []string{"gnb-1"}) {
-					t.Errorf("unexpected gNBs: got %+v, expected %+v", got, []string{"gnb-1"})
-				}
+			expected: []nfConfigApi.SessionManagement{
+				{
+					SliceName: "slice-1",
+					PlmnId: nfConfigApi.PlmnId{
+						Mcc: "001",
+						Mnc: "01",
+					},
+					Snssai: nfConfigApi.Snssai{
+						Sst: 1,
+						Sd:  sharedSd,
+					},
+					IpDomain: []nfConfigApi.IpDomain{
+						{
+							DnnName:  "internet",
+							DnsIpv4:  "8.8.8.8",
+							UeSubnet: "10.1.1.0/24",
+							Mtu:      1500,
+						},
+					},
+					Upf: &nfConfigApi.Upf{
+						Hostname: "upf.local",
+						Port:     ptr(int32(8805)),
+					},
+					GnbNames: []string{"gnb-1"},
+				},
 			},
 		},
 		{
@@ -179,11 +163,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					sd:        "010203",
 				},
 			},
-			validateFunc: func(t *testing.T, sessions []nfConfigApi.SessionManagement) {
-				if len(sessions) != 0 {
-					t.Errorf("expected no sessions with invalid SST, got %d", len(sessions))
-				}
-			},
+			expected: []nfConfigApi.SessionManagement{},
 		},
 		{
 			name: "Slice missing UPF",
@@ -207,14 +187,27 @@ func TestSyncSessionManagement(t *testing.T) {
 					mtu:        1500,
 				},
 			},
-			validateFunc: func(t *testing.T, sessions []nfConfigApi.SessionManagement) {
-				if len(sessions) != 1 {
-					t.Fatalf("expected 1 session, got %d", len(sessions))
-				}
-				s := sessions[0]
-				if s.Upf.GetHostname() != "" {
-					t.Errorf("expected UPF not available, got %+v", s.GetUpf())
-				}
+			expected: []nfConfigApi.SessionManagement{
+				{
+					SliceName: "slice-1",
+					PlmnId: nfConfigApi.PlmnId{
+						Mcc: "001",
+						Mnc: "01",
+					},
+					Snssai: nfConfigApi.Snssai{
+						Sst: 1,
+						Sd:  sharedSd,
+					},
+					IpDomain: []nfConfigApi.IpDomain{
+						{
+							DnnName:  "internet",
+							DnsIpv4:  "8.8.8.8",
+							UeSubnet: "10.1.1.0/24",
+							Mtu:      1500,
+						},
+					},
+					GnbNames: []string{"gnb-1"},
+				},
 			},
 		},
 		{
@@ -226,7 +219,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					mnc:         "01",
 					sst:         "1",
 					sd:          "010203",
-					upfHostname: "12123",
+					upfHostname: "upf.local",
 					upfPort:     "8805",
 					gnbNames:    []string{"gnb-1"},
 				},
@@ -240,14 +233,23 @@ func TestSyncSessionManagement(t *testing.T) {
 					mtu:        1500,
 				},
 			},
-			validateFunc: func(t *testing.T, sessions []nfConfigApi.SessionManagement) {
-				if len(sessions) != 1 {
-					t.Fatalf("expected 1 session, got %d", len(sessions))
-				}
-				s := sessions[0]
-				if len(s.GetIpDomain()) != 0 {
-					t.Errorf("expected no IP domains due to missing device group, got %+v", s.GetIpDomain())
-				}
+			expected: []nfConfigApi.SessionManagement{
+				{
+					SliceName: "slice-1",
+					PlmnId: nfConfigApi.PlmnId{
+						Mcc: "001",
+						Mnc: "01",
+					},
+					Snssai: nfConfigApi.Snssai{
+						Sst: 1,
+						Sd:  sharedSd,
+					},
+					Upf: &nfConfigApi.Upf{
+						Hostname: "upf.local",
+						Port:     ptr(int32(8805)),
+					},
+					GnbNames: []string{"gnb-1"},
+				},
 			},
 		},
 		{
@@ -258,7 +260,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					mcc:          "001",
 					mnc:          "01",
 					sst:          "1",
-					sd:           "000001",
+					sd:           "010203",
 					deviceGroups: []string{"dg-9"},
 					upfHostname:  "upf-b.local",
 				},
@@ -267,7 +269,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					mcc:          "001",
 					mnc:          "01",
 					sst:          "1",
-					sd:           "000002",
+					sd:           "010203",
 					deviceGroups: []string{"dg-9"},
 					upfHostname:  "upf-b.local",
 				},
@@ -277,17 +279,55 @@ func TestSyncSessionManagement(t *testing.T) {
 					name:       "dg-9",
 					dnn:        "internet",
 					dnsPrimary: "1.1.1.1",
-					ueIpPool:   "10.1.2.0/24",
+					ueIpPool:   "10.1.1.0/24",
 					mtu:        1400,
 				},
 			},
-			validateFunc: func(t *testing.T, sessions []nfConfigApi.SessionManagement) {
-				if len(sessions) != 2 {
-					t.Fatalf("expected 2 session, got %d", len(sessions))
-				}
-				if sessions[0].GetSliceName() != "slice-e" {
-					t.Errorf("expected slice to be 'slice-e', got %s", sessions[0].GetSliceName())
-				}
+			expected: []nfConfigApi.SessionManagement{
+				{
+					SliceName: "slice-e",
+					PlmnId: nfConfigApi.PlmnId{
+						Mcc: "001",
+						Mnc: "01",
+					},
+					Snssai: nfConfigApi.Snssai{
+						Sst: 1,
+						Sd:  sharedSd,
+					},
+					IpDomain: []nfConfigApi.IpDomain{
+						{
+							DnnName:  "internet",
+							DnsIpv4:  "1.1.1.1",
+							UeSubnet: "10.1.1.0/24",
+							Mtu:      1400,
+						},
+					},
+					Upf: &nfConfigApi.Upf{
+						Hostname: "upf-b.local",
+					},
+				},
+				{
+					SliceName: "slice-f",
+					PlmnId: nfConfigApi.PlmnId{
+						Mcc: "001",
+						Mnc: "01",
+					},
+					Snssai: nfConfigApi.Snssai{
+						Sst: 1,
+						Sd:  sharedSd,
+					},
+					IpDomain: []nfConfigApi.IpDomain{
+						{
+							DnnName:  "internet",
+							DnsIpv4:  "1.1.1.1",
+							UeSubnet: "10.1.1.0/24",
+							Mtu:      1400,
+						},
+					},
+					Upf: &nfConfigApi.Upf{
+						Hostname: "upf-b.local",
+					},
+				},
 			},
 		},
 		{
@@ -313,16 +353,29 @@ func TestSyncSessionManagement(t *testing.T) {
 					mtu:        1500,
 				},
 			},
-			validateFunc: func(t *testing.T, sessions []nfConfigApi.SessionManagement) {
-				if len(sessions) != 1 {
-					t.Fatalf("expected 1 session, got %d", len(sessions))
-				}
-				if sessions[0].Upf.GetHostname() != "upf.local" {
-					t.Errorf("expected UPF hostname 'upf.local', got %s", sessions[0].Upf.GetHostname())
-				}
-				if sessions[0].Upf.GetPort() != 0 {
-					t.Errorf("expected UPF port to be 0 due to invalid input, got %d", sessions[0].Upf.GetPort())
-				}
+			expected: []nfConfigApi.SessionManagement{
+				{
+					SliceName: "slice-2",
+					PlmnId: nfConfigApi.PlmnId{
+						Mcc: "001",
+						Mnc: "01",
+					},
+					Snssai: nfConfigApi.Snssai{
+						Sst: 1,
+						Sd:  sharedSd,
+					},
+					IpDomain: []nfConfigApi.IpDomain{
+						{
+							DnnName:  "internet",
+							DnsIpv4:  "9.9.9.9",
+							UeSubnet: "10.2.2.0/24",
+							Mtu:      1500,
+						},
+					},
+					Upf: &nfConfigApi.Upf{
+						Hostname: "upf.local",
+					},
+				},
 			},
 		},
 		{
@@ -333,7 +386,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					mcc:          "001",
 					mnc:          "01",
 					sst:          "1",
-					sd:           "030201",
+					sd:           "010203",
 					upfHostname:  "upf.local",
 					upfPort:      "2152",
 					deviceGroups: []string{"dg-1"},
@@ -348,17 +401,30 @@ func TestSyncSessionManagement(t *testing.T) {
 					mtu:        1400,
 				},
 			},
-			validateFunc: func(t *testing.T, sessions []nfConfigApi.SessionManagement) {
-				if len(sessions) != 1 {
-					t.Fatalf("expected 1 session, got %d", len(sessions))
-				}
-				upf := sessions[0].GetUpf()
-				if upf.GetHostname() != "upf.local" {
-					t.Errorf("expected hostname upf.local, got %s", upf.GetHostname())
-				}
-				if upf.GetPort() != 2152 {
-					t.Errorf("expected port 2152, got %d", upf.GetPort())
-				}
+			expected: []nfConfigApi.SessionManagement{
+				{
+					SliceName: "slice-3",
+					PlmnId: nfConfigApi.PlmnId{
+						Mcc: "001",
+						Mnc: "01",
+					},
+					Snssai: nfConfigApi.Snssai{
+						Sst: 1,
+						Sd:  sharedSd,
+					},
+					IpDomain: []nfConfigApi.IpDomain{
+						{
+							DnnName:  "internet",
+							DnsIpv4:  "4.4.4.4",
+							UeSubnet: "10.3.3.0/24",
+							Mtu:      1400,
+						},
+					},
+					Upf: &nfConfigApi.Upf{
+						Hostname: "upf.local",
+						Port:     ptr(int32(2152)),
+					},
+				},
 			},
 		},
 		{
@@ -369,41 +435,56 @@ func TestSyncSessionManagement(t *testing.T) {
 					mcc:          "001",
 					mnc:          "01",
 					sst:          "1",
-					sd:           "040302",
+					sd:           "010203",
 					deviceGroups: []string{"dg-1"},
 					gnbNames:     []string{"gnb-1"},
 				},
 			},
-			validateFunc: func(t *testing.T, sessions []nfConfigApi.SessionManagement) {
-				if len(sessions) != 1 {
-					t.Fatalf("expected 1 session, got %d", len(sessions))
-				}
-				if sessions[0].Upf.GetHostname() != "" {
-					t.Errorf("expected empty hostname due to invalid type, got: %s", sessions[0].Upf.GetHostname())
-				}
+			expected: []nfConfigApi.SessionManagement{
+				{
+					SliceName: "slice-4",
+					PlmnId: nfConfigApi.PlmnId{
+						Mcc: "001",
+						Mnc: "01",
+					},
+					Snssai: nfConfigApi.Snssai{
+						Sst: 1,
+						Sd:  sharedSd,
+					},
+					Upf:      nil,
+					GnbNames: []string{"gnb-1"},
+				},
 			},
 		},
 		{
 			name: "empty device group list",
 			sliceParams: []networkSliceParams{
 				{
-					sliceName:    "slice-5",
+					sliceName:    "slice-1",
 					mcc:          "001",
 					mnc:          "01",
 					sst:          "1",
-					sd:           "050607",
+					sd:           "010203",
 					deviceGroups: []string{},
 					upfHostname:  "upf.local",
 				},
 			},
 			deviceGroups: nil,
-			validateFunc: func(t *testing.T, sessions []nfConfigApi.SessionManagement) {
-				if len(sessions) != 1 {
-					t.Fatalf("expected 1 session, got %d", len(sessions))
-				}
-				if len(sessions[0].GetIpDomain()) != 0 {
-					t.Errorf("expected no IP domain due to empty device group list, got %+v", sessions[0].GetIpDomain())
-				}
+			expected: []nfConfigApi.SessionManagement{
+				{
+					SliceName: "slice-1",
+					PlmnId: nfConfigApi.PlmnId{
+						Mcc: "001",
+						Mnc: "01",
+					},
+					Snssai: nfConfigApi.Snssai{
+						Sst: 1,
+						Sd:  sharedSd,
+					},
+					Upf: &nfConfigApi.Upf{
+						Hostname: "upf.local",
+					},
+				},
 			},
 		},
 	}
@@ -424,8 +505,8 @@ func TestSyncSessionManagement(t *testing.T) {
 			cfg := inMemoryConfig{}
 			cfg.syncSessionManagement(slices, deviceGroupMap)
 
-			if tt.validateFunc != nil {
-				tt.validateFunc(t, cfg.sessionManagement)
+			if !reflect.DeepEqual(cfg.sessionManagement, tt.expected) {
+				t.Errorf("expected %+v, got %+v", tt.expected, cfg.sessionManagement)
 			}
 		})
 	}

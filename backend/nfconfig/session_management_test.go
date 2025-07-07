@@ -95,11 +95,11 @@ var sharedSd = ptr("010203")
 
 func TestSyncSessionManagement(t *testing.T) {
 	tests := []struct {
-		name          string
-		sliceParams   []networkSliceParams
-		deviceGroups  []deviceGroupParams
-		expectedError bool
-		expected      []nfConfigApi.SessionManagement
+		name             string
+		sliceParams      []networkSliceParams
+		deviceGroups     []deviceGroupParams
+		expectedError    bool
+		expectedResponse []nfConfigApi.SessionManagement
 	}{
 		{
 			name: "valid slice with all fields",
@@ -125,7 +125,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					mtu:        1500,
 				},
 			},
-			expected: []nfConfigApi.SessionManagement{
+			expectedResponse: []nfConfigApi.SessionManagement{
 				{
 					SliceName: "slice-1",
 					PlmnId: nfConfigApi.PlmnId{
@@ -163,7 +163,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					sd:        "010203",
 				},
 			},
-			expected: []nfConfigApi.SessionManagement{},
+			expectedResponse: []nfConfigApi.SessionManagement{},
 		},
 		{
 			name: "Slice missing UPF",
@@ -187,7 +187,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					mtu:        1500,
 				},
 			},
-			expected: []nfConfigApi.SessionManagement{
+			expectedResponse: []nfConfigApi.SessionManagement{
 				{
 					SliceName: "slice-1",
 					PlmnId: nfConfigApi.PlmnId{
@@ -233,7 +233,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					mtu:        1500,
 				},
 			},
-			expected: []nfConfigApi.SessionManagement{
+			expectedResponse: []nfConfigApi.SessionManagement{
 				{
 					SliceName: "slice-1",
 					PlmnId: nfConfigApi.PlmnId{
@@ -283,7 +283,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					mtu:        1400,
 				},
 			},
-			expected: []nfConfigApi.SessionManagement{
+			expectedResponse: []nfConfigApi.SessionManagement{
 				{
 					SliceName: "slice-e",
 					PlmnId: nfConfigApi.PlmnId{
@@ -353,7 +353,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					mtu:        1500,
 				},
 			},
-			expected: []nfConfigApi.SessionManagement{
+			expectedResponse: []nfConfigApi.SessionManagement{
 				{
 					SliceName: "slice-2",
 					PlmnId: nfConfigApi.PlmnId{
@@ -401,7 +401,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					mtu:        1400,
 				},
 			},
-			expected: []nfConfigApi.SessionManagement{
+			expectedResponse: []nfConfigApi.SessionManagement{
 				{
 					SliceName: "slice-3",
 					PlmnId: nfConfigApi.PlmnId{
@@ -441,7 +441,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					gnbNames:     []string{"gnb-1"},
 				},
 			},
-			expected: []nfConfigApi.SessionManagement{
+			expectedResponse: []nfConfigApi.SessionManagement{
 				{
 					SliceName: "slice-4",
 					PlmnId: nfConfigApi.PlmnId{
@@ -471,7 +471,7 @@ func TestSyncSessionManagement(t *testing.T) {
 				},
 			},
 			deviceGroups: nil,
-			expected: []nfConfigApi.SessionManagement{
+			expectedResponse: []nfConfigApi.SessionManagement{
 				{
 					SliceName: "slice-1",
 					PlmnId: nfConfigApi.PlmnId{
@@ -502,8 +502,8 @@ func TestSyncSessionManagement(t *testing.T) {
 			cfg := inMemoryConfig{}
 			cfg.syncSessionManagement(slices, deviceGroupMap)
 
-			if !reflect.DeepEqual(cfg.sessionManagement, tt.expected) {
-				t.Errorf("expected %+v, got %+v", tt.expected, cfg.sessionManagement)
+			if !reflect.DeepEqual(cfg.sessionManagement, tt.expectedResponse) {
+				t.Errorf("expected %+v, got %+v", tt.expectedResponse, cfg.sessionManagement)
 			}
 		})
 	}

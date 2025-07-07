@@ -20,7 +20,7 @@ type networkSliceParams struct {
 	sst          string
 	sd           string
 	deviceGroups []string
-	upfHostname  string
+	upfHostname  any
 	upfPort      string
 	gnbNames     []string
 }
@@ -436,6 +436,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					mnc:          "01",
 					sst:          "1",
 					sd:           "010203",
+					upfHostname:  1234,
 					deviceGroups: []string{"dg-1"},
 					gnbNames:     []string{"gnb-1"},
 				},
@@ -498,10 +499,6 @@ func TestSyncSessionManagement(t *testing.T) {
 			}
 
 			slices := prepareMultipleSlices(tt.sliceParams)
-			if tt.name == "invalid upf hostname (non-string)" {
-				slices[0].SiteInfo.Upf["upf-name"] = 1234
-			}
-
 			cfg := inMemoryConfig{}
 			cfg.syncSessionManagement(slices, deviceGroupMap)
 

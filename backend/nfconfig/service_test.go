@@ -40,7 +40,7 @@ func (m *MockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[stri
 	return results, m.err
 }
 
-func makeNetworkSlice(mcc, mnc, sst string, sd string, tacs []int32) configmodels.Slice { //////
+func makeNetworkSlice(mcc, mnc, sst string, sd string, tacs []int32) configmodels.Slice {
 	plmnId := configmodels.SliceSiteInfoPlmn{
 		Mcc: mcc,
 		Mnc: mnc,
@@ -69,7 +69,7 @@ func makeNetworkSlice(mcc, mnc, sst string, sd string, tacs []int32) configmodel
 	return networkSlice
 }
 
-func makeSnssaiWithSd(sst int32, sd string) nfConfigApi.Snssai { /////////
+func makeSnssaiWithSd(sst int32, sd string) nfConfigApi.Snssai {
 	s := nfConfigApi.NewSnssai(sst)
 	s.SetSd(sd)
 	return *s
@@ -500,11 +500,11 @@ func TestSyncInMemoryConfig_UpdateAllConfigs(t *testing.T) {
 				makeNetworkSlice("123", "23", "1", "01234", []int32{2}),
 			},
 			expectedPlmn: []nfConfigApi.PlmnId{
-				nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+				*nfConfigApi.NewPlmnId("123", "23"),
 			},
 			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{
 				{
-					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
 					SNssaiList: []nfConfigApi.Snssai{
 						makeSnssaiWithSd(1, "01234"),
 						makeSnssaiWithSd(2, "abcd"),
@@ -513,12 +513,12 @@ func TestSyncInMemoryConfig_UpdateAllConfigs(t *testing.T) {
 			},
 			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
 				{
-					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
 					Snssai: makeSnssaiWithSd(1, "01234"),
 					Tacs:   []string{"2"},
 				},
 				{
-					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
 					Snssai: makeSnssaiWithSd(2, "abcd"),
 					Tacs:   []string{"1"},
 				},
@@ -596,7 +596,7 @@ func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 			},
 			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{
 				{
-					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
 					SNssaiList: []nfConfigApi.Snssai{
 						makeSnssaiWithSd(1, "01234"),
 						makeSnssaiWithSd(2, "abcd"),
@@ -605,7 +605,7 @@ func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 			},
 			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
 				{
-					PlmnId: nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+					PlmnId: *nfConfigApi.NewPlmnId("123", "23"),
 					Snssai: makeSnssaiWithSd(1, "01234"),
 					Tacs:   []string{"1", "2"},
 				},

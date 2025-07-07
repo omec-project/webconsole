@@ -192,9 +192,108 @@ func sortAccessAndMobilityConfig(accessAndMobility []nfConfigApi.AccessAndMobili
 	}
 }
 
-func (c *inMemoryConfig) syncSessionManagement() {
-	c.sessionManagement = []nfConfigApi.SessionManagement{}
-	logger.NfConfigLog.Debugf("Updated Session Management in-memory configuration. New configuration: %+v", c.sessionManagement)
+func (c *inMemoryConfig) syncSessionManagement(slices []configmodels.Slice, deviceGroupMap map[string]configmodels.DeviceGroups) {
+	sessionConfigs := make([]nfConfigApi.SessionManagement, 0, len(slices))
+
+	for _, slice := range slices {
+		session, ok := buildSessionManagementConfig(slice, deviceGroupMap)
+		if ok {
+			sessionConfigs = append(sessionConfigs, *session)
+		}
+	}
+
+	sort.Slice(sessionConfigs, func(i, j int) bool {
+		return sessionConfigs[i].GetSliceName() < sessionConfigs[j].GetSliceName()
+	})
+
+	c.sessionManagement = sessionConfigs
+	logger.NfConfigLog.Debugf("Updated Session Management configuration with %d slices: %+v", len(sessionConfigs), c.sessionManagement)
+}
+
+func buildSessionManagementConfig(slice configmodels.Slice, deviceGroupMap map[string]configmodels.DeviceGroups) (*nfConfigApi.SessionManagement, bool) {
+	plmn := nfConfigApi.NewPlmnId(slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc)
+
+	snssai, err := parseSnssaiFromSlice(slice.SliceId)
+	if err != nil {
+		logger.NfConfigLog.Errorf("Invalid SNSSAI for slice %s: %+v", slice.SliceName, err)
+		return nil, false
+	}
+	session := nfConfigApi.NewSessionManagement(slice.SliceName, *plmn, snssai)
+
+	if ipDomains := extractIpDomains(slice.SiteDeviceGroup, deviceGroupMap); len(ipDomains) > 0 {
+		session.SetIpDomain(ipDomains)
+	}
+
+	if upf := extractUpf(slice); upf != nil {
+		session.SetUpf(*upf)
+	}
+
+	if gnbNames := extractGnbNames(slice); len(gnbNames) > 0 {
+		session.SetGnbNames(gnbNames)
+	}
+
+	return session, true
+}
+
+func extractIpDomains(groupNames []string, deviceGroupMap map[string]configmodels.DeviceGroups) []nfConfigApi.IpDomain {
+	ipDomains := make([]nfConfigApi.IpDomain, 0, len(groupNames))
+
+	for _, name := range groupNames {
+		dg, exists := deviceGroupMap[name]
+		if !exists {
+			logger.NfConfigLog.Warnf("Device group %s not found", name)
+			continue
+		}
+		ip := nfConfigApi.NewIpDomain(
+			dg.IpDomainExpanded.Dnn,
+			dg.IpDomainExpanded.DnsPrimary,
+			dg.IpDomainExpanded.UeIpPool,
+			dg.IpDomainExpanded.Mtu,
+		)
+		ipDomains = append(ipDomains, *ip)
+	}
+	return ipDomains
+}
+
+func extractUpf(slice configmodels.Slice) *nfConfigApi.Upf {
+	upfMap := slice.SiteInfo.Upf
+	if upfMap == nil {
+		logger.NfConfigLog.Warnf("no UPF defined for slice %s", slice.SliceName)
+		return nil
+	}
+	hostnameRaw, ok := upfMap["upf-name"]
+	if !ok {
+		logger.NfConfigLog.Warnf("missing UPF hostname for slice %s", slice.SliceName)
+		return nil
+	}
+	hostname, ok := hostnameRaw.(string)
+	if !ok || hostname == "" {
+		logger.NfConfigLog.Warnf("invalid UPF hostname for slice %s: %v", slice.SliceName, hostnameRaw)
+		return nil
+	}
+	upf := nfConfigApi.NewUpf(hostname)
+
+	if portRaw, ok := upfMap["upf-port"]; ok {
+		if portStr, ok := portRaw.(string); ok {
+			if port, err := strconv.ParseUint(portStr, 10, 16); err == nil {
+				upf.SetPort(int32(port))
+			} else {
+				logger.NfConfigLog.Warnf("invalid UPF port for slice %s: %+v", slice.SliceName, err)
+			}
+		} else {
+			logger.NfConfigLog.Warnf("UPF port should be a string for slice %s, got: %T", slice.SliceName, portRaw)
+		}
+	}
+	return upf
+}
+
+func extractGnbNames(slice configmodels.Slice) []string {
+	names := make([]string, 0, len(slice.SiteInfo.GNodeBs))
+	for _, gnb := range slice.SiteInfo.GNodeBs {
+		names = append(names, gnb.Name)
+	}
+	slices.Sort(names)
+	return names
 }
 
 func (c *inMemoryConfig) syncPolicyControl() {

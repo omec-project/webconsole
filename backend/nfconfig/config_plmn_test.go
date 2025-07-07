@@ -43,8 +43,8 @@ func TestSyncPlmnConfig_Success(t *testing.T) {
 				makeNetworkSliceWithPlmn("456", "77"),
 			},
 			expectedPlmn: []nfConfigApi.PlmnId{
-				nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
-				nfConfigApi.PlmnId{Mcc: "456", Mnc: "77"},
+				{Mcc: "123", Mnc: "23"},
+				{Mcc: "456", Mnc: "77"},
 			},
 		},
 		{
@@ -54,8 +54,8 @@ func TestSyncPlmnConfig_Success(t *testing.T) {
 				makeNetworkSliceWithPlmn("123", "77"),
 			},
 			expectedPlmn: []nfConfigApi.PlmnId{
-				nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
-				nfConfigApi.PlmnId{Mcc: "123", Mnc: "77"},
+				{Mcc: "123", Mnc: "23"},
+				{Mcc: "123", Mnc: "77"},
 			},
 		},
 		{
@@ -65,7 +65,7 @@ func TestSyncPlmnConfig_Success(t *testing.T) {
 				makeNetworkSliceWithPlmn("123", "23"),
 			},
 			expectedPlmn: []nfConfigApi.PlmnId{
-				nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
+				{Mcc: "123", Mnc: "23"},
 			},
 		},
 		{
@@ -77,9 +77,9 @@ func TestSyncPlmnConfig_Success(t *testing.T) {
 				makeNetworkSliceWithPlmn("123", "23"),
 			},
 			expectedPlmn: []nfConfigApi.PlmnId{
-				nfConfigApi.PlmnId{Mcc: "123", Mnc: "23"},
-				nfConfigApi.PlmnId{Mcc: "123", Mnc: "233"},
-				nfConfigApi.PlmnId{Mcc: "999", Mnc: "455"},
+				{Mcc: "123", Mnc: "23"},
+				{Mcc: "123", Mnc: "233"},
+				{Mcc: "999", Mnc: "455"},
 			},
 		},
 		{

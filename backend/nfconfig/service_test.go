@@ -62,7 +62,7 @@ func makeNetworkSlice(mcc, mnc, sst string, sd string, tacs []int32) configmodel
 		Sd:  sd,
 	}
 	networkSlice := configmodels.Slice{
-		SliceName: "slice1",
+		SliceName: "slice" + sst + sd,
 		SliceId:   sliceId,
 		SiteInfo:  siteInfo,
 	}
@@ -523,8 +523,21 @@ func TestSyncInMemoryConfig_UpdateAllConfigs(t *testing.T) {
 					Tacs:   []string{"1"},
 				},
 			},
-			expectedSessionManagement: []nfConfigApi.SessionManagement{},
-			expectedPolicyControl:     []nfConfigApi.PolicyControl{},
+			expectedSessionManagement: []nfConfigApi.SessionManagement{
+				{
+					SliceName: "slice101234",
+					PlmnId:    *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai:    makeSnssaiWithSd(1, "01234"),
+					GnbNames:  []string{"test-gnb-2"},
+				},
+				{
+					SliceName: "slice2abcd",
+					PlmnId:    *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai:    makeSnssaiWithSd(2, "abcd"),
+					GnbNames:  []string{"test-gnb-1"},
+				},
+			},
+			expectedPolicyControl: []nfConfigApi.PolicyControl{},
 		},
 		{
 			name:                      "Empty slices",
@@ -553,19 +566,19 @@ func TestSyncInMemoryConfig_UpdateAllConfigs(t *testing.T) {
 				t.Errorf("expected no error. Got %s", err)
 			}
 			if !reflect.DeepEqual(tc.expectedPlmn, n.inMemoryConfig.plmn) {
-				t.Errorf("Expected PLMN %v, got %v", tc.expectedPlmn, n.inMemoryConfig.plmn)
+				t.Errorf("Expected PLMN %+v, got %+v", tc.expectedPlmn, n.inMemoryConfig.plmn)
 			}
 			if !reflect.DeepEqual(tc.expectedPlmnSnssai, n.inMemoryConfig.plmnSnssai) {
-				t.Errorf("Expected PLMN-SNSSAI %v, got %v", tc.expectedPlmnSnssai, n.inMemoryConfig.plmnSnssai)
+				t.Errorf("Expected PLMN-SNSSAI %+v, got %+v", tc.expectedPlmnSnssai, n.inMemoryConfig.plmnSnssai)
 			}
 			if !reflect.DeepEqual(tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility) {
-				t.Errorf("Expected Access and Mobility %v, got %v", tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility)
+				t.Errorf("Expected Access and Mobility %+v, got %+v", tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility)
 			}
 			if !reflect.DeepEqual(tc.expectedSessionManagement, n.inMemoryConfig.sessionManagement) {
-				t.Errorf("Expected Session Management %v, got %v", tc.expectedSessionManagement, n.inMemoryConfig.sessionManagement)
+				t.Errorf("Expected Session Management %+v, got %+v", tc.expectedSessionManagement, n.inMemoryConfig.sessionManagement)
 			}
 			if !reflect.DeepEqual(tc.expectedPolicyControl, n.inMemoryConfig.policyControl) {
-				t.Errorf("Expected Policy Control %v, got %v", tc.expectedPolicyControl, n.inMemoryConfig.policyControl)
+				t.Errorf("Expected Policy Control %+v, got %+v", tc.expectedPolicyControl, n.inMemoryConfig.policyControl)
 			}
 		})
 	}
@@ -644,6 +657,7 @@ func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 					plmn:              tc.expectedPlmn,
 					plmnSnssai:        tc.expectedPlmnSnssai,
 					accessAndMobility: tc.expectedAccessAndMobility,
+					policyControl:     tc.expectedPolicyControl,
 				},
 			}
 
@@ -660,6 +674,9 @@ func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 			}
 			if !reflect.DeepEqual(tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility) {
 				t.Errorf("Expected Access and Mobility %v, got %v", tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility)
+			}
+			if !reflect.DeepEqual(tc.expectedPolicyControl, n.inMemoryConfig.policyControl) {
+				t.Errorf("Expected Policy Control %+v, got %+v", tc.expectedPolicyControl, n.inMemoryConfig.policyControl)
 			}
 		})
 	}

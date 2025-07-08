@@ -13,7 +13,7 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 )
 
-func makeAccesAndMobilityNetworkSlice(mcc, mnc, sst string, sd string, tacs []int32) configmodels.Slice {
+func makeAccessAndMobilityNetworkSlice(mcc, mnc, sst string, sd string, tacs []int32) configmodels.Slice {
 	plmnId := configmodels.SliceSiteInfoPlmn{
 		Mcc: mcc,
 		Mnc: mnc,
@@ -51,8 +51,8 @@ func TestAccessAndMobilityConfig(t *testing.T) {
 		{
 			name: "Two network slices with different PLMNs",
 			networkSlices: []configmodels.Slice{
-				makeAccesAndMobilityNetworkSlice("002", "01", "001", "01", []int32{1, 2}),
-				makeAccesAndMobilityNetworkSlice("001", "01", "001", "02", []int32{3, 2}),
+				makeAccessAndMobilityNetworkSlice("002", "01", "001", "01", []int32{1, 2}),
+				makeAccessAndMobilityNetworkSlice("001", "01", "001", "02", []int32{3, 2}),
 			},
 			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
 				{
@@ -70,8 +70,8 @@ func TestAccessAndMobilityConfig(t *testing.T) {
 		{
 			name: "Two network slices with same PLMN and different SNSSAI (SST and SD populated)",
 			networkSlices: []configmodels.Slice{
-				makeAccesAndMobilityNetworkSlice("001", "01", "001", "02", []int32{}),
-				makeAccesAndMobilityNetworkSlice("001", "01", "001", "01", []int32{}),
+				makeAccessAndMobilityNetworkSlice("001", "01", "001", "02", []int32{}),
+				makeAccessAndMobilityNetworkSlice("001", "01", "001", "01", []int32{}),
 			},
 			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
 				{
@@ -89,8 +89,8 @@ func TestAccessAndMobilityConfig(t *testing.T) {
 		{
 			name: "Two network slices with same PLMN and different SNSSAI (only SST populated)",
 			networkSlices: []configmodels.Slice{
-				makeAccesAndMobilityNetworkSlice("001", "01", "001", "01", []int32{}),
-				makeAccesAndMobilityNetworkSlice("001", "01", "001", "", []int32{}),
+				makeAccessAndMobilityNetworkSlice("001", "01", "001", "01", []int32{}),
+				makeAccessAndMobilityNetworkSlice("001", "01", "001", "", []int32{}),
 			},
 			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
 				{
@@ -108,8 +108,8 @@ func TestAccessAndMobilityConfig(t *testing.T) {
 		{
 			name: "Two network slices with same PLMN and same SNSSAI",
 			networkSlices: []configmodels.Slice{
-				makeAccesAndMobilityNetworkSlice("001", "01", "001", "01", []int32{1, 2}),
-				makeAccesAndMobilityNetworkSlice("001", "01", "001", "01", []int32{2, 3}),
+				makeAccessAndMobilityNetworkSlice("001", "01", "001", "01", []int32{1, 2}),
+				makeAccessAndMobilityNetworkSlice("001", "01", "001", "01", []int32{2, 3}),
 			},
 			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
 				{
@@ -122,10 +122,10 @@ func TestAccessAndMobilityConfig(t *testing.T) {
 		{
 			name: "Several slices different PLMN are ordered",
 			networkSlices: []configmodels.Slice{
-				makeAccesAndMobilityNetworkSlice("999", "455", "2", "abcd", []int32{2, 1}),
-				makeAccesAndMobilityNetworkSlice("123", "23", "3", "3333", []int32{4, 5, 1}),
-				makeAccesAndMobilityNetworkSlice("999", "455", "2", "", []int32{1}),
-				makeAccesAndMobilityNetworkSlice("123", "23", "3", "123", []int32{1}),
+				makeAccessAndMobilityNetworkSlice("999", "455", "2", "abcd", []int32{2, 1}),
+				makeAccessAndMobilityNetworkSlice("123", "23", "3", "3333", []int32{4, 5, 1}),
+				makeAccessAndMobilityNetworkSlice("999", "455", "2", "", []int32{1}),
+				makeAccessAndMobilityNetworkSlice("123", "23", "3", "123", []int32{1}),
 			},
 			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
 				{
@@ -176,8 +176,8 @@ func TestAccessAndMobilityConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T
 		{
 			name: "Invalid SST is ignored",
 			networkSlices: []configmodels.Slice{
-				makeAccesAndMobilityNetworkSlice("123", "23", "1", "01234", []int32{1}),
-				makeAccesAndMobilityNetworkSlice("123", "455", "a", "56789", []int32{1}),
+				makeAccessAndMobilityNetworkSlice("123", "23", "1", "01234", []int32{1}),
+				makeAccessAndMobilityNetworkSlice("123", "455", "a", "56789", []int32{1}),
 			},
 			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
 				{
@@ -190,8 +190,8 @@ func TestAccessAndMobilityConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T
 		{
 			name: "Empty SST is ignored",
 			networkSlices: []configmodels.Slice{
-				makeAccesAndMobilityNetworkSlice("123", "23", "1", "01234", []int32{1}),
-				makeAccesAndMobilityNetworkSlice("123", "455", "", "56789", []int32{1}),
+				makeAccessAndMobilityNetworkSlice("123", "23", "1", "01234", []int32{1}),
+				makeAccessAndMobilityNetworkSlice("123", "455", "", "56789", []int32{1}),
 			},
 			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{
 				{
@@ -204,7 +204,7 @@ func TestAccessAndMobilityConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T
 		{
 			name: "Invalid SST final list is empty",
 			networkSlices: []configmodels.Slice{
-				makeAccesAndMobilityNetworkSlice("123", "455", "a", "56789", []int32{1}),
+				makeAccessAndMobilityNetworkSlice("123", "455", "a", "56789", []int32{1}),
 			},
 			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{},
 		},

@@ -628,7 +628,6 @@ func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 					SliceName: "name",
 					PlmnId:    nfConfigApi.PlmnId{Mcc: "67", Mnc: "23"},
 					Snssai:    makeSnssaiWithSd(1, "01234"),
-					IpDomain:  []nfConfigApi.IpDomain{},
 					Upf:       nil,
 					GnbNames:  []string{"gnb1", "gnb3"},
 				},
@@ -657,6 +656,7 @@ func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 					plmn:              tc.expectedPlmn,
 					plmnSnssai:        tc.expectedPlmnSnssai,
 					accessAndMobility: tc.expectedAccessAndMobility,
+					sessionManagement: tc.expectedSessionManagement,
 					policyControl:     tc.expectedPolicyControl,
 				},
 			}
@@ -674,6 +674,9 @@ func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 			}
 			if !reflect.DeepEqual(tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility) {
 				t.Errorf("Expected Access and Mobility %v, got %v", tc.expectedAccessAndMobility, n.inMemoryConfig.accessAndMobility)
+			}
+			if !reflect.DeepEqual(tc.expectedSessionManagement, n.inMemoryConfig.sessionManagement) {
+				t.Errorf("Expected Session Management %+v, got %+v", tc.expectedSessionManagement, n.inMemoryConfig.sessionManagement)
 			}
 			if !reflect.DeepEqual(tc.expectedPolicyControl, n.inMemoryConfig.policyControl) {
 				t.Errorf("Expected Policy Control %+v, got %+v", tc.expectedPolicyControl, n.inMemoryConfig.policyControl)

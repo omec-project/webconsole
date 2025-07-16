@@ -89,28 +89,27 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, msgOp int, groupName string) (int, error) {
 	logger.ConfigLog.Infof("received device group: %s", groupName)
 
-	ipdomain := &requestDeviceGroup.IpDomainExpanded
+	ipdomains := &requestDeviceGroup.IpDomainExpanded
 	logger.ConfigLog.Infof("imsis.size: %v, Imsis: %s", len(requestDeviceGroup.Imsis), requestDeviceGroup.Imsis)
-	logger.ConfigLog.Infof("IP Domain Name: %s", requestDeviceGroup.IpDomainName)
-	logger.ConfigLog.Infof("IP Domain details: %+v", ipdomain)
-	logger.ConfigLog.Infof("dnn name: %s", ipdomain.Dnn)
-	logger.ConfigLog.Infof("ue pool: %s", ipdomain.UeIpPool)
-	logger.ConfigLog.Infof("dns Primary: %s", ipdomain.DnsPrimary)
-	logger.ConfigLog.Infof("dns Secondary: %s", ipdomain.DnsSecondary)
-	logger.ConfigLog.Infof("ip mtu: %v", ipdomain.Mtu)
-	logger.ConfigLog.Infof("device Group Name: %s", groupName)
-
-	if ipdomain.UeDnnQos != nil {
-		ipdomain.UeDnnQos.DnnMbrDownlink = convertToBps(ipdomain.UeDnnQos.DnnMbrDownlink, ipdomain.UeDnnQos.BitrateUnit)
-		if ipdomain.UeDnnQos.DnnMbrDownlink < 0 {
-			ipdomain.UeDnnQos.DnnMbrDownlink = math.MaxInt64
+	for i, ipdomain := range *ipdomains {
+		logger.ConfigLog.Infof("IP Domain details [%d]: %+v", i, ipdomain)
+		logger.ConfigLog.Infof("DNN Name : %v", ipdomain.Dnn)
+		logger.ConfigLog.Infof("UE Pool  : %v", ipdomain.UeIpPool)
+		logger.ConfigLog.Infof("DNS Primary : %v", ipdomain.DnsPrimary)
+		logger.ConfigLog.Infof("DNS Secondary : %v", ipdomain.DnsSecondary)
+		logger.ConfigLog.Infof("IP MTU : %v", ipdomain.Mtu)
+		if ipdomain.UeDnnQos != nil {
+			ipdomain.UeDnnQos.DnnMbrDownlink = convertToBps(ipdomain.UeDnnQos.DnnMbrDownlink, ipdomain.UeDnnQos.BitrateUnit)
+			if ipdomain.UeDnnQos.DnnMbrDownlink < 0 {
+				ipdomain.UeDnnQos.DnnMbrDownlink = math.MaxInt64
+			}
+			logger.ConfigLog.Infof("MBR DownLink : %v", ipdomain.UeDnnQos.DnnMbrDownlink)
+			ipdomain.UeDnnQos.DnnMbrUplink = convertToBps(ipdomain.UeDnnQos.DnnMbrUplink, ipdomain.UeDnnQos.BitrateUnit)
+			if ipdomain.UeDnnQos.DnnMbrUplink < 0 {
+				ipdomain.UeDnnQos.DnnMbrUplink = math.MaxInt64
+			}
+			logger.ConfigLog.Infof("MBR UpLink : %v", ipdomain.UeDnnQos.DnnMbrUplink)
 		}
-		logger.ConfigLog.Infof("MbrDownLink: %v", ipdomain.UeDnnQos.DnnMbrDownlink)
-		ipdomain.UeDnnQos.DnnMbrUplink = convertToBps(ipdomain.UeDnnQos.DnnMbrUplink, ipdomain.UeDnnQos.BitrateUnit)
-		if ipdomain.UeDnnQos.DnnMbrUplink < 0 {
-			ipdomain.UeDnnQos.DnnMbrUplink = math.MaxInt64
-		}
-		logger.ConfigLog.Infof("MbrUpLink: %v", ipdomain.UeDnnQos.DnnMbrUplink)
 	}
 
 	prevDevGroup := getDeviceGroupByName(groupName)
@@ -214,18 +213,25 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 		Sst: int32(sVal),
 	}
 	var errorOccured bool
+	dnnMap := make(map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos)
 	for _, imsi := range devGroup.Imsis {
 		/* update all current IMSIs */
 		subscriberAuthData := DatabaseSubscriberAuthenticationData{}
 		if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-"+imsi) != nil {
-			dnn := devGroup.IpDomainExpanded.Dnn
+			for _, ipDomain := range devGroup.IpDomainExpanded {
+				dnn := ipDomain.Dnn
+
+				// Ensure UeDnnQos is not nil before appending
+				if ipDomain.UeDnnQos != nil {
+					dnnMap[dnn] = append(dnnMap[dnn], *ipDomain.UeDnnQos) // Directly append the UeDnnQos
+				}
+			}
 			err = updatePolicyAndProvisionedData(
 				imsi,
 				slice.SiteInfo.Plmn.Mcc,
 				slice.SiteInfo.Plmn.Mnc,
 				snssai,
-				dnn,
-				devGroup.IpDomainExpanded.UeDnnQos,
+				dnnMap,
 			)
 			if err != nil {
 				logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %+v", imsi, err)

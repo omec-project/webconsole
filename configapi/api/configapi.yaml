@@ -124,7 +124,7 @@ components:
         ip-domain-name:
           example: pool1
           type: string
-        ip-domain-expanded:
+        ip-domains:
           $ref: '#/components/schemas/device_groups_ip_domain_expanded'
       type: object
     slice:

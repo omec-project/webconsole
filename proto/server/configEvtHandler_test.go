@@ -48,7 +48,7 @@ func deviceGroup(name string) configmodels.DeviceGroups {
 		Imsis:            []string{"1234", "5678"},
 		SiteInfo:         "demo",
 		IpDomainName:     "pool1",
-		IpDomainExpanded: ipdomain,
+		IpDomainExpanded: []configmodels.DeviceGroupsIpDomainExpanded{ipdomain},
 	}
 	return deviceGroup
 }

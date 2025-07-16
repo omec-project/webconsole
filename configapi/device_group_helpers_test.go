@@ -63,8 +63,12 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		deviceGroup("group_no_imsis"), deviceGroup("group_no_traf_class"), deviceGroup("group_no_qos"),
 	}
 	deviceGroups[2].Imsis = []string{}
-	deviceGroups[3].IpDomainExpanded.UeDnnQos.TrafficClass = nil
-	deviceGroups[4].IpDomainExpanded.UeDnnQos = nil
+	if len(deviceGroups[3].IpDomainExpanded) > 0 {
+		deviceGroups[3].IpDomainExpanded[0].UeDnnQos.TrafficClass = nil
+	}
+	if len(deviceGroups[4].IpDomainExpanded) > 0 {
+		deviceGroups[4].IpDomainExpanded[0].UeDnnQos = nil
+	}
 	factory.WebUIConfig.Configuration.Mode5G = true
 
 	for _, testGroup := range deviceGroups {
@@ -157,9 +161,12 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		deviceGroup("group_no_qos"),
 	}
 	deviceGroups[2].Imsis = []string{}
-	deviceGroups[3].IpDomainExpanded.UeDnnQos.TrafficClass = nil
-	deviceGroups[4].IpDomainExpanded.UeDnnQos = nil
-
+	if len(deviceGroups[3].IpDomainExpanded) > 0 {
+		deviceGroups[3].IpDomainExpanded[0].UeDnnQos.TrafficClass = nil
+	}
+	if len(deviceGroups[4].IpDomainExpanded) > 0 {
+		deviceGroups[4].IpDomainExpanded[0].UeDnnQos = nil
+	}
 	factory.WebUIConfig.Configuration.Mode5G = true
 
 	for _, testGroup := range deviceGroups {
@@ -248,25 +255,27 @@ const DEVICE_GROUP_CONFIG = `{
   "imsis": [
     "string"
   ],
-  "ip-domain-expanded": {
-    "dnn": "string",
-    "dns-primary": "string",
-    "dns-secondary": "string",
-    "mtu": 0,
-    "ue-dnn-qos": {
-      "bitrate-unit": "string",
-      "dnn-mbr-downlink": 0,
-      "dnn-mbr-uplink": 0,
-      "traffic-class": {
-        "arp": 0,
-        "name": "string",
-        "pdb": 0,
-        "pelr": 0,
-        "qci": 0
-      }
-    },
-    "ue-ip-pool": "string"
-  },
+  "ip-domains": [
+	  {
+		"dnn": "string",
+		"dns-primary": "string",
+		"dns-secondary": "string",
+		"mtu": 0,
+		"ue-dnn-qos": {
+		  "bitrate-unit": "string",
+		  "dnn-mbr-downlink": 0,
+		  "dnn-mbr-uplink": 0,
+		  "traffic-class": {
+			"arp": 0,
+			"name": "string",
+			"pdb": 0,
+			"pelr": 0,
+			"qci": 0
+		  }
+		},
+		"ue-ip-pool": "string"
+	  }
+	],
   "ip-domain-name": "string",
   "site-info": "string"
 }`

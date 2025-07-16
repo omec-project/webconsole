@@ -163,33 +163,56 @@ func (m *MockMongoClientFoundNetworkSlice) RestfulAPIGetOne(coll string, filter 
 }
 
 func deviceGroup(name string) configmodels.DeviceGroups {
-	traffic_class := configmodels.TrafficClassInfo{
+	traffic_class1 := configmodels.TrafficClassInfo{
 		Name: "platinum",
 		Qci:  8,
 		Arp:  6,
 		Pdb:  300,
 		Pelr: 6,
 	}
-	qos := configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+	qos1 := configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
 		DnnMbrUplink:   10000000,
 		DnnMbrDownlink: 10000000,
 		BitrateUnit:    "kbps",
-		TrafficClass:   &traffic_class,
+		TrafficClass:   &traffic_class1,
 	}
-	ipdomain := configmodels.DeviceGroupsIpDomainExpanded{
+	ipdomain1 := configmodels.DeviceGroupsIpDomainExpanded{
 		Dnn:          "internet",
 		UeIpPool:     "172.250.1.0/16",
 		DnsPrimary:   "1.1.1.1",
 		DnsSecondary: "8.8.8.8",
 		Mtu:          1460,
-		UeDnnQos:     &qos,
+		UeDnnQos:     &qos1,
+	}
+
+	// Define the second traffic class and QoS
+	traffic_class2 := configmodels.TrafficClassInfo{
+		Name: "gold",
+		Qci:  7,
+		Arp:  5,
+		Pdb:  150,
+		Pelr: 5,
+	}
+	qos2 := configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+		DnnMbrUplink:   5000000,
+		DnnMbrDownlink: 5000000,
+		BitrateUnit:    "kbps",
+		TrafficClass:   &traffic_class2,
+	}
+	ipdomain2 := configmodels.DeviceGroupsIpDomainExpanded{
+		Dnn:          "ims",
+		UeIpPool:     "172.248.0.0/16",
+		DnsPrimary:   "4.4.4.4",
+		DnsSecondary: "8.8.4.4",
+		Mtu:          1400,
+		UeDnnQos:     &qos2,
 	}
 	deviceGroup := configmodels.DeviceGroups{
 		DeviceGroupName:  name,
 		Imsis:            []string{"1234", "5678"},
 		SiteInfo:         "demo",
 		IpDomainName:     "pool1",
-		IpDomainExpanded: ipdomain,
+		IpDomainExpanded: []configmodels.DeviceGroupsIpDomainExpanded{ipdomain1, ipdomain2},
 	}
 	return deviceGroup
 }
@@ -297,7 +320,7 @@ func TestGetDeviceGroupByNameDoesExists(t *testing.T) {
 		t.Fatalf("failed to read response body: %v", err)
 	}
 	body := string(body_bytes)
-	expected := `{"group-name":"group1","imsis":["1234","5678"],"site-info":"demo","ip-domain-name":"pool1","ip-domain-expanded":{"dnn":"internet","ue-ip-pool":"172.250.1.0/16","dns-primary":"1.1.1.1","dns-secondary":"8.8.8.8","mtu":1460,"ue-dnn-qos":{"dnn-mbr-uplink":10000000,"dnn-mbr-downlink":10000000,"bitrate-unit":"kbps","traffic-class":{"name":"platinum","qci":8,"arp":6,"pdb":300,"pelr":6}}}}`
+	expected := "{\"group-name\":\"group1\",\"imsis\":[\"1234\",\"5678\"],\"site-info\":\"demo\",\"ip-domain-name\":\"pool1\",\"ip-domains\":[{\"dnn\":\"internet\",\"ue-ip-pool\":\"172.250.1.0/16\",\"dns-primary\":\"1.1.1.1\",\"dns-secondary\":\"8.8.8.8\",\"mtu\":1460,\"ue-dnn-qos\":{\"dnn-mbr-uplink\":10000000,\"dnn-mbr-downlink\":10000000,\"bitrate-unit\":\"kbps\",\"traffic-class\":{\"name\":\"platinum\",\"qci\":8,\"arp\":6,\"pdb\":300,\"pelr\":6}}},{\"dnn\":\"ims\",\"ue-ip-pool\":\"172.248.0.0/16\",\"dns-primary\":\"4.4.4.4\",\"dns-secondary\":\"8.8.4.4\",\"mtu\":1400,\"ue-dnn-qos\":{\"dnn-mbr-uplink\":5000000,\"dnn-mbr-downlink\":5000000,\"bitrate-unit\":\"kbps\",\"traffic-class\":{\"name\":\"gold\",\"qci\":7,\"arp\":5,\"pdb\":150,\"pelr\":5}}}]}"
 	if body != expected {
 		t.Errorf("Expected %v, got %v", expected, body)
 	}

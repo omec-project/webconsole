@@ -78,11 +78,13 @@ type deviceGroupParams struct {
 
 func makeDeviceGroup(p deviceGroupParams) (string, configmodels.DeviceGroups) {
 	return p.name, configmodels.DeviceGroups{
-		IpDomainExpanded: configmodels.DeviceGroupsIpDomainExpanded{
-			Dnn:        p.dnn,
-			DnsPrimary: p.dnsPrimary,
-			UeIpPool:   p.ueIpPool,
-			Mtu:        p.mtu,
+		IpDomainExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
+			{
+				Dnn:        p.dnn,
+				DnsPrimary: p.dnsPrimary,
+				UeIpPool:   p.ueIpPool,
+				Mtu:        p.mtu,
+			},
 		},
 	}
 }

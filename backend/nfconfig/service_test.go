@@ -69,12 +69,6 @@ func makeNetworkSlice(mcc, mnc, sst string, sd string, tacs []int32) configmodel
 	return networkSlice
 }
 
-func makeSnssaiWithSd(sst int32, sd string) nfConfigApi.Snssai {
-	s := nfConfigApi.NewSnssai(sst)
-	s.SetSd(sd)
-	return *s
-}
-
 func TestNewNFConfig_nil_config(t *testing.T) {
 	_, err := NewNFConfigServer(nil)
 	if err == nil {
@@ -537,7 +531,18 @@ func TestSyncInMemoryConfig_UpdateAllConfigs(t *testing.T) {
 					GnbNames:  []string{"test-gnb-1"},
 				},
 			},
-			expectedPolicyControl: []nfConfigApi.PolicyControl{},
+			expectedPolicyControl: []nfConfigApi.PolicyControl{
+				{
+					PlmnId:   *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai:   makeSnssaiWithSd(2, "abcd"),
+					PccRules: []nfConfigApi.PccRule{*defaultPccRule},
+				},
+				{
+					PlmnId:   *nfConfigApi.NewPlmnId("123", "23"),
+					Snssai:   makeSnssaiWithSd(1, "01234"),
+					PccRules: []nfConfigApi.PccRule{*defaultPccRule},
+				},
+			},
 		},
 		{
 			name:                      "Empty slices",
@@ -636,7 +641,6 @@ func TestSyncInMemoryConfig_DBError_KeepsPreviousConfig(t *testing.T) {
 				{
 					PlmnId:   nfConfigApi.PlmnId{Mcc: "123", Mnc: "87"},
 					Snssai:   makeSnssaiWithSd(1, "01234"),
-					DnnQos:   []nfConfigApi.DnnQos{},
 					PccRules: []nfConfigApi.PccRule{},
 				},
 			},

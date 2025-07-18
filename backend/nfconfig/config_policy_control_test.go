@@ -130,7 +130,7 @@ func TestSyncPolicyControl(t *testing.T) {
 		{
 			name: "Network Slice with invalid SNSSAI is ignored",
 			networkSlices: []configmodels.Slice{
-				makePolicyControlNetworkSlice("001", "01", "a", testSd, []configmodels.SliceApplicationFilteringRules{}),
+				makePolicyControlNetworkSlice("999", "99", "a", testSd, []configmodels.SliceApplicationFilteringRules{}),
 			},
 			expectedResponse: []nfConfigApi.PolicyControl{},
 		},

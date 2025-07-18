@@ -195,7 +195,8 @@ func (n *NFConfigServer) syncInMemoryConfig() error {
 	n.inMemoryConfig.syncPlmnSnssai(slices)
 	n.inMemoryConfig.syncAccessAndMobility(slices)
 	n.inMemoryConfig.syncSessionManagement(slices, deviceGroups)
-	n.inMemoryConfig.syncPolicyControl()
+	n.inMemoryConfig.syncPolicyControl(slices)
+	n.inMemoryConfig.syncImsiQos(deviceGroups)
 	logger.NfConfigLog.Infoln("Updated NF in-memory configuration")
 	return nil
 }

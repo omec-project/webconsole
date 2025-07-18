@@ -68,25 +68,6 @@ func prepareMultipleSlices(params []networkSliceParams) []configmodels.Slice {
 	return slices
 }
 
-type deviceGroupParams struct {
-	name       string
-	dnn        string
-	dnsPrimary string
-	ueIpPool   string
-	mtu        int32
-}
-
-func makeDeviceGroup(p deviceGroupParams) (string, configmodels.DeviceGroups) {
-	return p.name, configmodels.DeviceGroups{
-		IpDomainExpanded: configmodels.DeviceGroupsIpDomainExpanded{
-			Dnn:        p.dnn,
-			DnsPrimary: p.dnsPrimary,
-			UeIpPool:   p.ueIpPool,
-			Mtu:        p.mtu,
-		},
-	}
-}
-
 func ptr[T any](v T) *T {
 	return &v
 }

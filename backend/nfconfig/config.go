@@ -12,11 +12,16 @@ import (
 	"strconv"
 	"strings"
 
-	protos "github.com/omec-project/config5g/proto/sdcoreConfig"
 	"github.com/omec-project/openapi/nfConfigApi"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
+	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
+)
+
+const (
+	tcp int32 = 6
+	udp int32 = 17
 )
 
 type accessAndMobilityKey struct {
@@ -410,32 +415,31 @@ func buildFlowDescription(ruleConfig configmodels.SliceApplicationFilteringRules
 		endp = "any"
 	}
 
-	if ruleConfig.Protocol == int32(protos.PccFlowTos_TCP.Number()) {
-		if ruleConfig.StartPort == 0 && ruleConfig.EndPort == 0 {
-			return fmt.Sprintf("permit out tcp from %s to assigned", endp)
-		} else if factory.WebUIConfig.Configuration.SdfComp {
-			return fmt.Sprintf("permit out tcp from %s %s-%s to assigned", endp, strconv.FormatInt(int64(ruleConfig.StartPort), 10), strconv.FormatInt(int64(ruleConfig.EndPort), 10))
-		} else {
-			return fmt.Sprintf("permit out tcp from %s to assigned %s-%s", endp, strconv.FormatInt(int64(ruleConfig.StartPort), 10), strconv.FormatInt(int64(ruleConfig.EndPort), 10))
-		}
-	} else if ruleConfig.Protocol == int32(protos.PccFlowTos_UDP.Number()) {
-		if ruleConfig.StartPort == 0 && ruleConfig.EndPort == 0 {
-			return fmt.Sprintf("permit out udp from %s to assigned", endp)
-		} else if factory.WebUIConfig.Configuration.SdfComp {
-			return fmt.Sprintf("permit out udp from %s %s-%s to assigned", endp, strconv.FormatInt(int64(ruleConfig.StartPort), 10), strconv.FormatInt(int64(ruleConfig.EndPort), 10))
-		} else {
-			return fmt.Sprintf("permit out udp from %s to assigned %s-%s", endp, strconv.FormatInt(int64(ruleConfig.StartPort), 10), strconv.FormatInt(int64(ruleConfig.EndPort), 10))
-		}
-	} else {
+	switch ruleConfig.Protocol {
+	case tcp:
+		return buildDescription("tcp", endp, ruleConfig.StartPort, ruleConfig.EndPort)
+	case udp:
+		return buildDescription("udp", endp, ruleConfig.StartPort, ruleConfig.EndPort)
+	default:
 		return fmt.Sprintf("permit out ip from %s to assigned", endp)
+	}
+}
+
+func buildDescription(protocol, endpoint string, startPort, endPort int32) string {
+	if startPort == 0 && endPort == 0 {
+		return fmt.Sprintf("permit out %s from %s to assigned", protocol, endpoint)
+	} else if factory.WebUIConfig.Configuration.SdfComp {
+		return fmt.Sprintf("permit out %s from %s %s-%s to assigned", protocol, endpoint, strconv.FormatInt(int64(startPort), 10), strconv.FormatInt(int64(endPort), 10))
+	} else {
+		return fmt.Sprintf("permit out %s from %s to assigned %s-%s", protocol, endpoint, strconv.FormatInt(int64(startPort), 10), strconv.FormatInt(int64(endPort), 10))
 	}
 }
 
 func buildPccQos(ruleConfig configmodels.SliceApplicationFilteringRules) nfConfigApi.PccQos {
 	pccQos := nfConfigApi.NewPccQos(
 		ruleConfig.TrafficClass.Qci,
-		bitrateAsString(ruleConfig.AppMbrUplink),
-		bitrateAsString(ruleConfig.AppMbrDownlink),
+		configapi.ConvertToString(uint64(ruleConfig.AppMbrUplink)),
+		configapi.ConvertToString(uint64(ruleConfig.AppMbrDownlink)),
 		*nfConfigApi.NewArp(
 			ruleConfig.TrafficClass.Arp,
 			nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
@@ -467,32 +471,9 @@ func (c *inMemoryConfig) syncImsiQos(deviceGroupMap map[string]configmodels.Devi
 
 func extractQosConfigFromDeviceGroup(group configmodels.DeviceGroups) nfConfigApi.ImsiQos {
 	return *nfConfigApi.NewImsiQos(
-		bitrateAsString(group.IpDomainExpanded.UeDnnQos.DnnMbrUplink),
-		bitrateAsString(group.IpDomainExpanded.UeDnnQos.DnnMbrDownlink),
+		configapi.ConvertToString(uint64(group.IpDomainExpanded.UeDnnQos.DnnMbrUplink)),
+		configapi.ConvertToString(uint64(group.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)),
 		group.IpDomainExpanded.UeDnnQos.TrafficClass.Qci,
 		group.IpDomainExpanded.UeDnnQos.TrafficClass.Arp,
 	)
-}
-
-type BitrateInt interface {
-	~int32 | ~int64
-}
-
-func bitrateAsString[T BitrateInt](bitrate T) string {
-	const (
-		Kbps = 1000
-		Mbps = 1000 * Kbps
-		Gbps = 1000 * Mbps
-	)
-
-	switch {
-	case bitrate >= Gbps:
-		return fmt.Sprintf("%.2f Gbps", float64(bitrate)/float64(Gbps))
-	case bitrate >= Mbps:
-		return fmt.Sprintf("%.2f Mbps", float64(bitrate)/float64(Mbps))
-	case bitrate >= Kbps:
-		return fmt.Sprintf("%.2f Kbps", float64(bitrate)/float64(Kbps))
-	default:
-		return fmt.Sprintf("%d bps", bitrate)
-	}
 }

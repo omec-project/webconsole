@@ -87,8 +87,8 @@ func TestSyncPolicyControl(t *testing.T) {
 							},
 							Qos: nfConfigApi.PccQos{
 								FiveQi:  testRuleQci,
-								MaxBrUl: "12.35 Kbps",
-								MaxBrDl: "67.89 Kbps",
+								MaxBrUl: "12 Kbps",
+								MaxBrDl: "67 Kbps",
 								Arp: nfConfigApi.Arp{
 									PriorityLevel: testRuleArp,
 									PreemptCap:    nfConfigApi.PREEMPTCAP_MAY_PREEMPT,

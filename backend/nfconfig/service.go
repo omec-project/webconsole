@@ -230,6 +230,10 @@ func (n *NFConfigServer) getRoutes() []Route {
 			Pattern:     "/session-management",
 			HandlerFunc: n.GetSessionManagementConfig,
 		},
+		{
+			Pattern:     "/qos/:dnn/:imsi",
+			HandlerFunc: n.GetImsiQosConfig,
+		},
 	}
 }
 

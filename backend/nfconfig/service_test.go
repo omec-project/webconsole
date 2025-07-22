@@ -266,6 +266,12 @@ func TestNFConfigRoutes(t *testing.T) {
 			wantStatus:   http.StatusOK,
 		},
 		{
+			name:         "imsi qos endpoint status OK",
+			path:         "/nfconfig/qos/internet/imsi-001011234567890",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusOK,
+		},
+		{
 			name:         "access mobility endpoint invalid accept header",
 			path:         "/nfconfig/access-mobility",
 			acceptHeader: "",
@@ -292,6 +298,12 @@ func TestNFConfigRoutes(t *testing.T) {
 		{
 			name:         "session management endpoint invalid accept header",
 			path:         "/nfconfig/session-management",
+			acceptHeader: "application/jsons",
+			wantStatus:   http.StatusBadRequest,
+		},
+		{
+			name:         "imsi qos endpoint invalid accept header",
+			path:         "/nfconfig/qos",
 			acceptHeader: "application/jsons",
 			wantStatus:   http.StatusBadRequest,
 		},

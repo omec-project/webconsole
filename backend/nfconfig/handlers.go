@@ -8,6 +8,7 @@ package nfconfig
 import (
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/openapi/nfConfigApi"
@@ -41,12 +42,13 @@ func (n *NFConfigServer) GetSessionManagementConfig(c *gin.Context) {
 
 func (n *NFConfigServer) GetImsiQosConfig(c *gin.Context) {
 	dnn := c.Param("dnn")
-	imsi := c.Param("imsi")
+	imsi := strings.TrimPrefix(c.Param("imsi"), "imis-")
 	logger.NfConfigLog.Debugf("Handling GET request for QoS config for IMSI %s", imsi)
-	var imsiQos []nfConfigApi.ImsiQos
+	imsiQos := []nfConfigApi.ImsiQos{}
 	for _, imsiQosConfig := range n.inMemoryConfig.imsiQos {
 		if imsiQosConfig.dnn == dnn && slices.Contains(imsiQosConfig.imsis, imsi) {
 			imsiQos = imsiQosConfig.qos
+			break
 		}
 	}
 	c.JSON(http.StatusOK, imsiQos)

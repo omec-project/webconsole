@@ -17,18 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type SubscriberAuthenticationData interface {
-	SubscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription)
-	SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error
-	SubscriberAuthenticationDataUpdate(imsi string, authSubData *models.AuthenticationSubscription) error
-	SubscriberAuthenticationDataDelete(imsi string) error
-}
-
-type DatabaseSubscriberAuthenticationData struct {
-	SubscriberAuthenticationData
-}
-
-func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
+func subscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
 	filter := bson.M{"ueId": imsi}
 	authSubDataInterface, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
 	if err != nil {
@@ -43,7 +32,9 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	return authSubData
 }
 
-func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
+func subscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
+	rwLock.Lock()
+	defer rwLock.Unlock()
 	filter := bson.M{"ueId": imsi}
 	logger.WebUILog.Infof("%+v", authSubData)
 	authDataBsonA := configmodels.ToBsonM(authSubData)
@@ -70,7 +61,9 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	return nil
 }
 
-func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataUpdate(imsi string, authSubData *models.AuthenticationSubscription) error {
+func subscriberAuthenticationDataUpdate(imsi string, authSubData *models.AuthenticationSubscription) error {
+	rwLock.Lock()
+	defer rwLock.Unlock()
 	filter := bson.M{"ueId": imsi}
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
@@ -103,7 +96,9 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 	return nil
 }
 
-func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataDelete(imsi string) error {
+func subscriberAuthenticationDataDelete(imsi string) error {
+	rwLock.Lock()
+	defer rwLock.Unlock()
 	logger.WebUILog.Debugf("delete authentication subscription from authenticationSubscription collection: %s", imsi)
 	filter := bson.M{"ueId": imsi}
 
@@ -205,45 +200,6 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string) error {
 		return err
 	}
 	logger.DbLog.Debugf("succeeded to delete subscriber entries related to device groups for IMSI %s", imsi)
-	return nil
-}
-
-func handleSubscriberDelete(imsi string) error {
-	rwLock.Lock()
-	defer rwLock.Unlock()
-	subscriberAuthData := DatabaseSubscriberAuthenticationData{}
-	err := subscriberAuthData.SubscriberAuthenticationDataDelete(imsi)
-	if err != nil {
-		logger.DbLog.Errorln("SubscriberAuthDataDelete error:", err)
-		return err
-	}
-	logger.DbLog.Debugf("successfully processed subscriber delete for IMSI: %s", imsi)
-	return nil
-}
-
-func handleSubscriberPut(imsi string, authSubData *models.AuthenticationSubscription) error {
-	rwLock.Lock()
-	defer rwLock.Unlock()
-	subscriberAuthData := DatabaseSubscriberAuthenticationData{}
-	err := subscriberAuthData.SubscriberAuthenticationDataUpdate(imsi, authSubData)
-	if err != nil {
-		logger.DbLog.Errorln("Subscriber Authentication Data Update Error:", err)
-		return err
-	}
-	logger.DbLog.Debugf("successfully processed subscriber update for IMSI: %s", imsi)
-	return nil
-}
-
-func handleSubscriberPost(imsi string, authSubData *models.AuthenticationSubscription) error {
-	rwLock.Lock()
-	defer rwLock.Unlock()
-	subscriberAuthData := DatabaseSubscriberAuthenticationData{}
-	err := subscriberAuthData.SubscriberAuthenticationDataCreate(imsi, authSubData)
-	if err != nil {
-		logger.DbLog.Errorln("Subscriber Authentication Data Create Error:", err)
-		return err
-	}
-	logger.DbLog.Debugf("successfully processed subscriber post for IMSI: %s", imsi)
 	return nil
 }
 

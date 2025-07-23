@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"slices"
 	"strings"
 	"testing"
 
@@ -712,10 +711,9 @@ func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
 		t.Fatalf("failed to marshal input data to JSON: %v", err)
 	}
 
-	commonDbAdapter := &MockMongoClientOneSubscriber{PostDataCommon: &postDataCommon}
 	origDBClient := dbadapter.CommonDBClient
 	defer func() { dbadapter.CommonDBClient = origDBClient }()
-	dbadapter.CommonDBClient = commonDbAdapter
+	dbadapter.CommonDBClient = &MockMongoClientOneSubscriber{PostDataCommon: &postDataCommon}
 
 	expectedCode := http.StatusConflict
 	expectedBody := "subscriber imsi-208930100007487 already exists"
@@ -751,43 +749,127 @@ func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
 	}
 }
 
-type MockMongoClientAuthDB struct {
+type MockMongoClientAuthDB struct { /////////////////////////////////////////
 	MockMongoClientEmptyDB
 }
 
-func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-	AddApiService(router)
-	origDBClient := dbadapter.CommonDBClient
-	dbAdapter := &MockMongoClientEmptyDB{}
-	dbadapter.CommonDBClient = dbAdapter
-	origAuthDBClient := dbadapter.AuthDBClient
-	authDbAdapter := &MockMongoClientAuthDB{}
-	dbadapter.AuthDBClient = authDbAdapter
+type DeleteSubscriberMockDBClient struct {
+	dbadapter.DBInterface
+	deviceGroups []configmodels.DeviceGroups
+	err          error
+}
 
-	route := "/api/subscriber/imsi-208930100007487"
-	expectedCode := http.StatusNoContent
-	expectedBody := ""
-
-	defer func() {
-		dbadapter.CommonDBClient = origDBClient
-		dbadapter.AuthDBClient = origAuthDBClient
-	}()
-	req, err := http.NewRequest(http.MethodDelete, route, nil)
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
+func (db *DeleteSubscriberMockDBClient) RestfulAPIPost(coll string, filter bson.M, postData map[string]interface{}) (bool, error) {
+	if db.err != nil {
+		return true, db.err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
+	return true, nil
+}
 
-	router.ServeHTTP(w, req)
-
-	if expectedCode != w.Code {
-		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOne(coll string, filter bson.M) error {
+	if db.err != nil {
+		return db.err
 	}
-	if !strings.Contains(w.Body.String(), expectedBody) {
-		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+	return nil
+}
+
+func (db *DeleteSubscriberMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+	if db.err != nil {
+		return nil, db.err
+	}
+	var results []map[string]any
+	for _, deviceGroup := range db.deviceGroups {
+		dg := configmodels.ToBsonM(deviceGroup)
+		if dg == nil {
+			panic("failed to convert device groups to BsonM")
+		}
+		results = append(results, dg)
+	}
+	return results, db.err
+}
+
+func (db *DeleteSubscriberMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+	if coll == "device_group" {
+		dg := configmodels.ToBsonM(db.deviceGroups[0])
+		if dg == nil {
+			panic("failed to convert device group to BsonM")
+		}
+		return dg, nil
+	}
+	return nil, nil
+}
+
+type AuthDBMockDBClient struct {
+	dbadapter.DBInterface
+}
+
+func (m *AuthDBMockDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
+	subscriber := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{})
+	subscriber["ueId"] = "208930100007487"
+	subscriber["servingPlmnId"] = "12345"
+	return subscriber, nil
+}
+
+func (db *AuthDBMockDBClient) RestfulAPIDeleteOne(coll string, filter bson.M) error {
+	return nil
+}
+
+func TestSubscriberDelete(t *testing.T) {
+	tests := []struct {
+		name            string
+		commonDbAdapter dbadapter.DBInterface
+		expectedCode    int
+	}{
+		{
+			name: "Subscriber belongs to a device group",
+			commonDbAdapter: &DeleteSubscriberMockDBClient{
+				deviceGroups: []configmodels.DeviceGroups{
+					deviceGroupWithImsis("group1", []string{"208930100007487"}),
+				},
+			},
+			expectedCode: http.StatusNoContent,
+		},
+		{
+			name: "Subscriber does not belongs to any device group",
+			commonDbAdapter: &DeleteSubscriberMockDBClient{
+				deviceGroups: []configmodels.DeviceGroups{},
+			},
+			expectedCode: http.StatusNoContent,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			router := gin.Default()
+			AddApiService(router)
+			origDBClient := dbadapter.CommonDBClient
+			origAuthDBClient := dbadapter.AuthDBClient
+			defer func() {
+				dbadapter.CommonDBClient = origDBClient
+				dbadapter.AuthDBClient = origAuthDBClient
+			}()
+			dbadapter.CommonDBClient = tc.commonDbAdapter
+			dbadapter.AuthDBClient = &AuthDBMockDBClient{}
+			route := "/api/subscriber/imsi-208930100007487"
+			expectedCode := tc.expectedCode
+			expectedBody := ""
+
+			req, err := http.NewRequest(http.MethodDelete, route, nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			if expectedCode != w.Code {
+				t.Errorf("Expected status code `%v`, got `%v`", expectedCode, w.Code)
+			}
+			if expectedBody != w.Body.String() {
+				t.Errorf("Expected body `%v`, got `%v`", expectedBody, w.Body.String())
+			}
+		})
 	}
 }
 
@@ -796,13 +878,14 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	router := gin.Default()
 	AddApiService(router)
 	origDBClient := dbadapter.CommonDBClient
-	dbAdapter := &MockMongoClientDBError{}
-	dbadapter.CommonDBClient = dbAdapter
+	defer func() { dbadapter.CommonDBClient = origDBClient }()
+	dbadapter.CommonDBClient = &DeleteSubscriberMockDBClient{
+		err: fmt.Errorf("mock error"),
+	}
 	route := "/api/subscriber/imsi-208930100007487"
 	expectedCode := http.StatusInternalServerError
 	expectedBody := "error deleting subscriber. Please check the log for details"
 
-	defer func() { dbadapter.CommonDBClient = origDBClient }()
 	req, err := http.NewRequest(http.MethodDelete, route, nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -817,41 +900,6 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), expectedBody) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-	}
-}
-
-func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-	AddApiService(router)
-	origDBClient := dbadapter.CommonDBClient
-	dbAdapter := &MockMongoClientDeviceGroupsWithSubscriber{}
-	dbadapter.CommonDBClient = dbAdapter
-	origAuthDBClient := dbadapter.AuthDBClient
-	authDbAdapter := &MockMongoClientAuthDB{}
-	dbadapter.AuthDBClient = authDbAdapter
-	route := "/api/subscriber/imsi-208930100007487"
-	expectedCode := http.StatusNoContent
-	expectedBody := ""
-
-	defer func() {
-		dbadapter.CommonDBClient = origDBClient
-		dbadapter.AuthDBClient = origAuthDBClient
-	}()
-	req, err := http.NewRequest(http.MethodDelete, route, nil)
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	if expectedCode != w.Code {
-		t.Errorf("Expected status code `%v`, got `%v`", expectedCode, w.Code)
-	}
-	if expectedBody != w.Body.String() {
-		t.Errorf("Expected body `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 }
 
@@ -885,10 +933,4 @@ func deviceGroupWithImsis(name string, imsis []string) configmodels.DeviceGroups
 		IpDomainExpanded: ipDomain,
 	}
 	return deviceGroup
-}
-
-func deviceGroupWithoutImsi() *configmodels.DeviceGroups {
-	tmp := deviceGroupWithImsis("group1", []string{"208930100007487", "208930100007488"})
-	tmp.Imsis = slices.Delete(tmp.Imsis, 0, 1)
-	return &tmp
 }

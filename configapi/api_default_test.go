@@ -21,9 +21,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-// error case
-// delete api
-
 type DeviceGroupMockDBClient struct {
 	dbadapter.DBInterface
 	deviceGroups []configmodels.DeviceGroups

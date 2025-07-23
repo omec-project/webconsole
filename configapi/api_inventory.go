@@ -545,7 +545,6 @@ func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels
 			logger.ConfigLog.Errorf("Error updating slice %s: %+v", networkSlice.SliceName, err)
 			return statusCode, err
 		}
-
 	}
 	return http.StatusOK, nil
 }

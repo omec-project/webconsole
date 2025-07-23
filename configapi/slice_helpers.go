@@ -212,8 +212,7 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 		}
 
 		for _, imsi := range devGroupConfig.Imsis {
-			subscriberAuthData := DatabaseSubscriberAuthenticationData{}
-			if subscriberAuthData.SubscriberAuthenticationDataGet("imsi-"+imsi) != nil {
+			if subscriberAuthenticationDataGet("imsi-"+imsi) != nil {
 				err := updatePolicyAndProvisionedData(
 					imsi,
 					slice.SiteInfo.Plmn.Mcc,

@@ -179,13 +179,6 @@ func TestInventoryGetGnbHandler(t *testing.T) {
 			expectedCode:   http.StatusOK,
 			expectedBody:   []configmodels.Gnb{gnb("gnb0", 12), gnb("gnb1", 345), gnb("gnb2", 678)},
 		},
-		/*{
-			name:         "GnbDBError",
-			route:        "/config/v1/inventory/gnb",
-			dbAdapter:    &MockMongoClientDBError{},
-			expectedCode: http.StatusInternalServerError,
-			expectedBody: `{"error":"failed to retrieve gNBs"}`,
-		},*/
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

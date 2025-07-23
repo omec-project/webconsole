@@ -68,7 +68,6 @@ func TestSubscriberAuthenticationDataCreate_Success(t *testing.T) {
 	dbadapter.AuthDBClient = authDB
 	dbadapter.CommonDBClient = commonDB
 
-	sub := DatabaseSubscriberAuthenticationData{}
 	subsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",
@@ -91,7 +90,7 @@ func TestSubscriberAuthenticationDataCreate_Success(t *testing.T) {
 		},
 		SequenceNumber: "16f3b3f70fc2",
 	}
-	err := sub.SubscriberAuthenticationDataCreate("imsi-1", &subsData)
+	err := subscriberAuthenticationDataCreate("imsi-1", &subsData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -128,7 +127,6 @@ func TestSubscriberAuthenticationDataCreate_CommonDBFails_RollsBack(t *testing.T
 	dbadapter.AuthDBClient = authDB
 	dbadapter.CommonDBClient = commonDB
 
-	sub := DatabaseSubscriberAuthenticationData{}
 	subsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",
@@ -151,7 +149,7 @@ func TestSubscriberAuthenticationDataCreate_CommonDBFails_RollsBack(t *testing.T
 		},
 		SequenceNumber: "16f3b3f70fc2",
 	}
-	err := sub.SubscriberAuthenticationDataCreate("imsi-1", &subsData)
+	err := subscriberAuthenticationDataCreate("imsi-1", &subsData)
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
@@ -179,8 +177,7 @@ func TestSubscriberAuthenticationDataDelete_Success(t *testing.T) {
 	dbadapter.AuthDBClient = authDB
 	dbadapter.CommonDBClient = commonDB
 
-	s := DatabaseSubscriberAuthenticationData{}
-	err := s.SubscriberAuthenticationDataDelete("imsi-12345")
+	err := subscriberAuthenticationDataDelete("imsi-12345")
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -196,8 +193,7 @@ func TestSubscriberAuthenticationDataDelete_AuthDBDeleteFails_Exits(t *testing.T
 	defer func() { dbadapter.AuthDBClient = origAuthDB }()
 	dbadapter.AuthDBClient = authDB
 
-	s := DatabaseSubscriberAuthenticationData{}
-	err := s.SubscriberAuthenticationDataDelete("imsi-12345")
+	err := subscriberAuthenticationDataDelete("imsi-12345")
 	if err == nil || !strings.Contains(err.Error(), "fail on authdb delete") {
 		t.Errorf("expected error about authdb delete, got %v", err)
 	}
@@ -222,8 +218,7 @@ func TestSubscriberAuthenticationDataDelete_CommonDBDeleteFails_RollbackSucceeds
 	dbadapter.AuthDBClient = authDB
 	dbadapter.CommonDBClient = commonDB
 
-	s := DatabaseSubscriberAuthenticationData{}
-	err := s.SubscriberAuthenticationDataDelete("imsi-12345")
+	err := subscriberAuthenticationDataDelete("imsi-12345")
 	if err == nil || !strings.Contains(err.Error(), "amData delete failed, rolled back AuthDB change") {
 		t.Errorf("expected error with rollback message, got %v", err)
 	}
@@ -250,8 +245,7 @@ func TestSubscriberAuthenticationDataDelete_CommonDBDeleteFails_RollbackFails(t 
 	dbadapter.AuthDBClient = authDB
 	dbadapter.CommonDBClient = commonDB
 
-	s := DatabaseSubscriberAuthenticationData{}
-	err := s.SubscriberAuthenticationDataDelete("imsi-12345")
+	err := subscriberAuthenticationDataDelete("imsi-12345")
 	if err == nil || !strings.Contains(err.Error(), "amData delete failed:") || !strings.Contains(err.Error(), "rollback failed") {
 		t.Errorf("expected error with rollback fail message, got %v", err)
 	}
@@ -277,8 +271,7 @@ func TestSubscriberAuthenticationDataDelete_NoDataInAuthDB_Exits(t *testing.T) {
 	dbadapter.AuthDBClient = authDB
 	dbadapter.CommonDBClient = commonDB
 
-	s := DatabaseSubscriberAuthenticationData{}
-	err := s.SubscriberAuthenticationDataDelete("imsi-12345")
+	err := subscriberAuthenticationDataDelete("imsi-12345")
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Errorf("expected data not found in AuthDB, got %v", err)
 	}
@@ -318,7 +311,7 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 	postData = make([]map[string]interface{}, 0)
 	dbadapter.AuthDBClient = &MockMongoPost{}
 	dbadapter.CommonDBClient = &MockMongoPost{}
-	postErr := handleSubscriberPost(ueId, authSubData)
+	postErr := subscriberAuthenticationDataCreate(ueId, authSubData)
 	if postErr != nil {
 		t.Errorf("Could not handle subscriber post: %v", postErr)
 	}
@@ -365,7 +358,7 @@ func Test_handleSubscriberDelete5G(t *testing.T) {
 	deleteData = make([]map[string]interface{}, 0)
 	dbadapter.AuthDBClient = &MockMongoDeleteOne{}
 	dbadapter.CommonDBClient = &MockMongoDeleteOne{}
-	delErr := handleSubscriberDelete(ueId)
+	delErr := subscriberAuthenticationDataDelete(ueId)
 	if delErr != nil {
 		t.Errorf("Could not handle subscriber delete: %v", delErr)
 	}
@@ -390,7 +383,6 @@ func Test_handleSubscriberDelete5G(t *testing.T) {
 func Test_handleSubscriberGet5G(t *testing.T) {
 	origAuthDBClient := dbadapter.AuthDBClient
 	defer func() { dbadapter.AuthDBClient = origAuthDBClient }()
-	subscriberAuthData := DatabaseSubscriberAuthenticationData{}
 	subscriber := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",
@@ -415,7 +407,7 @@ func Test_handleSubscriberGet5G(t *testing.T) {
 	subscribers := []bson.M{configmodels.ToBsonM(subscriber)}
 	subscribers[0]["ueId"] = "imsi-208930100007487"
 	dbadapter.AuthDBClient = &MockMongoSubscriberGetOne{dbadapter.AuthDBClient, subscribers[0]}
-	subscriberResult := subscriberAuthData.SubscriberAuthenticationDataGet("imsi-208930100007487")
+	subscriberResult := subscriberAuthenticationDataGet("imsi-208930100007487")
 	if !reflect.DeepEqual(&subscriber, subscriberResult) {
 		t.Errorf("Expected subscriber %v, got %v", &subscriber, subscriberResult)
 	}

@@ -37,13 +37,6 @@ func deviceGroupDeleteHelper(groupName string) error {
 	if err := handleDeviceGroupDelete(groupName); err != nil {
 		return fmt.Errorf("error deleting device group %s: %+v", groupName, err)
 	}
-	var msg configmodels.ConfigMessage
-	msg.MsgType = configmodels.Device_group
-	msg.MsgMethod = configmodels.Delete_op
-	msg.DevGroupName = groupName
-	configChannel <- &msg
-
-	logger.ConfigLog.Infof("successfully Added Device Group [%s] with delete_op to config channel", groupName)
 	return nil
 }
 
@@ -71,14 +64,6 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 			errorOccurred = true
 			continue
 		}
-		msg := &configmodels.ConfigMessage{
-			MsgMethod: configmodels.Post_op,
-			MsgType:   configmodels.Network_slice,
-			Slice:     &networkSlice,
-			SliceName: networkSlice.SliceName,
-		}
-		configChannel <- msg
-		logger.ConfigLog.Infof("network slice [%s] update sent to config channel", networkSlice.SliceName)
 	}
 	if errorOccurred {
 		return fmt.Errorf("one or more network slice updates failed (see logs)")
@@ -86,7 +71,7 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 	return nil
 }
 
-func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, msgOp int, groupName string) (int, error) {
+func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, groupName string) (int, error) {
 	logger.ConfigLog.Infof("received device group: %s", groupName)
 
 	ipdomain := &requestDeviceGroup.IpDomainExpanded
@@ -128,13 +113,6 @@ func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, msgOp i
 		}
 	}
 
-	var msg configmodels.ConfigMessage
-	msg.MsgType = configmodels.Device_group
-	msg.MsgMethod = msgOp
-	msg.DevGroup = &requestDeviceGroup
-	msg.DevGroupName = groupName
-	configChannel <- &msg
-	logger.ConfigLog.Infof("successfully added Device Group [%s] to config channel", groupName)
 	return http.StatusOK, nil
 }
 

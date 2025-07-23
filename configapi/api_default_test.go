@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2025 Canonical Ltd
 // SPDX-FileCopyrightText: 2023 Open Networking Foundation <info@opennetworking.org>
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -6,160 +7,56 @@
 package configapi
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type MockMongoClientNoDeviceGroups struct {
+// error case
+// delete api
+
+type DeviceGroupMockDBClient struct {
 	dbadapter.DBInterface
+	deviceGroups []configmodels.DeviceGroups
+	err          error
 }
 
-type MockMongoClientOneDeviceGroups struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientManyDeviceGroups struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientNotFoundDeviceGroup struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientFoundDeviceGroup struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientNoNetworkSlice struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientNotFoundNetworkSlice struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientFoundNetworkSlice struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientOneNetworkSlice struct {
-	dbadapter.DBInterface
-}
-
-type MockMongoClientManyNetworkSlices struct {
-	dbadapter.DBInterface
-}
-
-func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
-	if sliceName, ok := filter["slice-name"].(string); ok {
-		ns := configmodels.ToBsonM(networkSlice(sliceName))
-		if ns == nil {
-			return nil, nil
-		}
-		return ns, nil
+func (db *DeviceGroupMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	if db.err != nil {
+		return nil, db.err
 	}
-	return nil, nil
-}
-
-func (m *MockMongoClientManyNetworkSlices) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
-	var results []map[string]any
-	names := []string{"slice1", "slice2", "slice3"}
-	for _, name := range names {
-		ns := configmodels.ToBsonM(networkSlice(name))
-		if ns == nil {
-			panic("failed to convert network slice to BsonM")
-		}
-		results = append(results, ns)
+	if len(db.deviceGroups) == 0 {
+		return nil, nil
 	}
-	return results, nil
-}
-
-func (m *MockMongoClientManyNetworkSlices) RestfulAPIPost(coll string, filter bson.M, data map[string]any) (bool, error) {
-	return true, nil
-}
-
-func (m *MockMongoClientManyNetworkSlices) RestfulAPIDeleteOne(coll string, filter bson.M) error {
-	return nil
-}
-
-func (m *MockMongoClientManyNetworkSlices) Client() *mongo.Client {
-	return nil
-}
-
-func (m *MockMongoClientNoDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
-	var results []map[string]any
-	return results, nil
-}
-
-func (m *MockMongoClientOneDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
-	var results []map[string]any
-	dg := configmodels.ToBsonM(deviceGroup("group1"))
-	if dg == nil {
-		panic("failed to convert device group to BsonM")
-	}
-	results = append(results, dg)
-	return results, nil
-}
-
-func (m *MockMongoClientManyDeviceGroups) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
-	var results []map[string]any
-	names := []string{"group1", "group2", "group3"}
-	for _, name := range names {
-		dg := configmodels.ToBsonM(deviceGroup(name))
-		if dg == nil {
-			panic("failed to convert device group to BsonM")
-		}
-		results = append(results, dg)
-	}
-	return results, nil
-}
-
-func (m *MockMongoClientNotFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
-	return nil, nil
-}
-
-func (m *MockMongoClientFoundDeviceGroup) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
-	dg := configmodels.ToBsonM(deviceGroup("group1"))
+	dg := configmodels.ToBsonM(db.deviceGroups[0])
 	if dg == nil {
 		panic("failed to convert device group to BsonM")
 	}
 	return dg, nil
 }
 
-func (m *MockMongoClientNoNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
-	var results []map[string]any
-	return results, nil
-}
-
-func (m *MockMongoClientOneNetworkSlice) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
-	var results []map[string]any
-	ns := configmodels.ToBsonM(networkSlice("slice1"))
-	if ns == nil {
-		panic("failed to convert network slice to BsonM")
+func (db *DeviceGroupMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	if db.err != nil {
+		return nil, db.err
 	}
-	results = append(results, ns)
-	return results, nil
-}
-
-func (m *MockMongoClientNotFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
-	return nil, nil
-}
-
-func (m *MockMongoClientFoundNetworkSlice) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
-	ns := configmodels.ToBsonM(networkSlice("slice1"))
-	if ns == nil {
-		panic("failed to convert network slice to BsonM")
+	var results []map[string]any
+	for _, deviceGroup := range db.deviceGroups {
+		dg := configmodels.ToBsonM(deviceGroup)
+		if dg == nil {
+			panic("failed to convert device groups to BsonM")
+		}
+		results = append(results, dg)
 	}
-	return ns, nil
+	return results, db.err
 }
 
 func deviceGroup(name string) configmodels.DeviceGroups {
@@ -194,272 +91,153 @@ func deviceGroup(name string) configmodels.DeviceGroups {
 	return deviceGroup
 }
 
-func TestGetDeviceGroupsNoGroups(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	dbadapter.CommonDBClient = &MockMongoClientNoDeviceGroups{}
-	GetDeviceGroups(c)
-	resp := w.Result()
-
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
-	}
-	body_bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
-	}
-	body := string(body_bytes)
-	if body != "[]" {
-		t.Errorf("Expected empty JSON list, got %v", body)
-	}
-}
-
-func TestGetDeviceGroupsOneGroup(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-
-	dbadapter.CommonDBClient = &MockMongoClientOneDeviceGroups{}
-	GetDeviceGroups(c)
-	resp := w.Result()
-
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
-	}
-	body_bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
-	}
-	body := string(body_bytes)
-	expected := `["group1"]`
-	if body != expected {
-		t.Errorf("Expected %v, got %v", expected, body)
-	}
-}
-
-func TestGetDeviceGroupsManyGroup(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-
-	dbadapter.CommonDBClient = &MockMongoClientManyDeviceGroups{}
-	GetDeviceGroups(c)
-	resp := w.Result()
-
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
-	}
-	body_bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
-	}
-	body := string(body_bytes)
-	expected := `["group1","group2","group3"]`
-	if body != expected {
-		t.Errorf("Expected %v, got %v", expected, body)
-	}
-}
-
-func TestGetDeviceGroupByNameDoesNotExist(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-
-	dbadapter.CommonDBClient = &MockMongoClientNotFoundDeviceGroup{}
-	c.Params = append(c.Params, gin.Param{Key: "device-name", Value: "group1"})
-	GetDeviceGroupByName(c)
-	resp := w.Result()
-
-	if resp.StatusCode != 404 {
-		t.Errorf("Expected StatusCode %d, got %d", 404, resp.StatusCode)
-	}
-	body_bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
-	}
-	body := string(body_bytes)
-	if body != "null" {
-		t.Errorf("Expected %v, got %v", "null", body)
-	}
-}
-
-func TestGetDeviceGroupByNameDoesExists(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-
-	dbadapter.CommonDBClient = &MockMongoClientFoundDeviceGroup{}
-	c.Params = append(c.Params, gin.Param{Key: "device-name", Value: "group1"})
-	GetDeviceGroupByName(c)
-	resp := w.Result()
-
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
-	}
-	body_bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
-	}
-	body := string(body_bytes)
-	expected := `{"group-name":"group1","imsis":["1234","5678"],"site-info":"demo","ip-domain-name":"pool1","ip-domain-expanded":{"dnn":"internet","ue-ip-pool":"172.250.1.0/16","dns-primary":"1.1.1.1","dns-secondary":"8.8.8.8","mtu":1460,"ue-dnn-qos":{"dnn-mbr-uplink":10000000,"dnn-mbr-downlink":10000000,"bitrate-unit":"kbps","traffic-class":{"name":"platinum","qci":8,"arp":6,"pdb":300,"pelr":6}}}}`
-	if body != expected {
-		t.Errorf("Expected %v, got %v", expected, body)
-	}
-}
-
-func TestDeviceGroupDeleteHandler_DeviceGroupExistsInNetworkSlices(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-	AddConfigV1Service(router)
-	mock := &MockMongoClientManyNetworkSlices{}
-
-	testCases := []struct {
-		name         string
-		route        string
-		dbAdapter    dbadapter.DBInterface
-		expectedCode int
+func TestGetDeviceGroups(t *testing.T) {
+	tests := []struct {
+		name                   string
+		configuredDeviceGroups []configmodels.DeviceGroups
+		expectedCode           int
+		expectedResult         []string
 	}{
 		{
-			name:         "Delete DG associated with NSs expects config messages sent for NSs and DG",
-			route:        "/config/v1/device-group/group1",
-			dbAdapter:    mock,
-			expectedCode: http.StatusOK,
+			name:                   "No device groups return empty list",
+			configuredDeviceGroups: []configmodels.DeviceGroups{},
+			expectedCode:           http.StatusOK,
+			expectedResult:         []string{},
+		},
+		{
+			name: "One device group returns a list with one name",
+			configuredDeviceGroups: []configmodels.DeviceGroups{
+				deviceGroup("group1"),
+			},
+			expectedCode:   http.StatusOK,
+			expectedResult: []string{"group1"},
+		},
+		{
+			name: "Many device groups returns a list with many names",
+			configuredDeviceGroups: []configmodels.DeviceGroups{
+				deviceGroup("group1"),
+				deviceGroup("group2"),
+				deviceGroup("group3"),
+			},
+			expectedCode:   http.StatusOK,
+			expectedResult: []string{"group1", "group2", "group3"},
 		},
 	}
-	for _, tc := range testCases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			originalDbAdapter := dbadapter.CommonDBClient
-			dbadapter.CommonDBClient = tc.dbAdapter
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 10)
-			defer func() {
-				configChannel = origChannel
-				dbadapter.CommonDBClient = originalDbAdapter
-			}()
-			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
-			if err != nil {
-				t.Fatalf("failed to create request: %v", err)
-			}
-			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+			c, _ := gin.CreateTestContext(w)
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
+				deviceGroups: tc.configuredDeviceGroups,
 			}
-			timeout := time.After(2 * time.Second)
-			expectedGroupName := "group1"
-			expectedSliceNames := []string{"slice1", "slice2", "slice3"}
-			for _, expectedSliceName := range expectedSliceNames {
-				select {
-				case msg := <-configChannel:
-					verifyNetworkSliceMessage(t, msg, expectedSliceName, expectedGroupName)
-				case <-timeout:
-					t.Fatalf("Timeout waiting for network slice message for %s", expectedSliceName)
-				}
-			}
+			GetDeviceGroups(c)
+			resp := w.Result()
 
-			select {
-			case msg := <-configChannel:
-				verifyDeviceGroupMessage(t, msg, expectedGroupName)
-			case <-timeout:
-				t.Fatal("Timeout waiting for device group deletion message")
+			if resp.StatusCode != tc.expectedCode {
+				t.Errorf("Expected StatusCode %d, got %d", tc.expectedCode, resp.StatusCode)
+			}
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
+			var actual []string
+			if err := json.Unmarshal(bodyBytes, &actual); err != nil {
+				t.Fatalf("failed to unmarshal response body: %v", err)
 			}
 
-			select {
-			case msg := <-configChannel:
-				t.Errorf("Unexpected extra message in channel: %+v", msg)
-			case <-time.After(100 * time.Millisecond):
-				// OK - no more messages
+			expected := tc.expectedResult
+			if !reflect.DeepEqual(expected, actual) {
+				t.Errorf("Expected %+v, got %+v", expected, actual)
 			}
 		})
 	}
 }
 
-func verifyNetworkSliceMessage(t *testing.T, msg *configmodels.ConfigMessage, expectedSliceName, expectedGroupName string) {
-	t.Helper()
-	if msg.MsgType != configmodels.Network_slice {
-		t.Errorf("Expected message type %v, got %v", configmodels.Network_slice, msg.MsgType)
+func TestGetDeviceGroupByName_DeviceGroupDoesNotExist(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+
+	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
+		deviceGroups: []configmodels.DeviceGroups{},
 	}
-	if msg.MsgMethod != configmodels.Post_op {
-		t.Errorf("Expected message method %v, got %v", configmodels.Post_op, msg.MsgMethod)
+	c.Params = append(c.Params, gin.Param{Key: "device-name", Value: "group1"})
+	GetDeviceGroupByName(c)
+	resp := w.Result()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected StatusCode %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
-	if msg.SliceName != expectedSliceName {
-		t.Errorf("Expected slice name %v, got %v", expectedSliceName, msg.SliceName)
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
 	}
-	for _, group := range msg.Slice.SiteDeviceGroup {
-		if group == expectedGroupName {
-			t.Errorf("Expected %v to be removed from SiteDeviceGroup in slice %s, but it was found",
-				expectedGroupName, msg.SliceName)
-		}
+	if string(bodyBytes) != "null" {
+		t.Errorf("Expected body 'null', got: %v", string(bodyBytes))
 	}
 }
 
-func verifyDeviceGroupMessage(t *testing.T, msg *configmodels.ConfigMessage, expectedGroupName string) {
-	t.Helper()
-	if msg.MsgType != configmodels.Device_group {
-		t.Errorf("Expected message type %v, got %v", configmodels.Device_group, msg.MsgType)
+func TestGetDeviceGroupByName_DBError(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+
+	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
+		err: fmt.Errorf("mock error"),
 	}
-	if msg.MsgMethod != configmodels.Delete_op {
-		t.Errorf("Expected message method %v, got %v", configmodels.Delete_op, msg.MsgMethod)
+	c.Params = append(c.Params, gin.Param{Key: "device-name", Value: "group1"})
+	GetDeviceGroupByName(c)
+	resp := w.Result()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("Expected StatusCode %d, got %d", http.StatusInternalServerError, resp.StatusCode)
 	}
-	if msg.DevGroupName != expectedGroupName {
-		t.Errorf("Expected device group name %v, got %v", expectedGroupName, msg.DevGroupName)
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+	var actual map[string]string
+	if err := json.Unmarshal(bodyBytes, &actual); err != nil {
+		t.Fatalf("failed to unmarshal JSON: %v", err)
+	}
+
+	expected := map[string]string{"error": "failed to retrieve device group"}
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expected response body %v, got %v", expected, actual)
 	}
 }
 
-func TestDeviceGroupDeleteHandler_DeviceGroupDoesNotExistInNetworkSlices(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-	AddConfigV1Service(router)
+func TestGetDeviceGroupByName_DeviceGroupExists(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
 
-	testCases := []struct {
-		name         string
-		route        string
-		dbAdapter    dbadapter.DBInterface
-		expectedCode int
-	}{
-		{
-			name:         "Delete DG not associated with any NS expects only one config message",
-			route:        "/config/v1/device-group/group1",
-			dbAdapter:    &MockMongoClientEmptyDB{},
-			expectedCode: http.StatusOK,
-		},
+	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
+		deviceGroups: []configmodels.DeviceGroups{deviceGroup("group1")},
 	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			originalDbAdapter := dbadapter.CommonDBClient
-			dbadapter.CommonDBClient = tc.dbAdapter
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 10)
-			defer func() {
-				configChannel = origChannel
-				dbadapter.CommonDBClient = originalDbAdapter
-			}()
-			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
-			if err != nil {
-				t.Fatalf("failed to create request: %v", err)
-			}
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
+	c.Params = append(c.Params, gin.Param{Key: "device-name", Value: "group1"})
+	GetDeviceGroupByName(c)
+	resp := w.Result()
 
-			router.ServeHTTP(w, req)
-			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
-			}
-			expectedGroupName := "group1"
-			timeout := time.After(2 * time.Second)
-			select {
-			case msg := <-configChannel:
-				verifyDeviceGroupMessage(t, msg, expectedGroupName)
-			case <-timeout:
-				t.Fatal("Timeout waiting for device group deletion message")
-			}
-
-			select {
-			case msg := <-configChannel:
-				t.Errorf("Unexpected extra message in channel: %+v", msg)
-			case <-time.After(100 * time.Millisecond):
-				// OK - no more messages
-			}
-		})
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected StatusCode %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+	var actual configmodels.DeviceGroups
+	if err := json.Unmarshal(bodyBytes, &actual); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
+	}
+	expected := deviceGroup("group1")
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expected %+v, got %+v", expected, actual)
 	}
 }
 
@@ -494,112 +272,187 @@ func networkSlice(name string) configmodels.Slice {
 	return slice
 }
 
-func TestGetNetworkSlicesNoSlices(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
+type NetworkSliceMockDBClient struct {
+	dbadapter.DBInterface
+	slices []configmodels.Slice
+	err    error
+}
 
-	dbadapter.CommonDBClient = &MockMongoClientNoNetworkSlice{}
-	GetNetworkSlices(c)
-	resp := w.Result()
+func (db *NetworkSliceMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	if db.err != nil {
+		return nil, db.err
+	}
+	if len(db.slices) == 0 {
+		return nil, nil
+	}
+	ns := configmodels.ToBsonM(db.slices[0])
+	if ns == nil {
+		panic("failed to convert network slice to BsonM")
+	}
+	return ns, nil
+}
 
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+func (db *NetworkSliceMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	if db.err != nil {
+		return nil, db.err
 	}
-	body_bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
+	var results []map[string]any
+	for _, s := range db.slices {
+		ns := configmodels.ToBsonM(s)
+		if ns == nil {
+			panic("failed to convert network slice to BsonM")
+		}
+		results = append(results, ns)
 	}
-	body := string(body_bytes)
-	if body != "[]" {
-		t.Errorf("Expected empty JSON list, got %v", body)
+	return results, db.err
+}
+
+func TestGetNetworkSlices(t *testing.T) {
+	tests := []struct {
+		name             string
+		configuredSlices []configmodels.Slice
+		expectedCode     int
+		expectedResult   []string
+	}{
+		{
+			name:             "No network slices return empty list",
+			configuredSlices: []configmodels.Slice{},
+			expectedCode:     http.StatusOK,
+			expectedResult:   []string{},
+		},
+		{
+			name: "One network slice returns a list with one name",
+			configuredSlices: []configmodels.Slice{
+				networkSlice("slice1"),
+			},
+			expectedCode:   http.StatusOK,
+			expectedResult: []string{"slice1"},
+		},
+		{
+			name: "Many slices returns a list with many slices names",
+			configuredSlices: []configmodels.Slice{
+				networkSlice("slice1"),
+				networkSlice("slice2"),
+				networkSlice("slice3"),
+			},
+			expectedCode:   http.StatusOK,
+			expectedResult: []string{"slice1", "slice2", "slice3"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+
+			dbadapter.CommonDBClient = &NetworkSliceMockDBClient{
+				slices: tc.configuredSlices,
+			}
+			GetNetworkSlices(c)
+			resp := w.Result()
+
+			if resp.StatusCode != tc.expectedCode {
+				t.Errorf("Expected StatusCode %d, got %d", tc.expectedCode, resp.StatusCode)
+			}
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
+			var actual []string
+			if err := json.Unmarshal(bodyBytes, &actual); err != nil {
+				t.Fatalf("failed to unmarshal response body: %v", err)
+			}
+			expected := tc.expectedResult
+			if !reflect.DeepEqual(expected, actual) {
+				t.Errorf("Expected %+v, got %+v", expected, actual)
+			}
+		})
 	}
 }
 
-func TestGetNetworkSlicesOneSlice(t *testing.T) {
+func TestGetNetworkSliceByName_NetworkSliceDoesNotExist(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
 
-	dbadapter.CommonDBClient = &MockMongoClientOneNetworkSlice{}
-	GetNetworkSlices(c)
-	resp := w.Result()
-
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{
+		slices: []configmodels.Slice{},
 	}
-	body_bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
-	}
-	body := string(body_bytes)
-	expected := `["slice1"]`
-	if body != expected {
-		t.Errorf("Expected %v, got %v", expected, body)
-	}
-}
-
-func TestGetNetworkSlicesManySlices(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-
-	dbadapter.CommonDBClient = &MockMongoClientManyNetworkSlices{}
-	GetNetworkSlices(c)
-	resp := w.Result()
-
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
-	}
-	body_bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
-	}
-	body := string(body_bytes)
-	expected := `["slice1","slice2","slice3"]`
-	if body != expected {
-		t.Errorf("Expected %v, got %v", expected, body)
-	}
-}
-
-func TestGetNetworkSliceByNameDoesNotExist(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-
-	dbadapter.CommonDBClient = &MockMongoClientNotFoundNetworkSlice{}
 	c.Params = append(c.Params, gin.Param{Key: "slice-name", Value: "slice1"})
 	GetNetworkSliceByName(c)
 	resp := w.Result()
 
-	if resp.StatusCode != 404 {
-		t.Errorf("Expected StatusCode %d, got %d", 404, resp.StatusCode)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected StatusCode %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
-	body_bytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("failed to read response body: %v", err)
 	}
-	body := string(body_bytes)
-	if body != "null" {
-		t.Errorf("Expected %v, got %v", "null", body)
+	if string(bodyBytes) != "null" {
+		t.Errorf("Expected body 'null', got: %v", string(bodyBytes))
 	}
 }
 
-func TestGetNetworkSliceByNameDoesExists(t *testing.T) {
+func TestGetNetworkSliceByName_DBError(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
 
-	dbadapter.CommonDBClient = &MockMongoClientFoundNetworkSlice{}
+	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{
+		err: fmt.Errorf("mock error"),
+	}
 	c.Params = append(c.Params, gin.Param{Key: "slice-name", Value: "slice1"})
 	GetNetworkSliceByName(c)
 	resp := w.Result()
 
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected StatusCode %d, got %d", 200, resp.StatusCode)
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("Expected StatusCode %d, got %d", http.StatusInternalServerError, resp.StatusCode)
 	}
-	body_bytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("failed to read response body: %v", err)
 	}
-	body := string(body_bytes)
-	expected := `{"slice-name":"slice1","slice-id":{"sst":"1","sd":"010203"},"site-device-group":["group1","group2"],"site-info":{"site-name":"demo","plmn":{"mcc":"208","mnc":"93"},"gNodeBs":[{"name":"demo-gnb1","tac":1}],"upf":{"upf-name":"upf","upf-port":"8805"}}}`
-	if body != expected {
-		t.Errorf("Expected %v, got %v", expected, body)
+	var actual map[string]string
+	if err := json.Unmarshal(bodyBytes, &actual); err != nil {
+		t.Fatalf("failed to unmarshal JSON: %v", err)
+	}
+
+	expected := map[string]string{"error": "failed to retrieve network slice"}
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expected response body %v, got %v", expected, actual)
+	}
+}
+
+func TestGetNetworkSliceByName_NetworkSliceExists(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{
+		slices: []configmodels.Slice{networkSlice("slice1")},
+	}
+	c.Params = append(c.Params, gin.Param{Key: "slice-name", Value: "slice1"})
+	GetNetworkSliceByName(c)
+	resp := w.Result()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected StatusCode %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+	var actual configmodels.Slice
+	if err := json.Unmarshal(bodyBytes, &actual); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
+	}
+	expected := networkSlice("slice1")
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expected %+v, got %+v", expected, actual)
 	}
 }

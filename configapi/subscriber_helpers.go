@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
 
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -27,30 +26,6 @@ type SubscriberAuthenticationData interface {
 
 type DatabaseSubscriberAuthenticationData struct {
 	SubscriberAuthenticationData
-}
-
-var (
-	imsiDataLock sync.RWMutex
-	ImsiData     = make(map[string]*models.AuthenticationSubscription)
-)
-
-func addSubscriber(imsi string, data *models.AuthenticationSubscription) {
-	imsiDataLock.Lock()
-	defer imsiDataLock.Unlock()
-	ImsiData[imsi] = data
-}
-
-func removeSubscriber(imsi string) {
-	imsiDataLock.Lock()
-	defer imsiDataLock.Unlock()
-	delete(ImsiData, imsi)
-}
-
-func getSubscriber(imsi string) *models.AuthenticationSubscription {
-	imsiDataLock.RLock()
-	defer imsiDataLock.RUnlock()
-	data := ImsiData[imsi]
-	return data
 }
 
 func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
@@ -161,41 +136,6 @@ func (subscriberAuthData DatabaseSubscriberAuthenticationData) SubscriberAuthent
 		return fmt.Errorf("amData delete failed, unable to rollback AuthDB change: %w", err)
 	}
 	logger.WebUILog.Debugf("successfully deleted authentication subscription from amData collection: %s", imsi)
-	return nil
-}
-
-type MemorySubscriberAuthenticationData struct {
-	SubscriberAuthenticationData
-}
-
-func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
-	return getSubscriber(imsi)
-}
-
-func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
-	filter := bson.M{"ueId": imsi}
-	basicAmData := map[string]interface{}{
-		"ueId": imsi,
-	}
-	basicDataBson := configmodels.ToBsonM(basicAmData)
-	logger.WebUILog.Debugf("insert/update authentication subscription in amData collection: %s", imsi)
-	if _, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson); err != nil {
-		return fmt.Errorf("failed to update amData: %w", err)
-	}
-	logger.WebUILog.Debugf("successfully inserted/updated authentication subscription in amData collection: %s", imsi)
-	addSubscriber(imsi, authSubData)
-	logger.WebUILog.Debugf("insert/update authentication subscription in memory: %s", imsi)
-	return nil
-}
-
-func (subscriberAuthData MemorySubscriberAuthenticationData) SubscriberAuthenticationDataDelete(imsi string) error {
-	filter := bson.M{"ueId": imsi}
-	if err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter); err != nil {
-		return fmt.Errorf("failed to delete from amData collection: %w", err)
-	}
-	logger.WebUILog.Debugf("successfully deleted authentication subscription from amData collection: %s", imsi)
-	removeSubscriber(imsi)
-	logger.WebUILog.Debugf("delete authentication subscription from memory: %s", imsi)
 	return nil
 }
 
@@ -316,7 +256,6 @@ func updateSubscriberInDeviceGroups(imsi string) (int, error) {
 		logger.DbLog.Errorf("failed to fetch device groups: %+v", err)
 		return http.StatusInternalServerError, err
 	}
-	var deviceGroupUpdateMessages []configmodels.ConfigMessage
 	for _, rawDeviceGroup := range rawDeviceGroups {
 		var deviceGroup configmodels.DeviceGroups
 		if err = json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup); err != nil {
@@ -335,17 +274,7 @@ func updateSubscriberInDeviceGroups(imsi string) (int, error) {
 			logger.ConfigLog.Errorf("error posting device group %+v: %+v", deviceGroup, err)
 			return statusCode, err
 		}
-		deviceGroupUpdateMessage := configmodels.ConfigMessage{
-			MsgType:      configmodels.Device_group,
-			MsgMethod:    configmodels.Post_op,
-			DevGroupName: deviceGroup.DeviceGroupName,
-			DevGroup:     &deviceGroup,
-		}
-		deviceGroupUpdateMessages = append(deviceGroupUpdateMessages, deviceGroupUpdateMessage)
 	}
-	for _, msg := range deviceGroupUpdateMessages {
-		configChannel <- &msg
-		logger.WebUILog.Infof("device group [%s] update sent to config channel", msg.DevGroupName)
-	}
+
 	return http.StatusOK, nil
 }

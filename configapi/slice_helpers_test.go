@@ -217,7 +217,6 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 	}
 	networkSlices[2].SiteInfo.GNodeBs = []configmodels.SliceSiteInfoGNodeBs{}
 	networkSlices[3].SiteDeviceGroup = []string{}
-	factory.WebUIConfig.Configuration.Mode5G = true
 
 	for _, testSlice := range networkSlices {
 		ts := testSlice // capture loop variable
@@ -293,7 +292,6 @@ func Test_handleNetworkSlicePost_alreadyExists(t *testing.T) {
 	}
 	networkSlices[2].SiteInfo.GNodeBs = []configmodels.SliceSiteInfoGNodeBs{}
 	networkSlices[3].SiteDeviceGroup = []string{}
-	factory.WebUIConfig.Configuration.Mode5G = true
 
 	for _, testSlice := range networkSlices {
 		ts := testSlice
@@ -440,10 +438,8 @@ func TestNetworkSlicePostHandler_NetworkSliceNameValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 1)
 			originalDBClient := dbadapter.CommonDBClient
-			defer func() { configChannel = origChannel; dbadapter.CommonDBClient = originalDBClient }()
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			if tc.expectedCode == http.StatusOK {
 				dbadapter.CommonDBClient = &MockMongoClientEmptyDB{}
 			}
@@ -492,9 +488,6 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 1)
-			defer func() { configChannel = origChannel }()
 			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)

@@ -623,7 +623,7 @@ func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
 		"key":            "8baf473f2f8fd09487cccbd7097c6862",
 		"sequenceNumber": "16f3b3f70fc2",
 	}
-	authSubsData := models.AuthenticationSubscription{
+	/*authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",
 		Milenage: &models.Milenage{
@@ -644,7 +644,7 @@ func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
 			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
 		},
 		SequenceNumber: "16f3b3f70fc2",
-	}
+	}*/
 	jsonData, err := json.Marshal(inputData)
 	if err != nil {
 		t.Fatalf("failed to marshal input data to JSON: %v", err)
@@ -655,10 +655,7 @@ func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
 	origAuthDBClient := dbadapter.AuthDBClient
 	dbadapter.CommonDBClient = commonDbAdapter
 	dbadapter.AuthDBClient = authDbAdapter
-	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 1)
 	defer func() {
-		configChannel = origChannel
 		dbadapter.CommonDBClient = origDBClient
 		dbadapter.AuthDBClient = origAuthDBClient
 	}()
@@ -666,12 +663,6 @@ func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
 	expectedBody := `{}`
 	expectedCommonPostDataDetails := []map[string]interface{}{
 		{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-208930100007487"}},
-	}
-	expectedMessage := &configmodels.ConfigMessage{
-		MsgType:     configmodels.Sub_data,
-		MsgMethod:   configmodels.Post_op,
-		AuthSubData: &authSubsData,
-		Imsi:        "imsi-208930100007487",
 	}
 
 	req, err := http.NewRequest(http.MethodPost, route, bytes.NewBuffer(jsonData))
@@ -700,24 +691,6 @@ func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
 	if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
 		t.Errorf("Expected CommonPostData `%v`, but got `%v`", expectedCommonPostDataDetails, postDataCommon)
 	}
-
-	select {
-	case msg := <-configChannel:
-		if msg.MsgType != expectedMessage.MsgType {
-			t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
-		}
-		if msg.MsgMethod != expectedMessage.MsgMethod {
-			t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
-		}
-		if !reflect.DeepEqual(expectedMessage.AuthSubData, msg.AuthSubData) {
-			t.Errorf("expected AuthSubData %+v, but got %+v", expectedMessage.AuthSubData, msg.AuthSubData)
-		}
-		if expectedMessage.Imsi != msg.Imsi {
-			t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)
-		}
-	default:
-		t.Error("expected message in configChannel, but none received")
-	}
 }
 
 func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
@@ -741,9 +714,7 @@ func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
 
 	commonDbAdapter := &MockMongoClientOneSubscriber{PostDataCommon: &postDataCommon}
 	origDBClient := dbadapter.CommonDBClient
-	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 1)
-	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
+	defer func() { dbadapter.CommonDBClient = origDBClient }()
 	dbadapter.CommonDBClient = commonDbAdapter
 
 	expectedCode := http.StatusConflict
@@ -778,13 +749,6 @@ func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
 	if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
 		t.Errorf("Expected CommonPostData `%v`, but got `%v`", expectedCommonPostDataDetails, postDataCommon)
 	}
-
-	select {
-	case <-configChannel:
-		t.Error("expected no message in configChannel, but got one")
-	default:
-		// No message received as expected.
-	}
 }
 
 type MockMongoClientAuthDB struct {
@@ -805,15 +769,8 @@ func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 	route := "/api/subscriber/imsi-208930100007487"
 	expectedCode := http.StatusNoContent
 	expectedBody := ""
-	expectedMessage := configmodels.ConfigMessage{
-		MsgType:   configmodels.Sub_data,
-		MsgMethod: configmodels.Delete_op,
-		Imsi:      "imsi-208930100007487",
-	}
-	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 3)
+
 	defer func() {
-		configChannel = origChannel
 		dbadapter.CommonDBClient = origDBClient
 		dbadapter.AuthDBClient = origAuthDBClient
 	}()
@@ -832,25 +789,6 @@ func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
 	if !strings.Contains(w.Body.String(), expectedBody) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
-	select {
-	case msg := <-configChannel:
-		if expectedMessage.MsgType != msg.MsgType {
-			t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
-		}
-		if expectedMessage.MsgMethod != msg.MsgMethod {
-			t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
-		}
-		if expectedMessage.Imsi != msg.Imsi {
-			t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)
-		}
-	default:
-		t.Error("expected message in configChannel, but none received")
-	}
-	select {
-	case msg := <-configChannel:
-		t.Errorf("expected no message in configChannel, but got %+v", msg)
-	default:
-	}
 }
 
 func TestSubscriberDeleteFailure(t *testing.T) {
@@ -864,9 +802,7 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	expectedCode := http.StatusInternalServerError
 	expectedBody := "error deleting subscriber. Please check the log for details"
 
-	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 1)
-	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
+	defer func() { dbadapter.CommonDBClient = origDBClient }()
 	req, err := http.NewRequest(http.MethodDelete, route, nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -881,11 +817,6 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), expectedBody) {
 		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-	}
-	select {
-	case msg := <-configChannel:
-		t.Errorf("expected no message in configChannel, but got %+v", msg)
-	default:
 	}
 }
 
@@ -902,21 +833,8 @@ func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
 	route := "/api/subscriber/imsi-208930100007487"
 	expectedCode := http.StatusNoContent
 	expectedBody := ""
-	expectedDeviceGroupMessage := configmodels.ConfigMessage{
-		MsgType:      configmodels.Device_group,
-		MsgMethod:    configmodels.Post_op,
-		DevGroupName: "group1",
-		DevGroup:     deviceGroupWithoutImsi(),
-	}
-	expectedMessage := configmodels.ConfigMessage{
-		MsgType:   configmodels.Sub_data,
-		MsgMethod: configmodels.Delete_op,
-		Imsi:      "imsi-208930100007487",
-	}
-	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 3)
+
 	defer func() {
-		configChannel = origChannel
 		dbadapter.CommonDBClient = origDBClient
 		dbadapter.AuthDBClient = origAuthDBClient
 	}()
@@ -934,42 +852,6 @@ func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
 	}
 	if expectedBody != w.Body.String() {
 		t.Errorf("Expected body `%v`, got `%v`", expectedBody, w.Body.String())
-	}
-	select {
-	case msg := <-configChannel:
-		if expectedDeviceGroupMessage.MsgType != msg.MsgType {
-			t.Errorf("expected MsgType %+v, but got %+v", expectedDeviceGroupMessage.MsgType, msg.MsgType)
-		}
-		if expectedDeviceGroupMessage.MsgMethod != msg.MsgMethod {
-			t.Errorf("expected MsgMethod %+v, but got %+v", expectedDeviceGroupMessage.MsgMethod, msg.MsgMethod)
-		}
-		if expectedDeviceGroupMessage.DevGroupName != msg.DevGroupName {
-			t.Errorf("expected device group name %+v, but got %+v", expectedDeviceGroupMessage.DevGroupName, msg.DevGroupName)
-		}
-		if !reflect.DeepEqual(expectedDeviceGroupMessage.DevGroup.Imsis, msg.DevGroup.Imsis) {
-			t.Errorf("expected IMSIs in device group: %+v, but got %+v", expectedDeviceGroupMessage.DevGroup.Imsis, msg.DevGroup.Imsis)
-		}
-	default:
-		t.Error("expected message in configChannel, but none received")
-	}
-	select {
-	case msg := <-configChannel:
-		if expectedMessage.MsgType != msg.MsgType {
-			t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
-		}
-		if expectedMessage.MsgMethod != msg.MsgMethod {
-			t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
-		}
-		if expectedMessage.Imsi != msg.Imsi {
-			t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)
-		}
-	default:
-		t.Error("expected message in configChannel, but none received")
-	}
-	select {
-	case msg := <-configChannel:
-		t.Errorf("expected no message in configChannel, but got %+v", msg)
-	default:
 	}
 }
 

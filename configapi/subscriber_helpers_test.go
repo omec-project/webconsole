@@ -285,45 +285,40 @@ func TestSubscriberAuthenticationDataDelete_NoDataInAuthDB_Exits(t *testing.T) {
 }
 
 func Test_handleSubscriberPost5G(t *testing.T) {
-	origImsiData := ImsiData
 	origAuthDBClient := dbadapter.AuthDBClient
 	origCommonDBClient := dbadapter.CommonDBClient
 	origPostData := postData
 	defer func() {
-		ImsiData = origImsiData
 		postData = origPostData
 		dbadapter.AuthDBClient = origAuthDBClient
 		dbadapter.CommonDBClient = origCommonDBClient
 	}()
 	ueId := "imsi-208930100007487"
-	configMsg := configmodels.ConfigMessage{
-		AuthSubData: &models.AuthenticationSubscription{
-			AuthenticationManagementField: "8000",
-			AuthenticationMethod:          "5G_AKA",
-			Milenage: &models.Milenage{
-				Op: &models.Op{
-					EncryptionAlgorithm: 0,
-					EncryptionKey:       0,
-				},
-			},
-			Opc: &models.Opc{
+	authSubData := &models.AuthenticationSubscription{
+		AuthenticationManagementField: "8000",
+		AuthenticationMethod:          "5G_AKA",
+		Milenage: &models.Milenage{
+			Op: &models.Op{
 				EncryptionAlgorithm: 0,
 				EncryptionKey:       0,
-				OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
 			},
-			PermanentKey: &models.PermanentKey{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-				PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
-			},
-			SequenceNumber: "16f3b3f70fc2",
 		},
+		Opc: &models.Opc{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
+		},
+		PermanentKey: &models.PermanentKey{
+			EncryptionAlgorithm: 0,
+			EncryptionKey:       0,
+			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
+		},
+		SequenceNumber: "16f3b3f70fc2",
 	}
 	postData = make([]map[string]interface{}, 0)
-	ImsiData = make(map[string]*models.AuthenticationSubscription)
 	dbadapter.AuthDBClient = &MockMongoPost{}
 	dbadapter.CommonDBClient = &MockMongoPost{}
-	postErr := handleSubscriberPost(ueId, configMsg.AuthSubData)
+	postErr := handleSubscriberPost(ueId, authSubData)
 	if postErr != nil {
 		t.Errorf("Could not handle subscriber post: %v", postErr)
 	}
@@ -350,15 +345,9 @@ func Test_handleSubscriberPost5G(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not unmarshall result %v", result)
 	}
-	if !reflect.DeepEqual(configMsg.AuthSubData, &authSubResult) {
-		t.Errorf("Expected authSubData %v, got %v", configMsg.AuthSubData, &authSubResult)
-	}
 	amDataResult := postData[1]["data"].(map[string]interface{})
 	if amDataResult["ueId"] != ueId {
 		t.Errorf("Expected ueId %v, got %v", ueId, amDataResult["ueId"])
-	}
-	if ImsiData[ueId] != nil {
-		t.Errorf("Expected no ueId in memory, got %v", ImsiData[ueId])
 	}
 }
 

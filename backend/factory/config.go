@@ -31,16 +31,13 @@ type Info struct {
 }
 
 type Configuration struct {
-	Mongodb                 *Mongodb    `yaml:"mongodb"`
-	WebuiTLS                *TLS        `yaml:"webui-tls"`
-	NfConfigTLS             *TLS        `yaml:"nfconfig-tls"`
-	RocEnd                  *RocEndpt   `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
-	LteEnd                  []*LteEndpt `yaml:"endpoints,omitempty"`          // LTE endpoints are configured and not auto-detected
-	Mode5G                  bool        `yaml:"mode5G,omitempty"`
-	SdfComp                 bool        `yaml:"spec-compliant-sdf"`
-	EnableAuthentication    bool        `yaml:"enableAuthentication,omitempty"`
-	SendPebbleNotifications bool        `yaml:"send-pebble-notifications,omitempty"`
-	CfgPort                 int         `yaml:"cfgport,omitempty"`
+	Mongodb                 *Mongodb  `yaml:"mongodb"`
+	WebuiTLS                *TLS      `yaml:"webui-tls"`
+	NfConfigTLS             *TLS      `yaml:"nfconfig-tls"`
+	RocEnd                  *RocEndpt `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
+	EnableAuthentication    bool      `yaml:"enableAuthentication,omitempty"`
+	SendPebbleNotifications bool      `yaml:"send-pebble-notifications,omitempty"`
+	CfgPort                 int       `yaml:"cfgport,omitempty"`
 }
 
 type TLS struct {
@@ -60,10 +57,4 @@ type Mongodb struct {
 type RocEndpt struct {
 	SyncUrl string `yaml:"syncUrl,omitempty"`
 	Enabled bool   `yaml:"enabled,omitempty"`
-}
-
-type LteEndpt struct {
-	NodeType       string `yaml:"type,omitempty"`
-	ConfigPushUrl  string `yaml:"configPushUrl,omitempty"`
-	ConfigCheckUrl string `yaml:"configCheckUrl,omitempty"` // only for 4G components
 }

@@ -526,14 +526,6 @@ func PostSubscriberByID(c *gin.Context) {
 	}
 	logger.WebUILog.Infoln("Subscriber %s created successfully", ueId)
 
-	msg := configmodels.ConfigMessage{
-		MsgType:     configmodels.Sub_data,
-		MsgMethod:   configmodels.Post_op,
-		AuthSubData: &authSubsData,
-		Imsi:        ueId,
-	}
-	configChannel <- &msg
-
 	c.JSON(http.StatusCreated, gin.H{})
 }
 
@@ -615,15 +607,6 @@ func PutSubscriberByID(c *gin.Context) {
 		return
 	}
 	logger.WebUILog.Infof("Subscriber %s updated successfully", ueId)
-
-	msg := configmodels.ConfigMessage{
-		MsgType:     configmodels.Sub_data,
-		MsgMethod:   configmodels.Put_op,
-		AuthSubData: &authSubsData,
-		Imsi:        ueId,
-	}
-	configChannel <- &msg
-
 	c.JSON(http.StatusNoContent, gin.H{})
 }
 
@@ -668,13 +651,6 @@ func DeleteSubscriberByID(c *gin.Context) {
 		return
 	}
 	logger.WebUILog.Infof("Subscriber %s deleted successfully", ueId)
-
-	msg := configmodels.ConfigMessage{
-		MsgType:   configmodels.Sub_data,
-		MsgMethod: configmodels.Delete_op,
-		Imsi:      ueId,
-	}
-	configChannel <- &msg
 
 	c.JSON(http.StatusNoContent, gin.H{})
 }

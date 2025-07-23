@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
@@ -65,7 +64,6 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 	deviceGroups[2].Imsis = []string{}
 	deviceGroups[3].IpDomainExpanded.UeDnnQos.TrafficClass = nil
 	deviceGroups[4].IpDomainExpanded.UeDnnQos = nil
-	factory.WebUIConfig.Configuration.Mode5G = true
 
 	for _, testGroup := range deviceGroups {
 		dg := testGroup
@@ -159,8 +157,6 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 	deviceGroups[2].Imsis = []string{}
 	deviceGroups[3].IpDomainExpanded.UeDnnQos.TrafficClass = nil
 	deviceGroups[4].IpDomainExpanded.UeDnnQos = nil
-
-	factory.WebUIConfig.Configuration.Mode5G = true
 
 	for _, testGroup := range deviceGroups {
 		dg := testGroup
@@ -300,10 +296,8 @@ func TestDeviceGroupPostHandler_DeviceGroupNameValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			origChannel := configChannel
-			configChannel = make(chan *configmodels.ConfigMessage, 1)
 			originalDBClient := dbadapter.CommonDBClient
-			defer func() { configChannel = origChannel; dbadapter.CommonDBClient = originalDBClient }()
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			if tc.expectedCode == http.StatusOK {
 				dbadapter.CommonDBClient = &MockMongoClientEmptyDB{}
 			}

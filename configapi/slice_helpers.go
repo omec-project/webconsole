@@ -29,16 +29,10 @@ func networkSliceDeleteHelper(sliceName string) error {
 		logger.ConfigLog.Errorf("Error deleting slice %s: %+v", sliceName, err)
 		return err
 	}
-	var msg configmodels.ConfigMessage
-	msg.MsgMethod = configmodels.Delete_op
-	msg.MsgType = configmodels.Network_slice
-	msg.SliceName = sliceName
-	configChannel <- &msg
-	logger.ConfigLog.Infof("successfully Added Network Slice [%s] with delete_op to config channel", sliceName)
 	return nil
 }
 
-func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, error) {
+func networkSlicePostHelper(c *gin.Context, sliceName string) (int, error) {
 	logger.ConfigLog.Infof("received slice: %s", sliceName)
 	requestSlice, err := parseAndValidateSliceRequest(c, sliceName)
 	if err != nil {
@@ -62,14 +56,6 @@ func networkSlicePostHelper(c *gin.Context, msgOp int, sliceName string) (int, e
 			return statusCode, err
 		}
 	}
-	var msg configmodels.ConfigMessage
-	msg.MsgMethod = msgOp
-	requestSlice.SliceName = sliceName
-	msg.MsgType = configmodels.Network_slice
-	msg.Slice = &requestSlice
-	msg.SliceName = sliceName
-	configChannel <- &msg
-	logger.ConfigLog.Infof("successfully Added Slice [%s] to config channel", sliceName)
 	return http.StatusOK, nil
 }
 

@@ -7,8 +7,11 @@ package nfconfig
 
 import (
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/openapi/nfConfigApi"
 	"github.com/omec-project/webconsole/backend/logger"
 )
 
@@ -35,4 +38,18 @@ func (n *NFConfigServer) GetPolicyControlConfig(c *gin.Context) {
 func (n *NFConfigServer) GetSessionManagementConfig(c *gin.Context) {
 	logger.NfConfigLog.Debugf("Handling GET request for session-management config %+v", n.inMemoryConfig.sessionManagement)
 	c.JSON(http.StatusOK, n.inMemoryConfig.sessionManagement)
+}
+
+func (n *NFConfigServer) GetImsiQosConfig(c *gin.Context) {
+	dnn := c.Param("dnn")
+	imsi := strings.TrimPrefix(c.Param("imsi"), "imis-")
+	logger.NfConfigLog.Debugf("Handling GET request for QoS config for IMSI %s", imsi)
+	imsiQos := []nfConfigApi.ImsiQos{}
+	for _, imsiQosConfig := range n.inMemoryConfig.imsiQos {
+		if imsiQosConfig.dnn == dnn && slices.Contains(imsiQosConfig.imsis, imsi) {
+			imsiQos = imsiQosConfig.qos
+			break
+		}
+	}
+	c.JSON(http.StatusOK, imsiQos)
 }

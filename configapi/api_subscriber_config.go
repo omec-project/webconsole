@@ -524,7 +524,7 @@ func PostSubscriberByID(c *gin.Context) {
 		})
 		return
 	}
-	logger.WebUILog.Infoln("Subscriber %s created successfully", ueId)
+	logger.WebUILog.Infof("Subscriber %s created successfully", ueId)
 
 	c.JSON(http.StatusCreated, gin.H{})
 }

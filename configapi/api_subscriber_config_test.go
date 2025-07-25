@@ -20,9 +20,14 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+type PostDataTracker interface {
+	dbadapter.DBInterface
+	GetPostData() []map[string]interface{}
+}
+
 type MockMongoClientOneSubscriber struct {
 	dbadapter.DBInterface
-	PostDataCommon *[]map[string]interface{}
+	postDataCommon []map[string]interface{}
 }
 
 type MockMongoClientManySubscribers struct {
@@ -39,13 +44,10 @@ func (m *MockMongoClientOneSubscriber) RestfulAPIGetMany(coll string, filter bso
 }
 
 func (m *MockMongoClientOneSubscriber) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
-	if m.PostDataCommon != nil {
-		*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
-			"coll":   collName,
-			"filter": filter,
-		})
-	}
-
+	m.postDataCommon = append(m.postDataCommon, map[string]interface{}{
+		"coll":   collName,
+		"filter": filter,
+	})
 	subscriber := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{})
 	subscriber["ueId"] = "208930100007487"
 	subscriber["servingPlmnId"] = "12345"
@@ -67,31 +69,36 @@ func (m *MockMongoClientManySubscribers) RestfulAPIGetMany(coll string, filter b
 
 type MockAuthDBClientEmpty struct {
 	dbadapter.DBInterface
-	PostDataAuth *[]map[string]interface{}
+	postDataAuth []map[string]interface{}
+}
+
+func (m *MockAuthDBClientEmpty) GetPostData() []map[string]interface{} {
+	return m.postDataAuth
 }
 
 func (m *MockAuthDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	if m.PostDataAuth != nil {
-		*m.PostDataAuth = append(*m.PostDataAuth, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+	m.postDataAuth = append(m.postDataAuth, map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+	})
 	return nil, nil
 }
 
 type MockAuthDBClientWithData struct {
 	dbadapter.DBInterface
-	PostDataAuth *[]map[string]interface{}
+	postDataAuth []map[string]interface{}
+}
+
+func (m *MockAuthDBClientWithData) GetPostData() []map[string]interface{} {
+	return m.postDataAuth
 }
 
 func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	if m.PostDataAuth != nil {
-		*m.PostDataAuth = append(*m.PostDataAuth, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+	m.postDataAuth = append(m.postDataAuth, map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+	})
+
 	authSubscription := configmodels.ToBsonM(models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",
@@ -122,41 +129,43 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 
 type MockCommonDBClientEmpty struct {
 	dbadapter.DBInterface
-	PostDataCommon *[]map[string]interface{}
+	postDataCommon []map[string]interface{}
+}
+
+func (m *MockCommonDBClientEmpty) GetPostData() []map[string]interface{} {
+	return m.postDataCommon
 }
 
 func (m *MockCommonDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	if m.PostDataCommon != nil {
-		*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+	m.postDataCommon = append(m.postDataCommon, map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+	})
 	return nil, nil
 }
 
 func (m *MockCommonDBClientEmpty) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	if m.PostDataCommon != nil {
-		*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+	m.postDataCommon = append(m.postDataCommon, map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+	})
 	return nil, nil
 }
 
 type MockCommonDBClientWithData struct {
 	dbadapter.DBInterface
-	PostDataCommon *[]map[string]interface{}
+	postDataCommon []map[string]interface{}
+}
+
+func (m *MockCommonDBClientWithData) GetPostData() []map[string]interface{} {
+	return m.postDataCommon
 }
 
 func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	if m.PostDataCommon != nil {
-		*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+	m.postDataCommon = append(m.postDataCommon, map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+	})
 
 	switch coll {
 	case "subscriptionData.provisionedData.amData":
@@ -243,12 +252,11 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 }
 
 func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	if m.PostDataCommon != nil {
-		*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+	m.postDataCommon = append(m.postDataCommon, map[string]interface{}{
+		"coll":   coll,
+		"filter": filter,
+	})
+
 	smDataData := []models.SessionManagementSubscriptionData{
 		{
 			SingleNssai: &models.Snssai{
@@ -294,15 +302,13 @@ func TestGetSubscriberByID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)
-	postDataCommon := make([]map[string]interface{}, 0)
-	postDataAuth := make([]map[string]interface{}, 0)
 
 	tests := []struct {
 		name                          string
 		ueId                          string
 		route                         string
-		commonDbAdapter               dbadapter.DBInterface
-		authDbAdapter                 dbadapter.DBInterface
+		commonDbAdapter               PostDataTracker
+		authDbAdapter                 PostDataTracker
 		expectedHTTPStatus            int
 		expectedFullResponse          map[string]interface{}
 		expectedCommonPostDataDetails []map[string]interface{}
@@ -312,8 +318,8 @@ func TestGetSubscriberByID(t *testing.T) {
 			name:                 "No subscriber data found",
 			ueId:                 "imsi-2089300007487",
 			route:                "/api/subscriber/:ueId",
-			commonDbAdapter:      &MockCommonDBClientEmpty{PostDataCommon: &postDataCommon},
-			authDbAdapter:        &MockAuthDBClientEmpty{PostDataAuth: &postDataAuth},
+			commonDbAdapter:      &MockCommonDBClientEmpty{},
+			authDbAdapter:        &MockAuthDBClientEmpty{},
 			expectedHTTPStatus:   http.StatusNotFound,
 			expectedFullResponse: map[string]interface{}{"error": "subscriber with ID imsi-2089300007487 not found"},
 			expectedCommonPostDataDetails: []map[string]interface{}{
@@ -331,8 +337,8 @@ func TestGetSubscriberByID(t *testing.T) {
 		{
 			name:               "Valid subscriber data retrieved",
 			ueId:               "imsi-2089300007487",
-			commonDbAdapter:    &MockCommonDBClientWithData{PostDataCommon: &postDataCommon},
-			authDbAdapter:      &MockAuthDBClientWithData{PostDataAuth: &postDataAuth},
+			commonDbAdapter:    &MockCommonDBClientWithData{},
+			authDbAdapter:      &MockAuthDBClientWithData{},
 			route:              "/api/subscriber/:ueId",
 			expectedHTTPStatus: http.StatusOK,
 			expectedFullResponse: map[string]interface{}{
@@ -449,8 +455,6 @@ func TestGetSubscriberByID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			postDataCommon = nil
-			postDataAuth = nil
 			originalAuthDBClient := dbadapter.AuthDBClient
 			originalCommonDBClient := dbadapter.CommonDBClient
 			dbadapter.CommonDBClient = tt.commonDbAdapter
@@ -490,24 +494,24 @@ func TestGetSubscriberByID(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal expected post data details: %v", err)
 			}
-			gotCommonData, err := json.Marshal(postDataCommon)
+			gotCommonData, err := json.Marshal(tt.commonDbAdapter.GetPostData())
 			if err != nil {
 				t.Fatalf("failed to marshal actual post data details: %v", err)
 			}
 			if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
-				t.Errorf("Expected CommonPostData `%v`, but got `%v`", tt.expectedCommonPostDataDetails, postDataCommon)
+				t.Errorf("Expected CommonPostData `%v`, but got `%v`", tt.expectedCommonPostDataDetails, gotCommonData)
 			}
 
 			expectedAuthData, err := json.Marshal(tt.expectedAuthPostDataDetails)
 			if err != nil {
 				t.Fatalf("failed to marshal expected auth post data details: %v", err)
 			}
-			gotAuthData, err := json.Marshal(postDataAuth)
+			gotAuthData, err := json.Marshal(tt.authDbAdapter.GetPostData())
 			if err != nil {
 				t.Fatalf("failed to marshal actual auth post data details: %v", err)
 			}
 			if !reflect.DeepEqual(expectedAuthData, gotAuthData) {
-				t.Errorf("Expected AuthPostData `%v`, but got `%v`", tt.expectedAuthPostDataDetails, postDataAuth)
+				t.Errorf("Expected AuthPostData `%v`, but got `%v`", tt.expectedAuthPostDataDetails, gotAuthData)
 			}
 		})
 	}
@@ -528,7 +532,7 @@ func TestSubscriberGetHandlers(t *testing.T) {
 		{
 			name:         "SubscriberEmptyDB",
 			route:        "/api/subscriber",
-			dbAdapter:    &MockMongoClientEmptyDB{},
+			dbAdapter:    &MockCommonDBClientEmpty{},
 			expectedCode: http.StatusOK,
 			expectedBody: "[]",
 		},
@@ -621,7 +625,7 @@ func (db *AuthDBMockDBClient) RestfulAPIPost(collName string, filter bson.M, pos
 	db.receivedPostData = append(db.receivedPostData, map[string]interface{}{
 		"coll":   collName,
 		"filter": filter,
-		//"data":   postData,
+		"data":   postData,
 	})
 	return true, nil
 }
@@ -669,18 +673,10 @@ func (db *PostSubscriberMockDBClient) RestfulAPIPost(collName string, filter bso
 	db.receivedPostData = append(db.receivedPostData, map[string]interface{}{
 		"coll":   collName,
 		"filter": filter,
-		//"data":   postData,
+		"data":   postData,
 	})
 	return true, nil
 }
-
-//func (db *PostSubscriberMockDBClient) RestfulAPIGetMany(collName string, filter bson.M) ([]map[string]interface{}, error) {
-//	return []map[string]interface{}{}, nil
-//}
-
-//func (m *PostSubscriberMockDBClient) Client() *mongo.Client {
-//	return nil
-//}
 
 func TestSubscriberPost(t *testing.T) {
 	tests := []struct {
@@ -714,7 +710,7 @@ func TestSubscriberPost(t *testing.T) {
 				{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-208930100007487"}},
 			},
 			expectedPostData: []map[string]interface{}{
-				{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-208930100007487"}},
+				{"coll": "subscriptionData.provisionedData.amData", "filter": bson.M{"ueId": "imsi-208930100007487"}},
 			},
 		},
 	}
@@ -749,10 +745,6 @@ func TestSubscriberPost(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal expected get data details: %v", err)
 			}
-			expectedPostData, err := json.Marshal(tc.expectedPostData)
-			if err != nil {
-				t.Fatalf("failed to marshal expected post data details: %v", err)
-			}
 
 			req, err := http.NewRequest(http.MethodPost, route, bytes.NewBuffer(jsonData))
 			if err != nil {
@@ -777,12 +769,18 @@ func TestSubscriberPost(t *testing.T) {
 				t.Errorf("Expected expectedGetData `%+v`, but got `%+v`", expectedGetData, tc.commonDbAdapter.receivedGetData)
 			}
 
-			gotPostData, err := json.Marshal(tc.commonDbAdapter.receivedPostData)
-			if err != nil {
-				t.Fatalf("failed to marshal actual post data details: %v", err)
-			}
-			if !reflect.DeepEqual(expectedPostData, gotPostData) {
-				t.Errorf("Expected expectedPostData `%v`, but got `%v`", expectedPostData, tc.commonDbAdapter.receivedPostData)
+			if tc.expectedPostData != nil {
+				expectedAmDataCollection := amDataColl
+				if tc.commonDbAdapter.receivedPostData[0]["coll"] != expectedAmDataCollection {
+					t.Errorf("Expected collection %v, got %v", expectedAmDataCollection, tc.commonDbAdapter.receivedPostData[0]["coll"])
+				}
+				if !reflect.DeepEqual(tc.commonDbAdapter.receivedPostData[0]["filter"], tc.expectedPostData[0]["filter"]) {
+					t.Errorf("Expected filter %t, got %t", tc.expectedPostData[0]["filter"], tc.commonDbAdapter.receivedPostData[0]["filter"])
+				}
+				expectedFilter := bson.M{"ueId": "imsi-208930100007487"}
+				if !reflect.DeepEqual(tc.commonDbAdapter.receivedPostData[0]["filter"], expectedFilter) {
+					t.Errorf("Expected filter %v, got %v", expectedFilter, tc.commonDbAdapter.receivedPostData[0]["filter"])
+				}
 			}
 		})
 	}

@@ -4,6 +4,8 @@
 package configapi
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -85,6 +88,31 @@ func (db *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.
 
 func (db *MockMongoClientRegularUser) RestfulAPIDeleteOne(collName string, filter bson.M) error {
 	return nil
+}
+
+type MockMongoClientDuplicateCreation struct {
+	dbadapter.DBInterface
+}
+
+func (db *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	return results, nil
+}
+
+func (db *MockMongoClientDuplicateCreation) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
+	return errors.New("E11000")
+}
+
+func (db *MockMongoClientDuplicateCreation) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []interface{}) error {
+	return errors.New("E11000")
+}
+
+func (db *MockMongoClientDuplicateCreation) RestfulAPICount(collName string, filter bson.M) (int64, error) {
+	return 1, nil
+}
+
+func (m *MockMongoClientDuplicateCreation) StartSession() (mongo.Session, error) {
+	return &MockSession{}, nil
 }
 
 func TestGetUserAccountsHandler(t *testing.T) {

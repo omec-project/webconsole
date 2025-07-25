@@ -4,12 +4,14 @@
 package configapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/omec-project/openapi/models"
+	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -232,14 +234,24 @@ func TestSubscriberAuthenticationDataDelete_CommonDBDeleteFails_RollbackFails(t 
 }
 
 func TestSubscriberAuthenticationDataDelete_NoDataInAuthDB_Exits(t *testing.T) {
+	authDB := &mockDB{
+		getOneFunc: func(c string, f bson.M) (map[string]interface{}, error) {
+			return nil, fmt.Errorf("data not found in AuthDB")
+		},
+		deleteOneFunc: func(c string, f bson.M) error { return nil },
+		postFunc:      func(c string, f bson.M, data map[string]interface{}) (bool, error) { return true, nil },
+	}
+	commonDB := &mockDB{
+		deleteOneFunc: func(c string, f bson.M) error { return fmt.Errorf("fail on commondb delete") },
+	}
 	origAuthDB := dbadapter.AuthDBClient
 	origCommonDB := dbadapter.CommonDBClient
 	defer func() {
 		dbadapter.AuthDBClient = origAuthDB
 		dbadapter.CommonDBClient = origCommonDB
 	}()
-	dbadapter.AuthDBClient = &AuthDBMockDBClient{err: fmt.Errorf("data not found in AuthDB")}
-	dbadapter.CommonDBClient = &DeleteSubscriberMockDBClient{}
+	dbadapter.AuthDBClient = authDB
+	dbadapter.CommonDBClient = commonDB
 
 	err := subscriberAuthenticationDataDelete("imsi-12345")
 	if err == nil || !strings.Contains(err.Error(), "not found") {
@@ -281,16 +293,16 @@ func Test_handleSubscriberPost(t *testing.T) {
 		t.Errorf("Expected filter %v, got %v", expectedFilter, commonDbClientMock.receivedPostData[0]["filter"])
 	}
 
-	//var authSubResult models.AuthenticationSubscription
-	//result := postData[0]["data"].(map[string]interface{})
-	//err := json.Unmarshal(configmodels.MapToByte(result), &authSubResult)
-	//if err != nil {
-	//	t.Errorf("Could not unmarshall result %v", result)
-	//}
-	//amDataResult := postData[1]["data"].(map[string]interface{})
-	//if amDataResult["ueId"] != ueId {
-	//	t.Errorf("Expected ueId %v, got %v", ueId, amDataResult["ueId"])
-	//}
+	var authSubResult models.AuthenticationSubscription
+	result := authDbClientMock.receivedPostData[0]["data"].(map[string]interface{})
+	err := json.Unmarshal(configmodels.MapToByte(result), &authSubResult)
+	if err != nil {
+		t.Errorf("Could not unmarshall result %v", result)
+	}
+	amDataResult := commonDbClientMock.receivedPostData[0]["data"].(map[string]interface{})
+	if amDataResult["ueId"] != ueId {
+		t.Errorf("Expected ueId %v, got %v", ueId, amDataResult["ueId"])
+	}
 }
 
 func Test_handleSubscriberDelete(t *testing.T) {

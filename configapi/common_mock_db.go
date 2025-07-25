@@ -127,28 +127,3 @@ func (m *MockMongoClientEmptyDB) RestfulAPIDeleteOne(coll string, filter bson.M)
 func (m *MockMongoClientEmptyDB) Client() *mongo.Client {
 	return nil
 }
-
-type MockMongoClientDuplicateCreation struct {
-	dbadapter.DBInterface
-}
-
-func (db *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	return results, nil
-}
-
-func (db *MockMongoClientDuplicateCreation) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
-	return errors.New("E11000")
-}
-
-func (db *MockMongoClientDuplicateCreation) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []interface{}) error {
-	return errors.New("E11000")
-}
-
-func (db *MockMongoClientDuplicateCreation) RestfulAPICount(collName string, filter bson.M) (int64, error) {
-	return 1, nil
-}
-
-func (m *MockMongoClientDuplicateCreation) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
-}

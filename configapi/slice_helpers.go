@@ -329,8 +329,8 @@ func updateAmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 			SingleNssais:        []models.Snssai{*snssai},
 		},
 		SubscribedUeAmbr: &models.AmbrRm{
-			Downlink: convertToString(uint64(qos.DnnMbrDownlink)),
-			Uplink:   convertToString(uint64(qos.DnnMbrUplink)),
+			Downlink: ConvertToString(uint64(qos.DnnMbrDownlink)),
+			Uplink:   ConvertToString(uint64(qos.DnnMbrUplink)),
 		},
 	}
 	amDataBsonA := configmodels.ToBsonM(amData)
@@ -369,8 +369,8 @@ func updateSmProvisionedData(snssai *models.Snssai, qos *configmodels.DeviceGrou
 					},
 				},
 				SessionAmbr: &models.Ambr{
-					Downlink: convertToString(uint64(qos.DnnMbrDownlink)),
-					Uplink:   convertToString(uint64(qos.DnnMbrUplink)),
+					Downlink: ConvertToString(uint64(qos.DnnMbrDownlink)),
+					Uplink:   ConvertToString(uint64(qos.DnnMbrUplink)),
 				},
 				Var5gQosProfile: &models.SubscribedDefaultQos{
 					Var5qi: 9,
@@ -425,7 +425,7 @@ func SnssaiModelsToHex(snssai models.Snssai) string {
 	return sst + snssai.Sd
 }
 
-func convertToString(val uint64) string {
+func ConvertToString(val uint64) string {
 	var mbVal, gbVal, kbVal uint64
 	kbVal = val / 1000
 	mbVal = val / 1000000

@@ -50,7 +50,7 @@ instructions, see the [MongoDB Replica Set Documentation](https://www.mongodb.co
 
 ## Webconsole Architecture diagram
 
-![Architecture](/docs/images/architecture1.png)
+![Architecture](/docs/images/architecture.png)
 
 The webconsole has two services: **WebUI** and **NF Config**.
 

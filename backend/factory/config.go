@@ -35,6 +35,7 @@ type Configuration struct {
 	WebuiTLS                *TLS      `yaml:"webui-tls"`
 	NfConfigTLS             *TLS      `yaml:"nfconfig-tls"`
 	RocEnd                  *RocEndpt `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
+	SdfComp                 bool      `yaml:"spec-compliant-sdf"`
 	EnableAuthentication    bool      `yaml:"enableAuthentication,omitempty"`
 	SendPebbleNotifications bool      `yaml:"send-pebble-notifications,omitempty"`
 	CfgPort                 int       `yaml:"cfgport,omitempty"`

@@ -17,6 +17,7 @@ func makePolicyControlNetworkSlice(mcc, mnc, sst, sd string, filteringRules []co
 		Mcc: mcc,
 		Mnc: mnc,
 	}
+	deviceGroups := []string{"testDG"}
 	siteInfo := configmodels.SliceSiteInfo{
 		SiteName: "test",
 		Plmn:     plmnId,
@@ -28,6 +29,7 @@ func makePolicyControlNetworkSlice(mcc, mnc, sst, sd string, filteringRules []co
 	}
 	networkSlice := configmodels.Slice{
 		SliceName:                 "slice1",
+		SiteDeviceGroup:           deviceGroups,
 		SiteInfo:                  siteInfo,
 		SliceId:                   sliceId,
 		ApplicationFilteringRules: filteringRules,
@@ -36,13 +38,23 @@ func makePolicyControlNetworkSlice(mcc, mnc, sst, sd string, filteringRules []co
 }
 
 var (
-	testSst                            int32 = 1
-	testSd                                   = "12345"
-	testRuleName                             = "TestRule"
-	testRulePriority                   int32 = 12
-	testRuleQci                        int32 = 12
-	testRuleArp                        int32 = 100
-	validSliceApplicationFilteringRule       = configmodels.SliceApplicationFilteringRules{
+	testSst             int32 = 1
+	testSd                    = "12345"
+	testRuleName              = "TestRule"
+	testRulePriority    int32 = 12
+	testRuleQci         int32 = 12
+	testRuleArp         int32 = 100
+	testDeviceGroupName       = "testDG"
+	testDnnName               = "testDnn"
+	testDG                    = configmodels.DeviceGroups{
+		DeviceGroupName: testDeviceGroupName,
+		Imsis:           []string{"001010123456789"},
+		IpDomainExpanded: configmodels.DeviceGroupsIpDomainExpanded{
+			Dnn: testDnnName,
+		},
+	}
+	testDeviceGroups                   = map[string]configmodels.DeviceGroups{testDeviceGroupName: testDG}
+	validSliceApplicationFilteringRule = configmodels.SliceApplicationFilteringRules{
 		RuleName:       testRuleName,
 		Priority:       testRulePriority,
 		Action:         "allow",
@@ -64,6 +76,7 @@ func TestSyncPolicyControl(t *testing.T) {
 	tests := []struct {
 		name             string
 		networkSlices    []configmodels.Slice
+		deviceGroups     map[string]configmodels.DeviceGroups
 		expectedResponse []nfConfigApi.PolicyControl
 	}{
 		{
@@ -71,10 +84,12 @@ func TestSyncPolicyControl(t *testing.T) {
 			networkSlices: []configmodels.Slice{
 				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []configmodels.SliceApplicationFilteringRules{validSliceApplicationFilteringRule}),
 			},
+			deviceGroups: testDeviceGroups,
 			expectedResponse: []nfConfigApi.PolicyControl{
 				{
 					PlmnId: *nfConfigApi.NewPlmnId("001", "01"),
 					Snssai: makeSnssaiWithSd(testSst, testSd),
+					Dnns:   []string{testDnnName},
 					PccRules: []nfConfigApi.PccRule{
 						{
 							RuleId: testRuleName,
@@ -106,10 +121,12 @@ func TestSyncPolicyControl(t *testing.T) {
 			networkSlices: []configmodels.Slice{
 				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []configmodels.SliceApplicationFilteringRules{}),
 			},
+			deviceGroups: testDeviceGroups,
 			expectedResponse: []nfConfigApi.PolicyControl{
 				{
 					PlmnId:   *nfConfigApi.NewPlmnId("001", "01"),
 					Snssai:   makeSnssaiWithSd(testSst, testSd),
+					Dnns:     []string{testDnnName},
 					PccRules: []nfConfigApi.PccRule{*defaultPccRule},
 				},
 			},
@@ -119,10 +136,12 @@ func TestSyncPolicyControl(t *testing.T) {
 			networkSlices: []configmodels.Slice{
 				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []configmodels.SliceApplicationFilteringRules{}),
 			},
+			deviceGroups: testDeviceGroups,
 			expectedResponse: []nfConfigApi.PolicyControl{
 				{
 					PlmnId:   *nfConfigApi.NewPlmnId("001", "01"),
 					Snssai:   makeSnssaiWithSd(testSst, testSd),
+					Dnns:     []string{testDnnName},
 					PccRules: []nfConfigApi.PccRule{*defaultPccRule},
 				},
 			},
@@ -132,14 +151,30 @@ func TestSyncPolicyControl(t *testing.T) {
 			networkSlices: []configmodels.Slice{
 				makePolicyControlNetworkSlice("999", "99", "a", testSd, []configmodels.SliceApplicationFilteringRules{}),
 			},
+			deviceGroups:     testDeviceGroups,
 			expectedResponse: []nfConfigApi.PolicyControl{},
+		},
+		{
+			name: "Network Slice with non-existent Device Group returns empty DNNs in Policy Control",
+			networkSlices: []configmodels.Slice{
+				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []configmodels.SliceApplicationFilteringRules{}),
+			},
+			deviceGroups: map[string]configmodels.DeviceGroups{},
+			expectedResponse: []nfConfigApi.PolicyControl{
+				{
+					PlmnId:   *nfConfigApi.NewPlmnId("001", "01"),
+					Snssai:   makeSnssaiWithSd(testSst, testSd),
+					Dnns:     []string{},
+					PccRules: []nfConfigApi.PccRule{*defaultPccRule},
+				},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := inMemoryConfig{}
-			cfg.syncPolicyControl(tt.networkSlices)
+			cfg.syncPolicyControl(tt.networkSlices, tt.deviceGroups)
 
 			if !reflect.DeepEqual(cfg.policyControl, tt.expectedResponse) {
 				t.Errorf("expected %+v, got %+v", tt.expectedResponse, cfg.policyControl)

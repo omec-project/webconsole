@@ -334,11 +334,11 @@ func extractGnbNames(slice configmodels.Slice) []string {
 	return names
 }
 
-func (c *inMemoryConfig) syncPolicyControl(slices []configmodels.Slice) {
+func (c *inMemoryConfig) syncPolicyControl(slices []configmodels.Slice, deviceGroupMap map[string]configmodels.DeviceGroups) {
 	policyControlConfigs := []nfConfigApi.PolicyControl{}
 
 	for _, slice := range slices {
-		policyControl, ok := buildPolicyControlConfig(slice)
+		policyControl, ok := buildPolicyControlConfig(slice, deviceGroupMap)
 		if ok {
 			policyControlConfigs = append(policyControlConfigs, *policyControl)
 		}
@@ -348,7 +348,7 @@ func (c *inMemoryConfig) syncPolicyControl(slices []configmodels.Slice) {
 	logger.NfConfigLog.Debugf("Updated Policy Control in-memory configuration. New configuration: %+v", c.policyControl)
 }
 
-func buildPolicyControlConfig(slice configmodels.Slice) (*nfConfigApi.PolicyControl, bool) {
+func buildPolicyControlConfig(slice configmodels.Slice, deviceGroups map[string]configmodels.DeviceGroups) (*nfConfigApi.PolicyControl, bool) {
 	plmn := nfConfigApi.NewPlmnId(slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc)
 
 	snssai, err := parseSnssaiFromSlice(slice.SliceId)
@@ -357,7 +357,8 @@ func buildPolicyControlConfig(slice configmodels.Slice) (*nfConfigApi.PolicyCont
 		return nil, false
 	}
 	pccRules := buildSlicePccRules(slice)
-	policyControl := nfConfigApi.NewPolicyControl(*plmn, snssai, pccRules)
+	dnns := getSupportedDnns(slice, deviceGroups)
+	policyControl := nfConfigApi.NewPolicyControl(*plmn, snssai, dnns, pccRules)
 
 	return policyControl, true
 }
@@ -433,6 +434,21 @@ func buildDescription(protocol, endpoint string, startPort, endPort int32) strin
 	} else {
 		return fmt.Sprintf("permit out %s from %s to assigned %s-%s", protocol, endpoint, strconv.FormatInt(int64(startPort), 10), strconv.FormatInt(int64(endPort), 10))
 	}
+}
+
+func getSupportedDnns(slice configmodels.Slice, deviceGroups map[string]configmodels.DeviceGroups) []string {
+	dnns := []string{}
+
+	for _, dgName := range slice.SiteDeviceGroup {
+		deviceGroup, exists := deviceGroups[dgName]
+		if !exists {
+			logger.NfConfigLog.Warnf("DeviceGroup %s not found", dgName)
+			continue
+		}
+		dnn := deviceGroup.IpDomainExpanded.Dnn
+		dnns = append(dnns, dnn)
+	}
+	return dnns
 }
 
 func buildPccQos(ruleConfig configmodels.SliceApplicationFilteringRules) nfConfigApi.PccQos {

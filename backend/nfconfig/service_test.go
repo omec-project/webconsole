@@ -547,11 +547,13 @@ func TestSyncInMemoryConfig_UpdateAllConfigs(t *testing.T) {
 				{
 					PlmnId:   *nfConfigApi.NewPlmnId("123", "23"),
 					Snssai:   makeSnssaiWithSd(2, "abcd"),
+					Dnns:     []string{},
 					PccRules: []nfConfigApi.PccRule{*defaultPccRule},
 				},
 				{
 					PlmnId:   *nfConfigApi.NewPlmnId("123", "23"),
 					Snssai:   makeSnssaiWithSd(1, "01234"),
+					Dnns:     []string{},
 					PccRules: []nfConfigApi.PccRule{*defaultPccRule},
 				},
 			},

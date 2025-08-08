@@ -36,47 +36,43 @@ func GetConfig() *Config {
 
 // TODO: Support configuration update from REST api
 func InitConfigFactory(f string) error {
-	if content, err := os.ReadFile(f); err != nil {
+	content, err := os.ReadFile(f)
+	if err != nil {
 		return fmt.Errorf("[Configuration] %+v", err)
-	} else {
-		if yamlErr := yaml.Unmarshal(content, WebUIConfig); yamlErr != nil {
-			return fmt.Errorf("[Configuration] %+v", yamlErr)
+	}
+	if err = yaml.Unmarshal(content, WebUIConfig); err != nil {
+		return fmt.Errorf("[Configuration] %+v", err)
+	}
+	if WebUIConfig.Configuration.WebuiTLS != nil {
+		if WebUIConfig.Configuration.WebuiTLS.Key == "" ||
+			WebUIConfig.Configuration.WebuiTLS.PEM == "" {
+			return fmt.Errorf("[WebUI Configuration] TLS Key and PEM must be set")
 		}
-		if WebUIConfig.Configuration.WebuiTLS != nil {
-			if WebUIConfig.Configuration.WebuiTLS.Key == "" ||
-				WebUIConfig.Configuration.WebuiTLS.PEM == "" {
-				return fmt.Errorf("[WebUI Configuration] TLS Key and PEM must be set")
-			}
+	}
+	if WebUIConfig.Configuration.NfConfigTLS != nil {
+		if WebUIConfig.Configuration.NfConfigTLS.Key == "" ||
+			WebUIConfig.Configuration.NfConfigTLS.PEM == "" {
+			return fmt.Errorf("[NFConfig Configuration] TLS Key and PEM must be set")
 		}
-		if WebUIConfig.Configuration.NfConfigTLS != nil {
-			if WebUIConfig.Configuration.NfConfigTLS.Key == "" ||
-				WebUIConfig.Configuration.NfConfigTLS.PEM == "" {
-				return fmt.Errorf("[NFConfig Configuration] TLS Key and PEM must be set")
-			}
-		}
-		if WebUIConfig.Configuration.Mongodb.AuthUrl == "" {
-			authUrl := WebUIConfig.Configuration.Mongodb.Url
-			WebUIConfig.Configuration.Mongodb.AuthUrl = authUrl
-		}
-		if WebUIConfig.Configuration.Mongodb.AuthKeysDbName == "" {
-			WebUIConfig.Configuration.Mongodb.AuthKeysDbName = "authentication"
-		}
+	}
+	if WebUIConfig.Configuration.Mongodb.AuthUrl == "" {
+		authUrl := WebUIConfig.Configuration.Mongodb.Url
+		WebUIConfig.Configuration.Mongodb.AuthUrl = authUrl
+	}
+	if WebUIConfig.Configuration.Mongodb.AuthKeysDbName == "" {
+		WebUIConfig.Configuration.Mongodb.AuthKeysDbName = "authentication"
+	}
 
-		if WebUIConfig.Configuration.EnableAuthentication {
-			if WebUIConfig.Configuration.Mongodb.WebuiDBName == "" ||
-				WebUIConfig.Configuration.Mongodb.WebuiDBUrl == "" {
-				return fmt.Errorf("[Configuration] if EnableAuthentication is set, WebuiDB must be set")
-			}
+	if WebUIConfig.Configuration.EnableAuthentication {
+		if WebUIConfig.Configuration.Mongodb.WebuiDBName == "" ||
+			WebUIConfig.Configuration.Mongodb.WebuiDBUrl == "" {
+			return fmt.Errorf("[Configuration] if EnableAuthentication is set, WebuiDB must be set")
 		}
-		// we dont want Mode5G coming from the helm chart, since
-		// there is chance of misconfiguration
-		if os.Getenv("CONFIGPOD_DEPLOYMENT") == "4G" {
-			logger.ConfigLog.Infoln("configPod running in 4G deployment")
-			WebUIConfig.Configuration.Mode5G = false
-		} else {
-			// default mode
-			logger.ConfigLog.Infoln("configPod running in 5G deployment")
-			WebUIConfig.Configuration.Mode5G = true
+	}
+
+	if WebUIConfig.Configuration.RocEnd != nil {
+		if WebUIConfig.Configuration.RocEnd.Enabled && WebUIConfig.Configuration.RocEnd.SyncUrl == "" {
+			return fmt.Errorf("[Configuration] if RocEnd enabled, SyncUrl must be set")
 		}
 	}
 

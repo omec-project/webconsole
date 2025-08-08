@@ -616,6 +616,9 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden"
+                    },
+                    "500": {
+                        "description": "Device Group Deletion Failed"
                     }
                 }
             }
@@ -691,6 +694,9 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden"
+                    },
+                    "409": {
+                        "description": "Resource Conflict"
                     },
                     "500": {
                         "description": "Error creating gNB"
@@ -862,6 +868,9 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden"
+                    },
+                    "409": {
+                        "description": "Resource Conflict"
                     },
                     "500": {
                         "description": "Error creating UPF"

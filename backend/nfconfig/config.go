@@ -55,8 +55,8 @@ var defaultPccRule = nfConfigApi.NewPccRule(
 	},
 	*nfConfigApi.NewPccQos(
 		9,
-		"1 Kbps",
-		"1 Kbps",
+		"1 Mbps",
+		"1 Mbps",
 		*nfConfigApi.NewArp(
 			1,
 			nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
@@ -343,9 +343,27 @@ func (c *inMemoryConfig) syncPolicyControl(slices []configmodels.Slice, deviceGr
 			policyControlConfigs = append(policyControlConfigs, *policyControl)
 		}
 	}
-
+	sortPolicyControl(policyControlConfigs)
 	c.policyControl = policyControlConfigs
 	logger.NfConfigLog.Debugf("Updated Policy Control in-memory configuration. New configuration: %+v", c.policyControl)
+}
+
+func sortPolicyControl(policyControl []nfConfigApi.PolicyControl) {
+	sort.Slice(policyControl, func(i, j int) bool {
+		if policyControl[i].PlmnId.GetMcc() != policyControl[j].PlmnId.GetMcc() {
+			return policyControl[i].PlmnId.GetMcc() < policyControl[j].PlmnId.GetMcc()
+		}
+		if policyControl[i].PlmnId.GetMnc() != policyControl[j].PlmnId.GetMnc() {
+			return policyControl[i].PlmnId.GetMnc() < policyControl[j].PlmnId.GetMnc()
+		}
+		if policyControl[i].Snssai.GetSst() != policyControl[j].Snssai.GetSst() {
+			return policyControl[i].Snssai.GetSst() < policyControl[j].Snssai.GetSst()
+		}
+		if policyControl[i].Snssai.HasSd() != policyControl[j].Snssai.HasSd() {
+			return !policyControl[i].Snssai.HasSd()
+		}
+		return policyControl[i].Snssai.GetSd() < policyControl[j].Snssai.GetSd()
+	})
 }
 
 func buildPolicyControlConfig(slice configmodels.Slice, deviceGroups map[string]configmodels.DeviceGroups) (*nfConfigApi.PolicyControl, bool) {
@@ -385,7 +403,9 @@ func buildSlicePccRules(slice configmodels.Slice) []nfConfigApi.PccRule {
 	if len(pccRules) == 0 {
 		pccRules = append(pccRules, *defaultPccRule)
 	}
-
+	sort.Slice(pccRules, func(i, j int) bool {
+		return pccRules[i].RuleId < pccRules[j].RuleId
+	})
 	return pccRules
 }
 
@@ -448,6 +468,7 @@ func getSupportedDnns(slice configmodels.Slice, deviceGroups map[string]configmo
 		dnn := deviceGroup.IpDomainExpanded.Dnn
 		dnns = append(dnns, dnn)
 	}
+	sort.Strings(dnns)
 	return dnns
 }
 

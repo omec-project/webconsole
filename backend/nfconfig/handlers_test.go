@@ -30,7 +30,8 @@ func TestGetImsiQosConfig(t *testing.T) {
 					dnn:   "internet",
 					imsis: []string{"001010000000001"},
 					qos: []nfConfigApi.ImsiQos{
-						{MbrUplink: "20 Kbps",
+						{
+							MbrUplink:        "20 Kbps",
 							MbrDownlink:      "100 Kbps",
 							FiveQi:           7,
 							ArpPriorityLevel: 32,
@@ -40,7 +41,8 @@ func TestGetImsiQosConfig(t *testing.T) {
 			},
 			expectedCode: http.StatusOK,
 			expectedData: []nfConfigApi.ImsiQos{
-				{MbrUplink: "20 Kbps",
+				{
+					MbrUplink:        "20 Kbps",
 					MbrDownlink:      "100 Kbps",
 					FiveQi:           7,
 					ArpPriorityLevel: 32,
@@ -55,7 +57,8 @@ func TestGetImsiQosConfig(t *testing.T) {
 					dnn:   "internet",
 					imsis: []string{"999990000000000"},
 					qos: []nfConfigApi.ImsiQos{
-						{MbrUplink: "20 Kbps",
+						{
+							MbrUplink:        "20 Kbps",
 							MbrDownlink:      "100 Kbps",
 							FiveQi:           7,
 							ArpPriorityLevel: 32,
@@ -74,7 +77,8 @@ func TestGetImsiQosConfig(t *testing.T) {
 					dnn:   "internet2",
 					imsis: []string{"001010000000001"},
 					qos: []nfConfigApi.ImsiQos{
-						{MbrUplink: "20 Kbps",
+						{
+							MbrUplink:        "20 Kbps",
 							MbrDownlink:      "100 Kbps",
 							FiveQi:           7,
 							ArpPriorityLevel: 32,
@@ -96,7 +100,6 @@ func TestGetImsiQosConfig(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			router := gin.New()
 
 			nfServer := &NFConfigServer{
@@ -105,16 +108,19 @@ func TestGetImsiQosConfig(t *testing.T) {
 			}
 			nfServer.setupRoutes()
 			w := httptest.NewRecorder()
-			req, _ := http.NewRequest(http.MethodGet, "/nfconfig/qos/"+"internet/"+tc.imsi, nil)
+			req, err := http.NewRequest(http.MethodGet, "/nfconfig/qos/"+"internet/"+tc.imsi, nil)
+			if err != nil {
+				t.Fatalf("fail create a request %v", err)
+			}
 			nfServer.Router.ServeHTTP(w, req)
 
 			if w.Code != tc.expectedCode {
 				t.Errorf("expected %v, got %v", tc.expectedCode, w.Code)
 			}
 			var got []nfConfigApi.ImsiQos
-			err := json.Unmarshal(w.Body.Bytes(), &got)
+			err = json.Unmarshal(w.Body.Bytes(), &got)
 			if err != nil {
-				t.Errorf("fail to unmarshal body %v", w.Body)
+				t.Fatalf("fail to unmarshal body %v", err)
 			}
 			if !reflect.DeepEqual(got, tc.expectedData) {
 				t.Errorf("expected %v, got %v", tc.expectedData, got)

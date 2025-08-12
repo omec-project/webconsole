@@ -266,10 +266,10 @@ func TestNFConfigRoutes(t *testing.T) {
 			wantStatus:   http.StatusOK,
 		},
 		{
-			name:         "imsi qos endpoint status OK",
+			name:         "imsi qos endpoint for missing configuraion returns not found",
 			path:         "/nfconfig/qos/internet/imsi-001011234567890",
 			acceptHeader: "application/json",
-			wantStatus:   http.StatusOK,
+			wantStatus:   http.StatusNotFound,
 		},
 		{
 			name:         "access mobility endpoint invalid accept header",
@@ -546,13 +546,13 @@ func TestSyncInMemoryConfig_UpdateAllConfigs(t *testing.T) {
 			expectedPolicyControl: []nfConfigApi.PolicyControl{
 				{
 					PlmnId:   *nfConfigApi.NewPlmnId("123", "23"),
-					Snssai:   makeSnssaiWithSd(2, "abcd"),
+					Snssai:   makeSnssaiWithSd(1, "01234"),
 					Dnns:     []string{},
 					PccRules: []nfConfigApi.PccRule{*defaultPccRule},
 				},
 				{
 					PlmnId:   *nfConfigApi.NewPlmnId("123", "23"),
-					Snssai:   makeSnssaiWithSd(1, "01234"),
+					Snssai:   makeSnssaiWithSd(2, "abcd"),
 					Dnns:     []string{},
 					PccRules: []nfConfigApi.PccRule{*defaultPccRule},
 				},

@@ -404,6 +404,9 @@ func buildSlicePccRules(slice configmodels.Slice) []nfConfigApi.PccRule {
 		pccRules = append(pccRules, *defaultPccRule)
 	}
 	sort.Slice(pccRules, func(i, j int) bool {
+		if pccRules[i].Precedence != pccRules[j].Precedence {
+			return pccRules[i].Precedence < pccRules[j].Precedence
+		}
 		return pccRules[i].RuleId < pccRules[j].RuleId
 	})
 	return pccRules

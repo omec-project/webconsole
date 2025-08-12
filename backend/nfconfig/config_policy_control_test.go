@@ -41,7 +41,7 @@ var (
 	testSd                    = "12345"
 	testRuleName              = "TestRule"
 	testRulePriority    int32 = 12
-	testRuleQci         int32 = 12
+	testRuleQci         int32 = 8
 	testRuleArp         int32 = 100
 	testDeviceGroupName       = "testDG"
 	testDnnName               = "testDnn"
@@ -74,6 +74,22 @@ var (
 		TrafficClass: &configmodels.TrafficClassInfo{
 			Qci: testRuleQci,
 			Arp: testRuleArp,
+		},
+	}
+	anotherSliceApplicationFilteringRule = configmodels.SliceApplicationFilteringRules{
+		RuleName:       "SOME-RULE",
+		Priority:       2,
+		Action:         "deny",
+		Endpoint:       "127.0.0.1",
+		Protocol:       6,
+		StartPort:      88,
+		EndPort:        9000,
+		AppMbrUplink:   45600,
+		AppMbrDownlink: 12300,
+		BitrateUnit:    "KBPS",
+		TrafficClass: &configmodels.TrafficClassInfo{
+			Qci: 9,
+			Arp: 1,
 		},
 	}
 )
@@ -125,44 +141,43 @@ func TestSyncPolicyControl(t *testing.T) {
 		{
 			name: "Two network slices with valid SliceApplicationFilteringRules produces ordered valid Policy Control config",
 			networkSlices: []configmodels.Slice{
-				makePolicyControlNetworkSlice("12", "01", fmt.Sprintf("%d", testSst), testSd, []string{"testDG", "dg2"}, []configmodels.SliceApplicationFilteringRules{validSliceApplicationFilteringRule}),
-				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []string{"testDG"}, []configmodels.SliceApplicationFilteringRules{validSliceApplicationFilteringRule}),
+				makePolicyControlNetworkSlice("128", "01", fmt.Sprintf("%d", testSst), testSd, []string{"testDG", "dg2"}, []configmodels.SliceApplicationFilteringRules{validSliceApplicationFilteringRule, anotherSliceApplicationFilteringRule}),
+				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []string{"testDG"}, []configmodels.SliceApplicationFilteringRules{}),
 			},
 			deviceGroups: map[string]configmodels.DeviceGroups{"dg2": testDG2, testDeviceGroupName: testDG},
 			expectedResponse: []nfConfigApi.PolicyControl{
 				{
-					PlmnId: *nfConfigApi.NewPlmnId("001", "01"),
+					PlmnId:   *nfConfigApi.NewPlmnId("001", "01"),
+					Snssai:   makeSnssaiWithSd(testSst, testSd),
+					Dnns:     []string{testDnnName},
+					PccRules: []nfConfigApi.PccRule{*defaultPccRule},
+				},
+				{
+					PlmnId: *nfConfigApi.NewPlmnId("128", "01"),
 					Snssai: makeSnssaiWithSd(testSst, testSd),
-					Dnns:   []string{testDnnName},
+					Dnns:   []string{"aDnn", testDnnName},
 					PccRules: []nfConfigApi.PccRule{
 						{
-							RuleId: testRuleName,
+							RuleId: "SOME-RULE",
 							Flows: []nfConfigApi.PccFlow{
 								{
-									Description: "permit out udp from any to assigned 5-5555",
+									Description: "permit out tcp from 127.0.0.1 to assigned 88-9000",
 									Direction:   nfConfigApi.DIRECTION_BIDIRECTIONAL,
-									Status:      nfConfigApi.STATUS_ENABLED,
+									Status:      nfConfigApi.STATUS_DISABLED,
 								},
 							},
 							Qos: nfConfigApi.PccQos{
-								FiveQi:  testRuleQci,
-								MaxBrUl: "12 Kbps",
-								MaxBrDl: "67 Kbps",
+								FiveQi:  9,
+								MaxBrUl: "45 Kbps",
+								MaxBrDl: "12 Kbps",
 								Arp: nfConfigApi.Arp{
-									PriorityLevel: testRuleArp,
+									PriorityLevel: 1,
 									PreemptCap:    nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
 									PreemptVuln:   nfConfigApi.PREEMPTVULN_PREEMPTABLE,
 								},
 							},
-							Precedence: testRulePriority,
+							Precedence: 2,
 						},
-					},
-				},
-				{
-					PlmnId: *nfConfigApi.NewPlmnId("12", "01"),
-					Snssai: makeSnssaiWithSd(testSst, testSd),
-					Dnns:   []string{"aDnn", testDnnName},
-					PccRules: []nfConfigApi.PccRule{
 						{
 							RuleId: testRuleName,
 							Flows: []nfConfigApi.PccFlow{

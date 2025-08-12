@@ -42,7 +42,7 @@ func (n *NFConfigServer) GetSessionManagementConfig(c *gin.Context) {
 
 func (n *NFConfigServer) GetImsiQosConfig(c *gin.Context) {
 	dnn := c.Param("dnn")
-	imsi := strings.TrimPrefix(c.Param("imsi"), "imis-")
+	imsi := strings.TrimPrefix(c.Param("imsi"), "imsi-")
 	logger.NfConfigLog.Debugf("Handling GET request for QoS config for IMSI %s", imsi)
 	imsiQos := []nfConfigApi.ImsiQos{}
 	for _, imsiQosConfig := range n.inMemoryConfig.imsiQos {
@@ -51,5 +51,9 @@ func (n *NFConfigServer) GetImsiQosConfig(c *gin.Context) {
 			break
 		}
 	}
-	c.JSON(http.StatusOK, imsiQos)
+	if len(imsiQos) > 0 {
+		c.JSON(http.StatusOK, imsiQos)
+		return
+	}
+	c.JSON(http.StatusNotFound, imsiQos)
 }

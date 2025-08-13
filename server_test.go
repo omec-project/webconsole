@@ -27,6 +27,7 @@ func (m *mockWebUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 	case <-ctx.Done():
 		return
 	default:
+		time.Sleep(50 * time.Millisecond)
 		m.started = true
 		if m.startedChan != nil {
 			close(m.startedChan)

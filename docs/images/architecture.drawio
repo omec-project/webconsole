@@ -1,0 +1,82 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36" version="28.1.0">
+  <diagram name="Page-1" id="NvRxbad_f63ygxTlyanT">
+    <mxGraphModel dx="1426" dy="764" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-1" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="135" y="150" width="575" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-4" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="200" width="460" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-5" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="380" width="460" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-6" value="Webconsole" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="135" y="150" width="85" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-7" value="Portal" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="260" y="50" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-8" value="Simapp" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="499" y="50" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-10" value="Network slice&amp;nbsp;&lt;div&gt;(add, remove, modify)&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="295" y="90" width="130" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-12" value="Subscriber&amp;nbsp;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;(add, remove, modify)&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="553" y="90" width="130" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-14" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.196;entryY=0.027;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="WwWEnpbyqZEoQ1Ba2UXA-7" target="WwWEnpbyqZEoQ1Ba2UXA-4">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="420" as="sourcePoint" />
+            <mxPoint x="450" y="370" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-16" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.715;entryY=0.027;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="WwWEnpbyqZEoQ1Ba2UXA-8" target="WwWEnpbyqZEoQ1Ba2UXA-4">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="363" y="420" as="sourcePoint" />
+            <mxPoint x="529.25" y="150" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-17" value="Network slice management API" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="245" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-18" value="Subscriber management API" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="490" y="250" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-19" value="In-memory configuration" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="370" y="410" width="145" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-20" value="NF Clients" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="265" y="630" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-22" value="MongoDB" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" vertex="1" parent="1">
+          <mxGeometry x="537" y="600" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-23" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.82;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="WwWEnpbyqZEoQ1Ba2UXA-4" target="WwWEnpbyqZEoQ1Ba2UXA-22">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="420" as="sourcePoint" />
+            <mxPoint x="450" y="370" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-24" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.25;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="WwWEnpbyqZEoQ1Ba2UXA-5" target="WwWEnpbyqZEoQ1Ba2UXA-20">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="420" as="sourcePoint" />
+            <mxPoint x="450" y="370" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-25" value="Polling" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="320" y="580" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-26" value="WebUI interface (:5000)" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="200" y="200" width="140" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WwWEnpbyqZEoQ1Ba2UXA-27" value="NF Config interface (:5001)" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="200" y="480" width="150" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

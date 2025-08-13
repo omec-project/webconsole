@@ -439,7 +439,7 @@ func TestSyncSessionManagement(t *testing.T) {
 			},
 		},
 		{
-			name: "int upf port",
+			name: "int upf port is valid",
 			sliceParams: []networkSliceParams{
 				{
 					sliceName:    "slice-4",
@@ -448,7 +448,7 @@ func TestSyncSessionManagement(t *testing.T) {
 					sst:          "1",
 					sd:           "010203",
 					upfHostname:  "hostname.com",
-					upfPort:      1234,
+					upfPort:      5677,
 					deviceGroups: []string{"dg-1"},
 					gnbNames:     []string{"gnb-1"},
 				},
@@ -466,14 +466,14 @@ func TestSyncSessionManagement(t *testing.T) {
 					},
 					Upf: &nfConfigApi.Upf{
 						Hostname: "hostname.com",
-						Port:     ptr(int32(1234)),
+						Port:     ptr(int32(5677)),
 					},
 					GnbNames: []string{"gnb-1"},
 				},
 			},
 		},
 		{
-			name: "float upf port",
+			name: "float upf port is valid",
 			sliceParams: []networkSliceParams{
 				{
 					sliceName:    "slice-4",

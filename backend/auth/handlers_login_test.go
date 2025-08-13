@@ -48,20 +48,20 @@ func hashPassword(password string) string {
 	return string(hashed)
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
-	return map[string]interface{}{}, nil
+func (db *MockMongoClientEmptyDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
+	return map[string]any{}, nil
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (db *MockMongoClientEmptyDB) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	return results, nil
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
+func (db *MockMongoClientEmptyDB) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
 	return true, nil
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
+func (db *MockMongoClientEmptyDB) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []any) error {
 	return nil
 }
 
@@ -69,15 +69,15 @@ func (db *MockMongoClientEmptyDB) RestfulAPICount(collName string, filter bson.M
 	return 0, nil
 }
 
-func (db *MockMongoClientDBError) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (db *MockMongoClientDBError) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	return nil, errors.New("DB error")
 }
 
-func (db *MockMongoClientDBError) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+func (db *MockMongoClientDBError) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
 	return nil, errors.New("DB error")
 }
 
-func (db *MockMongoClientDBError) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
+func (db *MockMongoClientDBError) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
 	return false, errors.New("DB error")
 }
 
@@ -85,8 +85,8 @@ func (db *MockMongoClientDBError) RestfulAPICount(collName string, filter bson.M
 	return 0, errors.New("DB error")
 }
 
-func (db *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
-	rawUser := map[string]interface{}{
+func (db *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
+	rawUser := map[string]any{
 		"username": "johndoe",
 		"password": 1234,
 		"role":     "a",
@@ -94,30 +94,30 @@ func (db *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter b
 	return rawUser, nil
 }
 
-func (db *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	rawUsers := []map[string]interface{}{
+func (db *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	rawUsers := []map[string]any{
 		{"username": "johndoe", "password": 1234, "role": "a"},
 		{"username": "janedoe", "password": hashPassword("Password123"), "role": 1},
 	}
 	return rawUsers, nil
 }
 
-func (db *MockMongoClientSuccess) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	rawUser := map[string]interface{}{
+func (db *MockMongoClientSuccess) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	rawUser := map[string]any{
 		"username": "janedoe", "password": hashPassword("password123!"), "role": 1,
 	}
 	return rawUser, nil
 }
 
-func (db *MockMongoClientSuccess) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	rawUsers := []map[string]interface{}{
+func (db *MockMongoClientSuccess) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	rawUsers := []map[string]any{
 		{"username": "johndoe", "password": hashPassword(".password123"), "role": 0},
 		{"username": "janedoe", "password": hashPassword("password123"), "role": 1},
 	}
 	return rawUsers, nil
 }
 
-func (db *MockMongoClientSuccess) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
+func (db *MockMongoClientSuccess) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
 	return true, nil
 }
 
@@ -125,8 +125,8 @@ func (db *MockMongoClientSuccess) RestfulAPICount(collName string, filter bson.M
 	return 5, nil
 }
 
-func (db *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	rawUser := map[string]interface{}{
+func (db *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	rawUser := map[string]any{
 		"username": "johndoe", "password": hashPassword("password-123"), "role": 0,
 	}
 	return rawUser, nil
@@ -211,10 +211,10 @@ func TestLogin_FailureCases(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -263,37 +263,37 @@ func TestLogin_SuccessCases(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			var respondeData map[string]string
 			err = json.Unmarshal(w.Body.Bytes(), &respondeData)
 			if err != nil {
-				t.Errorf("Unable to unmarshal response`%v`", w.Body.String())
+				t.Errorf("unable to unmarshal response`%v`", w.Body.String())
 			}
 
 			responseToken, exists := respondeData["token"]
 			if !exists {
-				t.Errorf("Unable to unmarshal response`%v`", w.Body.String())
+				t.Errorf("unable to unmarshal response`%v`", w.Body.String())
 			}
 
-			token, parseErr := jwt.Parse(responseToken, func(token *jwt.Token) (interface{}, error) {
+			token, parseErr := jwt.Parse(responseToken, func(token *jwt.Token) (any, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 				}
 				return mockJWTSecret, nil
 			})
 			if parseErr != nil {
-				t.Errorf("Error parsing JWT: %v", parseErr)
+				t.Errorf("error parsing JWT: %v", parseErr)
 				return
 			}
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 				if claims["username"] != tc.expectedUsername {
-					t.Errorf("Expected `%v` username, got `%v`", tc.expectedUsername, claims["username"])
+					t.Errorf("expected `%v` username, got `%v`", tc.expectedUsername, claims["username"])
 				} else if int(claims["role"].(float64)) != tc.expectedRole {
-					t.Errorf("Expected `%v` role, got `%v`", tc.expectedRole, claims["role"])
+					t.Errorf("expected `%v` role, got `%v`", tc.expectedRole, claims["role"])
 				}
 			} else {
-				t.Errorf("Invalid JWT token or JWT claims are not readable")
+				t.Errorf("invalid JWT token or JWT claims are not readable")
 			}
 		})
 	}

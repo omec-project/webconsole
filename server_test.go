@@ -158,7 +158,7 @@ func TestStartApplication(t *testing.T) {
 	t.Run("nil config", func(t *testing.T) {
 		err := startApplication(nil)
 		if err == nil || !strings.Contains(err.Error(), "nil") {
-			t.Errorf("Expected error for nil config, got: %v", err)
+			t.Errorf("expected error for nil config, got: %v", err)
 		}
 	})
 
@@ -168,7 +168,7 @@ func TestStartApplication(t *testing.T) {
 		}
 		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
 		if err == nil || !strings.Contains(err.Error(), "mongo failed") {
-			t.Errorf("Expected mongo init error, got: %v", err)
+			t.Errorf("expected mongo init error, got: %v", err)
 		}
 	})
 
@@ -179,7 +179,7 @@ func TestStartApplication(t *testing.T) {
 		}
 		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
 		if err == nil || !strings.Contains(err.Error(), "nfconfig init fail") {
-			t.Errorf("Expected NF config init failure, got: %v", err)
+			t.Errorf("expected NF config init failure, got: %v", err)
 		}
 	})
 
@@ -193,7 +193,7 @@ func TestStartApplication(t *testing.T) {
 		}
 		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
 		if err == nil || !strings.Contains(err.Error(), "run fail") {
-			t.Errorf("Expected run error, got: %v", err)
+			t.Errorf("expected run error, got: %v", err)
 		}
 	})
 
@@ -207,7 +207,7 @@ func TestStartApplication(t *testing.T) {
 		}
 		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
 		if err != nil {
-			t.Errorf("Expected no error, got: %v", err)
+			t.Errorf("expected no error, got: %v", err)
 		}
 	})
 }

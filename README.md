@@ -54,7 +54,7 @@ instructions, see the [MongoDB Replica Set Documentation](https://www.mongodb.co
 
 The webconsole has two services: **WebUI** and **NF Config**.
 
-### WebUI Service 
+### WebUI Service
 
 The **WebUI** service runs by default on port `5000`. This port can be configured using
 the `cfgport` parameter in the configuration file.
@@ -73,12 +73,12 @@ To run the service over HTTPS, add the following parameters to the configuration
 ```yaml
 configuration:
 ...
-  nfconfig-tls: 
+  nfconfig-tls:
     pem: <path-to-cert.pem>
     key: <path-to-key.pem>
 ```
 
-There are six endpoints exposed by this service.  
+There are six endpoints exposed by this service.
 
 | Endpoint Name        | NF                  | HTTP Method | Path                           | Body  | Response          |
 |----------------------|---------------------|-------------|--------------------------------|-------|--------------------------|
@@ -89,7 +89,7 @@ There are six endpoints exposed by this service.
 | Session Management   | SMF                 | GET         | `/nfconfig/session-management` | None  | [List of Session Management](https://github.com/omec-project/openapi/blob/main/nfConfigApi/model_session_management.go)  |
 | IMSI QoS             | PCF                 | GET         | `/nfconfig/qos/{dnn}/{imsi}`   | None  | [List of ImsiQoS](https://github.com/omec-project/openapi/blob/main/nfConfigApi/model_imsi_qos.go)            |
 
-To make modifications to the NF Config API, please refer to the 
+To make modifications to the NF Config API, please refer to the
 [NF config API documentation](https://github.com/omec-project/openapi/blob/main/nfConfigApi/README.md)
 in the [openapi](https://github.com/omec-project/openapi) repository.
 

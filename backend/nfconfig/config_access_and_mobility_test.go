@@ -214,7 +214,7 @@ func TestAccessAndMobilityConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T
 			c := inMemoryConfig{}
 			c.syncAccessAndMobility(tc.networkSlices)
 			if !reflect.DeepEqual(tc.expectedAccessAndMobility, c.accessAndMobility) {
-				t.Errorf("Expected Access and Mobility %v, got %v", tc.expectedAccessAndMobility, c.accessAndMobility)
+				t.Errorf("expected Access and Mobility %v, got %v", tc.expectedAccessAndMobility, c.accessAndMobility)
 			}
 		})
 	}

@@ -117,7 +117,9 @@ func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 	// fetch one time configuration from the simapp/roc on startup
 	// this is to fetch existing config
 	if factory.WebUIConfig.Configuration.RocEnd != nil {
-		go fetchConfigAdapater()
+		if factory.WebUIConfig.Configuration.RocEnd.Enabled && factory.WebUIConfig.Configuration.RocEnd.SyncUrl != "" {
+			go fetchConfigAdapater()
+		}
 	} else {
 		logger.AppLog.Infoln("simapp/roc configuration not fetched")
 	}

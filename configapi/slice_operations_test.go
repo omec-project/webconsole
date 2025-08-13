@@ -18,6 +18,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/backend/factory"
+	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
@@ -30,7 +31,7 @@ func networkSlice(name string) configmodels.Slice {
 }
 
 func networkSliceWithGnbParams(name string, gnbName string, gnbTac int32) configmodels.Slice {
-	upf := make(map[string]interface{}, 0)
+	upf := make(map[string]any, 0)
 	upf["upf-name"] = "upf"
 	upf["upf-port"] = "8805"
 	plmn := configmodels.SliceSiteInfoPlmn{
@@ -63,7 +64,7 @@ func networkSliceWithGnbParams(name string, gnbName string, gnbTac int32) config
 type NetworkSliceMockDBClient struct {
 	dbadapter.DBInterface
 	slices   []configmodels.Slice
-	postData []map[string]interface{}
+	postData []map[string]any
 	err      error
 }
 
@@ -76,7 +77,7 @@ func (db *NetworkSliceMockDBClient) RestfulAPIGetOne(coll string, filter bson.M)
 	}
 	ns := configmodels.ToBsonM(db.slices[0])
 	if ns == nil {
-		panic("failed to convert network slice to BsonM")
+		logger.DbLog.Fatalln("failed to convert network slice to BsonM")
 	}
 	return ns, nil
 }
@@ -89,15 +90,15 @@ func (db *NetworkSliceMockDBClient) RestfulAPIGetMany(coll string, filter bson.M
 	for _, s := range db.slices {
 		ns := configmodels.ToBsonM(s)
 		if ns == nil {
-			panic("failed to convert network slice to BsonM")
+			logger.DbLog.Fatalln("failed to convert network slice to BsonM")
 		}
 		results = append(results, ns)
 	}
 	return results, db.err
 }
 
-func (db *NetworkSliceMockDBClient) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
-	params := map[string]interface{}{
+func (db *NetworkSliceMockDBClient) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
+	params := map[string]any{
 		"coll":   collName,
 		"filter": filter,
 		"data":   postData,
@@ -152,7 +153,7 @@ func TestGetNetworkSlices(t *testing.T) {
 			resp := w.Result()
 
 			if resp.StatusCode != tc.expectedCode {
-				t.Errorf("Expected StatusCode %d, got %d", tc.expectedCode, resp.StatusCode)
+				t.Errorf("expected StatusCode %d, got %d", tc.expectedCode, resp.StatusCode)
 			}
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
@@ -164,7 +165,7 @@ func TestGetNetworkSlices(t *testing.T) {
 			}
 			expected := tc.expectedResult
 			if !reflect.DeepEqual(expected, actual) {
-				t.Errorf("Expected %+v, got %+v", expected, actual)
+				t.Errorf("expected %+v, got %+v", expected, actual)
 			}
 		})
 	}
@@ -184,14 +185,14 @@ func TestGetNetworkSliceByName_NetworkSliceDoesNotExist(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("Expected StatusCode %d, got %d", http.StatusNotFound, resp.StatusCode)
+		t.Errorf("expected StatusCode %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("failed to read response body: %v", err)
 	}
 	if string(bodyBytes) != "null" {
-		t.Errorf("Expected body 'null', got: %v", string(bodyBytes))
+		t.Errorf("expected body 'null', got: %v", string(bodyBytes))
 	}
 }
 
@@ -209,7 +210,7 @@ func TestGetNetworkSliceByName_DBError(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("Expected StatusCode %d, got %d", http.StatusInternalServerError, resp.StatusCode)
+		t.Errorf("expected StatusCode %d, got %d", http.StatusInternalServerError, resp.StatusCode)
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -222,7 +223,7 @@ func TestGetNetworkSliceByName_DBError(t *testing.T) {
 
 	expected := map[string]string{"error": "failed to retrieve network slice"}
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("Expected response body %v, got %v", expected, actual)
+		t.Errorf("expected response body %v, got %v", expected, actual)
 	}
 }
 
@@ -240,7 +241,7 @@ func TestGetNetworkSliceByName_NetworkSliceExists(t *testing.T) {
 	resp := w.Result()
 
 	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected StatusCode %d, got %d", http.StatusOK, resp.StatusCode)
+		t.Errorf("expected StatusCode %d, got %d", http.StatusOK, resp.StatusCode)
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -252,7 +253,7 @@ func TestGetNetworkSliceByName_NetworkSliceExists(t *testing.T) {
 	}
 	expected := networkSlice("slice1")
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("Expected %+v, got %+v", expected, actual)
+		t.Errorf("expected %+v, got %+v", expected, actual)
 	}
 }
 
@@ -288,10 +289,10 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 
 	statusCode, err := handleNetworkSlicePost(slice, prevSlice)
 	if err != nil {
-		t.Errorf("Could not handle network slice post: %+v statusCode: %d", err, statusCode)
+		t.Errorf("could not handle network slice post: %+v statusCode: %d", err, statusCode)
 	}
 	if execCommandTimesCalled != numPebbleNotificationsSent+1 {
-		t.Errorf("Unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent+1)
+		t.Errorf("unexpected number of Pebble notifications: %v. Should be: %v", execCommandTimesCalled, numPebbleNotificationsSent+1)
 	}
 }
 
@@ -326,7 +327,7 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 	}
 
 	if execCommandTimesCalled != 0 {
-		t.Errorf("Expected 0 Pebble notifications, but got %v", execCommandTimesCalled)
+		t.Errorf("expected 0 Pebble notifications, but got %v", execCommandTimesCalled)
 	}
 }
 
@@ -357,19 +358,19 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 			}
 
 			if len(mock.postData) == 0 {
-				t.Fatal("Expected a post operation but none was recorded")
+				t.Fatal("expected a post operation but none was recorded")
 			}
 
 			if mock.postData[0]["coll"] != sliceDataColl {
-				t.Errorf("Expected collection %v, got %v", sliceDataColl, mock.postData[0]["coll"])
+				t.Errorf("expected collection %v, got %v", sliceDataColl, mock.postData[0]["coll"])
 			}
 
 			expectedFilter := bson.M{"slice-name": ts.SliceName}
 			if !reflect.DeepEqual(mock.postData[0]["filter"], expectedFilter) {
-				t.Errorf("Expected filter %v, got %v", expectedFilter, mock.postData[0]["filter"])
+				t.Errorf("expected filter %v, got %v", expectedFilter, mock.postData[0]["filter"])
 			}
 
-			result := mock.postData[0]["data"].(map[string]interface{})
+			result := mock.postData[0]["data"].(map[string]any)
 			bytes, err := json.Marshal(result)
 			if err != nil {
 				t.Fatalf("Failed to marshal result data: %v", err)
@@ -379,7 +380,7 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 				t.Fatalf("Failed to unmarshal result data: %v", err)
 			}
 			if !reflect.DeepEqual(resultSlice, ts) {
-				t.Errorf("Expected slice %v, got %v", ts, resultSlice)
+				t.Errorf("expected slice %v, got %v", ts, resultSlice)
 			}
 		})
 	}
@@ -432,7 +433,7 @@ func TestNetworkSlicePostHandler_NetworkSliceNameValidation(t *testing.T) {
 
 			router.ServeHTTP(w, req)
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 		})
 	}
@@ -481,10 +482,10 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 
 			router.ServeHTTP(w, req)
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if !strings.Contains(w.Body.String(), tc.expectedError) {
-				t.Errorf("Expected body to contain error about  `%v`, got `%v`", tc.expectedError, w.Body.String())
+				t.Errorf("expected body to contain error about  `%v`, got `%v`", tc.expectedError, w.Body.String())
 			}
 		})
 	}

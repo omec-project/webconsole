@@ -39,8 +39,8 @@ func hashPassword(password string) string {
 	return string(hashed)
 }
 
-func (db *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
-	rawUser := map[string]interface{}{
+func (db *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
+	rawUser := map[string]any{
 		"username": "johndoe",
 		"password": 1234,
 		"role":     "a",
@@ -48,30 +48,30 @@ func (db *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter b
 	return rawUser, nil
 }
 
-func (db *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	rawUsers := []map[string]interface{}{
+func (db *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	rawUsers := []map[string]any{
 		{"username": "johndoe", "password": 1234, "role": "a"},
 		{"username": "janedoe", "password": hashPassword("Password123"), "role": 1},
 	}
 	return rawUsers, nil
 }
 
-func (db *MockMongoClientSuccess) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	rawUser := map[string]interface{}{
+func (db *MockMongoClientSuccess) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	rawUser := map[string]any{
 		"username": "janedoe", "password": hashPassword("password123!"), "role": 1,
 	}
 	return rawUser, nil
 }
 
-func (db *MockMongoClientSuccess) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	rawUsers := []map[string]interface{}{
+func (db *MockMongoClientSuccess) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	rawUsers := []map[string]any{
 		{"username": "johndoe", "password": hashPassword(".password123"), "role": 0},
 		{"username": "janedoe", "password": hashPassword("password123"), "role": 1},
 	}
 	return rawUsers, nil
 }
 
-func (db *MockMongoClientSuccess) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
+func (db *MockMongoClientSuccess) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
 	return true, nil
 }
 
@@ -79,8 +79,8 @@ func (db *MockMongoClientSuccess) RestfulAPICount(collName string, filter bson.M
 	return 5, nil
 }
 
-func (db *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	rawUser := map[string]interface{}{
+func (db *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	rawUser := map[string]any{
 		"username": "johndoe", "password": hashPassword("password-123"), "role": 0,
 	}
 	return rawUser, nil
@@ -94,16 +94,16 @@ type MockMongoClientDuplicateCreation struct {
 	dbadapter.DBInterface
 }
 
-func (db *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (db *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	return results, nil
 }
 
-func (db *MockMongoClientDuplicateCreation) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
+func (db *MockMongoClientDuplicateCreation) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []any) error {
 	return errors.New("E11000")
 }
 
-func (db *MockMongoClientDuplicateCreation) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []interface{}) error {
+func (db *MockMongoClientDuplicateCreation) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []any) error {
 	return errors.New("E11000")
 }
 
@@ -163,10 +163,10 @@ func TestGetUserAccountsHandler(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -222,10 +222,10 @@ func TestGetUserAccountHandler(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -306,10 +306,10 @@ func TestCreateUserAccountHandler(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -368,10 +368,10 @@ func TestDeleteUserAccountHandler(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -444,10 +444,10 @@ func TestChangePasswordHandler(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}

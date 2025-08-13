@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
@@ -46,28 +47,28 @@ func (db *GnbMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[
 	for _, g := range db.gnbs {
 		gnb := configmodels.ToBsonM(g)
 		if gnb == nil {
-			panic("failed to convert gnbs to BsonM")
+			logger.DbLog.Fatalln("failed to convert gnbs to BsonM")
 		}
 		results = append(results, gnb)
 	}
 	return results, db.err
 }
 
-func (db *GnbMockDBClient) RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]interface{}) (bool, error) {
+func (db *GnbMockDBClient) RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]any) (bool, error) {
 	if db.err != nil {
 		return false, db.err
 	}
 	if len(db.gnbs) == 0 {
 		return false, nil
 	}
-	return true, nil // Return true if data existed
+	return true, nil // Return true if data exists
 }
 
 func (db *GnbMockDBClient) StartSession() (mongo.Session, error) {
 	return &MockSession{}, nil
 }
 
-func (db *GnbMockDBClient) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []interface{}) error {
+func (db *GnbMockDBClient) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []any) error {
 	if db.err != nil {
 		return db.err
 	}
@@ -108,28 +109,28 @@ func (db *UpfMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[
 	for _, u := range db.upfs {
 		upf := configmodels.ToBsonM(u)
 		if upf == nil {
-			panic("failed to convert upfs to BsonM")
+			logger.DbLog.Fatalln("failed to convert upfs to BsonM")
 		}
 		results = append(results, upf)
 	}
 	return results, db.err
 }
 
-func (db *UpfMockDBClient) RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]interface{}) (bool, error) {
+func (db *UpfMockDBClient) RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]any) (bool, error) {
 	if db.err != nil {
 		return false, db.err
 	}
 	if len(db.upfs) == 0 {
 		return false, nil
 	}
-	return true, nil // Return true if data existed
+	return true, nil // Return true if data exists
 }
 
 func (db *UpfMockDBClient) StartSession() (mongo.Session, error) {
 	return &MockSession{}, nil
 }
 
-func (db *UpfMockDBClient) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []interface{}) error {
+func (db *UpfMockDBClient) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []any) error {
 	if db.err != nil {
 		return db.err
 	}
@@ -197,7 +198,7 @@ func TestInventoryGetGnbHandler(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			bodyBytes, err := io.ReadAll(w.Body)
 			if err != nil {
@@ -209,7 +210,7 @@ func TestInventoryGetGnbHandler(t *testing.T) {
 			}
 			expected := tc.expectedBody
 			if !reflect.DeepEqual(expected, actual) {
-				t.Errorf("Expected %+v, got %+v", expected, actual)
+				t.Errorf("expected %+v, got %+v", expected, actual)
 			}
 		})
 	}
@@ -266,7 +267,7 @@ func TestInventoryGetUPFHandler(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			bodyBytes, err := io.ReadAll(w.Body)
 			if err != nil {
@@ -278,7 +279,7 @@ func TestInventoryGetUPFHandler(t *testing.T) {
 			}
 			expected := tc.expectedBody
 			if !reflect.DeepEqual(expected, actual) {
-				t.Errorf("Expected %+v, got %+v", expected, actual)
+				t.Errorf("expected %+v, got %+v", expected, actual)
 			}
 		})
 	}
@@ -326,7 +327,7 @@ func TestGetInventory_DBError(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			bodyBytes, err := io.ReadAll(w.Body)
 			if err != nil {
@@ -338,7 +339,7 @@ func TestGetInventory_DBError(t *testing.T) {
 			}
 			expected := tc.expectedBody
 			if !reflect.DeepEqual(expected, actual) {
-				t.Errorf("Expected response body %v, got %v", expected, actual)
+				t.Errorf("expected response body %v, got %v", expected, actual)
 			}
 		})
 	}
@@ -444,7 +445,7 @@ func TestGnbPostHandler(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			bodyBytes, err := io.ReadAll(w.Body)
 			if err != nil {
@@ -456,7 +457,7 @@ func TestGnbPostHandler(t *testing.T) {
 			}
 			expected := tc.expectedBody
 			if !reflect.DeepEqual(expected, actual) {
-				t.Errorf("Expected response body %v, got %v", expected, actual)
+				t.Errorf("expected response body %v, got %v", expected, actual)
 			}
 		})
 	}
@@ -538,7 +539,7 @@ func TestGnbPutHandler(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			bodyBytes, err := io.ReadAll(w.Body)
 			if err != nil {
@@ -550,7 +551,7 @@ func TestGnbPutHandler(t *testing.T) {
 			}
 			expected := tc.expectedBody
 			if !reflect.DeepEqual(expected, actual) {
-				t.Errorf("Expected response body %v, got %v", expected, actual)
+				t.Errorf("expected response body %v, got %v", expected, actual)
 			}
 		})
 	}
@@ -648,7 +649,7 @@ func TestUpfPostHandler(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			bodyBytes, err := io.ReadAll(w.Body)
 			if err != nil {
@@ -660,7 +661,7 @@ func TestUpfPostHandler(t *testing.T) {
 			}
 			expected := tc.expectedBody
 			if !reflect.DeepEqual(expected, actual) {
-				t.Errorf("Expected response body %v, got %v", expected, actual)
+				t.Errorf("expected response body %v, got %v", expected, actual)
 			}
 		})
 	}
@@ -750,7 +751,7 @@ func TestUpfPutHandler(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			bodyBytes, err := io.ReadAll(w.Body)
 			if err != nil {
@@ -762,7 +763,7 @@ func TestUpfPutHandler(t *testing.T) {
 			}
 			expected := tc.expectedBody
 			if !reflect.DeepEqual(expected, actual) {
-				t.Errorf("Expected response body %v, got %v", expected, actual)
+				t.Errorf("expected response body %v, got %v", expected, actual)
 			}
 		})
 	}
@@ -823,7 +824,7 @@ func TestInventoryDeleteHandlers(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			bodyBytes, err := io.ReadAll(w.Body)
 			if err != nil {
@@ -835,7 +836,7 @@ func TestInventoryDeleteHandlers(t *testing.T) {
 			}
 			expected := tc.expectedBody
 			if !reflect.DeepEqual(expected, actual) {
-				t.Errorf("Expected response body %v, got %v", expected, actual)
+				t.Errorf("expected response body %v, got %v", expected, actual)
 			}
 		})
 	}

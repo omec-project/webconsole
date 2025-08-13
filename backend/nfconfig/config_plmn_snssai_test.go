@@ -121,7 +121,7 @@ func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {
 			config := inMemoryConfig{}
 			config.syncPlmnSnssai(tc.slices)
 			if !reflect.DeepEqual(tc.expectedPlmnSnssai, config.plmnSnssai) {
-				t.Errorf("Expected PLMN-SNSSAI %v, got %v", tc.expectedPlmnSnssai, config.plmnSnssai)
+				t.Errorf("expected PLMN-SNSSAI %v, got %v", tc.expectedPlmnSnssai, config.plmnSnssai)
 			}
 		})
 	}
@@ -176,7 +176,7 @@ func TestSyncPlmnSnssaiConfig_UnmarshalError_IgnoresNetworkSlice(t *testing.T) {
 			config := inMemoryConfig{}
 			config.syncPlmnSnssai(tc.slices)
 			if !reflect.DeepEqual(tc.expectedPlmnSnssai, config.plmnSnssai) {
-				t.Errorf("Expected PLMN-SNSSAI %v, got %v", tc.expectedPlmnSnssai, config.plmnSnssai)
+				t.Errorf("expected PLMN-SNSSAI %v, got %v", tc.expectedPlmnSnssai, config.plmnSnssai)
 			}
 		})
 	}

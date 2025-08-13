@@ -41,17 +41,17 @@ func authenticationSubscription() *models.AuthenticationSubscription {
 }
 
 type mockDB struct {
-	getOneFunc    func(collName string, filter bson.M) (map[string]interface{}, error)
+	getOneFunc    func(collName string, filter bson.M) (map[string]any, error)
 	deleteOneFunc func(collName string, filter bson.M) error
-	postFunc      func(collName string, filter bson.M, postData map[string]interface{}) (bool, error)
+	postFunc      func(collName string, filter bson.M, postData map[string]any) (bool, error)
 	dbadapter.DBInterface
 }
 
-func (m *mockDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
+func (m *mockDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
 	return m.getOneFunc(collName, filter)
 }
 
-func (m *mockDB) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
+func (m *mockDB) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
 	return m.postFunc(collName, filter, postData)
 }
 
@@ -63,7 +63,7 @@ func TestSubscriberAuthenticationDataCreate_Success(t *testing.T) {
 	authCalled, commonCalled := false, false
 
 	authDB := &mockDB{
-		postFunc: func(coll string, filter bson.M, data map[string]interface{}) (bool, error) {
+		postFunc: func(coll string, filter bson.M, data map[string]any) (bool, error) {
 			authCalled = true
 			return true, nil
 		},
@@ -74,7 +74,7 @@ func TestSubscriberAuthenticationDataCreate_Success(t *testing.T) {
 	}
 
 	commonDB := &mockDB{
-		postFunc: func(coll string, filter bson.M, data map[string]interface{}) (bool, error) {
+		postFunc: func(coll string, filter bson.M, data map[string]any) (bool, error) {
 			commonCalled = true
 			return true, nil
 		},
@@ -105,7 +105,7 @@ func TestSubscriberAuthenticationDataCreate_Success(t *testing.T) {
 func TestSubscriberAuthenticationDataCreate_CommonDBFails_RollsBack(t *testing.T) {
 	rollbackCalled := false
 	authDB := &mockDB{
-		postFunc: func(coll string, filter bson.M, data map[string]interface{}) (bool, error) {
+		postFunc: func(coll string, filter bson.M, data map[string]any) (bool, error) {
 			return true, nil
 		},
 		deleteOneFunc: func(coll string, filter bson.M) error {
@@ -114,7 +114,7 @@ func TestSubscriberAuthenticationDataCreate_CommonDBFails_RollsBack(t *testing.T
 		},
 	}
 	commonDB := &mockDB{
-		postFunc: func(coll string, filter bson.M, data map[string]interface{}) (bool, error) {
+		postFunc: func(coll string, filter bson.M, data map[string]any) (bool, error) {
 			return false, fmt.Errorf("common db failure")
 		},
 		deleteOneFunc: func(coll string, filter bson.M) error {
@@ -141,11 +141,11 @@ func TestSubscriberAuthenticationDataCreate_CommonDBFails_RollsBack(t *testing.T
 }
 
 func TestSubscriberAuthenticationDataDelete_Success(t *testing.T) {
-	origAuth := map[string]interface{}{"ueId": "imsi-12345"}
+	origAuth := map[string]any{"ueId": "imsi-12345"}
 	authDB := &mockDB{
-		getOneFunc:    func(c string, f bson.M) (map[string]interface{}, error) { return origAuth, nil },
+		getOneFunc:    func(c string, f bson.M) (map[string]any, error) { return origAuth, nil },
 		deleteOneFunc: func(c string, f bson.M) error { return nil },
-		postFunc:      func(c string, f bson.M, data map[string]interface{}) (bool, error) { return true, nil },
+		postFunc:      func(c string, f bson.M, data map[string]any) (bool, error) { return true, nil },
 	}
 	commonDB := &mockDB{
 		deleteOneFunc: func(c string, f bson.M) error { return nil },
@@ -166,9 +166,9 @@ func TestSubscriberAuthenticationDataDelete_Success(t *testing.T) {
 }
 
 func TestSubscriberAuthenticationDataDelete_AuthDBDeleteFails_Exits(t *testing.T) {
-	origAuth := map[string]interface{}{"ueId": "imsi-12345"}
+	origAuth := map[string]any{"ueId": "imsi-12345"}
 	authDB := &mockDB{
-		getOneFunc:    func(c string, f bson.M) (map[string]interface{}, error) { return origAuth, nil },
+		getOneFunc:    func(c string, f bson.M) (map[string]any, error) { return origAuth, nil },
 		deleteOneFunc: func(c string, f bson.M) error { return fmt.Errorf("fail on authdb delete") },
 	}
 	origAuthDB := dbadapter.AuthDBClient
@@ -182,11 +182,11 @@ func TestSubscriberAuthenticationDataDelete_AuthDBDeleteFails_Exits(t *testing.T
 }
 
 func TestSubscriberAuthenticationDataDelete_CommonDBDeleteFails_RollbackSucceeds(t *testing.T) {
-	origAuth := map[string]interface{}{"ueId": "imsi-12345"}
+	origAuth := map[string]any{"ueId": "imsi-12345"}
 	authDB := &mockDB{
-		getOneFunc:    func(c string, f bson.M) (map[string]interface{}, error) { return origAuth, nil },
+		getOneFunc:    func(c string, f bson.M) (map[string]any, error) { return origAuth, nil },
 		deleteOneFunc: func(c string, f bson.M) error { return nil },
-		postFunc:      func(c string, f bson.M, data map[string]interface{}) (bool, error) { return true, nil },
+		postFunc:      func(c string, f bson.M, data map[string]any) (bool, error) { return true, nil },
 	}
 	commonDB := &mockDB{
 		deleteOneFunc: func(c string, f bson.M) error { return fmt.Errorf("fail on commondb delete") },
@@ -207,11 +207,11 @@ func TestSubscriberAuthenticationDataDelete_CommonDBDeleteFails_RollbackSucceeds
 }
 
 func TestSubscriberAuthenticationDataDelete_CommonDBDeleteFails_RollbackFails(t *testing.T) {
-	origAuth := map[string]interface{}{"ueId": "imsi-12345"}
+	origAuth := map[string]any{"ueId": "imsi-12345"}
 	authDB := &mockDB{
-		getOneFunc:    func(c string, f bson.M) (map[string]interface{}, error) { return origAuth, nil },
+		getOneFunc:    func(c string, f bson.M) (map[string]any, error) { return origAuth, nil },
 		deleteOneFunc: func(c string, f bson.M) error { return nil },
-		postFunc: func(c string, f bson.M, data map[string]interface{}) (bool, error) {
+		postFunc: func(c string, f bson.M, data map[string]any) (bool, error) {
 			return false, fmt.Errorf("rollback fail")
 		},
 	}
@@ -235,11 +235,11 @@ func TestSubscriberAuthenticationDataDelete_CommonDBDeleteFails_RollbackFails(t 
 
 func TestSubscriberAuthenticationDataDelete_NoDataInAuthDB_Exits(t *testing.T) {
 	authDB := &mockDB{
-		getOneFunc: func(c string, f bson.M) (map[string]interface{}, error) {
+		getOneFunc: func(c string, f bson.M) (map[string]any, error) {
 			return nil, fmt.Errorf("data not found in AuthDB")
 		},
 		deleteOneFunc: func(c string, f bson.M) error { return nil },
-		postFunc:      func(c string, f bson.M, data map[string]interface{}) (bool, error) { return true, nil },
+		postFunc:      func(c string, f bson.M, data map[string]any) (bool, error) { return true, nil },
 	}
 	commonDB := &mockDB{
 		deleteOneFunc: func(c string, f bson.M) error { return fmt.Errorf("fail on commondb delete") },
@@ -274,34 +274,34 @@ func Test_handleSubscriberPost(t *testing.T) {
 	dbadapter.CommonDBClient = commonDbClientMock
 	postErr := subscriberAuthenticationDataCreate(ueId, authSubData)
 	if postErr != nil {
-		t.Errorf("Could not handle subscriber post: %v", postErr)
+		t.Errorf("could not handle subscriber post: %v", postErr)
 	}
 	expectedAuthSubCollection := authSubsDataColl
 	expectedAmDataCollection := amDataColl
 	if authDbClientMock.receivedPostData[0]["coll"] != expectedAuthSubCollection {
-		t.Errorf("Expected collection %v, got %v", expectedAuthSubCollection, authDbClientMock.receivedPostData[0]["coll"])
+		t.Errorf("expected collection %v, got %v", expectedAuthSubCollection, authDbClientMock.receivedPostData[0]["coll"])
 	}
 	if commonDbClientMock.receivedPostData[0]["coll"] != expectedAmDataCollection {
-		t.Errorf("Expected collection %v, got %v", expectedAmDataCollection, commonDbClientMock.receivedPostData[0]["coll"])
+		t.Errorf("expected collection %v, got %v", expectedAmDataCollection, commonDbClientMock.receivedPostData[0]["coll"])
 	}
 
 	expectedFilter := bson.M{"ueId": ueId}
 	if !reflect.DeepEqual(authDbClientMock.receivedPostData[0]["filter"], expectedFilter) {
-		t.Errorf("Expected filter %v, got %v", expectedFilter, authDbClientMock.receivedPostData[0]["filter"])
+		t.Errorf("expected filter %v, got %v", expectedFilter, authDbClientMock.receivedPostData[0]["filter"])
 	}
 	if !reflect.DeepEqual(commonDbClientMock.receivedPostData[0]["filter"], expectedFilter) {
-		t.Errorf("Expected filter %v, got %v", expectedFilter, commonDbClientMock.receivedPostData[0]["filter"])
+		t.Errorf("expected filter %v, got %v", expectedFilter, commonDbClientMock.receivedPostData[0]["filter"])
 	}
 
 	var authSubResult models.AuthenticationSubscription
-	result := authDbClientMock.receivedPostData[0]["data"].(map[string]interface{})
+	result := authDbClientMock.receivedPostData[0]["data"].(map[string]any)
 	err := json.Unmarshal(configmodels.MapToByte(result), &authSubResult)
 	if err != nil {
-		t.Errorf("Could not unmarshall result %v", result)
+		t.Errorf("could not unmarshall result %v", result)
 	}
-	amDataResult := commonDbClientMock.receivedPostData[0]["data"].(map[string]interface{})
+	amDataResult := commonDbClientMock.receivedPostData[0]["data"].(map[string]any)
 	if amDataResult["ueId"] != ueId {
-		t.Errorf("Expected ueId %v, got %v", ueId, amDataResult["ueId"])
+		t.Errorf("expected ueId %v, got %v", ueId, amDataResult["ueId"])
 	}
 }
 
@@ -320,23 +320,23 @@ func Test_handleSubscriberDelete(t *testing.T) {
 	dbadapter.CommonDBClient = commonDbClientMock
 	delErr := subscriberAuthenticationDataDelete(ueId)
 	if delErr != nil {
-		t.Errorf("Could not handle subscriber delete: %v", delErr)
+		t.Errorf("could not handle subscriber delete: %v", delErr)
 	}
 	expectedAuthSubCollection := authSubsDataColl
 	expectedAmDataCollection := amDataColl
 	if authDbClientMock.deleteData[0]["coll"] != expectedAuthSubCollection {
-		t.Errorf("Expected collection %v, got %v", expectedAuthSubCollection, authDbClientMock.deleteData[0]["coll"])
+		t.Errorf("expected collection %v, got %v", expectedAuthSubCollection, authDbClientMock.deleteData[0]["coll"])
 	}
 	if commonDbClientMock.deleteData[0]["coll"] != expectedAmDataCollection {
-		t.Errorf("Expected collection %v, got %v", expectedAmDataCollection, commonDbClientMock.deleteData[0]["coll"])
+		t.Errorf("expected collection %v, got %v", expectedAmDataCollection, commonDbClientMock.deleteData[0]["coll"])
 	}
 
 	expectedFilter := bson.M{"ueId": ueId}
 	if !reflect.DeepEqual(authDbClientMock.deleteData[0]["filter"], expectedFilter) {
-		t.Errorf("Expected filter %v, got %v", expectedFilter, authDbClientMock.deleteData[0]["filter"])
+		t.Errorf("expected filter %v, got %v", expectedFilter, authDbClientMock.deleteData[0]["filter"])
 	}
 	if !reflect.DeepEqual(commonDbClientMock.deleteData[0]["filter"], expectedFilter) {
-		t.Errorf("Expected filter %v, got %v", expectedFilter, commonDbClientMock.deleteData[0]["filter"])
+		t.Errorf("expected filter %v, got %v", expectedFilter, commonDbClientMock.deleteData[0]["filter"])
 	}
 }
 
@@ -347,6 +347,6 @@ func Test_handleSubscriberGet(t *testing.T) {
 	dbadapter.AuthDBClient = &AuthDBMockDBClient{subscribers: []string{"imsi-208930100007487"}}
 	subscriberResult := subscriberAuthenticationDataGet("imsi-208930100007487")
 	if !reflect.DeepEqual(subscriber, subscriberResult) {
-		t.Errorf("Expected subscriber %v, got %v", &subscriber, subscriberResult)
+		t.Errorf("expected subscriber %v, got %v", &subscriber, subscriberResult)
 	}
 }

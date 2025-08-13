@@ -34,7 +34,7 @@ func init() {
 	}
 }
 
-func sliceToByte(data []map[string]interface{}) ([]byte, error) {
+func sliceToByte(data []map[string]any) ([]byte, error) {
 	ret, err := json.Marshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal data: %w", err)
@@ -50,7 +50,7 @@ func setCorsHeader(c *gin.Context) {
 }
 
 func sendResponseToClient(c *gin.Context, response *http.Response) {
-	var jsonData interface{}
+	var jsonData any
 	if err := json.NewDecoder(response.Body).Decode(&jsonData); err != nil {
 		logger.DbLog.Errorf("failed to decode response: %+v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode response"})

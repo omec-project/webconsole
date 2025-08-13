@@ -116,7 +116,7 @@ func PostGnb(c *gin.Context) {
 func postGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
 	filter := bson.M{"name": gnb.Name}
 	gnbDataBson := configmodels.ToBsonM(gnb)
-	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.GnbDataColl, filter, []interface{}{gnbDataBson})
+	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.GnbDataColl, filter, []any{gnbDataBson})
 }
 
 // PutGnb godoc
@@ -370,7 +370,7 @@ func postUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
 	if upfDataBson == nil {
 		return fmt.Errorf("failed to serialize UPF")
 	}
-	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.UpfDataColl, filter, []interface{}{upfDataBson})
+	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.UpfDataColl, filter, []any{upfDataBson})
 }
 
 // PutUpf godoc
@@ -436,7 +436,7 @@ func putUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
 func updateUpfInNetworkSlices(upf configmodels.Upf) error {
 	filterByUpf := bson.M{"site-info.upf.upf-name": upf.Hostname}
 	statusCode, err := updateInventoryInNetworkSlices(filterByUpf, func(networkSlice *configmodels.Slice) {
-		networkSlice.SiteInfo.Upf = map[string]interface{}{
+		networkSlice.SiteInfo.Upf = map[string]any{
 			"upf-name": upf.Hostname,
 			"upf-port": upf.Port,
 		}
@@ -542,7 +542,7 @@ func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels
 		prevSlice := getSliceByName(networkSlice.SliceName)
 		updateFunc(&networkSlice)
 		if statusCode, err := updateNS(networkSlice, *prevSlice); err != nil {
-			logger.ConfigLog.Errorf("Error updating slice %s: %+v", networkSlice.SliceName, err)
+			logger.ConfigLog.Errorf("error updating slice %s: %+v", networkSlice.SliceName, err)
 			return statusCode, err
 		}
 	}

@@ -46,7 +46,7 @@ func subscriberAuthenticationDataCreate(imsi string, authSubData *models.Authent
 	}
 	logger.WebUILog.Infof("updated authentication subscription in authenticationSubscription collection: %s", imsi)
 	// write to CommonDB
-	basicAmData := map[string]interface{}{"ueId": imsi}
+	basicAmData := map[string]any{"ueId": imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
 	if _, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson); err != nil {
 		logger.DbLog.Errorf("failed to update amData error: %+v", err)
@@ -79,7 +79,7 @@ func subscriberAuthenticationDataUpdate(imsi string, authSubData *models.Authent
 	}
 	logger.WebUILog.Debugf("updated authentication subscription in authenticationSubscription collection: %s", imsi)
 	// write to CommonDB
-	basicAmData := map[string]interface{}{"ueId": imsi}
+	basicAmData := map[string]any{"ueId": imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
 	if _, err = dbadapter.CommonDBClient.RestfulAPIPutOne(amDataColl, filter, basicDataBson); err != nil {
 		logger.DbLog.Errorf("failed to update amData error: %+v", err)

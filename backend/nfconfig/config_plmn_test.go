@@ -94,7 +94,7 @@ func TestSyncPlmnConfig_Success(t *testing.T) {
 			config.syncPlmn(tc.slices)
 
 			if !reflect.DeepEqual(tc.expectedPlmn, config.plmn) {
-				t.Errorf("Expected PLMN %v, got %v", tc.expectedPlmn, config.plmn)
+				t.Errorf("expected PLMN %v, got %v", tc.expectedPlmn, config.plmn)
 			}
 		})
 	}

@@ -312,14 +312,27 @@ func extractUpf(slice configmodels.Slice) *nfConfigApi.Upf {
 	upf := nfConfigApi.NewUpf(hostname)
 
 	if portRaw, ok := upfMap["upf-port"]; ok {
-		if portStr, ok := portRaw.(string); ok {
-			if port, err := strconv.ParseUint(portStr, 10, 16); err == nil {
+		switch v := portRaw.(type) {
+		case string:
+			if port, err := strconv.ParseUint(v, 10, 16); err == nil {
 				upf.SetPort(int32(port))
 			} else {
 				logger.NfConfigLog.Warnf("invalid UPF port for slice %s: %+v", slice.SliceName, err)
 			}
-		} else {
-			logger.NfConfigLog.Warnf("UPF port should be a string for slice %s, got: %T", slice.SliceName, portRaw)
+		case float64:
+			if v >= 0 && v <= 65535 {
+				upf.SetPort(int32(v))
+			} else {
+				logger.NfConfigLog.Warnf("UPF port out of valid range (0-65535) for slice %s: %v", slice.SliceName, v)
+			}
+		case int:
+			if v >= 0 && v <= 65535 {
+				upf.SetPort(int32(v))
+			} else {
+				logger.NfConfigLog.Warnf("UPF port out of valid range (0-65535) for slice %s: %v", slice.SliceName, v)
+			}
+		default:
+			logger.NfConfigLog.Warnf("UPF port should be a string or number for slice %s, got: %T", slice.SliceName, v)
 		}
 	}
 	return upf

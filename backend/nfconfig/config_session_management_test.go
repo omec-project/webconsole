@@ -21,7 +21,7 @@ type networkSliceParams struct {
 	sd           string
 	deviceGroups []string
 	upfHostname  any
-	upfPort      string
+	upfPort      any
 	gnbNames     []string
 }
 
@@ -434,6 +434,74 @@ func TestSyncSessionManagement(t *testing.T) {
 						Sd:  sharedSd,
 					},
 					Upf:      nil,
+					GnbNames: []string{"gnb-1"},
+				},
+			},
+		},
+		{
+			name: "int upf port is valid",
+			sliceParams: []networkSliceParams{
+				{
+					sliceName:    "slice-4",
+					mcc:          "001",
+					mnc:          "01",
+					sst:          "1",
+					sd:           "010203",
+					upfHostname:  "hostname.com",
+					upfPort:      5677,
+					deviceGroups: []string{"dg-1"},
+					gnbNames:     []string{"gnb-1"},
+				},
+			},
+			expectedResponse: []nfConfigApi.SessionManagement{
+				{
+					SliceName: "slice-4",
+					PlmnId: nfConfigApi.PlmnId{
+						Mcc: "001",
+						Mnc: "01",
+					},
+					Snssai: nfConfigApi.Snssai{
+						Sst: 1,
+						Sd:  sharedSd,
+					},
+					Upf: &nfConfigApi.Upf{
+						Hostname: "hostname.com",
+						Port:     ptr(int32(5677)),
+					},
+					GnbNames: []string{"gnb-1"},
+				},
+			},
+		},
+		{
+			name: "float upf port is valid",
+			sliceParams: []networkSliceParams{
+				{
+					sliceName:    "slice-4",
+					mcc:          "001",
+					mnc:          "01",
+					sst:          "1",
+					sd:           "010203",
+					upfHostname:  "hostname.com",
+					upfPort:      1234.00,
+					deviceGroups: []string{"dg-1"},
+					gnbNames:     []string{"gnb-1"},
+				},
+			},
+			expectedResponse: []nfConfigApi.SessionManagement{
+				{
+					SliceName: "slice-4",
+					PlmnId: nfConfigApi.PlmnId{
+						Mcc: "001",
+						Mnc: "01",
+					},
+					Snssai: nfConfigApi.Snssai{
+						Sst: 1,
+						Sd:  sharedSd,
+					},
+					Upf: &nfConfigApi.Upf{
+						Hostname: "hostname.com",
+						Port:     ptr(int32(1234)),
+					},
 					GnbNames: []string{"gnb-1"},
 				},
 			},

@@ -22,12 +22,7 @@ type mockWebUI struct {
 }
 
 func (m *mockWebUI) Start(ctx context.Context, syncChan chan<- struct{}) {
-	select {
-	case <-ctx.Done():
-		return
-	default:
-		m.started = true
-	}
+	m.started = true
 }
 
 type mockNFConfigSuccess struct{}

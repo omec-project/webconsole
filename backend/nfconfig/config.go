@@ -245,7 +245,7 @@ func (c *inMemoryConfig) syncSessionManagement(slices []configmodels.Slice, devi
 	})
 
 	c.sessionManagement = sessionConfigs
-	logger.NfConfigLog.Debugf("Updated Session Management configuration with %d slices: %+v", len(sessionConfigs), c.sessionManagement)
+	logger.NfConfigLog.Debugf("updated Session Management configuration with %d slices: %+v", len(sessionConfigs), c.sessionManagement)
 }
 
 func buildSessionManagementConfig(slice configmodels.Slice, deviceGroupMap map[string]configmodels.DeviceGroups) (*nfConfigApi.SessionManagement, bool) {
@@ -253,7 +253,7 @@ func buildSessionManagementConfig(slice configmodels.Slice, deviceGroupMap map[s
 
 	snssai, err := parseSnssaiFromSlice(slice.SliceId)
 	if err != nil {
-		logger.NfConfigLog.Errorf("Invalid SNSSAI for slice %s: %+v", slice.SliceName, err)
+		logger.NfConfigLog.Errorf("invalid SNSSAI for slice %s: %+v", slice.SliceName, err)
 		return nil, false
 	}
 	session := nfConfigApi.NewSessionManagement(slice.SliceName, *plmn, snssai)
@@ -384,7 +384,7 @@ func buildPolicyControlConfig(slice configmodels.Slice, deviceGroups map[string]
 
 	snssai, err := parseSnssaiFromSlice(slice.SliceId)
 	if err != nil {
-		logger.NfConfigLog.Errorf("Invalid SNSSAI for slice %s: %+v", slice.SliceName, err)
+		logger.NfConfigLog.Errorf("invalid SNSSAI for slice %s: %+v", slice.SliceName, err)
 		return nil, false
 	}
 	pccRules := buildSlicePccRules(slice)

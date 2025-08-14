@@ -10,32 +10,33 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/openapi/models"
+	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+type PostDataTracker interface {
+	dbadapter.DBInterface
+	GetPostData() []map[string]any
+}
+
 type MockMongoClientOneSubscriber struct {
 	dbadapter.DBInterface
-	PostDataCommon *[]map[string]interface{}
+	postDataCommon []map[string]any
 }
 
 type MockMongoClientManySubscribers struct {
 	dbadapter.DBInterface
 }
 
-type MockMongoClientDeviceGroupsWithSubscriber struct {
-	dbadapter.DBInterface
-}
-
-func (m *MockMongoClientOneSubscriber) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (m *MockMongoClientOneSubscriber) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	subscriber := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{})
 	subscriber["ueId"] = "208930100007487"
 	subscriber["servingPlmnId"] = "12345"
@@ -43,30 +44,19 @@ func (m *MockMongoClientOneSubscriber) RestfulAPIGetMany(coll string, filter bso
 	return results, nil
 }
 
-func (m *MockMongoClientOneSubscriber) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
-	if m.PostDataCommon != nil {
-		*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
-			"coll":   collName,
-			"filter": filter,
-		})
-	}
-
+func (m *MockMongoClientOneSubscriber) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
+	m.postDataCommon = append(m.postDataCommon, map[string]any{
+		"coll":   collName,
+		"filter": filter,
+	})
 	subscriber := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{})
 	subscriber["ueId"] = "208930100007487"
 	subscriber["servingPlmnId"] = "12345"
 	return subscriber, nil
 }
 
-func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIPost(coll string, filter bson.M, postData map[string]interface{}) (bool, error) {
-	return true, nil
-}
-
-func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIDeleteOne(coll string, filter bson.M) error {
-	return nil
-}
-
-func (m *MockMongoClientManySubscribers) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (m *MockMongoClientManySubscribers) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	ueIds := []string{"208930100007487", "208930100007488"}
 	plmnIDs := []string{"12345", "54321"}
 	for i, ueId := range ueIds {
@@ -78,53 +68,38 @@ func (m *MockMongoClientManySubscribers) RestfulAPIGetMany(coll string, filter b
 	return results, nil
 }
 
-func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	dg := configmodels.ToBsonM(deviceGroupWithImsis("group1", []string{"208930100007487", "208930100007488"}))
-	if dg == nil {
-		panic("failed to convert device group to BsonM")
-	}
-	results = append(results, dg)
-	return results, nil
-}
-
-func (m *MockMongoClientDeviceGroupsWithSubscriber) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	if coll == "device_group" && filter["deviceGroupName"] == "group1" {
-		return map[string]interface{}{
-			"deviceGroupName": "group1",
-			"imsi":            []string{"imsi-208930100007487"},
-		}, nil
-	}
-	return nil, nil
-}
-
 type MockAuthDBClientEmpty struct {
 	dbadapter.DBInterface
-	PostDataAuth *[]map[string]interface{}
+	postDataAuth []map[string]any
 }
 
-func (m *MockAuthDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	if m.PostDataAuth != nil {
-		*m.PostDataAuth = append(*m.PostDataAuth, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+func (m *MockAuthDBClientEmpty) GetPostData() []map[string]any {
+	return m.postDataAuth
+}
+
+func (m *MockAuthDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	m.postDataAuth = append(m.postDataAuth, map[string]any{
+		"coll":   coll,
+		"filter": filter,
+	})
 	return nil, nil
 }
 
 type MockAuthDBClientWithData struct {
 	dbadapter.DBInterface
-	PostDataAuth *[]map[string]interface{}
+	postDataAuth []map[string]any
 }
 
-func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	if m.PostDataAuth != nil {
-		*m.PostDataAuth = append(*m.PostDataAuth, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+func (m *MockAuthDBClientWithData) GetPostData() []map[string]any {
+	return m.postDataAuth
+}
+
+func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	m.postDataAuth = append(m.postDataAuth, map[string]any{
+		"coll":   coll,
+		"filter": filter,
+	})
+
 	authSubscription := configmodels.ToBsonM(models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",
@@ -148,48 +123,50 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 		SequenceNumber: "16f3b3f70fc2",
 	})
 	if authSubscription == nil {
-		panic("failed to convert subscriber to BsonM")
+		logger.DbLog.Fatalln("failed to convert subscriber to BsonM")
 	}
 	return authSubscription, nil
 }
 
 type MockCommonDBClientEmpty struct {
 	dbadapter.DBInterface
-	PostDataCommon *[]map[string]interface{}
+	postDataCommon []map[string]any
 }
 
-func (m *MockCommonDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	if m.PostDataCommon != nil {
-		*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+func (m *MockCommonDBClientEmpty) GetPostData() []map[string]any {
+	return m.postDataCommon
+}
+
+func (m *MockCommonDBClientEmpty) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	m.postDataCommon = append(m.postDataCommon, map[string]any{
+		"coll":   coll,
+		"filter": filter,
+	})
 	return nil, nil
 }
 
-func (m *MockCommonDBClientEmpty) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	if m.PostDataCommon != nil {
-		*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+func (m *MockCommonDBClientEmpty) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	m.postDataCommon = append(m.postDataCommon, map[string]any{
+		"coll":   coll,
+		"filter": filter,
+	})
 	return nil, nil
 }
 
 type MockCommonDBClientWithData struct {
 	dbadapter.DBInterface
-	PostDataCommon *[]map[string]interface{}
+	postDataCommon []map[string]any
 }
 
-func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	if m.PostDataCommon != nil {
-		*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+func (m *MockCommonDBClientWithData) GetPostData() []map[string]any {
+	return m.postDataCommon
+}
+
+func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	m.postDataCommon = append(m.postDataCommon, map[string]any{
+		"coll":   coll,
+		"filter": filter,
+	})
 
 	switch coll {
 	case "subscriptionData.provisionedData.amData":
@@ -217,7 +194,7 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 			},
 		})
 		if amDataData == nil {
-			panic("failed to convert amDataData to BsonM")
+			logger.DbLog.Fatalln("failed to convert amDataData to BsonM")
 		}
 		return amDataData, nil
 
@@ -228,7 +205,7 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 			},
 		})
 		if amPolicyData == nil {
-			panic("failed to convert amPolicyData to BsonM")
+			logger.DbLog.Fatalln("failed to convert amPolicyData to BsonM")
 		}
 		return amPolicyData, nil
 
@@ -249,7 +226,7 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 			},
 		})
 		if smPolicyData == nil {
-			panic("failed to convert smPolicyData to BsonM")
+			logger.DbLog.Fatalln("failed to convert smPolicyData to BsonM")
 		}
 		return smPolicyData, nil
 
@@ -266,7 +243,7 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 			},
 		})
 		if smfSelData == nil {
-			panic("failed to convert smfSelData to BsonM")
+			logger.DbLog.Fatalln("failed to convert smfSelData to BsonM")
 		}
 		return smfSelData, nil
 
@@ -275,13 +252,12 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 	}
 }
 
-func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	if m.PostDataCommon != nil {
-		*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
-			"coll":   coll,
-			"filter": filter,
-		})
-	}
+func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	m.postDataCommon = append(m.postDataCommon, map[string]any{
+		"coll":   coll,
+		"filter": filter,
+	})
+
 	smDataData := []models.SessionManagementSubscriptionData{
 		{
 			SingleNssai: &models.Snssai{
@@ -313,9 +289,9 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.
 			},
 		},
 	}
-	result := make([]map[string]interface{}, len(smDataData))
+	result := make([]map[string]any, len(smDataData))
 	for i, smData := range smDataData {
-		result[i] = map[string]interface{}{
+		result[i] = map[string]any{
 			"SingleNssai":       smData.SingleNssai,
 			"DnnConfigurations": smData.DnnConfigurations,
 		}
@@ -327,82 +303,80 @@ func TestGetSubscriberByID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)
-	postDataCommon := make([]map[string]interface{}, 0)
-	postDataAuth := make([]map[string]interface{}, 0)
 
 	tests := []struct {
 		name                          string
 		ueId                          string
 		route                         string
-		commonDbAdapter               dbadapter.DBInterface
-		authDbAdapter                 dbadapter.DBInterface
+		commonDbAdapter               PostDataTracker
+		authDbAdapter                 PostDataTracker
 		expectedHTTPStatus            int
-		expectedFullResponse          map[string]interface{}
-		expectedCommonPostDataDetails []map[string]interface{}
-		expectedAuthPostDataDetails   []map[string]interface{}
+		expectedFullResponse          map[string]any
+		expectedCommonPostDataDetails []map[string]any
+		expectedAuthPostDataDetails   []map[string]any
 	}{
 		{
 			name:                 "No subscriber data found",
 			ueId:                 "imsi-2089300007487",
 			route:                "/api/subscriber/:ueId",
-			commonDbAdapter:      &MockCommonDBClientEmpty{PostDataCommon: &postDataCommon},
-			authDbAdapter:        &MockAuthDBClientEmpty{PostDataAuth: &postDataAuth},
+			commonDbAdapter:      &MockCommonDBClientEmpty{},
+			authDbAdapter:        &MockAuthDBClientEmpty{},
 			expectedHTTPStatus:   http.StatusNotFound,
-			expectedFullResponse: map[string]interface{}{"error": "subscriber with ID imsi-2089300007487 not found"},
-			expectedCommonPostDataDetails: []map[string]interface{}{
-				{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
-				{"coll": "subscriptionData.provisionedData.smData", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
-				{"coll": "subscriptionData.provisionedData.smfSelectionSubscriptionData", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
-				{"coll": "policyData.ues.amData", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
-				{"coll": "policyData.ues.smData", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
+			expectedFullResponse: map[string]any{"error": "subscriber with ID imsi-2089300007487 not found"},
+			expectedCommonPostDataDetails: []map[string]any{
+				{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
+				{"coll": "subscriptionData.provisionedData.smData", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
+				{"coll": "subscriptionData.provisionedData.smfSelectionSubscriptionData", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
+				{"coll": "policyData.ues.amData", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
+				{"coll": "policyData.ues.smData", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
 			},
-			expectedAuthPostDataDetails: []map[string]interface{}{
-				{"coll": "subscriptionData.authenticationData.authenticationSubscription", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
+			expectedAuthPostDataDetails: []map[string]any{
+				{"coll": "subscriptionData.authenticationData.authenticationSubscription", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
 			},
 		},
 
 		{
 			name:               "Valid subscriber data retrieved",
 			ueId:               "imsi-2089300007487",
-			commonDbAdapter:    &MockCommonDBClientWithData{PostDataCommon: &postDataCommon},
-			authDbAdapter:      &MockAuthDBClientWithData{PostDataAuth: &postDataAuth},
+			commonDbAdapter:    &MockCommonDBClientWithData{},
+			authDbAdapter:      &MockAuthDBClientWithData{},
 			route:              "/api/subscriber/:ueId",
 			expectedHTTPStatus: http.StatusOK,
-			expectedFullResponse: map[string]interface{}{
-				"AccessAndMobilitySubscriptionData": map[string]interface{}{
-					"gpsis": []interface{}{"msisdn-0900000000"},
-					"nssai": map[string]interface{}{
-						"defaultSingleNssais": []interface{}{
-							map[string]interface{}{"sd": "010203", "sst": 1},
+			expectedFullResponse: map[string]any{
+				"AccessAndMobilitySubscriptionData": map[string]any{
+					"gpsis": []any{"msisdn-0900000000"},
+					"nssai": map[string]any{
+						"defaultSingleNssais": []any{
+							map[string]any{"sd": "010203", "sst": 1},
 						},
-						"singleNssais": []interface{}{
-							map[string]interface{}{"sd": "010203", "sst": 1},
+						"singleNssais": []any{
+							map[string]any{"sd": "010203", "sst": 1},
 						},
 					},
-					"subscribedUeAmbr": map[string]interface{}{
+					"subscribedUeAmbr": map[string]any{
 						"downlink": "1000 Kbps",
 						"uplink":   "1000 Kbps",
 					},
 				},
-				"AmPolicyData": map[string]interface{}{
-					"subscCats": []interface{}{"aether"},
+				"AmPolicyData": map[string]any{
+					"subscCats": []any{"aether"},
 				},
-				"AuthenticationSubscription": map[string]interface{}{
+				"AuthenticationSubscription": map[string]any{
 					"authenticationManagementField": "8000",
 					"authenticationMethod":          "5G_AKA",
-					"milenage": map[string]interface{}{
-						"op": map[string]interface{}{
+					"milenage": map[string]any{
+						"op": map[string]any{
 							"encryptionAlgorithm": 0,
 							"encryptionKey":       0,
 							"opValue":             "c9e8763286b5b9ffbdf56e1297d0887b",
 						},
 					},
-					"opc": map[string]interface{}{
+					"opc": map[string]any{
 						"encryptionAlgorithm": 0,
 						"encryptionKey":       0,
 						"opcValue":            "981d464c7c52eb6e5036234984ad0bcf",
 					},
-					"permanentKey": map[string]interface{}{
+					"permanentKey": map[string]any{
 						"encryptionAlgorithm": 0,
 						"encryptionKey":       0,
 						"permanentKeyValue":   "5122250214c33e723a5dd523fc145fc0",
@@ -410,55 +384,55 @@ func TestGetSubscriberByID(t *testing.T) {
 					"sequenceNumber": "16f3b3f70fc2",
 				},
 				"FlowRules": nil,
-				"SessionManagementSubscriptionData": []interface{}{
-					map[string]interface{}{
-						"dnnConfigurations": map[string]interface{}{
-							"internet": map[string]interface{}{
-								"5gQosProfile": map[string]interface{}{
+				"SessionManagementSubscriptionData": []any{
+					map[string]any{
+						"dnnConfigurations": map[string]any{
+							"internet": map[string]any{
+								"5gQosProfile": map[string]any{
 									"5qi":           9,
-									"arp":           map[string]interface{}{"preemptCap": "", "preemptVuln": "", "priorityLevel": 8},
+									"arp":           map[string]any{"preemptCap": "", "preemptVuln": "", "priorityLevel": 8},
 									"priorityLevel": 8,
 								},
-								"pduSessionTypes": map[string]interface{}{
-									"allowedSessionTypes": []interface{}{"IPV4"},
+								"pduSessionTypes": map[string]any{
+									"allowedSessionTypes": []any{"IPV4"},
 									"defaultSessionType":  "IPV4",
 								},
-								"sessionAmbr": map[string]interface{}{
+								"sessionAmbr": map[string]any{
 									"downlink": "1000 Kbps",
 									"uplink":   "1000 Kbps",
 								},
-								"sscModes": map[string]interface{}{
-									"allowedSscModes": []interface{}{"SSC_MODE_1"},
+								"sscModes": map[string]any{
+									"allowedSscModes": []any{"SSC_MODE_1"},
 									"defaultSscMode":  "SSC_MODE_1",
 								},
 							},
 						},
-						"singleNssai": map[string]interface{}{
+						"singleNssai": map[string]any{
 							"sd":  "010203",
 							"sst": 1,
 						},
 					},
 				},
-				"SmPolicyData": map[string]interface{}{
-					"smPolicySnssaiData": map[string]interface{}{
-						"01010203": map[string]interface{}{
-							"smPolicyDnnData": map[string]interface{}{
-								"internet": map[string]interface{}{
+				"SmPolicyData": map[string]any{
+					"smPolicySnssaiData": map[string]any{
+						"01010203": map[string]any{
+							"smPolicyDnnData": map[string]any{
+								"internet": map[string]any{
 									"dnn": "internet",
 								},
 							},
-							"snssai": map[string]interface{}{
+							"snssai": map[string]any{
 								"sd":  "010203",
 								"sst": 1,
 							},
 						},
 					},
 				},
-				"SmfSelectionSubscriptionData": map[string]interface{}{
-					"subscribedSnssaiInfos": map[string]interface{}{
-						"01010203": map[string]interface{}{
-							"dnnInfos": []interface{}{
-								map[string]interface{}{
+				"SmfSelectionSubscriptionData": map[string]any{
+					"subscribedSnssaiInfos": map[string]any{
+						"01010203": map[string]any{
+							"dnnInfos": []any{
+								map[string]any{
 									"dnn": "internet",
 								},
 							},
@@ -468,22 +442,20 @@ func TestGetSubscriberByID(t *testing.T) {
 				"plmnID": "",
 				"ueId":   "imsi-2089300007487",
 			},
-			expectedCommonPostDataDetails: []map[string]interface{}{
-				{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
-				{"coll": "subscriptionData.provisionedData.smData", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
-				{"coll": "subscriptionData.provisionedData.smfSelectionSubscriptionData", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
-				{"coll": "policyData.ues.amData", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
-				{"coll": "policyData.ues.smData", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
+			expectedCommonPostDataDetails: []map[string]any{
+				{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
+				{"coll": "subscriptionData.provisionedData.smData", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
+				{"coll": "subscriptionData.provisionedData.smfSelectionSubscriptionData", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
+				{"coll": "policyData.ues.amData", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
+				{"coll": "policyData.ues.smData", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
 			},
-			expectedAuthPostDataDetails: []map[string]interface{}{
-				{"coll": "subscriptionData.authenticationData.authenticationSubscription", "filter": map[string]interface{}{"ueId": "imsi-2089300007487"}},
+			expectedAuthPostDataDetails: []map[string]any{
+				{"coll": "subscriptionData.authenticationData.authenticationSubscription", "filter": map[string]any{"ueId": "imsi-2089300007487"}},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			postDataCommon = nil
-			postDataAuth = nil
 			originalAuthDBClient := dbadapter.AuthDBClient
 			originalCommonDBClient := dbadapter.CommonDBClient
 			dbadapter.CommonDBClient = tt.commonDbAdapter
@@ -499,13 +471,13 @@ func TestGetSubscriberByID(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if w.Code != tt.expectedHTTPStatus {
-				t.Errorf("Expected HTTP status %d, got %d", tt.expectedHTTPStatus, w.Code)
+				t.Errorf("expected HTTP status %d, got %d", tt.expectedHTTPStatus, w.Code)
 			}
 
 			responseContent := w.Body.String()
-			var actual map[string]interface{}
+			var actual map[string]any
 			if err := json.Unmarshal([]byte(responseContent), &actual); err != nil {
-				t.Fatalf("Failed to unmarshal actual response: %v. Raw response: %s", err, responseContent)
+				t.Fatalf("failed to unmarshal actual response: %v. Raw response: %s", err, responseContent)
 			}
 			expectedResponse, err := json.Marshal(tt.expectedFullResponse)
 			if err != nil {
@@ -516,31 +488,31 @@ func TestGetSubscriberByID(t *testing.T) {
 				t.Fatalf("failed to marshal actual response: %v", err)
 			}
 			if !reflect.DeepEqual(expectedResponse, actualResponse) {
-				t.Errorf("Mismatch in response:\nExpected:\n%s\nGot:\n%s\n", string(expectedResponse), string(actualResponse))
+				t.Errorf("mismatch in response:\nExpected:\n%s\nGot:\n%s\n", string(expectedResponse), string(actualResponse))
 			}
 
 			expectedCommonData, err := json.Marshal(tt.expectedCommonPostDataDetails)
 			if err != nil {
 				t.Fatalf("failed to marshal expected post data details: %v", err)
 			}
-			gotCommonData, err := json.Marshal(postDataCommon)
+			gotCommonData, err := json.Marshal(tt.commonDbAdapter.GetPostData())
 			if err != nil {
 				t.Fatalf("failed to marshal actual post data details: %v", err)
 			}
 			if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
-				t.Errorf("Expected CommonPostData `%v`, but got `%v`", tt.expectedCommonPostDataDetails, postDataCommon)
+				t.Errorf("expected CommonPostData `%v`, but got `%v`", tt.expectedCommonPostDataDetails, gotCommonData)
 			}
 
 			expectedAuthData, err := json.Marshal(tt.expectedAuthPostDataDetails)
 			if err != nil {
 				t.Fatalf("failed to marshal expected auth post data details: %v", err)
 			}
-			gotAuthData, err := json.Marshal(postDataAuth)
+			gotAuthData, err := json.Marshal(tt.authDbAdapter.GetPostData())
 			if err != nil {
 				t.Fatalf("failed to marshal actual auth post data details: %v", err)
 			}
 			if !reflect.DeepEqual(expectedAuthData, gotAuthData) {
-				t.Errorf("Expected AuthPostData `%v`, but got `%v`", tt.expectedAuthPostDataDetails, postDataAuth)
+				t.Errorf("expected AuthPostData `%v`, but got `%v`", tt.expectedAuthPostDataDetails, gotAuthData)
 			}
 		})
 	}
@@ -561,7 +533,7 @@ func TestSubscriberGetHandlers(t *testing.T) {
 		{
 			name:         "SubscriberEmptyDB",
 			route:        "/api/subscriber",
-			dbAdapter:    &MockMongoClientEmptyDB{},
+			dbAdapter:    &MockCommonDBClientEmpty{},
 			expectedCode: http.StatusOK,
 			expectedBody: "[]",
 		},
@@ -601,36 +573,34 @@ func TestSubscriberGetHandlers(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
 }
 
-func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-	AddApiService(router)
+type AuthDBMockDBClient struct {
+	dbadapter.DBInterface
+	subscribers      []string
+	receivedPostData []map[string]any
+	deleteData       []map[string]any
+	err              error
+}
 
-	postDataCommon := make([]map[string]interface{}, 0)
-	route := "/api/subscriber/imsi-208930100007487"
-	inputData := map[string]string{
-		"plmnID":         "12345",
-		"opc":            "8e27b6af0e692e750f32667a3b14605d",
-		"key":            "8baf473f2f8fd09487cccbd7097c6862",
-		"sequenceNumber": "16f3b3f70fc2",
+func (db *AuthDBMockDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
+	if len(db.subscribers) == 0 {
+		return nil, nil
 	}
-	authSubsData := models.AuthenticationSubscription{
+	s := models.AuthenticationSubscription{
 		AuthenticationManagementField: "8000",
 		AuthenticationMethod:          "5G_AKA",
 		Milenage: &models.Milenage{
 			Op: &models.Op{
 				EncryptionAlgorithm: 0,
 				EncryptionKey:       0,
-				OpValue:             "",
 			},
 		},
 		Opc: &models.Opc{
@@ -645,211 +615,286 @@ func TestSubscriberPostHandlersNoExistingSubscriber(t *testing.T) {
 		},
 		SequenceNumber: "16f3b3f70fc2",
 	}
-	jsonData, err := json.Marshal(inputData)
-	if err != nil {
-		t.Fatalf("failed to marshal input data to JSON: %v", err)
+
+	subscriber := configmodels.ToBsonM(s)
+	subscriber["ueId"] = db.subscribers[0]
+	subscriber["servingPlmnId"] = "12345"
+	return subscriber, nil
+}
+
+func (db *AuthDBMockDBClient) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
+	db.receivedPostData = append(db.receivedPostData, map[string]any{
+		"coll":   collName,
+		"filter": filter,
+		"data":   postData,
+	})
+	return true, nil
+}
+
+func (db *AuthDBMockDBClient) RestfulAPIDeleteOne(collName string, filter bson.M) error {
+	if db.err != nil {
+		return db.err
 	}
-	commonDbAdapter := &MockMongoClientNoSubscriberInDB{PostDataCommon: &postDataCommon}
-	authDbAdapter := &MockMongoClientAuthDB{}
-	origDBClient := dbadapter.CommonDBClient
-	origAuthDBClient := dbadapter.AuthDBClient
-	dbadapter.CommonDBClient = commonDbAdapter
-	dbadapter.AuthDBClient = authDbAdapter
-	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 1)
-	defer func() {
-		configChannel = origChannel
-		dbadapter.CommonDBClient = origDBClient
-		dbadapter.AuthDBClient = origAuthDBClient
-	}()
-	expectedCode := http.StatusCreated
-	expectedBody := `{}`
-	expectedCommonPostDataDetails := []map[string]interface{}{
-		{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-208930100007487"}},
+	params := map[string]any{
+		"coll":   collName,
+		"filter": filter,
 	}
-	expectedMessage := &configmodels.ConfigMessage{
-		MsgType:     configmodels.Sub_data,
-		MsgMethod:   configmodels.Post_op,
-		AuthSubData: &authSubsData,
-		Imsi:        "imsi-208930100007487",
+	db.deleteData = append(db.deleteData, params)
+	return nil
+}
+
+type PostSubscriberMockDBClient struct {
+	dbadapter.DBInterface
+	subscribers      []string
+	receivedGetData  []map[string]any
+	receivedPostData []map[string]any
+	err              error
+}
+
+func (db *PostSubscriberMockDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
+	db.receivedGetData = append(db.receivedGetData, map[string]any{
+		"coll":   collName,
+		"filter": filter,
+	})
+
+	if db.err != nil {
+		return nil, db.err
+	}
+	if len(db.subscribers) == 0 {
+		return nil, nil
 	}
 
-	req, err := http.NewRequest(http.MethodPost, route, bytes.NewBuffer(jsonData))
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	subscriber := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{})
+	subscriber["ueId"] = db.subscribers[0]
+	subscriber["servingPlmnId"] = "12345"
+	return subscriber, nil
+}
 
-	if w.Code != expectedCode {
-		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
-	}
-	if w.Body.String() != expectedBody {
-		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-	}
+func (db *PostSubscriberMockDBClient) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
+	db.receivedPostData = append(db.receivedPostData, map[string]any{
+		"coll":   collName,
+		"filter": filter,
+		"data":   postData,
+	})
+	return true, nil
+}
 
-	expectedCommonData, err := json.Marshal(expectedCommonPostDataDetails)
-	if err != nil {
-		t.Fatalf("failed to marshal expected post data details: %v", err)
+func TestSubscriberPost(t *testing.T) {
+	tests := []struct {
+		name             string
+		commonDbAdapter  PostSubscriberMockDBClient
+		expectedCode     int
+		expectedBody     string
+		expectedGetData  []map[string]any
+		expectedPostData []map[string]any
+	}{
+		{
+			name: "Existing subscriber is rejected",
+			commonDbAdapter: PostSubscriberMockDBClient{
+				subscribers: []string{"imsi-208930100007487"},
+			},
+			expectedCode: http.StatusConflict,
+			expectedBody: "subscriber imsi-208930100007487 already exists",
+			expectedGetData: []map[string]any{
+				{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]any{"ueId": "imsi-208930100007487"}},
+			},
+			expectedPostData: nil,
+		},
+		{
+			name: "New subscriber is created",
+			commonDbAdapter: PostSubscriberMockDBClient{
+				subscribers: []string{},
+			},
+			expectedCode: http.StatusCreated,
+			expectedBody: `{}`,
+			expectedGetData: []map[string]any{
+				{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]any{"ueId": "imsi-208930100007487"}},
+			},
+			expectedPostData: []map[string]any{
+				{"coll": "subscriptionData.provisionedData.amData", "filter": bson.M{"ueId": "imsi-208930100007487"}},
+			},
+		},
 	}
-	gotCommonData, err := json.Marshal(postDataCommon)
-	if err != nil {
-		t.Fatalf("failed to marshal actual post data details: %v", err)
-	}
-	if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
-		t.Errorf("Expected CommonPostData `%v`, but got `%v`", expectedCommonPostDataDetails, postDataCommon)
-	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			router := gin.Default()
+			AddApiService(router)
 
-	select {
-	case msg := <-configChannel:
-		if msg.MsgType != expectedMessage.MsgType {
-			t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
-		}
-		if msg.MsgMethod != expectedMessage.MsgMethod {
-			t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
-		}
-		if !reflect.DeepEqual(expectedMessage.AuthSubData, msg.AuthSubData) {
-			t.Errorf("expected AuthSubData %+v, but got %+v", expectedMessage.AuthSubData, msg.AuthSubData)
-		}
-		if expectedMessage.Imsi != msg.Imsi {
-			t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)
-		}
-	default:
-		t.Error("expected message in configChannel, but none received")
+			route := "/api/subscriber/imsi-208930100007487"
+			inputData := map[string]string{
+				"plmnID":         "12345",
+				"opc":            "8e27b6af0e692e750f32667a3b14605d",
+				"key":            "8baf473f2f8fd09487cccbd7097c6862",
+				"sequenceNumber": "16f3b3f70fc2",
+			}
+			jsonData, err := json.Marshal(inputData)
+			if err != nil {
+				t.Fatalf("failed to marshal input data to JSON: %v", err)
+			}
+
+			origDBClient := dbadapter.CommonDBClient
+			origAuthDBClient := dbadapter.AuthDBClient
+			defer func() {
+				dbadapter.CommonDBClient = origDBClient
+				dbadapter.AuthDBClient = origAuthDBClient
+			}()
+			dbadapter.AuthDBClient = &AuthDBMockDBClient{}
+			dbadapter.CommonDBClient = &tc.commonDbAdapter
+
+			expectedGetData, err := json.Marshal(tc.expectedGetData)
+			if err != nil {
+				t.Fatalf("failed to marshal expected get data details: %v", err)
+			}
+
+			req, err := http.NewRequest(http.MethodPost, route, bytes.NewBuffer(jsonData))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			if w.Code != tc.expectedCode {
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
+			}
+			if !strings.Contains(w.Body.String(), tc.expectedBody) {
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+			}
+
+			gotGetData, err := json.Marshal(tc.commonDbAdapter.receivedGetData)
+			if err != nil {
+				t.Fatalf("failed to marshal actual get data details: %v", err)
+			}
+			if !reflect.DeepEqual(expectedGetData, gotGetData) {
+				t.Errorf("expected expectedGetData `%+v`, but got `%+v`", expectedGetData, tc.commonDbAdapter.receivedGetData)
+			}
+
+			if tc.expectedPostData != nil {
+				expectedAmDataCollection := amDataColl
+				if tc.commonDbAdapter.receivedPostData[0]["coll"] != expectedAmDataCollection {
+					t.Errorf("expected collection %v, got %v", expectedAmDataCollection, tc.commonDbAdapter.receivedPostData[0]["coll"])
+				}
+				if !reflect.DeepEqual(tc.commonDbAdapter.receivedPostData[0]["filter"], tc.expectedPostData[0]["filter"]) {
+					t.Errorf("expected filter %t, got %t", tc.expectedPostData[0]["filter"], tc.commonDbAdapter.receivedPostData[0]["filter"])
+				}
+				expectedFilter := bson.M{"ueId": "imsi-208930100007487"}
+				if !reflect.DeepEqual(tc.commonDbAdapter.receivedPostData[0]["filter"], expectedFilter) {
+					t.Errorf("expected filter %v, got %v", expectedFilter, tc.commonDbAdapter.receivedPostData[0]["filter"])
+				}
+			}
+		})
 	}
 }
 
-func TestSubscriberPostHandlersSubscriberExists(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-	AddApiService(router)
-
-	postDataCommon := make([]map[string]interface{}, 0)
-	route := "/api/subscriber/imsi-208930100007487"
-	inputData := map[string]string{
-		"plmnID":         "12345",
-		"opc":            "8e27b6af0e692e750f32667a3b14605d",
-		"key":            "8baf473f2f8fd09487cccbd7097c6862",
-		"sequenceNumber": "16f3b3f70fc2",
-	}
-
-	jsonData, err := json.Marshal(inputData)
-	if err != nil {
-		t.Fatalf("failed to marshal input data to JSON: %v", err)
-	}
-
-	commonDbAdapter := &MockMongoClientOneSubscriber{PostDataCommon: &postDataCommon}
-	origDBClient := dbadapter.CommonDBClient
-	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 1)
-	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
-	dbadapter.CommonDBClient = commonDbAdapter
-
-	expectedCode := http.StatusConflict
-	expectedBody := "subscriber imsi-208930100007487 already exists"
-	expectedCommonPostDataDetails := []map[string]interface{}{
-		{"coll": "subscriptionData.provisionedData.amData", "filter": map[string]interface{}{"ueId": "imsi-208930100007487"}},
-	}
-
-	req, err := http.NewRequest(http.MethodPost, route, bytes.NewBuffer(jsonData))
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != expectedCode {
-		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
-	}
-	if !strings.Contains(w.Body.String(), expectedBody) {
-		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-	}
-
-	expectedCommonData, err := json.Marshal(expectedCommonPostDataDetails)
-	if err != nil {
-		t.Fatalf("failed to marshal expected post data details: %v", err)
-	}
-	gotCommonData, err := json.Marshal(postDataCommon)
-	if err != nil {
-		t.Fatalf("failed to marshal actual post data details: %v", err)
-	}
-	if !reflect.DeepEqual(expectedCommonData, gotCommonData) {
-		t.Errorf("Expected CommonPostData `%v`, but got `%v`", expectedCommonPostDataDetails, postDataCommon)
-	}
-
-	select {
-	case <-configChannel:
-		t.Error("expected no message in configChannel, but got one")
-	default:
-		// No message received as expected.
-	}
+type DeleteSubscriberMockDBClient struct {
+	dbadapter.DBInterface
+	deviceGroups []configmodels.DeviceGroups
+	deleteData   []map[string]any
+	err          error
 }
 
-type MockMongoClientAuthDB struct {
-	MockMongoClientEmptyDB
+func (db *DeleteSubscriberMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	if coll == "device_group" {
+		dg := configmodels.ToBsonM(db.deviceGroups[0])
+		if dg == nil {
+			logger.DbLog.Fatalln("failed to convert device group to BsonM")
+		}
+		return dg, nil
+	}
+	return nil, nil
 }
 
-func TestSubscriberDeleteSuccessNoDeviceGroup(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-	AddApiService(router)
-	origDBClient := dbadapter.CommonDBClient
-	dbAdapter := &MockMongoClientEmptyDB{}
-	dbadapter.CommonDBClient = dbAdapter
-	origAuthDBClient := dbadapter.AuthDBClient
-	authDbAdapter := &MockMongoClientAuthDB{}
-	dbadapter.AuthDBClient = authDbAdapter
-
-	route := "/api/subscriber/imsi-208930100007487"
-	expectedCode := http.StatusNoContent
-	expectedBody := ""
-	expectedMessage := configmodels.ConfigMessage{
-		MsgType:   configmodels.Sub_data,
-		MsgMethod: configmodels.Delete_op,
-		Imsi:      "imsi-208930100007487",
+func (db *DeleteSubscriberMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	if db.err != nil {
+		return nil, db.err
 	}
-	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 3)
-	defer func() {
-		configChannel = origChannel
-		dbadapter.CommonDBClient = origDBClient
-		dbadapter.AuthDBClient = origAuthDBClient
-	}()
-	req, err := http.NewRequest(http.MethodDelete, route, nil)
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	if expectedCode != w.Code {
-		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
-	}
-	if !strings.Contains(w.Body.String(), expectedBody) {
-		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-	}
-	select {
-	case msg := <-configChannel:
-		if expectedMessage.MsgType != msg.MsgType {
-			t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
+	var results []map[string]any
+	for _, deviceGroup := range db.deviceGroups {
+		dg := configmodels.ToBsonM(deviceGroup)
+		if dg == nil {
+			logger.DbLog.Fatalln("failed to convert device groups to BsonM")
 		}
-		if expectedMessage.MsgMethod != msg.MsgMethod {
-			t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
-		}
-		if expectedMessage.Imsi != msg.Imsi {
-			t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)
-		}
-	default:
-		t.Error("expected message in configChannel, but none received")
+		results = append(results, dg)
 	}
-	select {
-	case msg := <-configChannel:
-		t.Errorf("expected no message in configChannel, but got %+v", msg)
-	default:
+	return results, db.err
+}
+
+func (db *DeleteSubscriberMockDBClient) RestfulAPIPost(coll string, filter bson.M, postData map[string]any) (bool, error) {
+	if db.err != nil {
+		return true, db.err
+	}
+	return true, nil
+}
+
+func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOne(coll string, filter bson.M) error {
+	if db.err != nil {
+		return db.err
+	}
+	params := map[string]any{
+		"coll":   coll,
+		"filter": filter,
+	}
+	db.deleteData = append(db.deleteData, params)
+	return nil
+}
+
+func TestSubscriberDelete(t *testing.T) {
+	tests := []struct {
+		name            string
+		commonDbAdapter dbadapter.DBInterface
+		expectedCode    int
+	}{
+		{
+			name: "Subscriber belongs to a device group",
+			commonDbAdapter: &DeleteSubscriberMockDBClient{
+				deviceGroups: []configmodels.DeviceGroups{
+					deviceGroupWithImsis("group1", []string{"208930100007487"}),
+				},
+			},
+			expectedCode: http.StatusNoContent,
+		},
+		{
+			name: "Subscriber does not belongs to any device group",
+			commonDbAdapter: &DeleteSubscriberMockDBClient{
+				deviceGroups: []configmodels.DeviceGroups{},
+			},
+			expectedCode: http.StatusNoContent,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			router := gin.Default()
+			AddApiService(router)
+			origDBClient := dbadapter.CommonDBClient
+			origAuthDBClient := dbadapter.AuthDBClient
+			defer func() {
+				dbadapter.CommonDBClient = origDBClient
+				dbadapter.AuthDBClient = origAuthDBClient
+			}()
+			dbadapter.CommonDBClient = tc.commonDbAdapter
+			dbadapter.AuthDBClient = &AuthDBMockDBClient{}
+			route := "/api/subscriber/imsi-208930100007487"
+			expectedCode := tc.expectedCode
+			expectedBody := ""
+
+			req, err := http.NewRequest(http.MethodDelete, route, nil)
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			if expectedCode != w.Code {
+				t.Errorf("expected status code `%v`, got `%v`", expectedCode, w.Code)
+			}
+			if expectedBody != w.Body.String() {
+				t.Errorf("expected body `%v`, got `%v`", expectedBody, w.Body.String())
+			}
+		})
 	}
 }
 
@@ -858,15 +903,14 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	router := gin.Default()
 	AddApiService(router)
 	origDBClient := dbadapter.CommonDBClient
-	dbAdapter := &MockMongoClientDBError{}
-	dbadapter.CommonDBClient = dbAdapter
+	defer func() { dbadapter.CommonDBClient = origDBClient }()
+	dbadapter.CommonDBClient = &DeleteSubscriberMockDBClient{
+		err: fmt.Errorf("mock error"),
+	}
 	route := "/api/subscriber/imsi-208930100007487"
 	expectedCode := http.StatusInternalServerError
 	expectedBody := "error deleting subscriber. Please check the log for details"
 
-	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 1)
-	defer func() { configChannel = origChannel; dbadapter.CommonDBClient = origDBClient }()
 	req, err := http.NewRequest(http.MethodDelete, route, nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -877,99 +921,10 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	if expectedCode != w.Code {
-		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+		t.Errorf("expected `%v`, got `%v`", expectedCode, w.Code)
 	}
 	if !strings.Contains(w.Body.String(), expectedBody) {
-		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
-	}
-	select {
-	case msg := <-configChannel:
-		t.Errorf("expected no message in configChannel, but got %+v", msg)
-	default:
-	}
-}
-
-func TestSubscriberDeleteSuccessWithDeviceGroup(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-	AddApiService(router)
-	origDBClient := dbadapter.CommonDBClient
-	dbAdapter := &MockMongoClientDeviceGroupsWithSubscriber{}
-	dbadapter.CommonDBClient = dbAdapter
-	origAuthDBClient := dbadapter.AuthDBClient
-	authDbAdapter := &MockMongoClientAuthDB{}
-	dbadapter.AuthDBClient = authDbAdapter
-	route := "/api/subscriber/imsi-208930100007487"
-	expectedCode := http.StatusNoContent
-	expectedBody := ""
-	expectedDeviceGroupMessage := configmodels.ConfigMessage{
-		MsgType:      configmodels.Device_group,
-		MsgMethod:    configmodels.Post_op,
-		DevGroupName: "group1",
-		DevGroup:     deviceGroupWithoutImsi(),
-	}
-	expectedMessage := configmodels.ConfigMessage{
-		MsgType:   configmodels.Sub_data,
-		MsgMethod: configmodels.Delete_op,
-		Imsi:      "imsi-208930100007487",
-	}
-	origChannel := configChannel
-	configChannel = make(chan *configmodels.ConfigMessage, 3)
-	defer func() {
-		configChannel = origChannel
-		dbadapter.CommonDBClient = origDBClient
-		dbadapter.AuthDBClient = origAuthDBClient
-	}()
-	req, err := http.NewRequest(http.MethodDelete, route, nil)
-	if err != nil {
-		t.Fatalf("failed to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	if expectedCode != w.Code {
-		t.Errorf("Expected status code `%v`, got `%v`", expectedCode, w.Code)
-	}
-	if expectedBody != w.Body.String() {
-		t.Errorf("Expected body `%v`, got `%v`", expectedBody, w.Body.String())
-	}
-	select {
-	case msg := <-configChannel:
-		if expectedDeviceGroupMessage.MsgType != msg.MsgType {
-			t.Errorf("expected MsgType %+v, but got %+v", expectedDeviceGroupMessage.MsgType, msg.MsgType)
-		}
-		if expectedDeviceGroupMessage.MsgMethod != msg.MsgMethod {
-			t.Errorf("expected MsgMethod %+v, but got %+v", expectedDeviceGroupMessage.MsgMethod, msg.MsgMethod)
-		}
-		if expectedDeviceGroupMessage.DevGroupName != msg.DevGroupName {
-			t.Errorf("expected device group name %+v, but got %+v", expectedDeviceGroupMessage.DevGroupName, msg.DevGroupName)
-		}
-		if !reflect.DeepEqual(expectedDeviceGroupMessage.DevGroup.Imsis, msg.DevGroup.Imsis) {
-			t.Errorf("expected IMSIs in device group: %+v, but got %+v", expectedDeviceGroupMessage.DevGroup.Imsis, msg.DevGroup.Imsis)
-		}
-	default:
-		t.Error("expected message in configChannel, but none received")
-	}
-	select {
-	case msg := <-configChannel:
-		if expectedMessage.MsgType != msg.MsgType {
-			t.Errorf("expected MsgType %+v, but got %+v", expectedMessage.MsgType, msg.MsgType)
-		}
-		if expectedMessage.MsgMethod != msg.MsgMethod {
-			t.Errorf("expected MsgMethod %+v, but got %+v", expectedMessage.MsgMethod, msg.MsgMethod)
-		}
-		if expectedMessage.Imsi != msg.Imsi {
-			t.Errorf("expected IMSI %+v, but got %+v", expectedMessage.Imsi, msg.Imsi)
-		}
-	default:
-		t.Error("expected message in configChannel, but none received")
-	}
-	select {
-	case msg := <-configChannel:
-		t.Errorf("expected no message in configChannel, but got %+v", msg)
-	default:
+		t.Errorf("expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 }
 
@@ -1003,10 +958,4 @@ func deviceGroupWithImsis(name string, imsis []string) configmodels.DeviceGroups
 		IpDomainExpanded: ipDomain,
 	}
 	return deviceGroup
-}
-
-func deviceGroupWithoutImsi() *configmodels.DeviceGroups {
-	tmp := deviceGroupWithImsis("group1", []string{"208930100007487", "208930100007488"})
-	tmp.Imsis = slices.Delete(tmp.Imsis, 0, 1)
-	return &tmp
 }

@@ -87,6 +87,8 @@ func GetDeviceGroupByName(c *gin.Context) {
 	rawDeviceGroup, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(devGroupDataColl, filter)
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve device group"})
+		return
 	}
 	err := json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup)
 	if err != nil {
@@ -187,7 +189,7 @@ func DeviceGroupGroupNamePut(c *gin.Context) {
 		return
 	}
 
-	if statusCode, err := deviceGroupPostHelper(requestDeviceGroup, configmodels.Put_op, groupName); err != nil {
+	if statusCode, err := deviceGroupPostHelper(requestDeviceGroup, groupName); err != nil {
 		logger.WebUILog.Errorf("Device group update failed: %+v", err)
 		c.JSON(statusCode, gin.H{
 			"error":      fmt.Sprintf("Failed to update device group %s with error: %+v.", groupName, err),
@@ -261,7 +263,7 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 		return
 	}
 
-	if statusCode, err := deviceGroupPostHelper(requestDeviceGroup, configmodels.Post_op, groupName); err != nil {
+	if statusCode, err := deviceGroupPostHelper(requestDeviceGroup, groupName); err != nil {
 		logger.WebUILog.Errorf("Device group create failed: %+v", err)
 		c.JSON(statusCode, gin.H{
 			"error":      fmt.Sprintf("Failed to create device group %s with error: %+v.", groupName, err),
@@ -328,6 +330,8 @@ func GetNetworkSliceByName(c *gin.Context) {
 	rawNetworkSlice, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(sliceDataColl, filter)
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve network slice"})
+		return
 	}
 	err := json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice)
 	if err != nil {
@@ -427,7 +431,7 @@ func NetworkSliceSliceNamePost(c *gin.Context) {
 		})
 		return
 	}
-	statusCode, err := networkSlicePostHelper(c, configmodels.Post_op, sliceName)
+	statusCode, err := networkSlicePostHelper(c, sliceName)
 	if err != nil {
 		c.JSON(statusCode, gin.H{
 			"error":      fmt.Sprintf("Failed to create network slice %s with error: %+v", sliceName, err),
@@ -463,7 +467,7 @@ func NetworkSliceSliceNamePut(c *gin.Context) {
 		})
 		return
 	}
-	statusCode, err := networkSlicePostHelper(c, configmodels.Put_op, sliceName)
+	statusCode, err := networkSlicePostHelper(c, sliceName)
 	if err != nil {
 		c.JSON(statusCode, gin.H{
 			"error":      fmt.Sprintf("Failed to update network slice %s with error: %+v.", sliceName, err),

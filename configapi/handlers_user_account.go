@@ -172,10 +172,10 @@ func CreateUserAccount(c *gin.Context) {
 	}
 
 	filter := bson.M{"username": dbUser.Username}
-	err = dbadapter.WebuiDBClient.RestfulAPIPostMany(configmodels.UserAccountDataColl, filter, []interface{}{configmodels.ToBsonM(dbUser)})
+	err = dbadapter.WebuiDBClient.RestfulAPIPostMany(configmodels.UserAccountDataColl, filter, []any{configmodels.ToBsonM(dbUser)})
 	if err != nil {
 		if strings.Contains(err.Error(), "E11000") {
-			logger.DbLog.Errorln("Duplicate username found:", err)
+			logger.DbLog.Errorln("duplicate username found:", err)
 			c.JSON(http.StatusConflict, gin.H{"error": "user account already exists"})
 			return
 		}

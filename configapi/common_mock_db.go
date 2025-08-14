@@ -35,15 +35,15 @@ type MockMongoClientDBError struct {
 	dbadapter.DBInterface
 }
 
-func (db *MockMongoClientDBError) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
+func (db *MockMongoClientDBError) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	return nil, errors.New("DB error")
 }
 
-func (db *MockMongoClientDBError) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
+func (db *MockMongoClientDBError) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
 	return nil, errors.New("DB error")
 }
 
-func (db *MockMongoClientDBError) RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]interface{}) (bool, error) {
+func (db *MockMongoClientDBError) RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]any) (bool, error) {
 	return false, errors.New("DB error")
 }
 
@@ -55,15 +55,15 @@ func (db *MockMongoClientDBError) RestfulAPIJSONPatchWithContext(context context
 	return errors.New("DB error")
 }
 
-func (db *MockMongoClientDBError) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
+func (db *MockMongoClientDBError) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
 	return false, errors.New("DB error")
 }
 
-func (db *MockMongoClientDBError) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
+func (db *MockMongoClientDBError) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []any) error {
 	return errors.New("DB error")
 }
 
-func (db *MockMongoClientDBError) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []interface{}) error {
+func (db *MockMongoClientDBError) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []any) error {
 	return errors.New("DB error")
 }
 
@@ -79,28 +79,28 @@ type MockMongoClientEmptyDB struct {
 	dbadapter.DBInterface
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {
-	return map[string]interface{}{}, nil
+func (db *MockMongoClientEmptyDB) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
+	return map[string]any{}, nil
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (db *MockMongoClientEmptyDB) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	var results []map[string]any
 	return results, nil
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]interface{}) (bool, error) {
+func (db *MockMongoClientEmptyDB) RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]any) (bool, error) {
 	return false, nil
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIPost(collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
+func (db *MockMongoClientEmptyDB) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
 	return true, nil
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
+func (db *MockMongoClientEmptyDB) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []any) error {
 	return nil
 }
 
-func (db *MockMongoClientEmptyDB) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []interface{}) error {
+func (db *MockMongoClientEmptyDB) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []any) error {
 	return nil
 }
 
@@ -126,46 +126,4 @@ func (m *MockMongoClientEmptyDB) RestfulAPIDeleteOne(coll string, filter bson.M)
 
 func (m *MockMongoClientEmptyDB) Client() *mongo.Client {
 	return nil
-}
-
-type MockMongoClientDuplicateCreation struct {
-	dbadapter.DBInterface
-}
-
-func (db *MockMongoClientDuplicateCreation) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	return results, nil
-}
-
-func (db *MockMongoClientDuplicateCreation) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []interface{}) error {
-	return errors.New("E11000")
-}
-
-func (db *MockMongoClientDuplicateCreation) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []interface{}) error {
-	return errors.New("E11000")
-}
-
-func (db *MockMongoClientDuplicateCreation) RestfulAPICount(collName string, filter bson.M) (int64, error) {
-	return 1, nil
-}
-
-func (m *MockMongoClientDuplicateCreation) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
-}
-
-type MockMongoClientNoSubscriberInDB struct {
-	*MockMongoClientEmptyDB
-	PostDataCommon *[]map[string]interface{}
-}
-
-func (m *MockMongoClientNoSubscriberInDB) RestfulAPIPost(coll string, filter bson.M, postData map[string]interface{}) (bool, error) {
-	*m.PostDataCommon = append(*m.PostDataCommon, map[string]interface{}{
-		"coll":   coll,
-		"filter": filter,
-	})
-	return true, nil
-}
-
-func (m *MockMongoClientNoSubscriberInDB) RestfulAPIGetOne(coll string, filter bson.M) (map[string]interface{}, error) {
-	return nil, nil
 }

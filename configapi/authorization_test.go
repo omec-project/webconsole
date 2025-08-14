@@ -206,10 +206,10 @@ func TestAdminOrUserAuthorizationMiddleware_NoHeaderRequest(t *testing.T) {
 			expectedCode := http.StatusUnauthorized
 			expectedBody := `{"error":"auth failed: authorization header not found"}`
 			if expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", expectedCode, w.Code)
 			}
 			if w.Body.String() != expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -257,10 +257,10 @@ func TestAdminOrUserAuthorizationMiddleware_TokenValidation(t *testing.T) {
 
 			expectedCode := http.StatusUnauthorized
 			if expectedCode != w.Code {
-				t.Errorf("Expected status code `%v`, got `%v`", expectedCode, w.Code)
+				t.Errorf("expected status code `%v`, got `%v`", expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected body `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected body `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -308,10 +308,10 @@ func TestGetUserAccounts_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -373,10 +373,10 @@ func TestGetUserAccount_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -396,10 +396,10 @@ func TestCreateUserAccount_CreateFirstUserWithoutHeaderAuthorization(t *testing.
 	expectedCode := http.StatusOK
 	expectedBody := successBody
 	if expectedCode != w.Code {
-		t.Errorf("Expected `%v`, got `%v`", expectedCode, w.Code)
+		t.Errorf("expected `%v`, got `%v`", expectedCode, w.Code)
 	}
 	if w.Body.String() != expectedBody {
-		t.Errorf("Expected `%v`, got `%v`", expectedBody, w.Body.String())
+		t.Errorf("expected `%v`, got `%v`", expectedBody, w.Body.String())
 	}
 }
 
@@ -445,10 +445,10 @@ func TestCreateUserAccount_AdminAuthorizationMiddleware(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -510,10 +510,10 @@ func TestDeleteUserAccount_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -575,10 +575,10 @@ func TestChangePassword_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}

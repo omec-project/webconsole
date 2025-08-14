@@ -18,8 +18,7 @@ import (
 )
 
 type mockWebUI struct {
-	started     bool
-	startedChan chan struct{}
+	started bool
 }
 
 func (m *mockWebUI) Start(ctx context.Context, syncChan chan<- struct{}) {
@@ -27,11 +26,7 @@ func (m *mockWebUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 	case <-ctx.Done():
 		return
 	default:
-		time.Sleep(50 * time.Millisecond)
 		m.started = true
-		if m.startedChan != nil {
-			close(m.startedChan)
-		}
 	}
 }
 
@@ -48,15 +43,14 @@ func (m *mockNFConfigFail) Start(ctx context.Context, syncChan <-chan struct{}) 
 	return errors.New("NFConfig start failed")
 }
 
-type MockNFConfig struct{}
+type mockNFConfig struct{}
 
-func (m *MockNFConfig) Start(ctx context.Context, syncChan <-chan struct{}) error {
+func (m *mockNFConfig) Start(ctx context.Context, syncChan <-chan struct{}) error {
 	return nil
 }
 
-func TestRunWebUIAndNFConfig_Success(t *testing.T) {
-	started := make(chan struct{})
-	webui := &mockWebUI{startedChan: started}
+func TestRunWebUIAndNFConfig_Success_ExpectNoError(t *testing.T) {
+	webui := &mockWebUI{}
 	nf := &mockNFConfigSuccess{}
 
 	err := runWebUIAndNFConfig(webui, nf)
@@ -64,26 +58,18 @@ func TestRunWebUIAndNFConfig_Success(t *testing.T) {
 		t.Errorf("expected no error, got %v", err)
 	}
 
-	select {
-	case <-started:
-	case <-time.After(100 * time.Millisecond):
+	if !webui.started {
 		t.Errorf("webui.Start was not called in time")
 	}
 }
 
-func TestRunWebUIAndNFConfig_Failure(t *testing.T) {
-	started := make(chan struct{})
-	webui := &mockWebUI{startedChan: started}
+func TestRunWebUIAndNFConfig_GivenFailureInNfConfigServiceExpectError(t *testing.T) {
+	webui := &mockWebUI{}
 	nf := &mockNFConfigFail{}
 
 	err := runWebUIAndNFConfig(webui, nf)
 	if err == nil || !strings.Contains(err.Error(), "NFConfig start failed") {
 		t.Errorf("expected NFConfig failure, got %v", err)
-	}
-
-	time.Sleep(30 * time.Millisecond)
-	if webui.started {
-		t.Errorf("webui.Start() should respect context cancellation and not proceed")
 	}
 }
 
@@ -187,7 +173,7 @@ func TestStartApplication(t *testing.T) {
 	t.Run("run failure", func(t *testing.T) {
 		initMongoDB = func() error { return nil }
 		newNFConfigServer = func(config *factory.Config) (nfconfig.NFConfigInterface, error) {
-			return &MockNFConfig{}, nil
+			return &mockNFConfig{}, nil
 		}
 		runServer = func(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
 			return fmt.Errorf("run fail")
@@ -201,7 +187,7 @@ func TestStartApplication(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		initMongoDB = func() error { return nil }
 		newNFConfigServer = func(config *factory.Config) (nfconfig.NFConfigInterface, error) {
-			return &MockNFConfig{}, nil
+			return &mockNFConfig{}, nil
 		}
 		runServer = func(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
 			return nil

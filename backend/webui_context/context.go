@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/dbadapter"
@@ -115,7 +115,6 @@ func WEBUI_Self() *WEBUIContext {
 	return &webuiContext
 }
 
-// Copy from lib/TimeDecode/TimeDecode.go
 func decode(source interface{}, format string) ([]models.NfProfile, error) {
 	var target []models.NfProfile
 

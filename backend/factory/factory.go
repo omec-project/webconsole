@@ -99,16 +99,16 @@ func SetLogLevelsFromConfig(cfg *Config) {
 		}
 	}
 
-	if cfg.Logger.MongoDBLibrary != nil {
-		if cfg.Logger.MongoDBLibrary.DebugLevel != "" {
-			if level, err := zapcore.ParseLevel(cfg.Logger.MongoDBLibrary.DebugLevel); err != nil {
-				utilLogger.AppLog.Warnf("MongoDBLibrary Log level [%s] is invalid, set to [info] level", cfg.Logger.MongoDBLibrary.DebugLevel)
+	if cfg.Logger.Util != nil {
+		if cfg.Logger.Util.DebugLevel != "" {
+			if level, err := zapcore.ParseLevel(cfg.Logger.Util.DebugLevel); err != nil {
+				utilLogger.UtilLog.Warnf("Util Log level [%s] is invalid, set to [info] level", cfg.Logger.Util.DebugLevel)
 				utilLogger.SetLogLevel(zap.InfoLevel)
 			} else {
 				utilLogger.SetLogLevel(level)
 			}
 		} else {
-			utilLogger.AppLog.Warnln("MongoDBLibrary Log level not set. Default set to [info] level")
+			utilLogger.UtilLog.Warnln("Util Log level not set. Default set to [info] level")
 			utilLogger.SetLogLevel(zap.InfoLevel)
 		}
 	}

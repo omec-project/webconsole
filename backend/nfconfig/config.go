@@ -488,7 +488,7 @@ func getSupportedDnns(slice configmodels.Slice, deviceGroups map[string]configmo
 
 func buildPccQos(ruleConfig configmodels.SliceApplicationFilteringRules) nfConfigApi.PccQos {
 	var arpi, var5qi int32
-	//Set default value for 5qi and arpi if TrafficClass not configured
+	// Set default value for 5qi and arpi if TrafficClass not configured
 	if ruleConfig.TrafficClass != nil {
 		var5qi = ruleConfig.TrafficClass.Qci
 		arpi = ruleConfig.TrafficClass.Arp

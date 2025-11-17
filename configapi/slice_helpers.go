@@ -80,6 +80,13 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 		}
 	}
 
+	for _, ruleConfig := range request.ApplicationFilteringRules {
+		if ruleConfig.TrafficClass == nil {
+			logger.ConfigLog.Errorf("TrafficClass not configured, do not configure network slice")
+			return request, fmt.Errorf("TrafficClass not configured, do not configure network slice")
+		}
+	}
+
 	slices.Sort(request.SiteDeviceGroup)
 	request.SiteDeviceGroup = slices.Compact(request.SiteDeviceGroup)
 

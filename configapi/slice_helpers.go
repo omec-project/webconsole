@@ -80,6 +80,13 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 		}
 	}
 
+	for _, ruleConfig := range request.ApplicationFilteringRules {
+		if ruleConfig.TrafficClass == nil {
+			logger.ConfigLog.Errorln("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
+			return request, fmt.Errorf("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
+		}
+	}
+
 	slices.Sort(request.SiteDeviceGroup)
 	request.SiteDeviceGroup = slices.Compact(request.SiteDeviceGroup)
 

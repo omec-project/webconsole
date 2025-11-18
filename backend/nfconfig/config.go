@@ -55,8 +55,6 @@ var defaultPccRule = nfConfigApi.NewPccRule(
 	},
 	*nfConfigApi.NewPccQos(
 		9,
-		"1 Mbps",
-		"1 Mbps",
 		*nfConfigApi.NewArp(
 			1,
 			nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
@@ -491,14 +489,18 @@ func getSupportedDnns(slice configmodels.Slice, deviceGroups map[string]configmo
 func buildPccQos(ruleConfig configmodels.SliceApplicationFilteringRules) nfConfigApi.PccQos {
 	pccQos := nfConfigApi.NewPccQos(
 		ruleConfig.TrafficClass.Qci,
-		configapi.ConvertToString(uint64(ruleConfig.AppMbrUplink)),
-		configapi.ConvertToString(uint64(ruleConfig.AppMbrDownlink)),
 		*nfConfigApi.NewArp(
 			ruleConfig.TrafficClass.Arp,
 			nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
 			nfConfigApi.PREEMPTVULN_PREEMPTABLE,
 		),
 	)
+	if ruleConfig.AppMbrUplink != 0 {
+		pccQos.SetMaxBrUl(configapi.ConvertToString(uint64(ruleConfig.AppMbrUplink)))
+	}
+	if ruleConfig.AppMbrDownlink != 0 {
+		pccQos.SetMaxBrDl(configapi.ConvertToString(uint64(ruleConfig.AppMbrDownlink)))
+	}
 	return *pccQos
 }
 

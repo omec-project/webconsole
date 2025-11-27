@@ -97,3 +97,8 @@ in the [openapi](https://github.com/omec-project/openapi) repository.
 
 1. Supporting dedicated flow QoS APIs
 2. Removal of Subscription to trigger 3gpp call flows
+
+## Reach out to us through
+
+1. #sdcore-dev channel in [Aether Community Slack](https://aether5g-project.slack.com)
+2. Raise Github Issues

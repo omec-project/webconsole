@@ -6,7 +6,8 @@
 
 
 PROJECT_NAME             := sdcore
-DOCKER_VERSION           ?= $(shell cat ./VERSION)
+#DOCKER_VERSION           ?= $(shell cat ./VERSION)
+PROJECT_VERSION           ?= $(shell cat ./VERSION)
 
 ## Docker related
 DOCKER_REGISTRY          ?=
@@ -49,19 +50,28 @@ $(WEBCONSOLE): $(GO_BIN_PATH)/$(WEBCONSOLE)
 
 $(GO_BIN_PATH)/$(WEBCONSOLE): server.go  $(WEBCONSOLE_GO_FILES)
 	@echo "Start building $(@F)...."
-	go build -o $(ROOT_PATH)/$@ ./server.go
+	CGO_ENABLED=0 go build -o $(ROOT_PATH)/$@ ./server.go
 
-vpath %.go $(addprefix $(GO_SRC_PATH)/, $(GO_NF))
+$(GO_BIN_PATH)/$(WEBCONSOLE)-ui: server.go  $(WEBCONSOLE_GO_FILES)
+	@echo "Start building $(@F) with UI...."
+	CGO_ENABLED=0 go build --tags ui -o $(ROOT_PATH)/$@ ./server.go
 
 webconsole-ui: $(GO_BIN_PATH)/$(WEBCONSOLE)-ui
 
-$(GO_BIN_PATH)/$(WEBCONSOLE)-ui: server.go  $(WEBCONSOLE_GO_FILES)
-	@echo "Start building $(@F)...."
-	go build --tags ui -o $(ROOT_PATH)/$@ ./server.go
+vpath %.go $(addprefix $(GO_SRC_PATH)/, $(GO_NF))
 
 clean:
 	rm -rf $(ROOT_PATH)/$(GO_BIN_PATH)/$(WEBCONSOLE)
 	rm -rf $(ROOT_PATH)/$(GO_BIN_PATH)/$(WEBCONSOLE)-ui
+
+print-branch:
+	@echo ${DOCKER_REPOSITORY}5gc-${DOCKER_TARGETS}-${DOCKER_TAG}
+
+print-tag:
+	@echo ${DOCKER_REPOSITORY}5gc-${DOCKER_TARGETS}:${DOCKER_TAG}
+
+print-target:
+	@echo ${DOCKER_TARGETS}
 
 docker-build:
 	@go mod vendor
@@ -69,7 +79,7 @@ docker-build:
 		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build  $(DOCKER_BUILD_ARGS) \
 			--target $$target \
 			--tag ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}5gc-$$target:${DOCKER_TAG} \
-			--build-arg org_label_schema_version="${DOCKER_VERSION}" \
+			--build-arg org_label_schema_version="${PROJECT_VERSION}" \
 			--build-arg org_label_schema_vcs_url="${DOCKER_LABEL_VCS_URL}" \
 			--build-arg org_label_schema_vcs_ref="${DOCKER_LABEL_VCS_REF}" \
 			--build-arg org_label_schema_build_date="${DOCKER_LABEL_BUILD_DATE}" \

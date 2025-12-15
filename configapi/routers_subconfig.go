@@ -92,4 +92,35 @@ var apiRoutes = Routes{
 		"/ue-pdu-session-info/:smContextRef",
 		GetUEPDUSessionInfo,
 	},
+	// K4 api endpoint (CRUD)
+	{
+		"Get k4 keys",
+		http.MethodGet,
+		"/k4opt",
+		HandleGetsK4,
+	},
+	{
+		"Get a only k4 keys filtering using the sno",
+		http.MethodGet,
+		"/k4opt/:idsno",
+		HandleGetK4,
+	},
+	{
+		"Post k4 key to create a k4 key",
+		http.MethodPost,
+		"/k4opt",
+		HandlePostK4,
+	},
+	{
+		"Update k4 keys",
+		http.MethodPut,
+		"/k4opt/:idsno",
+		HandlePutK4,
+	},
+	{
+		"Delete k4 keys",
+		http.MethodDelete,
+		"/k4opt/:idsno/:keylabel",
+		HandleDeleteK4,
+	},
 }

@@ -5,10 +5,544 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webui</title>
-</head>
+    <title>Aether Webconsole Management</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="shortcut icon" href="favicon.ico">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d6efd">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css"></head>
 <body>
-    <h1>Welcome to the webconsole UI</h1>
-    <h3>This is an example of a static file from a frontend application.</h3>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-broadcast-tower me-2"></i>
+                Aether Webconsole
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" onclick="showSection('device-groups')">
+                            <i class="fas fa-mobile-alt me-1"></i>Device Groups
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSection('network-slices')">
+                            <i class="fas fa-layer-group me-1"></i>Network Slices
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSection('gnb-inventory')">
+                            <i class="fas fa-tower-broadcast me-1"></i>gNB Inventory
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSection('upf-inventory')">
+                            <i class="fas fa-server me-1"></i>UPF Inventory
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="subscribersDropdown" role="button" 
+                           data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-shield me-1"></i>Subscribers
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="showSection('k4-keys')">
+                                <i class="fas fa-key me-2"></i>K4 Keys
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="showSection('subscribers-list')">
+                                <i class="fas fa-users me-2"></i>Subscribers
+                            </a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSection('admin-options')">
+                            <i class="fas fa-cog me-1"></i>Admin Options
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <!-- Device Groups Section -->
+        <div id="device-groups" class="content-section">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="fas fa-mobile-alt me-2"></i>Device Groups Management</h5>
+                            <button class="btn btn-primary" onclick="showCreateForm('device-group')">
+                                <i class="fas fa-plus me-1"></i>Create Device Group
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="device-groups-list">
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Loading device groups...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Device Group Details Section -->
+        <div id="device-group-details" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-outline-secondary me-3" onclick="showSection('device-groups')">
+                                    <i class="fas fa-arrow-left me-1"></i>Back to List
+                                </button>
+                                <h5 class="mb-0"><i class="fas fa-mobile-alt me-2"></i><span id="device-group-detail-title">Device Group Details</span></h5>
+                            </div>
+                            <div class="btn-group">
+                                <button id="edit-device-group-btn" class="btn btn-outline-primary" onclick="toggleEditMode()">
+                                    <i class="fas fa-edit me-1"></i>Edit
+                                </button>
+                                <button id="delete-device-group-btn" class="btn btn-outline-danger" onclick="confirmDeleteDeviceGroup()">
+                                    <i class="fas fa-trash me-1"></i>Delete
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="device-group-details-content">
+                                <!-- Device group details will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Slices Section -->
+        <div id="network-slices" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="fas fa-layer-group me-2"></i>Network Slices Management</h5>
+                            <button class="btn btn-primary" onclick="showCreateForm('network-slice')">
+                                <i class="fas fa-plus me-1"></i>Create Network Slice
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="network-slices-list">
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Loading network slices...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Slice Details Section -->
+        <div id="network-slice-details" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-outline-secondary me-3" onclick="showSection('network-slices')">
+                                    <i class="fas fa-arrow-left me-1"></i>Back to List
+                                </button>
+                                <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i><span id="network-slice-detail-title">Network Slice Details</span></h5>
+                            </div>
+                            <div class="btn-group">
+                                <button id="edit-network-slice-btn" class="btn btn-outline-primary" onclick="toggleNetworkSliceEditMode()">
+                                    <i class="fas fa-edit me-1"></i>Edit
+                                </button>
+                                <button id="delete-network-slice-btn" class="btn btn-outline-danger" onclick="confirmDeleteNetworkSlice()">
+                                    <i class="fas fa-trash me-1"></i>Delete
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="network-slice-details-content">
+                                <!-- Network slice details will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- gNB Inventory Section -->
+        <div id="gnb-inventory" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="fas fa-tower-broadcast me-2"></i>gNB Inventory Management</h5>
+                            <button class="btn btn-primary" onclick="showCreateForm('gnb')">
+                                <i class="fas fa-plus me-1"></i>Add gNB
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="gnb-list">
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Loading gNBs...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- gNB Details Section -->
+        <div id="gnb-details" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-outline-secondary me-3" onclick="showSection('gnb-inventory')">
+                                    <i class="fas fa-arrow-left me-1"></i>Back to List
+                                </button>
+                                <h5 class="mb-0"><i class="fas fa-tower-broadcast me-2"></i><span id="gnb-detail-title">gNB Details</span></h5>
+                            </div>
+                            <div class="btn-group">
+                                <button id="edit-gnb-btn" class="btn btn-outline-primary" onclick="toggleGnbEditMode()">
+                                    <i class="fas fa-edit me-1"></i>Edit
+                                </button>
+                                <button id="delete-gnb-btn" class="btn btn-outline-danger" onclick="confirmDeleteGnb()">
+                                    <i class="fas fa-trash me-1"></i>Delete
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="gnb-details-content">
+                                <!-- gNB details will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- UPF Inventory Section -->
+        <div id="upf-inventory" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="fas fa-server me-2"></i>UPF Inventory Management</h5>
+                            <button class="btn btn-primary" onclick="showCreateForm('upf')">
+                                <i class="fas fa-plus me-1"></i>Add UPF
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="upf-list">
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Loading UPFs...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- K4 Keys Section -->
+        <div id="k4-keys" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="fas fa-key me-2"></i>K4 Keys Management</h5>
+                            <button class="btn btn-primary" onclick="showCreateForm('k4-key')">
+                                <i class="fas fa-plus me-1"></i>Add K4 Key
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="k4-keys-list">
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Loading K4 keys...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- K4 Key Details Section -->
+        <div id="k4-key-details" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-outline-secondary me-3" onclick="showSection('k4-keys')">
+                                    <i class="fas fa-arrow-left me-1"></i>Back to List
+                                </button>
+                                <h5 class="mb-0"><i class="fas fa-key me-2"></i><span id="k4-key-detail-title">K4 Key Details</span></h5>
+                            </div>
+                            <div class="btn-group">
+                                <button id="edit-k4-key-btn" class="btn btn-outline-primary" onclick="toggleK4KeyEditMode()">
+                                    <i class="fas fa-edit me-1"></i>Edit
+                                </button>
+                                <button id="delete-k4-key-btn" class="btn btn-outline-danger" onclick="confirmDeleteK4Key()">
+                                    <i class="fas fa-trash me-1"></i>Delete
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="k4-key-details-content">
+                                <!-- K4 key details will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subscribers List Section -->
+        <div id="subscribers-list" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="fas fa-users me-2"></i>Subscribers Management</h5>
+                            <button class="btn btn-primary" onclick="showCreateForm('subscriber')">
+                                <i class="fas fa-plus me-1"></i>Add Subscriber
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="subscribers-list-content">
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Loading subscribers...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- K4 Details Section -->
+        <div id="k4-details" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-outline-secondary me-3" onclick="showSection('k4-keys')">
+                                    <i class="fas fa-arrow-left me-1"></i>Back to List
+                                </button>
+                                <h5 class="mb-0"><i class="fas fa-key me-2"></i><span id="k4-detail-title">K4 Key Details</span></h5>
+                            </div>
+                            <div class="btn-group">
+                                <button id="edit-k4-btn" class="btn btn-outline-primary" onclick="toggleK4EditMode()">
+                                    <i class="fas fa-edit me-1"></i>Edit
+                                </button>
+                                <button id="delete-k4-btn" class="btn btn-outline-danger" onclick="confirmDeleteK4()">
+                                    <i class="fas fa-trash me-1"></i>Delete
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="k4-details-content">
+                                <!-- K4 details will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subscriber Details Section -->
+        <div id="subscriber-details" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-outline-secondary me-3" onclick="showSection('subscribers-list')">
+                                    <i class="fas fa-arrow-left me-1"></i>Back to List
+                                </button>
+                                <h5 class="mb-0"><i class="fas fa-user me-2"></i><span id="subscriber-detail-title">Subscriber Details</span></h5>
+                            </div>
+                            <div class="btn-group">
+                                <button id="edit-subscriber-btn" class="btn btn-outline-primary" onclick="toggleSubscriberEditMode()">
+                                    <i class="fas fa-edit me-1"></i>Edit
+                                </button>
+                                <button id="delete-subscriber-btn" class="btn btn-outline-danger" onclick="confirmDeleteSubscriber()">
+                                    <i class="fas fa-trash me-1"></i>Delete
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="subscriber-details-content">
+                                <!-- Subscriber details will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Options Section -->
+        <div id="admin-options" class="content-section" style="display: none;">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-cog me-2"></i>Admin Options - SSM Sync Management</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <div class="card border-primary">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                <i class="fas fa-sync-alt me-2 text-primary"></i>Sync K4 Keys
+                                            </h5>
+                                            <p class="card-text">Synchronize K4 keys and users with the SSM</p>
+                                            <button class="btn btn-primary w-100" onclick="syncK4Keys()">
+                                                <i class="fas fa-play me-1"></i>Execute Sync
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="card border-success">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                <i class="fas fa-heartbeat me-2 text-success"></i>Check K4 Life
+                                            </h5>
+                                            <p class="card-text">Health check to K4 keys lifecycle</p>
+                                            <button class="btn btn-success w-100" onclick="checkK4Life()">
+                                                <i class="fas fa-play me-1"></i>Execute Check
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="card border-warning">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                <i class="fas fa-rotate me-2 text-warning"></i>K4 Rotation
+                                            </h5>
+                                            <p class="card-text">Initialize K4 key rotation manually</p>
+                                            <button class="btn btn-warning w-100" onclick="rotateK4Keys()">
+                                                <i class="fas fa-play me-1"></i>Execute Rotation
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <h6><i class="fas fa-info-circle me-2"></i>Operation Results</h6>
+                                    <div id="admin-results" class="bg-light p-3 rounded">
+                                        <p class="text-muted mb-0">No operations executed yet. Click on any button above to execute an admin operation.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    <!-- Create/Edit Modal -->
+    <div class="modal fade" id="createEditModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Create Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createEditForm">
+                        <div id="formFields">
+                            <!-- Dynamic form fields will be inserted here -->
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveItem()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="notificationToast" class="toast" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastBody">
+                <!-- Notification message -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Deletion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="deleteConfirmMessage">Are you sure you want to delete this item?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn" onclick="executeDelete()">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>

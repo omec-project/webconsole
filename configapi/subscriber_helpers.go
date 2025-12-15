@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -19,7 +20,7 @@ import (
 
 func subscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
 	filter := bson.M{"ueId": imsi}
-	authSubDataInterface, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
+	authSubDataInterface, err := dbadapter.AuthDBClient.RestfulAPIGetOne(AuthSubsDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln(err)
 		return
@@ -32,15 +33,13 @@ func subscriberAuthenticationDataGet(imsi string) (authSubData *models.Authentic
 	return authSubData
 }
 
-func subscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
-	rwLock.Lock()
-	defer rwLock.Unlock()
+func SubscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
 	filter := bson.M{"ueId": imsi}
 	logger.WebUILog.Infof("%+v", authSubData)
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
 	// write to AuthDB
-	if _, err := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA); err != nil {
+	if _, err := dbadapter.AuthDBClient.RestfulAPIPost(AuthSubsDataColl, filter, authDataBsonA); err != nil {
 		logger.DbLog.Errorf("failed to update authentication subscription error: %+v", err)
 		return err
 	}
@@ -48,10 +47,10 @@ func subscriberAuthenticationDataCreate(imsi string, authSubData *models.Authent
 	// write to CommonDB
 	basicAmData := map[string]any{"ueId": imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
-	if _, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson); err != nil {
+	if _, err := dbadapter.CommonDBClient.RestfulAPIPost(AmDataColl, filter, basicDataBson); err != nil {
 		logger.DbLog.Errorf("failed to update amData error: %+v", err)
 		// rollback AuthDB operation
-		if cleanupErr := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter); cleanupErr != nil {
+		if cleanupErr := dbadapter.AuthDBClient.RestfulAPIDeleteOne(AuthSubsDataColl, filter); cleanupErr != nil {
 			logger.DbLog.Errorf("rollback failed after authData op error: %+v", cleanupErr)
 			return fmt.Errorf("authData update failed: %w, rollback failed: %+v", err, cleanupErr)
 		}
@@ -61,19 +60,17 @@ func subscriberAuthenticationDataCreate(imsi string, authSubData *models.Authent
 	return nil
 }
 
-func subscriberAuthenticationDataUpdate(imsi string, authSubData *models.AuthenticationSubscription) error {
-	rwLock.Lock()
-	defer rwLock.Unlock()
+func SubscriberAuthenticationDataUpdate(imsi string, authSubData *models.AuthenticationSubscription) error {
 	filter := bson.M{"ueId": imsi}
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
 	// get backup
-	backup, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
+	backup, err := dbadapter.AuthDBClient.RestfulAPIGetOne(AuthSubsDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorf("failed to get backup data for authentication subscription: %+v", err)
 	}
 	// write to AuthDB
-	if _, err = dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, authDataBsonA); err != nil {
+	if _, err = dbadapter.AuthDBClient.RestfulAPIPutOne(AuthSubsDataColl, filter, authDataBsonA); err != nil {
 		logger.DbLog.Errorf("failed to update authentication subscription error: %+v", err)
 		return err
 	}
@@ -81,11 +78,11 @@ func subscriberAuthenticationDataUpdate(imsi string, authSubData *models.Authent
 	// write to CommonDB
 	basicAmData := map[string]any{"ueId": imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
-	if _, err = dbadapter.CommonDBClient.RestfulAPIPutOne(amDataColl, filter, basicDataBson); err != nil {
+	if _, err = dbadapter.CommonDBClient.RestfulAPIPutOne(AmDataColl, filter, basicDataBson); err != nil {
 		logger.DbLog.Errorf("failed to update amData error: %+v", err)
 		// restore old auth data if any
 		if backup != nil {
-			_, err = dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, backup)
+			_, err = dbadapter.AuthDBClient.RestfulAPIPutOne(AuthSubsDataColl, filter, backup)
 			if err != nil {
 				logger.DbLog.Errorf("failed to restore backup data for authentication subscription error: %+v", err)
 			}
@@ -97,31 +94,29 @@ func subscriberAuthenticationDataUpdate(imsi string, authSubData *models.Authent
 }
 
 func subscriberAuthenticationDataDelete(imsi string) error {
-	rwLock.Lock()
-	defer rwLock.Unlock()
 	logger.WebUILog.Debugf("delete authentication subscription from authenticationSubscription collection: %s", imsi)
 	filter := bson.M{"ueId": imsi}
 
-	origAuthData, getErr := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
+	origAuthData, getErr := dbadapter.AuthDBClient.RestfulAPIGetOne(AuthSubsDataColl, filter)
 	if getErr != nil {
 		logger.DbLog.Errorln("failed to fetch original AuthDB record before delete:", getErr)
 		return getErr
 	}
 
 	// delete in AuthDB
-	err := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
+	err := dbadapter.AuthDBClient.RestfulAPIDeleteOne(AuthSubsDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln(err)
 		return err
 	}
 	logger.WebUILog.Debugf("successfully deleted authentication subscription from authenticationSubscription collection: %v", imsi)
 
-	err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
+	err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(AmDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln(err)
 		// rollback AuthDB operation
 		if origAuthData != nil {
-			_, restoreErr := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, origAuthData)
+			_, restoreErr := dbadapter.AuthDBClient.RestfulAPIPost(AuthSubsDataColl, filter, origAuthData)
 			if restoreErr != nil {
 				logger.DbLog.Errorf("rollback failed after amData delete error error: %+v", restoreErr)
 				return fmt.Errorf("amData delete failed: %w, rollback failed: %w", err, restoreErr)
@@ -164,31 +159,31 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string) error {
 
 	err := sessionRunner(context.TODO(), func(sc mongo.SessionContext) error {
 		// AM policy
-		err := dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, amPolicyDataColl, filterImsiOnly)
+		err := dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, AmPolicyDataColl, filterImsiOnly)
 		if err != nil {
 			logger.DbLog.Errorf("failed to delete AM policy data for IMSI %s: %+v", imsi, err)
 			return err
 		}
 		// SM policy
-		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, smPolicyDataColl, filterImsiOnly)
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, SmPolicyDataColl, filterImsiOnly)
 		if err != nil {
 			logger.DbLog.Errorf("failed to delete SM policy data for IMSI %s: %+v", imsi, err)
 			return err
 		}
 		// AM data
-		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, amDataColl, filter)
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, AmDataColl, filter)
 		if err != nil {
 			logger.DbLog.Errorf("failed to delete AM data for IMSI %s: %+v", imsi, err)
 			return err
 		}
 		// SM data
-		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, smDataColl, filter)
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, SmDataColl, filter)
 		if err != nil {
 			logger.DbLog.Errorf("failed to delete SM data for IMSI %s: %+v", imsi, err)
 			return err
 		}
 		// SMF selection
-		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, smfSelDataColl, filter)
+		err = dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, SmfSelDataColl, filter)
 		if err != nil {
 			logger.DbLog.Errorf("failed to delete SMF selection data for IMSI %s: %+v", imsi, err)
 			return err
@@ -203,7 +198,7 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string) error {
 	return nil
 }
 
-func updateSubscriberInDeviceGroups(imsi string) (int, error) {
+func updateSubscriberInDeviceGroupsWhenDeleteSub(imsi string) (int, error) {
 	filterByImsi := bson.M{
 		"imsis": imsi,
 	}
@@ -226,9 +221,51 @@ func updateSubscriberInDeviceGroups(imsi string) (int, error) {
 		}
 		deviceGroup.Imsis = filteredImsis
 		prevDevGroup := getDeviceGroupByName(deviceGroup.DeviceGroupName)
-		if statusCode, err := handleDeviceGroupPost(&deviceGroup, prevDevGroup); err != nil {
-			logger.ConfigLog.Errorf("error posting device group %+v: %+v", deviceGroup, err)
-			return statusCode, err
+
+		filter := bson.M{"group-name": deviceGroup.DeviceGroupName}
+		devGroupDataBsonA := configmodels.ToBsonM(deviceGroup)
+		result, err := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
+		if err != nil {
+			logger.DbLog.Errorf("failed to post device group data for %s: %+v", deviceGroup.DeviceGroupName, err)
+			return http.StatusInternalServerError, err
+		}
+		logger.DbLog.Infof("DB operation result for device group %s: %v",
+			deviceGroup.DeviceGroupName, result)
+
+		slice := findSliceByDeviceGroup(deviceGroup.DeviceGroupName)
+		if slice == nil {
+			logger.WebUILog.Infof("Device group %s not associated with any slice — skipping sync", deviceGroup.DeviceGroupName)
+			return http.StatusOK, nil
+		}
+		logger.WebUILog.Infof("Device group %s is part of slice %s", deviceGroup.DeviceGroupName, slice.SliceName)
+		if slice.SliceId.Sst == "" {
+			err := fmt.Errorf("missing SST in slice %s", slice.SliceName)
+			logger.DbLog.Errorln(err)
+			return http.StatusBadRequest, err
+		}
+
+		var errorOccured bool
+		wg := sync.WaitGroup{}
+
+		// delete IMSI's that are removed
+		dimsis := getDeletedImsisList(&deviceGroup, prevDevGroup)
+		for _, imsi := range dimsis {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err := removeSubscriberEntriesRelatedToDeviceGroups(slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
+				if err != nil {
+					logger.ConfigLog.Errorln(err)
+					errorOccured = true
+				}
+			}()
+		}
+		wg.Wait()
+
+		if errorOccured {
+			return http.StatusInternalServerError, fmt.Errorf("syncDeviceGroupSubscriber failed, please check logs")
+		} else {
+			return http.StatusOK, nil
 		}
 	}
 

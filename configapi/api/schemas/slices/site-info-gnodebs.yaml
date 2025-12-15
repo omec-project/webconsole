@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+type: object
+description: gNodeB definition
+required:
+  - name
+  - tac
+properties:
+  name:
+    type: string
+    example: menlo-gnb1
+  tac:
+    description: unique tac per gNB. This should match gNB configuration.
+    type: integer
+    minimum: 1
+    example: 1

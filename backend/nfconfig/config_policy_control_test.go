@@ -128,8 +128,8 @@ func TestSyncPolicyControl(t *testing.T) {
 							},
 							Qos: nfConfigApi.PccQos{
 								FiveQi:  testRuleQci,
-								MaxBrUl: &testMaxBrUl1,
-								MaxBrDl: &testMaxBrDl1,
+								MaxBrUl: testMaxBrUl1,
+								MaxBrDl: testMaxBrDl1,
 								Arp: nfConfigApi.Arp{
 									PriorityLevel: testRuleArp,
 									PreemptCap:    nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
@@ -172,8 +172,8 @@ func TestSyncPolicyControl(t *testing.T) {
 							},
 							Qos: nfConfigApi.PccQos{
 								FiveQi:  9,
-								MaxBrUl: &testMaxBrUl2,
-								MaxBrDl: &testMaxBrDl2,
+								MaxBrUl: testMaxBrUl2,
+								MaxBrDl: testMaxBrDl2,
 								Arp: nfConfigApi.Arp{
 									PriorityLevel: 1,
 									PreemptCap:    nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
@@ -193,8 +193,8 @@ func TestSyncPolicyControl(t *testing.T) {
 							},
 							Qos: nfConfigApi.PccQos{
 								FiveQi:  testRuleQci,
-								MaxBrUl: &testMaxBrUl1,
-								MaxBrDl: &testMaxBrDl1,
+								MaxBrUl: testMaxBrUl1,
+								MaxBrDl: testMaxBrDl1,
 								Arp: nfConfigApi.Arp{
 									PriorityLevel: testRuleArp,
 									PreemptCap:    nfConfigApi.PREEMPTCAP_MAY_PREEMPT,

@@ -1,0 +1,67 @@
+info:
+  version: 1.0.0
+  description: WebUI Configuration
+  http-version: 2
+
+configuration:
+  # 5G mode
+  spec-compliant-sdf: false
+  enableAuthentication: false
+  send-pebble-notifications: false
+  cfgport: 5000
+
+  # MongoDB configuration
+  mongodb:
+    name: aether
+    url: "mongodb://172.28.31.5:27017/?replicaSet=rs0&connectTimeoutMS=10000"
+    authKeysDbName: authentication
+    authUrl: "mongodb://172.28.31.5:27017/?replicaSet=rs0&connectTimeoutMS=10000"
+    webuiDbName: aether
+    webuiDbUrl: "mongodb://172.28.31.5:27017/?replicaSet=rs0&connectTimeoutMS=10000"
+    checkReplica: true
+    concurrency-ops: 5
+    defaultConns: 500
+    authConns: 200
+    webuiDbConns: 200
+
+  # ROC endpoint configuration
+  managedByConfigPod:
+    syncUrl: http://roc-service:8080/sync
+    enabled: false
+
+  vault:
+    vault-uri: "http://127.0.0.1:8200"
+    allow-vault: false
+    tls-insecure: true
+    
+    # AppRole authentication
+    role-id: "${VAULT_ROLE_ID}"
+    secret-id: "${VAULT_SECRET_ID}"
+    
+    # Custom mount paths for auth methods (optional, uses defaults if not specified)
+    approle-mount-path: "auth-dev-approle"  # Default: "approle"
+    # k8s-mount-path: "kubernetes"   # Default: "kubernetes"
+    cert-mount-path: "auth-dev-cert"        # Default: "cert"
+
+    key-kv-path: "kv-dev/data/k4keys"
+    key-kv-metadata-path: "kv-dev/metadata/k4keys"
+    transit-keys-list-path: "transit-dev/keys"
+    transit-key-create-fmt: "transit-dev/keys/%s"
+    transit-key-rotate-fmt: "transit-dev/keys/%s/rotate"
+    transit-key-rewrap-fmt: "transit-dev/rewrap/%s"
+    transit-keys-encrypt-path: "transit-dev/encrypt"
+    concurrency-ops: 300
+
+    ssm-synchronize:
+      enable: false
+      interval-minute: 180
+      max-keys-create: 5
+      delete-missing: true
+      max-sync-keys: 5
+      max-sync-users: 5
+      max-sync-rotations: 5
+
+logger:
+  WEBUI:
+    debugLevel: debug
+  

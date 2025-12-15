@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+type: object
+description: Application filtering rule
+required:
+  - rule-name
+  - action
+  - endpoint
+  - protocol
+  - dest-port-start
+  - dest-port-end
+  - bitrate-unit
+  - traffic-class
+properties:
+  rule-name:
+    description: Rule name
+    type: string
+    example: default
+  priority:
+    description: Rule priority
+    type: integer
+    minimum: 0
+    example: 0
+  action:
+    description: Action
+    type: string
+    example: permit
+  endpoint:
+    description: Application destination IP or network
+    type: string
+    example: any
+  protocol:
+    description: Protocol number (0 means any)
+    type: integer
+    minimum: 0
+    example: 0
+  dest-port-start:
+    description: Port range start
+    type: integer
+    minimum: 0
+    maximum: 65535
+    example: 0
+  dest-port-end:
+    description: Port range end
+    type: integer
+    minimum: 0
+    maximum: 65535
+    example: 65535
+  app-mbr-uplink:
+    description: Application MBR uplink
+    type: integer
+    minimum: 0
+    example: 0
+  app-mbr-downlink:
+    description: Application MBR downlink
+    type: integer
+    minimum: 0
+    example: 0
+  bitrate-unit:
+    description: Data rate unit for uplink and downlink
+    type: string
+    example: bps
+  traffic-class:
+    $ref: './traffic-class-info.yaml'
+  rule-trigger:
+    description: Trigger expression or name
+    type: string
+    example: ""

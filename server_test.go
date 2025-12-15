@@ -18,11 +18,20 @@ import (
 )
 
 type mockWebUI struct {
-	started bool
+	started     bool
+	startedChan chan struct{}
 }
 
 func (m *mockWebUI) Start(ctx context.Context, syncChan chan<- struct{}) {
-	m.started = true
+	select {
+	case <-ctx.Done():
+		return
+	default:
+		m.started = true
+		if m.startedChan != nil {
+			close(m.startedChan)
+		}
+	}
 }
 
 type mockNFConfigSuccess struct{}
@@ -38,14 +47,15 @@ func (m *mockNFConfigFail) Start(ctx context.Context, syncChan <-chan struct{}) 
 	return errors.New("NFConfig start failed")
 }
 
-type mockNFConfig struct{}
+type MockNFConfig struct{}
 
-func (m *mockNFConfig) Start(ctx context.Context, syncChan <-chan struct{}) error {
+func (m *MockNFConfig) Start(ctx context.Context, syncChan <-chan struct{}) error {
 	return nil
 }
 
-func TestRunWebUIAndNFConfig_Success_ExpectNoError(t *testing.T) {
-	webui := &mockWebUI{}
+func TestRunWebUIAndNFConfig_Success(t *testing.T) {
+	started := make(chan struct{})
+	webui := &mockWebUI{startedChan: started}
 	nf := &mockNFConfigSuccess{}
 
 	err := runWebUIAndNFConfig(webui, nf)
@@ -53,18 +63,26 @@ func TestRunWebUIAndNFConfig_Success_ExpectNoError(t *testing.T) {
 		t.Errorf("expected no error, got %v", err)
 	}
 
-	if !webui.started {
+	select {
+	case <-started:
+	case <-time.After(100 * time.Millisecond):
 		t.Errorf("webui.Start was not called in time")
 	}
 }
 
-func TestRunWebUIAndNFConfig_GivenFailureInNfConfigServiceExpectError(t *testing.T) {
-	webui := &mockWebUI{}
+func TestRunWebUIAndNFConfig_Failure(t *testing.T) {
+	started := make(chan struct{})
+	webui := &mockWebUI{startedChan: started}
 	nf := &mockNFConfigFail{}
 
 	err := runWebUIAndNFConfig(webui, nf)
 	if err == nil || !strings.Contains(err.Error(), "NFConfig start failed") {
 		t.Errorf("expected NFConfig failure, got %v", err)
+	}
+
+	time.Sleep(30 * time.Millisecond)
+	if webui.started {
+		t.Errorf("webui.Start() should respect context cancellation and not proceed")
 	}
 }
 
@@ -140,7 +158,7 @@ func TestStartApplication(t *testing.T) {
 	t.Run("nil config", func(t *testing.T) {
 		err := startApplication(nil)
 		if err == nil || !strings.Contains(err.Error(), "nil") {
-			t.Errorf("expected error for nil config, got: %v", err)
+			t.Errorf("Expected error for nil config, got: %v", err)
 		}
 	})
 
@@ -150,7 +168,7 @@ func TestStartApplication(t *testing.T) {
 		}
 		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
 		if err == nil || !strings.Contains(err.Error(), "mongo failed") {
-			t.Errorf("expected mongo init error, got: %v", err)
+			t.Errorf("Expected mongo init error, got: %v", err)
 		}
 	})
 
@@ -161,35 +179,35 @@ func TestStartApplication(t *testing.T) {
 		}
 		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
 		if err == nil || !strings.Contains(err.Error(), "nfconfig init fail") {
-			t.Errorf("expected NF config init failure, got: %v", err)
+			t.Errorf("Expected NF config init failure, got: %v", err)
 		}
 	})
 
 	t.Run("run failure", func(t *testing.T) {
 		initMongoDB = func() error { return nil }
 		newNFConfigServer = func(config *factory.Config) (nfconfig.NFConfigInterface, error) {
-			return &mockNFConfig{}, nil
+			return &MockNFConfig{}, nil
 		}
 		runServer = func(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
 			return fmt.Errorf("run fail")
 		}
 		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
 		if err == nil || !strings.Contains(err.Error(), "run fail") {
-			t.Errorf("expected run error, got: %v", err)
+			t.Errorf("Expected run error, got: %v", err)
 		}
 	})
 
 	t.Run("success", func(t *testing.T) {
 		initMongoDB = func() error { return nil }
 		newNFConfigServer = func(config *factory.Config) (nfconfig.NFConfigInterface, error) {
-			return &mockNFConfig{}, nil
+			return &MockNFConfig{}, nil
 		}
 		runServer = func(webui webui_service.WebUIInterface, nf nfconfig.NFConfigInterface) error {
 			return nil
 		}
 		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
 		if err != nil {
-			t.Errorf("expected no error, got: %v", err)
+			t.Errorf("Expected no error, got: %v", err)
 		}
 	})
 }

@@ -33,7 +33,7 @@ func authenticationSubscription() *models.AuthenticationSubscription {
 		},
 		PermanentKey: &models.PermanentKey{
 			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
+			EncryptionKey:       "",
 			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
 		},
 		SequenceNumber: "16f3b3f70fc2",
@@ -93,7 +93,7 @@ func TestSubscriberAuthenticationDataCreate_Success(t *testing.T) {
 	dbadapter.CommonDBClient = commonDB
 
 	subsData := authenticationSubscription()
-	err := subscriberAuthenticationDataCreate("imsi-1", subsData)
+	err := SubscriberAuthenticationDataCreate("imsi-1", subsData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestSubscriberAuthenticationDataCreate_CommonDBFails_RollsBack(t *testing.T
 	dbadapter.CommonDBClient = commonDB
 
 	subsData := authenticationSubscription()
-	err := subscriberAuthenticationDataCreate("imsi-1", subsData)
+	err := SubscriberAuthenticationDataCreate("imsi-1", subsData)
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
@@ -272,12 +272,12 @@ func Test_handleSubscriberPost(t *testing.T) {
 	dbadapter.AuthDBClient = authDbClientMock
 	commonDbClientMock := &PostSubscriberMockDBClient{}
 	dbadapter.CommonDBClient = commonDbClientMock
-	postErr := subscriberAuthenticationDataCreate(ueId, authSubData)
+	postErr := SubscriberAuthenticationDataCreate(ueId, authSubData)
 	if postErr != nil {
 		t.Errorf("could not handle subscriber post: %v", postErr)
 	}
-	expectedAuthSubCollection := authSubsDataColl
-	expectedAmDataCollection := amDataColl
+	expectedAuthSubCollection := AuthSubsDataColl
+	expectedAmDataCollection := AmDataColl
 	if authDbClientMock.receivedPostData[0]["coll"] != expectedAuthSubCollection {
 		t.Errorf("expected collection %v, got %v", expectedAuthSubCollection, authDbClientMock.receivedPostData[0]["coll"])
 	}
@@ -322,8 +322,8 @@ func Test_handleSubscriberDelete(t *testing.T) {
 	if delErr != nil {
 		t.Errorf("could not handle subscriber delete: %v", delErr)
 	}
-	expectedAuthSubCollection := authSubsDataColl
-	expectedAmDataCollection := amDataColl
+	expectedAuthSubCollection := AuthSubsDataColl
+	expectedAmDataCollection := AmDataColl
 	if authDbClientMock.deleteData[0]["coll"] != expectedAuthSubCollection {
 		t.Errorf("expected collection %v, got %v", expectedAuthSubCollection, authDbClientMock.deleteData[0]["coll"])
 	}

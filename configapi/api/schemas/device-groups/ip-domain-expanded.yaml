@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+# 
+
+type: object
+description: This is APN for device
+properties:
+  dnn:
+    type: string
+    example: internet
+  ue-ip-pool:
+    type: string
+    example: 10.91.0.0/16
+  dns-primary:
+    type: string
+    example: 8.8.8.8
+  dns-secondary:
+    type: string
+    nullable: false
+    example: 8.8.4.4
+  mtu:
+    type: integer
+    example: 1460
+  ue-dnn-qos:
+    type: object
+    properties:
+      dnn-mbr-uplink:
+        type: integer
+        description: uplink data rate in bps
+        example: 4000000
+      dnn-mbr-downlink:
+        type: integer
+        description: downlink data rate in bps
+        example: 20000000
+      traffic-class:
+        type: string
+        description: QCI/QFI for the traffic
+        enum:
+        - platinum
+        - gold
+        - silver

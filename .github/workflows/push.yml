@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2024 Intel Corporation
 # Copyright 2025 Canonical Ltd.
-name: Release Pipeline
-
 on:
   push:
     branches:
@@ -10,40 +8,23 @@ on:
     paths:
       - "VERSION"
 
-permissions:
-  contents: read
-
 jobs:
   tag-github:
-    permissions:
-      contents: write
-      actions: read
-      id-token: write
-    uses: omec-project/.github/.github/workflows/tag-github.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/tag-github.yml@main
     secrets: inherit
 
   release-image:
     needs: tag-github
-    permissions:
-      contents: read
-      packages: write
-      actions: read
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/release-image.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/release-image.yml@main
     with:
       changed: ${{ needs.tag-github.outputs.changed }}
       version: ${{ needs.tag-github.outputs.version }}
+      docker_repository: "network5gcore/"
     secrets: inherit
 
   update-version:
     needs: tag-github
-    permissions:
-      contents: write
-      pull-requests: write
-      actions: read
-      id-token: write
-    uses: omec-project/.github/.github/workflows/update-version.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/update-version.yml@main
     with:
       changed: ${{ needs.tag-github.outputs.changed }}
       version: ${{ needs.tag-github.outputs.version }}
@@ -51,11 +32,7 @@ jobs:
 
   branch-release:
     needs: tag-github
-    permissions:
-      contents: write
-      actions: read
-      id-token: write
-    uses: omec-project/.github/.github/workflows/branch-release.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/branch-release.yml@main
     with:
       release_branch: ${{ needs.tag-github.outputs.release_branch }}
       version_branch: ${{ needs.tag-github.outputs.version_branch }}

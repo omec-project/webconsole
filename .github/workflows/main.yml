@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2023 Canonical Ltd.
 # Copyright 2024 Intel Corporation
-name: CI Pipeline
-
 on:
   pull_request:
     branches:
@@ -11,121 +9,49 @@ on:
     branches:
       - main
 
-permissions:
-  contents: read
-
 jobs:
   build:
-    permissions:
-      contents: read
-      actions: read
-      security-events: write
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/build.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/build.yml@main
     with:
       branch_name: ${{ github.ref }}
 
   build-ui:
-    permissions:
-      contents: read
-      actions: read
-      security-events: write
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/webconsole-build-ui.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/webconsole-build-ui.yml@main
     with:
       branch_name: ${{ github.ref }}
 
   docker-build:
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/docker-build.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/docker-build.yml@main
     with:
       branch_name: ${{ github.ref }}
 
   static-analysis:
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/static-analysis.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/static-analysis.yml@main
     with:
       branch_name: ${{ github.ref }}
 
   lint:
-    permissions:
-      contents: read
-      checks: write
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/lint.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/lint.yml@main
     with:
       branch_name: ${{ github.ref }}
 
   hadolint:
-    permissions:
-      contents: read
-      security-events: write
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/hadolint.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/hadolint.yml@main
     with:
       branch_name: ${{ github.ref }}
 
   license-check:
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/license-check.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/license-check.yml@main
     with:
       branch_name: ${{ github.ref }}
 
   fossa-scan:
-    permissions:
-      contents: read
-      security-events: write
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/fossa-scan.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/fossa-scan.yml@main
     with:
       branch_name: ${{ github.ref }}
 
   unit-tests:
-    permissions:
-      contents: read
-      checks: write
-      id-token: write
-      attestations: write
-    uses: omec-project/.github/.github/workflows/unit-test.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
+    uses: networkgcorefullcode/.github/.github/workflows/unit-test.yml@main
     with:
       branch_name: ${{ github.ref }}
 
-  analysis:
-    if: github.repository_owner == 'omec-project'
-    permissions:
-      actions: read
-      artifact-metadata: read
-      attestations: read
-      checks: read
-      contents: read
-      deployments: read
-      discussions: read
-      id-token: write
-      issues: read
-      models: read
-      packages: read
-      pages: read
-      pull-requests: read
-      repository-projects: read
-      security-events: write
-      statuses: read
-    uses: omec-project/.github/.github/workflows/scorecard-analysis.yml@76c248f1621bfe102956c558ea8cecfe5df143bf # v0.0.3
-    with:
-      branch_name: ${{ github.ref }}

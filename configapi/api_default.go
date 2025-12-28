@@ -30,12 +30,14 @@ import (
 const (
 	devGroupDataColl = "webconsoleData.snapshots.devGroupData"
 	sliceDataColl    = "webconsoleData.snapshots.sliceData"
-	amDataColl       = "subscriptionData.provisionedData.amData"
-	smDataColl       = "subscriptionData.provisionedData.smData"
-	smfSelDataColl   = "subscriptionData.provisionedData.smfSelectionSubscriptionData"
-	amPolicyDataColl = "policyData.ues.amData"
-	smPolicyDataColl = "policyData.ues.smData"
-	authSubsDataColl = "subscriptionData.authenticationData.authenticationSubscription"
+	AmDataColl       = "subscriptionData.provisionedData.amData"
+	SmDataColl       = "subscriptionData.provisionedData.smData"
+	SmfSelDataColl   = "subscriptionData.provisionedData.smfSelectionSubscriptionData"
+	AmPolicyDataColl = "policyData.ues.amData"
+	SmPolicyDataColl = "policyData.ues.smData"
+	AuthSubsDataColl = "subscriptionData.authenticationData.authenticationSubscription"
+	K4KeysColl       = "encryption.keysdata.k4"
+	k4KeysCollCom    = "encryption.keysdata.k4_com"
 )
 
 // GetDeviceGroups godoc
@@ -56,7 +58,7 @@ func GetDeviceGroups(c *gin.Context) {
 	deviceGroups := make([]string, 0)
 	rawDeviceGroups, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(devGroupDataColl, bson.M{})
 	if errGetMany != nil {
-		logger.DbLog.Warnln(errGetMany)
+		logger.AppLog.Warnln(errGetMany)
 	}
 	for _, rawDeviceGroup := range rawDeviceGroups {
 		deviceGroups = append(deviceGroups, rawDeviceGroup["group-name"].(string))
@@ -86,7 +88,7 @@ func GetDeviceGroupByName(c *gin.Context) {
 	filter := bson.M{"group-name": c.Param("group-name")}
 	rawDeviceGroup, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(devGroupDataColl, filter)
 	if errGetOne != nil {
-		logger.DbLog.Warnln(errGetOne)
+		logger.AppLog.Warnln(errGetOne)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve device group"})
 		return
 	}
@@ -189,6 +191,13 @@ func DeviceGroupGroupNamePut(c *gin.Context) {
 		return
 	}
 
+	requestDeviceGroup.DeviceGroupName = groupName
+	if err := isValidDeviceGroup(&requestDeviceGroup); err != nil {
+		logger.ConfigLog.Errorln(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "request_id": requestID})
+		return
+	}
+
 	if statusCode, err := deviceGroupPostHelper(requestDeviceGroup, groupName); err != nil {
 		logger.WebUILog.Errorf("Device group update failed: %+v", err)
 		c.JSON(statusCode, gin.H{
@@ -263,6 +272,13 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 		return
 	}
 
+	requestDeviceGroup.DeviceGroupName = groupName
+	if err := isValidDeviceGroup(&requestDeviceGroup); err != nil {
+		logger.ConfigLog.Errorln(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "request_id": requestID})
+		return
+	}
+
 	if statusCode, err := deviceGroupPostHelper(requestDeviceGroup, groupName); err != nil {
 		logger.WebUILog.Errorf("Device group create failed: %+v", err)
 		c.JSON(statusCode, gin.H{
@@ -293,7 +309,7 @@ func GetNetworkSlices(c *gin.Context) {
 
 	rawNetworkSlices, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, bson.M{})
 	if errGetMany != nil {
-		logger.DbLog.Errorln(errGetMany)
+		logger.AppLog.Errorln(errGetMany)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slices"})
 		return
 	}
@@ -329,7 +345,7 @@ func GetNetworkSliceByName(c *gin.Context) {
 	filter := bson.M{"slice-name": c.Param("slice-name")}
 	rawNetworkSlice, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(sliceDataColl, filter)
 	if errGetOne != nil {
-		logger.DbLog.Warnln(errGetOne)
+		logger.AppLog.Warnln(errGetOne)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve network slice"})
 		return
 	}

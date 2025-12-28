@@ -47,7 +47,7 @@ func (db *GnbMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[
 	for _, g := range db.gnbs {
 		gnb := configmodels.ToBsonM(g)
 		if gnb == nil {
-			logger.DbLog.Fatalln("failed to convert gnbs to BsonM")
+			logger.AppLog.Fatalln("failed to convert gnbs to BsonM")
 		}
 		results = append(results, gnb)
 	}
@@ -109,7 +109,7 @@ func (db *UpfMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[
 	for _, u := range db.upfs {
 		upf := configmodels.ToBsonM(u)
 		if upf == nil {
-			logger.DbLog.Fatalln("failed to convert upfs to BsonM")
+			logger.AppLog.Fatalln("failed to convert upfs to BsonM")
 		}
 		results = append(results, upf)
 	}

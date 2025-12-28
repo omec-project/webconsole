@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+type: object
+description: give details of the site where this slice is activated
+required:
+  - site-name
+  - plmn
+  - gNodeBs
+  - upf
+properties:
+  site-name:
+    description: Unique name per Site.
+    type: string
+    example: menlo
+  plmn:
+    $ref: './site-info-plmn.yaml'
+  gNodeBs:
+    type: array
+    items:
+      $ref: './site-info-gnodebs.yaml'
+  upf:
+    description: UPF which belong to this slice
+    type: object
+    properties:
+      upf-name:
+        type: string
+        example: upf.menlo.aetherproject.org
+      upf-port:
+        type: integer
+        example: 8805

@@ -1,0 +1,196 @@
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+# Copyright 2019 free5GC.org
+#
+# SPDX-License-Identifier: Apache-2.0
+
+version: "3"
+
+vars:
+  PROJECT_NAME: sdcore
+  DOCKER_VERSION:
+    sh: cat ./VERSION 2>/dev/null || echo "latest"
+
+  # Docker related
+  DOCKER_REGISTRY: "192.168.12.15:8083/"
+  DOCKER_REPOSITORY: "omecproject/"
+  DOCKER_TAG: "{{.DOCKER_TAG | default .DOCKER_VERSION}}"
+  DOCKER_IMAGENAME: "{{.DOCKER_REGISTRY}}{{.DOCKER_REPOSITORY}}{{.PROJECT_NAME}}:{{.DOCKER_TAG}}"
+  DOCKER_BUILDKIT: '{{.DOCKER_BUILDKIT | default "1"}}'
+  DOCKER_BUILD_ARGS: '{{.DOCKER_BUILD_ARGS | default ""}}'
+
+  # Docker labels
+  DOCKER_LABEL_VCS_URL:
+    sh: git remote get-url $(git remote) 2>/dev/null || echo "unknown"
+  DOCKER_LABEL_VCS_REF:
+    sh: git diff-index --quiet HEAD -- && git rev-parse HEAD || echo "unknown"
+  DOCKER_LABEL_COMMIT_DATE:
+    sh: git diff-index --quiet HEAD -- && git show -s --format=%cd --date=iso-strict HEAD || echo "unknown"
+  DOCKER_LABEL_BUILD_DATE:
+    sh: date -u "+%Y-%m-%dT%H:%M:%SZ"
+
+  DOCKER_TARGETS: '{{.DOCKER_TARGETS | default "webui"}}'
+
+  # Build paths
+  GO_BIN_PATH: bin
+  GO_SRC_PATH: ./
+  C_BUILD_PATH: build
+  ROOT_PATH: ./
+
+  WEBCONSOLE: webconsole
+
+  # Version info
+  VERSION:
+    sh: git describe --tags 2>/dev/null || echo "unknown"
+  BUILD_TIME:
+    sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
+  WEBCONSOLE_COMMIT_HASH:
+    sh: git submodule status | grep webconsole | awk '{print $1}' | cut -c1-8 2>/dev/null || echo "unknown"
+  WEBCONSOLE_COMMIT_TIME:
+    sh: git log --pretty="%ai" -1 | awk '{time=$1"T"$2"Z"; print time}' 2>/dev/null || echo "unknown"
+
+tasks:
+  default:
+    desc: "Default task - build webconsole"
+    deps: [webconsole]
+
+  all:
+    desc: "Build all components"
+    deps: [webconsole]
+
+  webconsole:
+    desc: "Build webconsole binary"
+    deps: [webconsole-bin]
+
+  webconsole-bin:
+    desc: "Build webconsole binary"
+    generates:
+      - "{{.GO_BIN_PATH}}/{{.WEBCONSOLE}}"
+    sources:
+      - "server.go"
+      - "./**/*.go"
+    cmds:
+      - echo "Start building {{.WEBCONSOLE}}...."
+      - mkdir -p {{.GO_BIN_PATH}}
+      - CGO_ENABLED=0 go build -o {{.GO_BIN_PATH}}/{{.WEBCONSOLE}} ./server.go
+
+  webconsole-ui:
+    desc: "Build webconsole binary with UI"
+    generates:
+      - "{{.GO_BIN_PATH}}/{{.WEBCONSOLE}}"
+    sources:
+      - "server.go"
+      - "./**/*.go"
+      - "ui/frontend_files/**/*"
+    cmds:
+      - echo "Start building {{.WEBCONSOLE}} with UI...."
+      - mkdir -p {{.GO_BIN_PATH}}
+      - CGO_ENABLED=0 go build --tags ui -o {{.GO_BIN_PATH}}/{{.WEBCONSOLE}} ./server.go
+
+  clean:
+    desc: "Clean built binaries"
+    cmds:
+      - rm -rf {{.GO_BIN_PATH}}/{{.WEBCONSOLE}}
+      - rm -rf {{.GO_BIN_PATH}}/{{.WEBCONSOLE}}-ui
+
+  docker-build:
+    desc: "Build Docker images"
+    deps: [vendor]
+    cmds:
+      - |
+        for target in {{.DOCKER_TARGETS}}; do
+          echo "Building Docker image for target: $target"
+          DOCKER_BUILDKIT={{.DOCKER_BUILDKIT}} docker build {{.DOCKER_BUILD_ARGS}} \
+            --target $target \
+            --tag {{.DOCKER_REGISTRY}}{{.DOCKER_REPOSITORY}}5gc-$target:{{.DOCKER_TAG}} \
+            --build-arg org_label_schema_version="{{.DOCKER_VERSION}}" \
+            --build-arg org_label_schema_vcs_url="{{.DOCKER_LABEL_VCS_URL}}" \
+            --build-arg org_label_schema_vcs_ref="{{.DOCKER_LABEL_VCS_REF}}" \
+            --build-arg org_label_schema_build_date="{{.DOCKER_LABEL_BUILD_DATE}}" \
+            --build-arg org_opencord_vcs_commit_date="{{.DOCKER_LABEL_COMMIT_DATE}}" \
+            . || exit 1
+        done
+      - rm -rf vendor
+  
+  docker-build-fast:
+    desc: "Build Docker image for AMF more fasted"
+    cmds:
+      - go mod vendor
+      - |
+        DOCKER_BUILDKIT={{.DOCKER_BUILDKIT}} docker build {{.DOCKER_BUILD_ARGS}} \
+          --target {{.DOCKER_TARGETS}} \
+          --tag {{.DOCKER_REGISTRY}}{{.DOCKER_REPOSITORY}}5gc-{{.DOCKER_TARGETS}}:{{.DOCKER_TAG}} \
+          --build-arg org_label_schema_version="{{.DOCKER_VERSION}}" \
+          --build-arg org_label_schema_vcs_url="{{.DOCKER_LABEL_VCS_URL}}" \
+          --build-arg org_label_schema_vcs_ref="{{.DOCKER_LABEL_VCS_REF}}" \
+          --build-arg org_label_schema_build_date="{{.DOCKER_LABEL_BUILD_DATE}}" \
+          --build-arg org_opencord_vcs_commit_date="{{.DOCKER_LABEL_COMMIT_DATE}}" \
+          --build-arg PATH_BINARY="{{.GO_BIN_PATH}}/{{.WEBCONSOLE}}" \
+          --file="Dockerfile.fast" .
+      - rm -rf vendor
+
+  docker-push:
+    desc: "Push Docker images to registry"
+    cmds:
+      - |
+        for target in {{.DOCKER_TARGETS}}; do
+          echo "Pushing Docker image: {{.DOCKER_REGISTRY}}{{.DOCKER_REPOSITORY}}5gc-$target:{{.DOCKER_TAG}}"
+          docker push {{.DOCKER_REGISTRY}}{{.DOCKER_REPOSITORY}}5gc-$target:{{.DOCKER_TAG}}
+        done
+
+  vendor:
+    desc: "Download Go module dependencies"
+    cmds:
+      - go mod vendor
+    sources:
+      - go.mod
+      - go.sum
+    generates:
+      - vendor/
+
+  test:
+    desc: "Run tests with coverage"
+    deps: [coverage-dir]
+    cmds:
+      - |
+        docker run --rm -v {{.ROOT_PATH}}:/webconsole -w /webconsole golang:latest \
+          go test \
+            -failfast \
+            -coverprofile=.coverage/coverage-unit.txt \
+            -covermode=atomic \
+            -v \
+            ./ ./...
+
+  mod-start:
+    desc: "execute go mod download to performance the docker build step"
+    aliases: [mod]
+    cmds:
+      - cd {{.GO_SRC_PATH}}
+      - go mod download
+
+  coverage-dir:
+    desc: "Create coverage directory"
+    cmds:
+      - rm -rf {{.ROOT_PATH}}/.coverage
+      - mkdir -p {{.ROOT_PATH}}/.coverage
+    status:
+      - test -d {{.ROOT_PATH}}/.coverage
+
+  # Utility tasks
+  build:
+    desc: "Alias for webconsole task"
+    deps: [webconsole]
+
+  ui:
+    desc: "Alias for webconsole-ui task"
+    deps: [webconsole-ui]
+
+  info:
+    desc: "Show build information"
+    cmds:
+      - echo "Project {{.PROJECT_NAME}}"
+      - echo "Version {{.VERSION}}"
+      - echo "Docker Version {{.DOCKER_VERSION}}"
+      - echo "Build Time {{.BUILD_TIME}}"
+      - echo "VCS URL {{.DOCKER_LABEL_VCS_URL}}"
+      - echo "VCS Ref {{.DOCKER_LABEL_VCS_REF}}"
+      - echo "Commit Date {{.DOCKER_LABEL_COMMIT_DATE}}"

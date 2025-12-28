@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+# 
+
+type: array
+items:
+  type: string
+  example: "123456789123456"

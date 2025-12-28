@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+# 
+
+type: object
+properties:
+  imsis:
+    type: array
+    items:
+      type: string
+      example: "123456789123456"
+  site-info:
+    type: string
+    example: menlo..add site info
+  ip-domain-name:
+    type: string
+    example: pool1
+  ip-domain-expanded:
+    $ref: './ip-domain-expanded.yaml'

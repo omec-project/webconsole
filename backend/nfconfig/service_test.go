@@ -17,7 +17,6 @@ import (
 	"github.com/omec-project/openapi/nfConfigApi"
 	"github.com/omec-project/util/logger"
 	"github.com/omec-project/webconsole/backend/factory"
-	webconsoleLogger "github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
@@ -34,7 +33,7 @@ func (m *MockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[stri
 	for _, s := range m.Slices {
 		ns := configmodels.ToBsonM(s)
 		if ns == nil {
-			webconsoleLogger.DbLog.Fatalln("failed to convert network slice to BsonM")
+			logger.AppLog.Fatalln("failed to convert network slice to BsonM")
 		}
 		results = append(results, ns)
 	}

@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+type: object
+description: Fixed supported plmn at the site.
+required:
+  - mcc
+  - mnc
+properties:
+  mcc:
+    type: string
+    example: "315"
+  mnc:
+    type: string
+    example: "010"

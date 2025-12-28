@@ -22,8 +22,10 @@ type SubsData struct {
 }
 
 type SubsOverrideData struct {
-	PlmnID         string `json:"plmnID"`
-	OPc            string `json:"opc"`
-	Key            string `json:"key"`
-	SequenceNumber string `json:"sequenceNumber"`
+	PlmnID              string `json:"plmnID"`
+	OPc                 string `json:"opc"`
+	Key                 string `json:"key"`
+	SequenceNumber      string `json:"sequenceNumber"`
+	K4Sno               *byte  `json:"k4_sno,omitempty"`
+	EncryptionAlgorithm *int32 `json:"encryptionAlgorithm,omitempty"`
 }

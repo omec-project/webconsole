@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/omec-project/openapi/models"
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
@@ -40,6 +41,16 @@ func Test_updatePolicyAndProvisionedDataBatch_UsesPutMany(t *testing.T) {
 	origCommon := dbadapter.CommonDBClient
 	defer func() { dbadapter.CommonDBClient = origCommon }()
 
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			Mongodb: &factory.Mongodb{
+				ConcurrencyOps: 5,
+			},
+		},
+	}
+
 	putManyCalls := make([]string, 0)
 	dbadapter.CommonDBClient = &dbadapter.MockDBClient{
 		PutManyFn: func(collName string, filterArray []primitive.M, putDataArray []map[string]any) error {
@@ -72,7 +83,15 @@ func Test_updatePolicyAndProvisionedDataBatch_UsesPutMany(t *testing.T) {
 func Test_updatePolicyAndProvisionedDataBatch_ChunksBy1000(t *testing.T) {
 	origCommon := dbadapter.CommonDBClient
 	defer func() { dbadapter.CommonDBClient = origCommon }()
-
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			Mongodb: &factory.Mongodb{
+				ConcurrencyOps: 5,
+			},
+		},
+	}
 	callSizes := make([]int, 0)
 	dbadapter.CommonDBClient = &dbadapter.MockDBClient{
 		PutManyFn: func(collName string, filterArray []primitive.M, putDataArray []map[string]any) error {

@@ -378,7 +378,7 @@ func TestGetSubscriberByID(t *testing.T) {
 					},
 					"permanentKey": map[string]any{
 						"encryptionAlgorithm": 0,
-						"encryptionKey":       0,
+						"encryptionKey":       "",
 						"permanentKeyValue":   "5122250214c33e723a5dd523fc145fc0",
 					},
 					"sequenceNumber": "16f3b3f70fc2",

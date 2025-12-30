@@ -67,6 +67,144 @@ func networkSlicePostHelper(c *gin.Context, sliceName string) (int, error) {
 	return http.StatusOK, nil
 }
 
+func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodels.Slice, error) {
+	var request configmodels.Slice
+
+	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
+	if ct != "application/json" {
+		return request, fmt.Errorf("unsupported content-type: %s", ct)
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		return request, fmt.Errorf("JSON bind error: %+v", err)
+	}
+
+	for i, gnb := range request.SiteInfo.GNodeBs {
+		if !isValidName(gnb.Name) {
+			return request, fmt.Errorf("invalid gNodeBs[%d].name `%s` in Network Slice %s", i, gnb.Name, sliceName)
+		}
+		if !isValidGnbTac(gnb.Tac) {
+			return request, fmt.Errorf("invalid gNodeBs[%d].tac %d for gNB %s in Network Slice %s", i, gnb.Tac, gnb.Name, sliceName)
+		}
+	}
+
+	request.SliceName = sliceName
+	// Validate required fields are not empty
+	if strings.TrimSpace(request.SliceName) == "" {
+		return request, fmt.Errorf("slice-name cannot be empty")
+	}
+	if strings.TrimSpace(request.SliceId.Sst) == "" {
+		return request, fmt.Errorf("slice-id.sst cannot be empty")
+	}
+	if strings.TrimSpace(request.SliceId.Sd) == "" {
+		return request, fmt.Errorf("slice-id.sd cannot be empty")
+	}
+	if len(request.SiteDeviceGroup) == 0 {
+		return request, fmt.Errorf("site-device-group cannot be empty")
+	}
+	if strings.TrimSpace(request.SiteInfo.SiteName) == "" {
+		return request, fmt.Errorf("site-info.site-name cannot be empty")
+	}
+	if strings.TrimSpace(request.SiteInfo.Plmn.Mcc) == "" {
+		return request, fmt.Errorf("site-info.plmn.mcc cannot be empty")
+	}
+	if strings.TrimSpace(request.SiteInfo.Plmn.Mnc) == "" {
+		return request, fmt.Errorf("site-info.plmn.mnc cannot be empty")
+	}
+	if request.SiteInfo.Upf == nil {
+		return request, fmt.Errorf("site-info.upf cannot be empty")
+	}
+	if len(request.SiteInfo.GNodeBs) == 0 {
+		return request, fmt.Errorf("site-info.gNodeBs cannot be empty")
+	}
+	for i, gnodeb := range request.SiteInfo.GNodeBs {
+		if strings.TrimSpace(gnodeb.Name) == "" {
+			return request, fmt.Errorf("site-info.gNodeBs[%d].name cannot be empty", i)
+		}
+		if gnodeb.Tac <= 0 {
+			return request, fmt.Errorf("site-info.gNodeBs[%d].tac must be > 0", i)
+		}
+	}
+
+	// Validate ApplicationFilteringRules
+	// Si no hay reglas de filtrado, agrega una por defecto
+	if len(request.ApplicationFilteringRules) == 0 {
+		request.ApplicationFilteringRules = append(request.ApplicationFilteringRules, configmodels.SliceApplicationFilteringRules{
+			RuleName:       "default",
+			Action:         "permit",
+			Endpoint:       "any",
+			Protocol:       0,
+			StartPort:      0,
+			EndPort:        65535,
+			AppMbrUplink:   0,
+			AppMbrDownlink: 0,
+			BitrateUnit:    "bps",
+			TrafficClass: &configmodels.TrafficClassInfo{
+				Name: "default",
+				Qci:  9,
+				Arp:  8,
+				Pdb:  100,
+				Pelr: 6,
+			},
+		})
+	} else {
+		for i, rule := range request.ApplicationFilteringRules {
+			if strings.TrimSpace(rule.RuleName) == "" {
+				return request, fmt.Errorf("application-filtering-rules[%d]: rule-name cannot be empty", i)
+			}
+			if strings.TrimSpace(rule.Action) == "" {
+				return request, fmt.Errorf("application-filtering-rules[%d]: action cannot be empty", i)
+			}
+			if strings.TrimSpace(rule.Endpoint) == "" {
+				return request, fmt.Errorf("application-filtering-rules[%d]: endpoint cannot be empty", i)
+			}
+			if rule.Protocol < 0 {
+				return request, fmt.Errorf("application-filtering-rules[%d]: protocol must be >= 0", i)
+			}
+			if rule.StartPort < 0 || rule.EndPort < 0 {
+				return request, fmt.Errorf("application-filtering-rules[%d]: port values must be >= 0", i)
+			}
+			if rule.EndPort < rule.StartPort {
+				return request, fmt.Errorf("application-filtering-rules[%d]: dest-port-end must be >= dest-port-start", i)
+			}
+			if rule.AppMbrUplink < 0 {
+				return request, fmt.Errorf("application-filtering-rules[%d]: app-mbr-uplink must be >= 0", i)
+			}
+			if rule.AppMbrDownlink < 0 {
+				return request, fmt.Errorf("application-filtering-rules[%d]: app-mbr-downlink must be >= 0", i)
+			}
+			if rule.BitrateUnit == "" {
+				return request, fmt.Errorf("application-filtering-rules[%d]: bitrate-unit cannot be empty", i)
+			}
+			if rule.TrafficClass != nil {
+				if strings.TrimSpace(rule.TrafficClass.Name) == "" {
+					return request, fmt.Errorf("application-filtering-rules[%d]: traffic-class.name cannot be empty", i)
+				}
+				if rule.TrafficClass.Qci < 1 || rule.TrafficClass.Qci > 9 {
+					return request, fmt.Errorf("application-filtering-rules[%d]: traffic-class.qci must be between 1 and 9", i)
+				}
+				if rule.TrafficClass.Arp < 1 || rule.TrafficClass.Arp > 15 {
+					return request, fmt.Errorf("application-filtering-rules[%d]: traffic-class.arp must be between 1 and 15", i)
+				}
+				if rule.TrafficClass.Pdb < 0 {
+					return request, fmt.Errorf("application-filtering-rules[%d]: traffic-class.pdb must be >= 0", i)
+				}
+				if rule.TrafficClass.Pelr < 1 || rule.TrafficClass.Pelr > 8 {
+					return request, fmt.Errorf("application-filtering-rules[%d]: traffic-class.pelr must be between 1 and 8", i)
+				}
+			}
+			if rule.TrafficClass == nil {
+				return request, fmt.Errorf("application-filtering-rules[%d]: traffic-class cannot be empty", i)
+			}
+		}
+	}
+
+	slices.Sort(request.SiteDeviceGroup)
+	request.SiteDeviceGroup = slices.Compact(request.SiteDeviceGroup)
+
+	return request, nil
+}
+
 func logSliceMetadata(slice configmodels.Slice) {
 	logger.ConfigLog.Infof("network slice: sst: %s, sd: %s", slice.SliceId.Sst, slice.SliceId.Sd)
 	logger.ConfigLog.Infof("number of device groups %v", len(slice.SiteDeviceGroup))
@@ -248,6 +386,124 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 	}
 	return http.StatusOK, nil
 }
+
+// var syncSubscribersOnSliceCreateOrUpdatev2 = func(slice configmodels.Slice, prevSlice configmodels.Slice) (int, error) {
+// 	rwLock.Lock()
+// 	defer rwLock.Unlock()
+// 	logger.WebUILog.Debugln("insert/update Slice:", slice)
+// 	logger.AppLog.Debugf("syncSubscribersOnSliceCreateOrUpdate: slice=%s deviceGroups=%d", slice.SliceName, len(slice.SiteDeviceGroup))
+// 	if slice.SliceId.Sst == "" {
+// 		err := fmt.Errorf("missing SST in slice %s", slice.SliceName)
+// 		logger.AppLog.Error(err)
+// 		return http.StatusBadRequest, err
+// 	}
+// 	sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
+// 	if err != nil {
+// 		logger.AppLog.Errorf("could not parse SST %s", slice.SliceId.Sst)
+// 		return http.StatusBadRequest, err
+// 	}
+// 	snssai := &models.Snssai{
+// 		Sd:  slice.SliceId.Sd,
+// 		Sst: int32(sVal),
+// 	}
+// 	for _, dgName := range slice.SiteDeviceGroup {
+// 		logger.ConfigLog.Debugf("dgName: %s", dgName)
+// 		devGroupConfig := getDeviceGroupByName(dgName)
+// 		if devGroupConfig == nil {
+// 			logger.ConfigLog.Warnf("Device group not found: %s", dgName)
+// 			continue
+// 		}
+// 		logger.AppLog.Debugf("slice=%s dg=%s: inputIMSIs=%d", slice.SliceName, dgName, len(devGroupConfig.Imsis))
+
+// 		err = updateImsisConcurrently(devGroupConfig.Imsis, slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, snssai,
+// 			devGroupConfig.IpDomainExpanded.Dnn, devGroupConfig.IpDomainExpanded.UeDnnQos)
+
+// 		if err != nil {
+// 			logger.AppLog.Errorf("concurrent update failed for device group %s: %v", dgName, err)
+// 			return http.StatusInternalServerError, err
+// 		}
+
+// 	}
+// 	if err := cleanupDeviceGroups(slice, prevSlice); err != nil {
+// 		return http.StatusInternalServerError, err
+// 	}
+// 	return http.StatusOK, nil
+// }
+
+// func updateImsisConcurrently(
+// 	imsis []string,
+// 	mcc string,
+// 	mnc string,
+// 	snssai *models.Snssai,
+// 	dnn string,
+// 	qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos,
+// ) error {
+
+// 	ctx, cancel := context.WithCancel(context.Background())
+// 	defer cancel()
+
+// 	sem := make(chan struct{}, factory.WebUIConfig.Configuration.Mongodb.ConcurrencyOps)
+// 	errChan := make(chan error, 1)
+
+// 	var wg sync.WaitGroup
+
+// 	for _, imsi := range imsis {
+// 		select {
+// 		case <-ctx.Done():
+// 			return ctx.Err()
+// 		default:
+// 		}
+
+// 		wg.Add(1)
+// 		sem <- struct{}{}
+// 		logger.AppLog.Debugf("Starting update for IMSI %s", imsi)
+// 		logger.AppLog.Debugf("len for pool operations is: %d", len(sem))
+
+// 		go func(imsi string) {
+// 			defer wg.Done()
+// 			defer func() {
+// 				<-sem
+// 				logger.AppLog.Debugf("Finished update for IMSI %s", imsi)
+// 				logger.AppLog.Debugf("len for pool operations is: %d", len(sem))
+// 			}()
+
+// 			// Si ya se canceló, no seguimos
+// 			select {
+// 			case <-ctx.Done():
+// 				return
+// 			default:
+// 			}
+
+// 			if err := updatePolicyAndProvisionedData(
+// 				imsi,
+// 				mcc,
+// 				mnc,
+// 				snssai,
+// 				dnn,
+// 				qos,
+// 			); err != nil {
+
+// 				logger.AppLog.Errorf("error %v", err)
+
+// 				// Enviamos el error solo una vez
+// 				select {
+// 				case errChan <- err:
+// 					cancel() // 🔥 cancela todas las demás gorutinas
+// 				default:
+// 				}
+// 			}
+// 		}(imsi)
+// 	}
+
+// 	wg.Wait()
+
+// 	select {
+// 	case err := <-errChan:
+// 		return err
+// 	default:
+// 		return nil
+// 	}
+// }
 
 func filterExistingIMSIsFromAuthDB(imsis []string) ([]string, error) {
 	if len(imsis) == 0 {

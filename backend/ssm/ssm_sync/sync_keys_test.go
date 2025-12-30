@@ -2,8 +2,12 @@ package ssmsync
 
 import (
 	"testing"
+	"time"
 
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/ssm"
+	"github.com/omec-project/webconsole/dbadapter"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestSyncOurKeysMutex(t *testing.T) {
@@ -74,18 +78,54 @@ func TestSyncExternalKeysFunction(t *testing.T) {
 }
 
 func TestSyncKeyListenChannel(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+				SsmSync: &factory.SsmSync{
+					IntervalMinute: 1, // 1 minute for testing
+				},
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+		},
+	}
+
+	// Mock CommonDBClient and AuthDBClient to prevent database access in SyncUsers and SyncKeys
+	oldCommonClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = oldCommonClient }()
+
+	oldAuthClient := dbadapter.AuthDBClient
+	defer func() { dbadapter.AuthDBClient = oldAuthClient }()
+
+	mockClient := &dbadapter.MockDBClient{
+		GetManyFn: func(collName string, filter bson.M) ([]map[string]any, error) {
+			return []map[string]any{}, nil // Empty response
+		},
+	}
+	dbadapter.CommonDBClient = mockClient
+	dbadapter.AuthDBClient = mockClient
+
 	ssmSyncMsg := make(chan *ssm.SsmSyncMessage, 10)
 
-	// Start the listener in a goroutine
-	go SyncKeyListen(ssmSyncMsg)
-
-	// Set stop condition to prevent actual operations
+	// Set stop condition immediately to prevent actual operations
 	StopSSMsyncFunction = true
 	defer func() {
-		StopSSMsyncFunction = false
+		StopSSMsyncFunction = false // Reset for other tests
 	}()
 
-	// Send test messages
+	// Start the listener in a goroutine AFTER setting up all mocks
+	go SyncKeyListen(ssmSyncMsg)
+
+	// Give goroutine a moment to initialize and see stop condition
+	time.Sleep(10 * time.Millisecond)
+
+	// Send test messages (these should not cause actual execution due to stop condition)
 	ssmSyncMsg <- &ssm.SsmSyncMessage{
 		Action: "SYNC_OUR_KEYS",
 		Info:   "Test sync",
@@ -100,6 +140,9 @@ func TestSyncKeyListenChannel(t *testing.T) {
 		Action: "SYNC_USERS",
 		Info:   "Test sync users",
 	}
+
+	// Allow messages to be processed
+	time.Sleep(10 * time.Millisecond)
 
 	// Close channel to stop listener
 	close(ssmSyncMsg)

@@ -15,10 +15,20 @@ var SyncExternalKeysMutex sync.Mutex
 var SyncUserMutex sync.Mutex
 
 func SyncKeyListen(ssmSyncMsg chan *ssm.SsmSyncMessage) {
+	// Check if we need to stop the sync function before initializing
+	if StopSSMsyncFunction {
+		return
+	}
+
 	period := time.Duration(factory.WebUIConfig.Configuration.SSM.SsmSync.IntervalMinute) * time.Minute
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 	for {
+		// Check if we need to stop the sync function
+		if StopSSMsyncFunction {
+			break
+		}
+
 		select {
 		case msg := <-ssmSyncMsg:
 			switch msg.Action {

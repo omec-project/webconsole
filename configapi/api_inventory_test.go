@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
@@ -64,6 +65,16 @@ func (db *GnbMockDBClient) RestfulAPIPutOneWithContext(context context.Context, 
 	return true, nil // Return true if data exists
 }
 
+func (db *GnbMockDBClient) RestfulAPIPutOne(collName string, filter bson.M, putData map[string]any) (bool, error) {
+	if db.err != nil {
+		return false, db.err
+	}
+	if len(db.gnbs) == 0 {
+		return false, nil
+	}
+	return true, nil // Return true if data exists
+}
+
 func (db *GnbMockDBClient) StartSession() (mongo.Session, error) {
 	return &MockSession{}, nil
 }
@@ -85,6 +96,16 @@ func (db *GnbMockDBClient) RestfulAPIDeleteOneWithContext(context context.Contex
 	return nil
 }
 
+func (db *GnbMockDBClient) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []any) error {
+	if db.err != nil {
+		return db.err
+	}
+	if len(db.gnbs) == 0 {
+		return nil
+	}
+	return errors.New("E11000")
+}
+
 func upf(hostname, port string) configmodels.Upf {
 	return configmodels.Upf{
 		Hostname: hostname,
@@ -96,6 +117,26 @@ type UpfMockDBClient struct {
 	dbadapter.DBInterface
 	upfs []configmodels.Upf
 	err  error
+}
+
+func (db *UpfMockDBClient) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []any) error {
+	if db.err != nil {
+		return db.err
+	}
+	if len(db.upfs) == 0 {
+		return nil
+	}
+	return errors.New("E11000")
+}
+
+func (db *UpfMockDBClient) RestfulAPIPutOne(collName string, filter bson.M, putData map[string]any) (bool, error) {
+	if db.err != nil {
+		return false, db.err
+	}
+	if len(db.upfs) == 0 {
+		return false, nil
+	}
+	return true, nil // Return true if data exists
 }
 
 func (db *UpfMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
@@ -357,6 +398,7 @@ func TestGnbPostHandler(t *testing.T) {
 		inputData    string
 		expectedCode int
 		expectedBody map[string]string
+		config       factory.Config
 	}{
 		{
 			name:         "Create a new gNB expects created status",
@@ -365,6 +407,13 @@ func TestGnbPostHandler(t *testing.T) {
 			inputData:    `{"name": "gnb1", "tac": 123}`,
 			expectedCode: http.StatusCreated,
 			expectedBody: make(map[string]string),
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
 		},
 		{
 			name:         "Create a new gNB without TAC expects created status",
@@ -373,6 +422,13 @@ func TestGnbPostHandler(t *testing.T) {
 			inputData:    `{"name": "gnb1"}`,
 			expectedCode: http.StatusCreated,
 			expectedBody: make(map[string]string),
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
 		},
 		{
 			name:         "Create an existing gNB expects failure",
@@ -381,6 +437,28 @@ func TestGnbPostHandler(t *testing.T) {
 			inputData:    `{"name": "gnb1", "tac": 123}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: map[string]string{"error": "gNB already exists"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: true,
+					},
+				},
+			},
+		},
+		{
+			name:         "Create an existing gNB expects failure config false",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &GnbMockDBClient{gnbs: []configmodels.Gnb{{Name: "gnb1"}}},
+			inputData:    `{"name": "gnb1", "tac": 123}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: map[string]string{"error": "post error"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
 		},
 		{
 			name:         "TAC is not an integer expects failure",
@@ -399,12 +477,34 @@ func TestGnbPostHandler(t *testing.T) {
 			expectedBody: map[string]string{"error": "invalid gNB TAC '0'. TAC must be an integer within the range [1, 16777215]"},
 		},
 		{
+			name:         "DB POST operation fails expects failure config false",
+			route:        "/config/v1/inventory/gnb",
+			dbAdapter:    &GnbMockDBClient{err: fmt.Errorf("mock error")},
+			inputData:    `{"name": "gnb1", "tac": 123}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: map[string]string{"error": "post error"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
+		},
+		{
 			name:         "DB POST operation fails expects failure",
 			route:        "/config/v1/inventory/gnb",
 			dbAdapter:    &GnbMockDBClient{err: fmt.Errorf("mock error")},
 			inputData:    `{"name": "gnb1", "tac": 123}`,
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: map[string]string{"error": "failed to create gNB"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: true,
+					},
+				},
+			},
 		},
 		{
 			name:         "gNB name not provided expects failure",
@@ -434,8 +534,13 @@ func TestGnbPostHandler(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			originalDBClient := dbadapter.CommonDBClient
-			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			originalConfig := factory.WebUIConfig
+			defer func() {
+				dbadapter.CommonDBClient = originalDBClient
+				factory.WebUIConfig = originalConfig
+			}()
 			dbadapter.CommonDBClient = tc.dbAdapter
+			factory.WebUIConfig = &tc.config
 			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
@@ -475,6 +580,7 @@ func TestGnbPutHandler(t *testing.T) {
 		inputData    string
 		expectedCode int
 		expectedBody map[string]string
+		config       factory.Config
 	}{
 		{
 			name:         "Put a new gNB expects OK status",
@@ -483,6 +589,13 @@ func TestGnbPutHandler(t *testing.T) {
 			inputData:    `{"tac": 123}`,
 			expectedCode: http.StatusOK,
 			expectedBody: make(map[string]string),
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
 		},
 		{
 			name:         "Put an existing gNB expects a OK status",
@@ -491,6 +604,13 @@ func TestGnbPutHandler(t *testing.T) {
 			inputData:    `{"tac": 123}`,
 			expectedCode: http.StatusOK,
 			expectedBody: make(map[string]string),
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
 		},
 		{
 			name:         "TAC is not an integer expects failure",
@@ -514,7 +634,29 @@ func TestGnbPutHandler(t *testing.T) {
 			dbAdapter:    &GnbMockDBClient{err: fmt.Errorf("mock error")},
 			inputData:    `{"tac": 123}`,
 			expectedCode: http.StatusInternalServerError,
+			expectedBody: map[string]string{"error": "post error"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
+		},
+		{
+			name:         "DB PUT operation fails expects failure config true",
+			route:        "/config/v1/inventory/gnb/gnb1",
+			dbAdapter:    &GnbMockDBClient{err: fmt.Errorf("mock error")},
+			inputData:    `{"tac": 123}`,
+			expectedCode: http.StatusInternalServerError,
 			expectedBody: map[string]string{"error": "failed to PUT gNB"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: true,
+					},
+				},
+			},
 		},
 		{
 			name:         "Invalid gNB name expects failure",
@@ -528,8 +670,13 @@ func TestGnbPutHandler(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			originalDBClient := dbadapter.CommonDBClient
-			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			originalConfig := factory.WebUIConfig
+			defer func() {
+				dbadapter.CommonDBClient = originalDBClient
+				factory.WebUIConfig = originalConfig
+			}()
 			dbadapter.CommonDBClient = tc.dbAdapter
+			factory.WebUIConfig = &tc.config
 			req, err := http.NewRequest(http.MethodPut, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
@@ -569,6 +716,7 @@ func TestUpfPostHandler(t *testing.T) {
 		inputData    string
 		expectedCode int
 		expectedBody map[string]string
+		config       factory.Config
 	}{
 		{
 			name:         "Create a new UPF success",
@@ -577,14 +725,43 @@ func TestUpfPostHandler(t *testing.T) {
 			inputData:    `{"hostname": "upf1.my-domain.com", "port": "123"}`,
 			expectedCode: http.StatusCreated,
 			expectedBody: make(map[string]string),
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
 		},
 		{
 			name:         "Create an existing UPF expects failure",
 			route:        "/config/v1/inventory/upf",
 			dbAdapter:    &UpfMockDBClient{upfs: []configmodels.Upf{upf("upf1.my-domain.com", "123")}},
 			inputData:    `{"hostname": "upf1.my-domain.com", "port": "123"}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: map[string]string{"error": "post error"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
+		},
+		{
+			name:         "Create an existing UPF expects failure true",
+			route:        "/config/v1/inventory/upf",
+			dbAdapter:    &UpfMockDBClient{upfs: []configmodels.Upf{upf("upf1.my-domain.com", "123")}},
+			inputData:    `{"hostname": "upf1.my-domain.com", "port": "123"}`,
 			expectedCode: http.StatusBadRequest,
 			expectedBody: map[string]string{"error": "UPF already exists"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: true,
+					},
+				},
+			},
 		},
 		{
 			name:         "Port is not a string expects failure",
@@ -608,7 +785,29 @@ func TestUpfPostHandler(t *testing.T) {
 			dbAdapter:    &UpfMockDBClient{err: fmt.Errorf("mock error")},
 			inputData:    `{"hostname": "upf1.my-domain.com", "port": "123"}`,
 			expectedCode: http.StatusInternalServerError,
+			expectedBody: map[string]string{"error": "post error"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
+		},
+		{
+			name:         "DB POST operation fails expects failure true",
+			route:        "/config/v1/inventory/upf",
+			dbAdapter:    &UpfMockDBClient{err: fmt.Errorf("mock error")},
+			inputData:    `{"hostname": "upf1.my-domain.com", "port": "123"}`,
+			expectedCode: http.StatusInternalServerError,
 			expectedBody: map[string]string{"error": "failed to create UPF"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: true,
+					},
+				},
+			},
 		},
 		{
 			name:         "Port cannot be converted to int expects failure",
@@ -638,8 +837,13 @@ func TestUpfPostHandler(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			originalDBClient := dbadapter.CommonDBClient
-			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			originalConfig := factory.WebUIConfig
+			defer func() {
+				dbadapter.CommonDBClient = originalDBClient
+				factory.WebUIConfig = originalConfig
+			}()
 			dbadapter.CommonDBClient = tc.dbAdapter
+			factory.WebUIConfig = &tc.config
 			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
@@ -679,6 +883,7 @@ func TestUpfPutHandler(t *testing.T) {
 		inputData    string
 		expectedCode int
 		expectedBody map[string]string
+		config       factory.Config
 	}{
 		{
 			name:         "Put a new UPF expects OK status",
@@ -687,6 +892,13 @@ func TestUpfPutHandler(t *testing.T) {
 			inputData:    `{"port": "123"}`,
 			expectedCode: http.StatusOK,
 			expectedBody: make(map[string]string),
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
 		},
 		{
 			name:         "Put an existing UPF expects a OK status",
@@ -695,6 +907,13 @@ func TestUpfPutHandler(t *testing.T) {
 			inputData:    `{"port": "123"}`,
 			expectedCode: http.StatusOK,
 			expectedBody: make(map[string]string),
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
 		},
 		{
 			name:         "Port is not a string expects failure",
@@ -718,7 +937,29 @@ func TestUpfPutHandler(t *testing.T) {
 			dbAdapter:    &UpfMockDBClient{err: fmt.Errorf("mock error")},
 			inputData:    `{"port": "123"}`,
 			expectedCode: http.StatusInternalServerError,
+			expectedBody: map[string]string{"error": "put error"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: false,
+					},
+				},
+			},
+		},
+		{
+			name:         "DB PUT operation fails expects failure config true",
+			route:        "/config/v1/inventory/upf/upf1.my-domain.com",
+			dbAdapter:    &UpfMockDBClient{err: fmt.Errorf("mock error")},
+			inputData:    `{"port": "123"}`,
+			expectedCode: http.StatusInternalServerError,
 			expectedBody: map[string]string{"error": "failed to PUT UPF"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: true,
+					},
+				},
+			},
 		},
 		{
 			name:         "Port cannot be converted to int expects failure",
@@ -740,8 +981,13 @@ func TestUpfPutHandler(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			originalDBClient := dbadapter.CommonDBClient
-			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			originalConfig := factory.WebUIConfig
+			defer func() {
+				dbadapter.CommonDBClient = originalDBClient
+				factory.WebUIConfig = originalConfig
+			}()
 			dbadapter.CommonDBClient = tc.dbAdapter
+			factory.WebUIConfig = &tc.config
 			req, err := http.NewRequest(http.MethodPut, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
@@ -780,6 +1026,7 @@ func TestInventoryDeleteHandlers(t *testing.T) {
 		dbAdapter    dbadapter.DBInterface
 		expectedCode int
 		expectedBody map[string]string
+		config       factory.Config
 	}{
 		{
 			name:         "Delete gNB Success",
@@ -787,6 +1034,13 @@ func TestInventoryDeleteHandlers(t *testing.T) {
 			dbAdapter:    &GnbMockDBClient{gnbs: []configmodels.Gnb{}},
 			expectedCode: http.StatusOK,
 			expectedBody: make(map[string]string),
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: true,
+					},
+				},
+			},
 		},
 		{
 			name:         "Delete gNB DB Failure",
@@ -794,6 +1048,13 @@ func TestInventoryDeleteHandlers(t *testing.T) {
 			dbAdapter:    &GnbMockDBClient{err: fmt.Errorf("mock error")},
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: map[string]string{"error": "failed to delete gNB"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: true,
+					},
+				},
+			},
 		},
 		{
 			name:         "Delete UPF Success",
@@ -801,6 +1062,13 @@ func TestInventoryDeleteHandlers(t *testing.T) {
 			dbAdapter:    &UpfMockDBClient{upfs: []configmodels.Upf{}},
 			expectedCode: http.StatusOK,
 			expectedBody: make(map[string]string),
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: true,
+					},
+				},
+			},
 		},
 		{
 			name:         "Delete UPF DB Failure",
@@ -808,13 +1076,25 @@ func TestInventoryDeleteHandlers(t *testing.T) {
 			dbAdapter:    &UpfMockDBClient{err: fmt.Errorf("mock error")},
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: map[string]string{"error": "failed to delete UPF"},
+			config: factory.Config{
+				Configuration: &factory.Configuration{
+					Mongodb: &factory.Mongodb{
+						CheckReplica: true,
+					},
+				},
+			},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			originalDBClient := dbadapter.CommonDBClient
-			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			originalConfig := factory.WebUIConfig
+			defer func() {
+				dbadapter.CommonDBClient = originalDBClient
+				factory.WebUIConfig = originalConfig
+			}()
 			dbadapter.CommonDBClient = tc.dbAdapter
+			factory.WebUIConfig = &tc.config
 			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)

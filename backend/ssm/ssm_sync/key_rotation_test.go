@@ -3,8 +3,11 @@ package ssmsync
 import (
 	"testing"
 
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/ssm"
 	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestCheckMutexInitialized(t *testing.T) {
@@ -64,6 +67,36 @@ func TestRotateExpiredKeysWithStopCondition(t *testing.T) {
 }
 
 func TestGetUsersForRotation(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+			Mongodb: &factory.Mongodb{
+				ConcurrencyOps: 10,
+			},
+		},
+	}
+
+	// Mock the DB client
+	oldAuthClient := dbadapter.AuthDBClient
+	defer func() { dbadapter.AuthDBClient = oldAuthClient }()
+
+	mockClient := &dbadapter.MockDBClient{
+		GetManyFn: func(collName string, filter bson.M) ([]map[string]any, error) {
+			// Return empty slice to avoid processing
+			return []map[string]any{}, nil
+		},
+	}
+	dbadapter.AuthDBClient = mockClient
+
 	// This will fail without proper DB connection, but we test the function signature
 	k4 := configmodels.K4{
 		K4_SNO:   1,

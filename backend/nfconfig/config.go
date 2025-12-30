@@ -499,12 +499,6 @@ func buildPccQos(ruleConfig configmodels.SliceApplicationFilteringRules) nfConfi
 			nfConfigApi.PREEMPTVULN_PREEMPTABLE,
 		),
 	)
-	if ruleConfig.AppMbrUplink != 0 {
-		pccQos.SetMaxBrUl(configapi.ConvertToString(uint64(ruleConfig.AppMbrUplink)))
-	}
-	if ruleConfig.AppMbrDownlink != 0 {
-		pccQos.SetMaxBrDl(configapi.ConvertToString(uint64(ruleConfig.AppMbrDownlink)))
-	}
 	return *pccQos
 }
 

@@ -195,7 +195,7 @@ func syncSubConcurrentlyInGroup(devGroup *configmodels.DeviceGroups, prevDevGrou
 	return 0, nil // Retorno inmediato, operación en background
 }
 
-func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
+var syncDeviceGroupSubscriber = func(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
 	rwLock.Lock()
 	defer rwLock.Unlock()
 	slice := findSliceByDeviceGroup(devGroup.DeviceGroupName)

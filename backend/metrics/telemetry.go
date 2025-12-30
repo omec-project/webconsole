@@ -18,6 +18,6 @@ import (
 func InitMetrics() {
 	http.Handle("/metrics", promhttp.Handler())
 	if err := http.ListenAndServe(":8080", nil); err != nil {
-		logger.InitLog.Errorf("Could not open metrics port: %v", err)
+		logger.InitLog.Errorf("could not open metrics port: %v", err)
 	}
 }

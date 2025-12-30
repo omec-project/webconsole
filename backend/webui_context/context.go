@@ -35,7 +35,7 @@ func init() {
 func (context *WEBUIContext) UpdateNfProfiles() {
 	nfProfilesRaw, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany("NfProfile", nil)
 	if errGetMany != nil {
-		logger.AppLog.Warnln(errGetMany)
+		logger.DbLog.Warnln(errGetMany)
 	}
 	nfProfiles, err := decode(nfProfilesRaw, time.RFC3339)
 	if err != nil {

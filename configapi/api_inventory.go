@@ -122,13 +122,13 @@ func PostGnb(c *gin.Context) {
 	if !factory.WebUIConfig.Configuration.Mongodb.CheckReplica {
 		if err := postGnbOperationWithOutContext(gnb); err != nil {
 			logger.WebUILog.Errorf("failed to post gNB in network slices: %+v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "post error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "post error"})
 			return
 		}
 
 		if err := updateGnbInNetworkSlices(gnb); err != nil {
 			logger.WebUILog.Errorf("failed to update gNB in network slices: %+v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "update error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "update error"})
 			return
 		}
 		logger.WebUILog.Infof("successfully executed POST gNB %s request", postGnbParams.Name)
@@ -205,17 +205,17 @@ func PutGnb(c *gin.Context) {
 	if !factory.WebUIConfig.Configuration.Mongodb.CheckReplica {
 		if err := putGnbOperationWithOutContext(putGnb); err != nil {
 			logger.WebUILog.Errorf("failed to post gNB in network slices: %+v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "post error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "post error"})
 			return
 		}
 
 		if err := updateGnbInNetworkSlices(putGnb); err != nil {
 			logger.WebUILog.Errorf("failed to update gNB in network slices: %+v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "update error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "update error"})
 			return
 		}
 		logger.WebUILog.Infof("successfully executed POST gNB %s request", putGnb.Name)
-		c.JSON(http.StatusCreated, gin.H{})
+		c.JSON(http.StatusOK, gin.H{})
 		return
 	}
 	if err := executeGnbTransaction(c.Request.Context(), putGnb, updateGnbInNetworkSlices, putGnbOperation); err != nil {
@@ -441,13 +441,13 @@ func PostUpf(c *gin.Context) {
 	if !factory.WebUIConfig.Configuration.Mongodb.CheckReplica {
 		if err := postUpfOperationWithOutContext(upf); err != nil {
 			logger.WebUILog.Errorf("failed to post UPF: %+v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "post error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "post error"})
 			return
 		}
 
 		if err := updateUpfInNetworkSlices(upf); err != nil {
 			logger.WebUILog.Errorf("failed to update UPF in network slices: %+v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "update error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "update error"})
 			return
 		}
 		logger.WebUILog.Infof("successfully executed POST UPF %s request", postUpfParams.Hostname)
@@ -531,13 +531,13 @@ func PutUpf(c *gin.Context) {
 	if !factory.WebUIConfig.Configuration.Mongodb.CheckReplica {
 		if err := putUpfOperationWithOutContext(putUpf); err != nil {
 			logger.WebUILog.Errorf("failed to put UPF: %+v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "put error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "put error"})
 			return
 		}
 
 		if err := updateUpfInNetworkSlices(putUpf); err != nil {
 			logger.WebUILog.Errorf("failed to update UPF in network slices: %+v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "update error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "update error"})
 			return
 		}
 		logger.WebUILog.Infof("successfully executed PUT UPF request for hostname: %s", hostname)

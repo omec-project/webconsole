@@ -2,6 +2,11 @@ package vaultsync
 
 import (
 	"testing"
+
+	"github.com/omec-project/webconsole/backend/factory"
+	"github.com/omec-project/webconsole/backend/ssm"
+	"github.com/omec-project/webconsole/dbadapter"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestSyncMutexesInitialized(t *testing.T) {
@@ -33,6 +38,24 @@ func TestSyncMutexesInitialized(t *testing.T) {
 }
 
 func TestCoreVaultUserSync(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+			Mongodb: &factory.Mongodb{
+				ConcurrencyOps: 10,
+			},
+		},
+	}
+
 	// Set stop condition to prevent actual DB operations
 	setStopCondition(true)
 	defer func() {
@@ -50,6 +73,40 @@ func TestCoreVaultUserSync(t *testing.T) {
 }
 
 func TestCoreVaultUserSyncNormal(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+			Mongodb: &factory.Mongodb{
+				ConcurrencyOps: 10,
+			},
+		},
+	}
+
+	// Mock the DB client
+	oldAuthClient := dbadapter.AuthDBClient
+	defer func() { dbadapter.AuthDBClient = oldAuthClient }()
+
+	mockClient := &dbadapter.MockDBClient{
+		GetManyFn: func(collName string, filter bson.M) ([]map[string]any, error) {
+			// Return empty slice to avoid processing
+			return []map[string]any{}, nil
+		},
+	}
+	dbadapter.AuthDBClient = mockClient
+
+	// Initialize the channel
+	ch := make(chan *ssm.SsmSyncMessage, 5)
+	SetSyncChanHandle(ch)
+
 	// Set stop condition to false but expect DB errors
 	setStopCondition(false)
 

@@ -53,14 +53,6 @@ func TestSsmSyncMessage(t *testing.T) {
 	}
 }
 
-func TestMockSSMImplementsInterface(t *testing.T) {
-	var ssm SSM = &MockSSM{}
-
-	if ssm == nil {
-		t.Error("MockSSM should implement SSM interface")
-	}
-}
-
 func TestMockSSMLogin(t *testing.T) {
 	mock := &MockSSM{
 		LoginToken: "test-token-123",

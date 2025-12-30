@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/openapi/models"
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/dbadapter"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
@@ -33,12 +34,18 @@ func TestHandleGetsK4(t *testing.T) {
 
 		// Mock the DB call
 		oldClient := dbadapter.CommonDBClient
-		dbadapter.CommonDBClient = &dbadapter.MockDBClient{
+		oldClient2 := dbadapter.AuthDBClient
+		mockClient := &dbadapter.MockDBClient{
 			GetManyFn: func(collName string, filter bson.M) ([]map[string]any, error) {
 				return mockK4Data, nil
 			},
 		}
-		defer func() { dbadapter.CommonDBClient = oldClient }()
+		dbadapter.CommonDBClient = mockClient
+		dbadapter.AuthDBClient = mockClient
+		defer func() {
+			dbadapter.CommonDBClient = oldClient
+			dbadapter.AuthDBClient = oldClient2
+		}()
 
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest("GET", "/k4opt", nil)
@@ -56,12 +63,18 @@ func TestHandleGetsK4(t *testing.T) {
 	t.Run("Database error", func(t *testing.T) {
 		// Mock the DB call with error
 		oldClient := dbadapter.CommonDBClient
-		dbadapter.CommonDBClient = &dbadapter.MockDBClient{
+		oldClient2 := dbadapter.AuthDBClient
+		mockClient := &dbadapter.MockDBClient{
 			GetManyFn: func(collName string, filter bson.M) ([]map[string]any, error) {
 				return nil, assert.AnError
 			},
 		}
-		defer func() { dbadapter.CommonDBClient = oldClient }()
+		dbadapter.CommonDBClient = mockClient
+		dbadapter.AuthDBClient = mockClient
+		defer func() {
+			dbadapter.CommonDBClient = oldClient
+			dbadapter.AuthDBClient = oldClient2
+		}()
 
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest("GET", "/k4opt", nil)
@@ -121,11 +134,24 @@ func TestHandlePostK4(t *testing.T) {
 	router := setupTestRouter()
 	router.POST("/k4opt", HandlePostK4)
 
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+		},
+	}
 	// Test case 1: Successful post
 	t.Run("Successful post", func(t *testing.T) {
 		k4Data := models.K4{
-			K4:     "testKey",
-			K4_SNO: uint8(1), // Cambiado de byte(1) a uint8(1)
+			K4:     "1234ABCDEF",
+			K4_SNO: byte(1),
 		}
 		jsonData, _ := json.Marshal(k4Data)
 
@@ -135,7 +161,7 @@ func TestHandlePostK4(t *testing.T) {
 
 		mockClient := &dbadapter.MockDBClient{
 			GetOneFn: func(collName string, filter bson.M) (map[string]any, error) {
-				return nil, assert.AnError // Simula que no existe el registro
+				return nil, assert.AnError
 			},
 			PostFn: func(collName string, filter bson.M, postData map[string]any) (bool, error) {
 				return true, nil
@@ -178,10 +204,24 @@ func TestHandlePutK4(t *testing.T) {
 	router := setupTestRouter()
 	router.PUT("/k4opt/:idsno", HandlePutK4)
 
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+		},
+	}
+
 	// Test case 1: Successful update
 	t.Run("Successful update", func(t *testing.T) {
 		k4Data := models.K4{
-			K4:     "testKey",
+			K4:     "1234ABCDEF",
 			K4_SNO: byte(1),
 		}
 		jsonData, _ := json.Marshal(k4Data)
@@ -192,7 +232,7 @@ func TestHandlePutK4(t *testing.T) {
 
 		mockClient := &dbadapter.MockDBClient{
 			GetOneFn: func(collName string, filter bson.M) (map[string]any, error) {
-				return map[string]any{"k4": "testKey", "k4_sno": "1"}, nil
+				return map[string]any{"k4": "1234ABCDEF", "k4_sno": "1"}, nil
 			},
 			PutOneFn: func(collName string, filter bson.M, putData map[string]any) (bool, error) {
 				return true, nil
@@ -217,7 +257,7 @@ func TestHandlePutK4(t *testing.T) {
 	// Test case 2: K4 not found
 	t.Run("K4 not found", func(t *testing.T) {
 		k4Data := models.K4{
-			K4:     "testKey",
+			K4:     "1234ABCDEF",
 			K4_SNO: byte(1),
 		}
 		jsonData, _ := json.Marshal(k4Data)
@@ -243,6 +283,19 @@ func TestHandleDeleteK4(t *testing.T) {
 	router := setupTestRouter()
 	router.DELETE("/k4opt/:idsno", HandleDeleteK4)
 
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+		},
+	}
 	// Test case 1: Successful deletion
 	t.Run("Successful deletion", func(t *testing.T) {
 		// Mock the DB calls
@@ -251,7 +304,7 @@ func TestHandleDeleteK4(t *testing.T) {
 
 		mockClient := &dbadapter.MockDBClient{
 			GetOneFn: func(collName string, filter bson.M) (map[string]any, error) {
-				return map[string]any{"k4": "testKey", "k4_sno": "1"}, nil
+				return map[string]any{"k4": "1234ABCDEF", "k4_sno": "1"}, nil
 			},
 			DeleteOneFn: func(collName string, filter bson.M) error {
 				return nil

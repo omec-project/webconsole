@@ -211,10 +211,10 @@ func TestLogin_FailureCases(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}
@@ -263,37 +263,37 @@ func TestLogin_SuccessCases(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			var respondeData map[string]string
 			err = json.Unmarshal(w.Body.Bytes(), &respondeData)
 			if err != nil {
-				t.Errorf("unable to unmarshal response`%v`", w.Body.String())
+				t.Errorf("Unable to unmarshal response`%v`", w.Body.String())
 			}
 
 			responseToken, exists := respondeData["token"]
 			if !exists {
-				t.Errorf("unable to unmarshal response`%v`", w.Body.String())
+				t.Errorf("Unable to unmarshal response`%v`", w.Body.String())
 			}
 
 			token, parseErr := jwt.Parse(responseToken, func(token *jwt.Token) (any, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 				}
 				return mockJWTSecret, nil
 			})
 			if parseErr != nil {
-				t.Errorf("error parsing JWT: %v", parseErr)
+				t.Errorf("Error parsing JWT: %v", parseErr)
 				return
 			}
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 				if claims["username"] != tc.expectedUsername {
-					t.Errorf("expected `%v` username, got `%v`", tc.expectedUsername, claims["username"])
+					t.Errorf("Expected `%v` username, got `%v`", tc.expectedUsername, claims["username"])
 				} else if int(claims["role"].(float64)) != tc.expectedRole {
-					t.Errorf("expected `%v` role, got `%v`", tc.expectedRole, claims["role"])
+					t.Errorf("Expected `%v` role, got `%v`", tc.expectedRole, claims["role"])
 				}
 			} else {
-				t.Errorf("invalid JWT token or JWT claims are not readable")
+				t.Errorf("Invalid JWT token or JWT claims are not readable")
 			}
 		})
 	}

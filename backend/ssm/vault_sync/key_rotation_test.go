@@ -3,10 +3,26 @@ package vaultsync
 import (
 	"testing"
 
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/ssm"
 )
 
 func TestKeyRotationListen(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+		},
+	}
+
 	ssmSyncMsg := make(chan *ssm.SsmSyncMessage, 5)
 
 	// Start the listener in a goroutine
@@ -35,6 +51,21 @@ func TestKeyRotationListen(t *testing.T) {
 }
 
 func TestKeyRotationListenLowerCase(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+		},
+	}
+
 	ssmSyncMsg := make(chan *ssm.SsmSyncMessage, 5)
 
 	// Start the listener in a goroutine
@@ -51,6 +82,21 @@ func TestKeyRotationListenLowerCase(t *testing.T) {
 }
 
 func TestRotateInternalTransitKeyWithStopCondition(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+		},
+	}
+
 	// Set stop condition
 	setStopCondition(true)
 	defer func() {
@@ -70,6 +116,21 @@ func TestRotateInternalTransitKeyWithStopCondition(t *testing.T) {
 }
 
 func TestRotateInternalTransitKeyWithValidLabel(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+		},
+	}
+
 	// Set stop condition to false to allow the function to proceed
 	setStopCondition(false)
 

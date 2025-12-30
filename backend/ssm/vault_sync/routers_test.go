@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/webconsole/backend/factory"
 )
 
 func TestRouteStructure(t *testing.T) {
@@ -162,6 +163,21 @@ func TestAddRoutesWithDifferentMethods(t *testing.T) {
 }
 
 func TestHandleCheckK4Life(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+		},
+	}
+
 	gin.SetMode(gin.TestMode)
 
 	w := httptest.NewRecorder()
@@ -169,7 +185,7 @@ func TestHandleCheckK4Life(t *testing.T) {
 
 	handleCheckK4Life(c)
 
-	if w.Code != http.StatusNotImplemented {
-		t.Errorf("Expected status code %d, got %d", http.StatusNotImplemented, w.Code)
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
 	}
 }

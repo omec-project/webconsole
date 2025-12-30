@@ -77,7 +77,7 @@ func (db *NetworkSliceMockDBClient) RestfulAPIGetOne(coll string, filter bson.M)
 	}
 	ns := configmodels.ToBsonM(db.slices[0])
 	if ns == nil {
-		logger.DbLog.Fatalln("failed to convert network slice to BsonM")
+		logger.AppLog.Fatalln("failed to convert network slice to BsonM")
 	}
 	return ns, nil
 }
@@ -90,7 +90,7 @@ func (db *NetworkSliceMockDBClient) RestfulAPIGetMany(coll string, filter bson.M
 	for _, s := range db.slices {
 		ns := configmodels.ToBsonM(s)
 		if ns == nil {
-			logger.DbLog.Fatalln("failed to convert network slice to BsonM")
+			logger.AppLog.Fatalln("failed to convert network slice to BsonM")
 		}
 		results = append(results, ns)
 	}
@@ -341,8 +341,22 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 	networkSlices[2].SiteInfo.GNodeBs = []configmodels.SliceSiteInfoGNodeBs{}
 	networkSlices[3].SiteDeviceGroup = []string{}
 
+	syncSubscribersOnSliceCreateOrUpdate = func(slice, prevSlice configmodels.Slice) (int, error) {
+		return http.StatusOK, nil
+	}
+
 	for _, testSlice := range networkSlices {
 		ts := testSlice
+
+		for {
+			syncSliceStopMutex.Lock()
+			if !SyncSliceStop {
+				t.Log("wait wait wait")
+				syncSliceStopMutex.Unlock()
+				break
+			}
+			syncSliceStopMutex.Unlock()
+		}
 
 		t.Run(ts.SliceName, func(t *testing.T) {
 			originalDBClient := dbadapter.CommonDBClient
@@ -390,6 +404,10 @@ func TestNetworkSlicePostHandler_NetworkSliceNameValidation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddConfigV1Service(router)
+
+	syncSubscribersOnSliceCreateOrUpdate = func(slice, prevSlice configmodels.Slice) (int, error) {
+		return http.StatusOK, nil
+	}
 
 	testCases := []struct {
 		name         string
@@ -444,6 +462,10 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 	router := gin.Default()
 	AddConfigV1Service(router)
 
+	syncSubscribersOnSliceCreateOrUpdate = func(slice, prevSlice configmodels.Slice) (int, error) {
+		return http.StatusOK, nil
+	}
+
 	testCases := []struct {
 		name          string
 		route         string
@@ -456,14 +478,14 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 			route:         "/config/v1/network-slice/slice-1",
 			inputData:     networkSliceWithGnbParams("slice-1", "", 3),
 			expectedCode:  http.StatusBadRequest,
-			expectedError: "invalid gNB name",
+			expectedError: "invalid gNodeBs[0].name",
 		},
 		{
 			name:          "Network Slice invalid gNB TAC",
 			route:         "/config/v1/network-slice/slice-1",
 			inputData:     networkSliceWithGnbParams("slice-1", "valid-gnb", 0),
 			expectedCode:  http.StatusBadRequest,
-			expectedError: "invalid TAC",
+			expectedError: "invalid gNodeBs[0].tac",
 		},
 	}
 

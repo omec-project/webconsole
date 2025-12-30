@@ -43,10 +43,6 @@ var (
 	testRulePriority    int32 = 12
 	testRuleQci         int32 = 8
 	testRuleArp         int32 = 100
-	testMaxBrUl1              = "12 Kbps"
-	testMaxBrDl1              = "67 Kbps"
-	testMaxBrUl2              = "45 Kbps"
-	testMaxBrDl2              = "12 Kbps"
 	testDeviceGroupName       = "testDG"
 	testDnnName               = "testDnn"
 	testDG                    = configmodels.DeviceGroups{
@@ -128,8 +124,8 @@ func TestSyncPolicyControl(t *testing.T) {
 							},
 							Qos: nfConfigApi.PccQos{
 								FiveQi:  testRuleQci,
-								MaxBrUl: testMaxBrUl1,
-								MaxBrDl: testMaxBrDl1,
+								MaxBrUl: "12 Kbps",
+								MaxBrDl: "67 Kbps",
 								Arp: nfConfigApi.Arp{
 									PriorityLevel: testRuleArp,
 									PreemptCap:    nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
@@ -172,8 +168,8 @@ func TestSyncPolicyControl(t *testing.T) {
 							},
 							Qos: nfConfigApi.PccQos{
 								FiveQi:  9,
-								MaxBrUl: testMaxBrUl2,
-								MaxBrDl: testMaxBrDl2,
+								MaxBrUl: "45 Kbps",
+								MaxBrDl: "12 Kbps",
 								Arp: nfConfigApi.Arp{
 									PriorityLevel: 1,
 									PreemptCap:    nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
@@ -193,8 +189,8 @@ func TestSyncPolicyControl(t *testing.T) {
 							},
 							Qos: nfConfigApi.PccQos{
 								FiveQi:  testRuleQci,
-								MaxBrUl: testMaxBrUl1,
-								MaxBrDl: testMaxBrDl1,
+								MaxBrUl: "12 Kbps",
+								MaxBrDl: "67 Kbps",
 								Arp: nfConfigApi.Arp{
 									PriorityLevel: testRuleArp,
 									PreemptCap:    nfConfigApi.PREEMPTCAP_MAY_PREEMPT,

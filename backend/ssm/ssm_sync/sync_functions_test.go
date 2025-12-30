@@ -3,7 +3,10 @@ package ssmsync
 import (
 	"testing"
 
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/configmodels"
+	"github.com/omec-project/webconsole/dbadapter"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestReadStopCondition(t *testing.T) {
@@ -39,6 +42,36 @@ func TestCreateNewKeySSM_InvalidLabel(t *testing.T) {
 }
 
 func TestDeleteKeyMongoDB(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+			Mongodb: &factory.Mongodb{
+				ConcurrencyOps: 10,
+			},
+		},
+	}
+
+	// Mock the DB client
+	oldAuthClient := dbadapter.AuthDBClient
+	defer func() { dbadapter.AuthDBClient = oldAuthClient }()
+
+	mockClient := &dbadapter.MockDBClient{
+		DeleteOneFn: func(collName string, filter bson.M) error {
+			// Return nil to simulate successful deletion
+			return nil
+		},
+	}
+	dbadapter.AuthDBClient = mockClient
+
 	k4 := configmodels.K4{
 		K4_SNO:   1,
 		K4_Label: "test_label",
@@ -55,6 +88,39 @@ func TestDeleteKeyMongoDB(t *testing.T) {
 }
 
 func TestStoreInMongoDB(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+			Mongodb: &factory.Mongodb{
+				ConcurrencyOps: 10,
+			},
+		},
+	}
+
+	// Mock the DB client
+	oldAuthClient := dbadapter.AuthDBClient
+	defer func() { dbadapter.AuthDBClient = oldAuthClient }()
+
+	mockClient := &dbadapter.MockDBClient{
+		GetOneFn: func(collName string, filter bson.M) (map[string]any, error) {
+			// Return empty map to simulate key doesn't exist
+			return map[string]any{}, nil
+		},
+		PutOneFn: func(collName string, filter bson.M, putData map[string]any) (bool, error) {
+			return true, nil
+		},
+	}
+	dbadapter.AuthDBClient = mockClient
+
 	k4 := configmodels.K4{
 		K4_SNO:   1,
 		K4_Label: "test_label",
@@ -72,6 +138,35 @@ func TestStoreInMongoDB(t *testing.T) {
 }
 
 func TestGetUsersMDB(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+			Mongodb: &factory.Mongodb{
+				ConcurrencyOps: 10,
+			},
+		},
+	}
+
+	// Mock the DB client
+	oldCommonClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = oldCommonClient }()
+
+	mockClient := &dbadapter.MockDBClient{
+		GetManyFn: func(collName string, filter bson.M) ([]map[string]any, error) {
+			return []map[string]any{}, nil
+		},
+	}
+	dbadapter.CommonDBClient = mockClient
+
 	// This will fail without proper DB connection, but we can test the function signature
 	users := GetUsersMDB()
 
@@ -82,6 +177,35 @@ func TestGetUsersMDB(t *testing.T) {
 }
 
 func TestGetSubscriberData(t *testing.T) {
+	// Set up factory.WebUIConfig to prevent nil pointer reference
+	oldConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = oldConfig }()
+
+	factory.WebUIConfig = &factory.Config{
+		Configuration: &factory.Configuration{
+			SSM: &factory.SSM{
+				AllowSsm: false,
+			},
+			Vault: &factory.Vault{
+				AllowVault: false,
+			},
+			Mongodb: &factory.Mongodb{
+				ConcurrencyOps: 10,
+			},
+		},
+	}
+
+	// Mock the DB client
+	oldAuthClient := dbadapter.AuthDBClient
+	defer func() { dbadapter.AuthDBClient = oldAuthClient }()
+
+	mockClient := &dbadapter.MockDBClient{
+		GetOneFn: func(collName string, filter bson.M) (map[string]any, error) {
+			return nil, nil // Simulate not found
+		},
+	}
+	dbadapter.AuthDBClient = mockClient
+
 	// Test with invalid ueId
 	_, err := GetSubscriberData("invalid_ue_id")
 

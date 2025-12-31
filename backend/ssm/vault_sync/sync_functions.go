@@ -8,7 +8,6 @@ import (
 
 	ssm_constants "github.com/networkgcorefullcode/ssm/const"
 	ssm_models "github.com/networkgcorefullcode/ssm/models"
-
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/ssm/apiclient"
 	ssmsync "github.com/omec-project/webconsole/backend/ssm/ssm_sync"
@@ -31,7 +30,7 @@ func createNewKeyVaultTransit(keyLabel string) (configmodels.K4, error) {
 	}
 
 	if apiclient.VaultAuthToken == "" {
-		if _, err := apiclient.LoginVault(); err != nil {
+		if _, err = apiclient.LoginVault(); err != nil {
 			logger.AppLog.Errorf("Failed to authenticate to Vault: %v", err)
 			setStopCondition(true)
 			return configmodels.K4{}, err
@@ -102,7 +101,7 @@ func createNewKeyVaultStore() error {
 	}
 
 	if apiclient.VaultAuthToken == "" {
-		if _, err := apiclient.LoginVault(); err != nil {
+		if _, err = apiclient.LoginVault(); err != nil {
 			logger.AppLog.Errorf("Failed to authenticate to Vault: %v", err)
 			setStopCondition(true)
 			return err

@@ -75,7 +75,7 @@ func handleSyncKey(c *gin.Context) {
 
 	coreUserSync()
 
-	c.JSON(http.StatusOK, gin.H{"succes": "sync function run succesfully"})
+	c.JSON(http.StatusOK, gin.H{"success": "sync function run successfully"})
 }
 
 func handleCheckK4Life(c *gin.Context) {
@@ -106,7 +106,7 @@ func handleCheckK4Life(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error: " + err.Error()})
 	}
-	c.JSON(http.StatusOK, gin.H{"succes": "sync function run succesfully"})
+	c.JSON(http.StatusOK, gin.H{"success": "sync function run successfully"})
 }
 
 func handleRotationKey(c *gin.Context) {
@@ -137,5 +137,5 @@ func handleRotationKey(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error: " + err.Error()})
 	}
-	c.JSON(http.StatusOK, gin.H{"succes": "rotation function run succesfully"})
+	c.JSON(http.StatusOK, gin.H{"success": "rotation function run successfully"})
 }

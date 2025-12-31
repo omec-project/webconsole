@@ -49,10 +49,12 @@ func checkKeyHealth(ssmSyncMsg chan *ssm.SsmSyncMessage) error {
 		return errors.New("SSM is down")
 	}
 	// first sync the keys
-	VaultSyncInitDefault(ssmSyncMsg)
+	if err := VaultSyncInitDefault(ssmSyncMsg); err != nil {
+		return err
+	}
 
 	// now we get all keys in mongodb
-	//channels
+	// channels
 	k4listChanMDB := make(chan []configmodels.K4)
 
 	// First get the keys using a filter on keyLabel (mongodb query)
@@ -114,7 +116,6 @@ func checkKeyHealth(ssmSyncMsg chan *ssm.SsmSyncMessage) error {
 	}
 
 	latest, err := getLatestTransitKeyVersion(client, internalKeyLabel, "opt2")
-
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
@@ -128,7 +129,9 @@ func rotateInternalTransitKey(keyLabel string, ssmSyncMsg chan *ssm.SsmSyncMessa
 		return errors.New("vault is down; skipping rotation")
 	}
 
-	VaultSyncInitDefault(ssmSyncMsg)
+	if err := VaultSyncInitDefault(ssmSyncMsg); err != nil {
+		return err
+	}
 
 	client, err := apiclient.GetVaultClient()
 	if err != nil {

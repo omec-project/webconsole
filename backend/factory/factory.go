@@ -37,7 +37,6 @@ func GetConfig() *Config {
 // TODO: Support configuration update from REST api
 func InitConfigFactory(f string) error {
 	content, err := os.ReadFile(f)
-
 	if err != nil {
 		return fmt.Errorf("[Configuration] %+v", err)
 	}

@@ -19,6 +19,7 @@ var (
 	WebUILog    *zap.SugaredLogger
 	ContextLog  *zap.SugaredLogger
 	GinLog      *zap.SugaredLogger
+	GrpcLog     *zap.SugaredLogger
 	ConfigLog   *zap.SugaredLogger
 	DbLog       *zap.SugaredLogger
 	AuthLog     *zap.SugaredLogger
@@ -57,6 +58,7 @@ func init() {
 	WebUILog = log.Sugar().With("component", "WebUI", "category", "WebUI")
 	ContextLog = log.Sugar().With("component", "WebUI", "category", "Context")
 	GinLog = log.Sugar().With("component", "WebUI", "category", "GIN")
+	GrpcLog = log.Sugar().With("component", "WebUI", "category", "GRPC")
 	ConfigLog = log.Sugar().With("component", "WebUI", "category", "CONFIG")
 	DbLog = log.Sugar().With("component", "WebUI", "category", "DB")
 	AuthLog = log.Sugar().With("component", "WebUI", "category", "Auth")

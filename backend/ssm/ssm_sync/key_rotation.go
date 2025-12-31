@@ -33,13 +33,16 @@ func KeyRotationListen(ssmSyncMsg chan *ssm.SsmSyncMessage) {
 		select {
 		case <-ticker24h.C:
 			logger.AppLog.Info("Performing daily key health check")
-			// TODO: implement the check function that return a report about the key life
-			CheckKeyHealth(ssmSyncMsg)
-
+			err := CheckKeyHealth(ssmSyncMsg)
+			if err != nil {
+				logger.AppLog.Errorf("Key health check failed: %v", err)
+			}
 		case <-ticker90d.C:
 			logger.AppLog.Info("Performing 90-day key rotation")
-			// TODO: do the function to do the rotation for each key that grown 90 days living
-			rotateExpiredKeys(ssmSyncMsg)
+			err := rotateExpiredKeys(ssmSyncMsg)
+			if err != nil {
+				logger.AppLog.Errorf("Key rotation failed: %v", err)
+			}
 		}
 	}
 }
@@ -54,7 +57,7 @@ func CheckKeyHealth(ssmSyncMsg chan *ssm.SsmSyncMessage) error {
 	SsmSyncInitDefault(ssmSyncMsg)
 
 	// now we get all keys in mongodb
-	//channels
+	// channels
 	k4listChanMDB := make(chan []configmodels.K4)
 
 	// First get the keys using a filter on keyLabel (mongodb query)
@@ -151,7 +154,7 @@ func rotateExpiredKeys(ssmSyncMsg chan *ssm.SsmSyncMessage) error {
 	}
 
 	// the next steps are integrated in rotateKey function
-	// 3rd get the users that use this key use a concurrent algoritm
+	// 3rd get the users that use this key use a concurrent algorithm
 	// 4th decrypt the ki for the user
 	// 5th delete the old key in HSM and mongoDB
 	// 6th generate a same key type use the same id and key label
@@ -193,9 +196,9 @@ func rotateKey(k4 configmodels.K4) {
 
 	// In this point all users have their KI decrypted and stored in userToRotateKi slice
 
-	//Delete the key for the HSM and create a new one with the same key label and k4_sno
+	// Delete the key for the HSM and create a new one with the same key label and k4_sno
 	logger.AppLog.Infof("Rotating key K4_SNO: %d, Label: %s", k4.K4_SNO, k4.K4_Label)
-	if err := deleteKeyToSSM(k4); err != nil {
+	if err = deleteKeyToSSM(k4); err != nil {
 		logger.AppLog.Errorf("failed to delete old key: %v", err)
 		return
 	}
@@ -249,7 +252,7 @@ func decryptUserKI(user *models.AuthenticationSubscription, k4 configmodels.K4) 
 
 func encryptUserKey(user *models.AuthenticationSubscription, k4 configmodels.K4, ueId string) {
 	// now we encrypt the key and store it back
-	var encryptRequest ssm_models.EncryptRequest = ssm_models.EncryptRequest{
+	encryptRequest := ssm_models.EncryptRequest{
 		KeyLabel:            k4.K4_Label,
 		Plain:               user.PermanentKey.PermanentKeyValue,
 		EncryptionAlgorithm: int32(ssm_constants.LabelAlgorithmMap[k4.K4_Label]),
@@ -258,7 +261,6 @@ func encryptUserKey(user *models.AuthenticationSubscription, k4 configmodels.K4,
 	apiClient := apiclient.GetSSMAPIClient()
 
 	resp, r, err := apiClient.EncryptionAPI.EncryptData(apiclient.AuthContext).EncryptRequest(encryptRequest).Execute()
-
 	if err != nil {
 		logger.AppLog.Errorf("Error when calling `KeyManagementAPI.GenerateAESKey`: %v", err)
 		logger.AppLog.Errorf("Full HTTP response: %v", r)

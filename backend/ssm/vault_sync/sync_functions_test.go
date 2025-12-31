@@ -95,6 +95,7 @@ func TestConvertVaultKeyToDataKeyInfo(t *testing.T) {
 	result = convertVaultKeyToDataKeyInfo(keyData, 42)
 	if result == nil {
 		t.Error("Expected non-nil result for valid input")
+		return
 	}
 
 	if result.Id != 42 {
@@ -108,6 +109,7 @@ func TestConvertVaultKeyToDataKeyInfoEmptyMap(t *testing.T) {
 	result := convertVaultKeyToDataKeyInfo(keyData, 10)
 	if result == nil {
 		t.Error("Expected non-nil result even for empty map")
+		return
 	}
 
 	if result.Id != 10 {

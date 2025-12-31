@@ -15,8 +15,10 @@ import (
 
 var StopSSMsyncFunction bool = false
 
-var ErrorSyncChan chan error = make(chan error, 10)
-var ErrorRotationChan chan error = make(chan error, 10)
+var (
+	ErrorSyncChan     chan error = make(chan error, 10)
+	ErrorRotationChan chan error = make(chan error, 10)
+)
 
 // Implementation of SSM synchronization logic
 func SyncSsm(ssmSyncMsg chan *ssm.SsmSyncMessage, ssm ssm.SSM) {

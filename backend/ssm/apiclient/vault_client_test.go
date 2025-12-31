@@ -83,24 +83,24 @@ mbkm0oeQ/kmUoe82o/yXmbkm0oeQ/kmUoe82o/yXmbkm0oeQ/kmUoe82o/yXmbkm
 0oeQ/kmUoe82o/yXmbkm0oeQ/kmUoe82o/yXmbkm0oeQ/kmUoe82o/yXmbkm
 -----END PRIVATE KEY-----`
 
-	if _, err := crt.WriteString(crtContent); err != nil {
+	if _, err = crt.WriteString(crtContent); err != nil {
 		t.Fatalf("cannot write to temp crt file: %v", err)
 	}
-	if err := crt.Close(); err != nil {
+	if err = crt.Close(); err != nil {
 		t.Fatalf("cannot close temp crt file: %v", err)
 	}
 
-	if _, err := key.WriteString(keyContent); err != nil {
+	if _, err = key.WriteString(keyContent); err != nil {
 		t.Fatalf("cannot write to temp key file: %v", err)
 	}
-	if err := key.Close(); err != nil {
+	if err = key.Close(); err != nil {
 		t.Fatalf("cannot close temp key file: %v", err)
 	}
 
-	if _, err := ca.WriteString(crtContent); err != nil {
+	if _, err = ca.WriteString(crtContent); err != nil {
 		t.Fatalf("cannot write to temp ca file: %v", err)
 	}
-	if err := ca.Close(); err != nil {
+	if err = ca.Close(); err != nil {
 		t.Fatalf("cannot close temp ca file: %v", err)
 	}
 

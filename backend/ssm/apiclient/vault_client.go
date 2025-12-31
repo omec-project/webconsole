@@ -1,6 +1,7 @@
 package apiclient
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -10,8 +11,10 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 )
 
-var vaultClient *vault.Client
-var mutexVaultClient sync.Mutex
+var (
+	vaultClient      *vault.Client
+	mutexVaultClient sync.Mutex
+)
 
 // GetVaultClient creates and returns a configured Vault API client
 func GetVaultClient() (*vault.Client, error) {
@@ -20,6 +23,10 @@ func GetVaultClient() (*vault.Client, error) {
 	if vaultClient != nil {
 		logger.AppLog.Debugf("Returning existing Vault client")
 		return vaultClient, nil
+	}
+
+	if factory.WebUIConfig == nil || factory.WebUIConfig.Configuration.Vault == nil {
+		return nil, errors.New("error: Vault Configuration Not Available")
 	}
 
 	logger.AppLog.Infof("Creating new Vault client for URI: %s", factory.WebUIConfig.Configuration.Vault.VaultUri)

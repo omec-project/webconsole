@@ -219,7 +219,11 @@ func syncSSM(ssmInterface ssm.SSM, ssmSyncMsg chan *ssm.SsmSyncMessage) error {
 	time.Sleep(time.Second * 5) // stop work to send the health check function
 	go ssmsync.SyncSsm(ssmSyncMsg, ssmInterface)
 	time.Sleep(time.Second * 5) // stop work to send the sync function
-	go ssmInterface.InitDefault(ssmSyncMsg)
+	go func() {
+		if err := ssmInterface.InitDefault(ssmSyncMsg); err != nil {
+			logger.WebUILog.Errorf("SSM InitDefault failed: %v", err)
+		}
+	}()
 
 	return nil
 }

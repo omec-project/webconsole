@@ -7,8 +7,10 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 )
 
-var AuthContext context.Context = context.Background()
-var CurrentJWT string = ""
+var (
+	AuthContext context.Context = context.Background()
+	CurrentJWT  string          = ""
+)
 
 // SetAuthContext sets the authentication context with the provided JWT token
 func SetAuthContext(jwt string) {
@@ -18,14 +20,14 @@ func SetAuthContext(jwt string) {
 
 // LoginSSM performs login to the SSM and returns the authentication token
 func LoginSSM(serviceId, password string) (string, error) {
-	var loginRequest = ssm_models.LoginRequest{
+	loginRequest := ssm_models.LoginRequest{
 		ServiceId: serviceId,
 		Password:  password,
 	}
 
-	apiClient := GetSSMAPIClient()
+	client := GetSSMAPIClient()
 
-	resp, r, err := apiClient.AuthenticationAPI.UserLogin(context.Background()).LoginRequest(loginRequest).Execute()
+	resp, r, err := client.AuthenticationAPI.UserLogin(context.Background()).LoginRequest(loginRequest).Execute()
 	if err != nil {
 		logger.WebUILog.Errorf("Error when calling `AuthenticationAPI.UserLogin`: %v", err)
 		logger.WebUILog.Errorf("Full HTTP response: %v", r)

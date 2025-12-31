@@ -233,6 +233,7 @@ func putGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
 	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.GnbDataColl, filter, gnbDataBson)
 	return err
 }
+
 func putGnbOperationWithOutContext(gnb configmodels.Gnb) error {
 	filter := bson.M{"name": gnb.Name}
 	gnbDataBson := configmodels.ToBsonM(gnb)
@@ -439,13 +440,13 @@ func PostUpf(c *gin.Context) {
 	upf := configmodels.Upf(postUpfParams)
 	// operate with normal mongodb database
 	if !factory.WebUIConfig.Configuration.Mongodb.CheckReplica {
-		if err := postUpfOperationWithOutContext(upf); err != nil {
+		if err = postUpfOperationWithOutContext(upf); err != nil {
 			logger.WebUILog.Errorf("failed to post UPF: %+v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "post error"})
 			return
 		}
 
-		if err := updateUpfInNetworkSlices(upf); err != nil {
+		if err = updateUpfInNetworkSlices(upf); err != nil {
 			logger.WebUILog.Errorf("failed to update UPF in network slices: %+v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "update error"})
 			return

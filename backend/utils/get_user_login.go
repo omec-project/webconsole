@@ -22,6 +22,5 @@ func GetUserLogin() (string, string, error) {
 	if username == "" || password == "" {
 		return "", "", errors.New("SSM login credentials are not set")
 	}
-
 	return username, password, nil
 }

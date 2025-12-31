@@ -148,6 +148,12 @@ var routes = Routes{
 		GetGnbs,
 	},
 	{
+		"GetGnb",
+		http.MethodGet,
+		"/inventory/gnb/:gnbName",
+		GetGnb,
+	},
+	{
 		"PostGnb",
 		http.MethodPost,
 		"/inventory/gnb",

@@ -49,10 +49,10 @@ func TestStatus(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if tc.expectedCode != w.Code {
-				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 			if w.Body.String() != tc.expectedBody {
-				t.Errorf("expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
+				t.Errorf("Expected `%v`, got `%v`", tc.expectedBody, w.Body.String())
 			}
 		})
 	}

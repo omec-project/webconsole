@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+# 
+
+/device-group/{group-name}:
+  description: Add IMSIs to the group
+  patch:
+    parameters:
+    - explode: false
+      in: path
+      name: group-name
+      required: true
+      schema:
+        type: string
+      style: simple
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/device-groups/imsis.yaml'
+    responses:
+      "200":
+        description: Additional IMSIs in the existing group
+  post:
+    parameters:
+    - explode: false
+      in: path
+      name: group-name
+      required: true
+      schema:
+        type: string
+      style: simple
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/device-groups/device-groups.yaml'
+    responses:
+      "200":
+        description: IMSIs successfully added to group

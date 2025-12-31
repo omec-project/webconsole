@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+type: object
+description: Network slice
+required:
+  - slice-id
+  - site-device-group
+  - site-info
+properties:
+  slice-name:
+    description: Slice name (taken from path parameter)
+    type: string
+    readOnly: true
+    example: slice1
+  slice-id:
+    $ref: './slice-id.yaml'
+  site-device-group:
+    description: Device groups attached to this slice
+    type: array
+    minItems: 1
+    items:
+      type: string
+      example: iot-camera
+  site-info:
+    $ref: './site-info.yaml'
+  application-filtering-rules:
+    description: Application filtering rules
+    type: array
+    items:
+      $ref: './application-filtering-rules.yaml'

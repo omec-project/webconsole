@@ -129,10 +129,12 @@ components:
       type: object
     slice:
       properties:
+        slice-name:
+          description: Slice name (taken from path parameter)
+          example: slice1
+          type: string
         slice-id:
           $ref: '#/components/schemas/slice_slice_id'
-        qos:
-          $ref: '#/components/schemas/slice_qos'
         site-device-group:
           items:
             description: Name of the device group which is added in this slice
@@ -141,22 +143,14 @@ components:
           type: array
         site-info:
           $ref: '#/components/schemas/slice_site_info'
-        deny-applications:
+        application-filtering-rules:
           items:
-            description: Single App or group of application identification
-            example: iot-app2
-            type: string
+            $ref: '#/components/schemas/slice_application_filtering_rules'
           type: array
-        permit-applications:
-          items:
-            description: Single App or group of application identification
-            example: iot-app
-            type: string
-          type: array
-        applications-information:
-          items:
-            $ref: '#/components/schemas/slice_applications_information'
-          type: array
+      required:
+        - slice-id
+        - site-device-group
+        - site-info
       type: object
     device_groups_ip_domain_expanded:
       description: This is APN for device
@@ -207,23 +201,106 @@ components:
           example: "010203"
           type: string
       type: object
-    slice_qos:
+    traffic_class_info:
+      description: Traffic class information
       properties:
-        uplink:
-          description: uplink data rate in bps
-          example: 4000000
-          type: integer
-        downlink:
-          description: downlink data rate in bps
-          example: 20000000
-          type: integer
-        traffic-class:
-          description: QCI/QFI for the traffic
-          enum:
-          - platinum
-          - gold
-          - silver
+        name:
+          description: Traffic class name
+          example: default
           type: string
+        qci:
+          description: QCI/5QI/QFI
+          example: 9
+          maximum: 9
+          minimum: 1
+          type: integer
+        arp:
+          description: Traffic class priority
+          example: 8
+          maximum: 15
+          minimum: 1
+          type: integer
+        pdb:
+          description: Packet Delay Budget
+          example: 100
+          minimum: 0
+          type: integer
+        pelr:
+          description: Packet Error Loss Rate
+          example: 6
+          maximum: 8
+          minimum: 1
+          type: integer
+      required:
+        - name
+        - qci
+        - arp
+        - pdb
+        - pelr
+      type: object
+    slice_application_filtering_rules:
+      description: Application filtering rule
+      properties:
+        rule-name:
+          description: Rule name
+          example: default
+          type: string
+        priority:
+          description: Rule priority
+          example: 0
+          minimum: 0
+          type: integer
+        action:
+          description: Action
+          example: permit
+          type: string
+        endpoint:
+          description: Application destination IP or network
+          example: any
+          type: string
+        protocol:
+          description: Protocol number (0 means any)
+          example: 0
+          minimum: 0
+          type: integer
+        dest-port-start:
+          description: Port range start
+          example: 0
+          maximum: 65535
+          minimum: 0
+          type: integer
+        dest-port-end:
+          description: Port range end
+          example: 65535
+          maximum: 65535
+          minimum: 0
+          type: integer
+        app-mbr-uplink:
+          example: 0
+          minimum: 0
+          type: integer
+        app-mbr-downlink:
+          example: 0
+          minimum: 0
+          type: integer
+        bitrate-unit:
+          description: Data rate unit for uplink and downlink
+          example: bps
+          type: string
+        traffic-class:
+          $ref: '#/components/schemas/traffic_class_info'
+        rule-trigger:
+          example: ""
+          type: string
+      required:
+        - rule-name
+        - action
+        - endpoint
+        - protocol
+        - dest-port-start
+        - dest-port-end
+        - bitrate-unit
+        - traffic-class
       type: object
     slice_site_info_plmn:
       description: Fixed supported plmn at the site.
@@ -243,6 +320,9 @@ components:
         tac:
           description: unique tac per gNB. This should match gNB configuration.
           example: 1
+        required:
+          - name
+          - tac
           type: integer
       type: object
     slice_site_info:
@@ -267,32 +347,4 @@ components:
             upf-port:
               example: 8805
               type: integer
-      type: object
-    slice_applications_information:
-      properties:
-        app-name:
-          description: Single App or group of application identification
-          example: iot-app
-          type: string
-        endpoint:
-          description: Single IP or network
-          example: 1.1.1.1/32
-          type: string
-        start-port:
-          description: port range start
-          example: 40000
-          maximum: 65565
-          minimum: 1
-          type: integer
-        end-port:
-          description: port range end
-          example: 40000
-          maximum: 65565
-          minimum: 1
-          type: integer
-        protocol:
-          example: 17
-          maximum: 255
-          minimum: 1
-          type: integer
       type: object

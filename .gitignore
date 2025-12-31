@@ -22,7 +22,7 @@ cscope.*
 # debug
 *.log
 *.pcap
-
+bin/
 # build
 bin/
 public/
@@ -30,3 +30,11 @@ public/
 .coverage/
 vendor/
 config/webuicfg.yaml
+server.exe
+webconsole.exe
+webconsole.exe~
+webconsole
+*.crt
+*.key
+*.pem
+*.csr

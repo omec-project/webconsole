@@ -117,13 +117,13 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 		},
 		PermanentKey: &models.PermanentKey{
 			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
+			EncryptionKey:       "",
 			PermanentKeyValue:   "5122250214c33e723a5dd523fc145fc0",
 		},
 		SequenceNumber: "16f3b3f70fc2",
 	})
 	if authSubscription == nil {
-		logger.DbLog.Fatalln("failed to convert subscriber to BsonM")
+		logger.AppLog.Fatalln("failed to convert subscriber to BsonM")
 	}
 	return authSubscription, nil
 }
@@ -194,7 +194,7 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 			},
 		})
 		if amDataData == nil {
-			logger.DbLog.Fatalln("failed to convert amDataData to BsonM")
+			logger.AppLog.Fatalln("failed to convert amDataData to BsonM")
 		}
 		return amDataData, nil
 
@@ -205,7 +205,7 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 			},
 		})
 		if amPolicyData == nil {
-			logger.DbLog.Fatalln("failed to convert amPolicyData to BsonM")
+			logger.AppLog.Fatalln("failed to convert amPolicyData to BsonM")
 		}
 		return amPolicyData, nil
 
@@ -226,7 +226,7 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 			},
 		})
 		if smPolicyData == nil {
-			logger.DbLog.Fatalln("failed to convert smPolicyData to BsonM")
+			logger.AppLog.Fatalln("failed to convert smPolicyData to BsonM")
 		}
 		return smPolicyData, nil
 
@@ -243,7 +243,7 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 			},
 		})
 		if smfSelData == nil {
-			logger.DbLog.Fatalln("failed to convert smfSelData to BsonM")
+			logger.AppLog.Fatalln("failed to convert smfSelData to BsonM")
 		}
 		return smfSelData, nil
 
@@ -378,7 +378,7 @@ func TestGetSubscriberByID(t *testing.T) {
 					},
 					"permanentKey": map[string]any{
 						"encryptionAlgorithm": 0,
-						"encryptionKey":       0,
+						"encryptionKey":       "",
 						"permanentKeyValue":   "5122250214c33e723a5dd523fc145fc0",
 					},
 					"sequenceNumber": "16f3b3f70fc2",
@@ -610,7 +610,7 @@ func (db *AuthDBMockDBClient) RestfulAPIGetOne(collName string, filter bson.M) (
 		},
 		PermanentKey: &models.PermanentKey{
 			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
+			EncryptionKey:       "",
 			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
 		},
 		SequenceNumber: "16f3b3f70fc2",
@@ -771,7 +771,7 @@ func TestSubscriberPost(t *testing.T) {
 			}
 
 			if tc.expectedPostData != nil {
-				expectedAmDataCollection := amDataColl
+				expectedAmDataCollection := AmDataColl
 				if tc.commonDbAdapter.receivedPostData[0]["coll"] != expectedAmDataCollection {
 					t.Errorf("expected collection %v, got %v", expectedAmDataCollection, tc.commonDbAdapter.receivedPostData[0]["coll"])
 				}
@@ -798,7 +798,7 @@ func (db *DeleteSubscriberMockDBClient) RestfulAPIGetOne(coll string, filter bso
 	if coll == "device_group" {
 		dg := configmodels.ToBsonM(db.deviceGroups[0])
 		if dg == nil {
-			logger.DbLog.Fatalln("failed to convert device group to BsonM")
+			logger.AppLog.Fatalln("failed to convert device group to BsonM")
 		}
 		return dg, nil
 	}
@@ -813,7 +813,7 @@ func (db *DeleteSubscriberMockDBClient) RestfulAPIGetMany(coll string, filter bs
 	for _, deviceGroup := range db.deviceGroups {
 		dg := configmodels.ToBsonM(deviceGroup)
 		if dg == nil {
-			logger.DbLog.Fatalln("failed to convert device groups to BsonM")
+			logger.AppLog.Fatalln("failed to convert device groups to BsonM")
 		}
 		results = append(results, dg)
 	}

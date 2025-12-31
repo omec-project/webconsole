@@ -1,0 +1,63 @@
+# Vault Configuration Example for Webconsole
+
+# This file shows how to configure Vault integration in the webconsole
+
+vault:
+  # URI of the Vault server
+  vault-uri: "https://vault.example.com:8200"
+  
+  # Enable Vault integration
+  allow-vault: true
+  
+  # Skip TLS certificate verification (not recommended for production)
+  tls-insecure: false
+  
+  # AppRole authentication (method 1)
+  # Recommended for applications running outside Kubernetes
+  role-id: "your-role-id-here"
+  secret-id: "your-secret-id-here"
+  
+  # Kubernetes authentication (method 2)
+  # Recommended for applications running in Kubernetes
+  k8s-role: "webconsole-role"
+  k8s-jwt-path: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  
+  # mTLS authentication (method 3)
+  # Recommended for production environments with certificate-based auth
+  cert-role: "webconsole-cert-role"
+  m-tls:
+    crt: "/path/to/client-cert.crt"
+    key: "/path/to/client-key.key"
+    ca: "/path/to/ca-cert.crt"
+  
+  # Custom mount paths for authentication methods (optional)
+  # These are useful when Vault has custom mount points configured
+  approle-mount-path: "approle"    # Default: "approle", change if using custom mount
+  k8s-mount-path: "kubernetes"     # Default: "kubernetes", change if using custom mount
+  cert-mount-path: "cert"          # Default: "cert", change if using custom mount
+  
+  # Mount point for application secrets
+  mount-app: "secret"
+  
+  # Synchronization settings
+  ssm-synchronize:
+    enable: true
+    interval-minute: 60
+    max-keys-create: 100
+    delete-missing: false
+    max-sync-keys: 1000
+    max-sync-users: 10000
+    max-sync-rotations: 100
+
+# Authentication Methods Priority:
+# 1. mTLS (if MTls is configured)
+# 2. Kubernetes (if k8s-role is configured and running in K8s)
+# 3. AppRole (if role-id and secret-id are configured)
+
+# Production Recommendations:
+# - Use mTLS for production environments
+# - Set tls-insecure: false
+# - Store sensitive credentials in environment variables or Kubernetes secrets
+# - Use proper certificate management
+# - Enable audit logging in Vault
+# - Implement proper secret rotation policies

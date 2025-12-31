@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-FROM golang:1.25.5-bookworm@sha256:09f53deea14d4019922334afe6258b7b776afc1d57952be2012f2c8c4076db05 AS builder
+FROM golang:1.24.5-bookworm AS builder
 
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
@@ -20,23 +20,45 @@ RUN apt-get update && \
     unzip && \
     apt-get clean
 
-WORKDIR $GOPATH/src/webconsole
-COPY . .
-RUN make all && \
-    CGO_ENABLED=0 go build -a -installsuffix nocgo -o webconsole -x server.go
+RUN go install github.com/go-task/task/v3/cmd/task@latest
 
-FROM alpine:3.23@sha256:51183f2cfa6320055da30872f211093f9ff1d3cf06f39a0bdb212314c5dc7375 AS webui
+WORKDIR $GOPATH/src/webconsole
+
+COPY go.mod .
+COPY go.sum .
+COPY Taskfile.yml .
+
+RUN task mod-start
+
+
+COPY . .
+
+ARG BUILD_UI=true
+RUN if [ "$BUILD_UI" = "true" ]; then \
+    task webconsole-ui; \
+    else \
+    task all; \
+    fi
+
+FROM alpine:3.22 AS webui
 
 LABEL maintainer="Aether SD-Core <dev@lists.aetherproject.org>" \
     description="ONF open source 5G Core Network" \
     version="Stage 3"
 
 ARG DEBUG_TOOLS
+ARG BUILD_UI=true
 
 # Install debug tools ~85MB (if DEBUG_TOOLS is set to true)
 RUN if [ "$DEBUG_TOOLS" = "true" ]; then \
-        apk update && apk add --no-cache -U vim strace net-tools curl netcat-openbsd bind-tools; \
-        fi
+    apk update && apk add --no-cache -U vim strace net-tools curl netcat-openbsd bind-tools; \
+    fi
 
-# Copy executable
-COPY --from=builder /go/src/webconsole/webconsole /usr/local/bin/.
+# Copy executable - choose the right binary based on BUILD_UI
+RUN if [ "$BUILD_UI" = "true" ]; then \
+    echo "Copying UI-enabled binary"; \
+    else \
+    echo "Copying standard binary"; \
+    fi
+
+COPY --from=builder /go/src/webconsole/bin/* /usr/local/bin/.

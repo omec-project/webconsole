@@ -12,6 +12,7 @@ import (
 	"context"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"strconv"
 	"time"
 
@@ -23,6 +24,11 @@ import (
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/metrics"
+	"github.com/omec-project/webconsole/backend/ssm"
+	ssmsync "github.com/omec-project/webconsole/backend/ssm/ssm_sync"
+	"github.com/omec-project/webconsole/backend/ssm/ssmhsm"
+	"github.com/omec-project/webconsole/backend/ssm/vault"
+	vaultsync "github.com/omec-project/webconsole/backend/ssm/vault_sync"
 	"github.com/omec-project/webconsole/backend/webui_context"
 	"github.com/omec-project/webconsole/configapi"
 )
@@ -55,6 +61,13 @@ func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 		configapi.AddApiService(subconfig_router)
 		configapi.AddConfigV1Service(subconfig_router, nFConfigSyncMiddleware)
 	}
+	if factory.WebUIConfig.Configuration.SSM.SsmSync.Enable {
+		logger.AppLog.Debug("exec ssmsync.AddSyncSSMService(subconfig_router)")
+		ssmsync.AddSyncSSMService(subconfig_router)
+	} else if factory.WebUIConfig.Configuration.Vault.SsmSync.Enable {
+		logger.AppLog.Debug("exec vaultsync.AddSyncSSMService(subconfig_router)")
+		vaultsync.AddSyncVaultService(subconfig_router)
+	}
 	AddSwaggerUiService(subconfig_router)
 	AddUiService(subconfig_router)
 
@@ -71,6 +84,25 @@ func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 		AllowAllOrigins:  true,
 		MaxAge:           86400,
 	}))
+
+	// Init a gorutine to sincronize SSM functionality
+	ssmSyncMsg := make(chan *ssm.SsmSyncMessage, 10)
+	if factory.WebUIConfig.Configuration.SSM.SsmSync.Enable && factory.WebUIConfig.Configuration.SSM.AllowSsm {
+		err := syncSSM(ssmhsm.Ssmhsm, ssmSyncMsg)
+		if err != nil {
+			logger.AppLog.Errorf("SSM synchronization setup failed: %v", err)
+			os.Exit(1)
+		}
+	}
+
+	if factory.WebUIConfig.Configuration.Vault.SsmSync.Enable && factory.WebUIConfig.Configuration.Vault.AllowVault {
+		vaultsync.SetSyncChanHandle(ssmSyncMsg)
+		err := syncSSM(vault.Vault, ssmSyncMsg)
+		if err != nil {
+			logger.AppLog.Errorf("Vault synchronization setup failed: %v", err)
+			os.Exit(1)
+		}
+	}
 
 	go func() {
 		httpAddr := ":" + strconv.Itoa(factory.WebUIConfig.Configuration.CfgPort)
@@ -125,7 +157,6 @@ func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 	}
 
 	<-ctx.Done()
-	logger.AppLog.Infoln("WebUI shutting down due to context cancel")
 }
 
 func fetchConfigAdapater() {
@@ -175,4 +206,24 @@ func isWritingMethod(method string) bool {
 
 func isStatusSuccess(status int) bool {
 	return status/100 == 2
+}
+
+func syncSSM(ssmInterface ssm.SSM, ssmSyncMsg chan *ssm.SsmSyncMessage) error {
+	_, err := ssmInterface.Login()
+	if err != nil {
+		logger.WebUILog.Errorf("SSM login failed: %v", err)
+		return err
+	}
+	logger.WebUILog.Infoln("SSM login successful")
+	go ssmInterface.HealthCheck()
+	time.Sleep(time.Second * 5) // stop work to send the health check function
+	go ssmsync.SyncSsm(ssmSyncMsg, ssmInterface)
+	time.Sleep(time.Second * 5) // stop work to send the sync function
+	go func() {
+		if err := ssmInterface.InitDefault(ssmSyncMsg); err != nil {
+			logger.WebUILog.Errorf("SSM InitDefault failed: %v", err)
+		}
+	}()
+
+	return nil
 }

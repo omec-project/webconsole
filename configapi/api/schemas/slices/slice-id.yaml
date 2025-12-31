@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+type: object
+description: Slice identifier
+required:
+  - sst
+  - sd
+properties:
+  sst:
+    description: Slice Service Type
+    type: string
+    example: "1"
+  sd:
+    description: Slice differentiator
+    type: string
+    example: "010203"

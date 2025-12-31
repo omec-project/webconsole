@@ -95,14 +95,18 @@ func HandleGetK4(c *gin.Context) {
 	logger.WebUILog.Infoln("Get One K4 key Data")
 
 	snoId := c.Param("idsno")
-	snoIdint, _ := strconv.Atoi(snoId)
+	snoIdint, err := strconv.Atoi(snoId)
+	if err != nil {
+		logger.WebUILog.Errorf("Invalid SNO ID: %s", snoId)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid SNO ID"})
+		return
+	}
 
 	filterSnoID := bson.M{"k4_sno": snoIdint}
 
 	var k4Data configmodels.K4
 
 	k4DataInterface, err := dbadapter.AuthDBClient.RestfulAPIGetOne(K4KeysColl, filterSnoID)
-
 	if err != nil {
 		logger.AppLog.Errorf("failed to fetch k4 key data from DB: %+v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested k4 key record from DB"})
@@ -255,7 +259,12 @@ func HandlePutK4(c *gin.Context) {
 	logger.WebUILog.Infoln("Put One K4 key Data")
 
 	snoId := c.Param("idsno")
-	snoIdint, _ := strconv.Atoi(snoId)
+	snoIdint, err := strconv.Atoi(snoId)
+	if err != nil {
+		logger.WebUILog.Errorf("Invalid SNO ID: %s", snoId)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid SNO ID"})
+		return
+	}
 	var k4Data configmodels.K4
 
 	if err := c.ShouldBindJSON(&k4Data); err != nil {
@@ -338,7 +347,12 @@ func HandleDeleteK4(c *gin.Context) {
 
 	snoId := c.Param("idsno")
 	keylabel := c.Param("keylabel")
-	snoIdint, _ := strconv.Atoi(snoId)
+	snoIdint, err := strconv.Atoi(snoId)
+	if err != nil {
+		logger.WebUILog.Errorf("Invalid SNO ID: %s", snoId)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid SNO ID"})
+		return
+	}
 
 	k4Data := configmodels.K4{
 		K4_Label: keylabel,

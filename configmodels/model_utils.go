@@ -15,12 +15,12 @@ import (
 func ToBsonM(data any) (ret bson.M) {
 	tmp, err := json.Marshal(data)
 	if err != nil {
-		logger.DbLog.Errorln("could not marshal data")
+		logger.AppLog.Errorln("could not marshal data")
 		return nil
 	}
 	err = json.Unmarshal(tmp, &ret)
 	if err != nil {
-		logger.DbLog.Errorln("could not unmarshal data")
+		logger.AppLog.Errorln("could not unmarshal data")
 		return nil
 	}
 	return ret
@@ -29,7 +29,7 @@ func ToBsonM(data any) (ret bson.M) {
 func MapToByte(data map[string]any) (ret []byte) {
 	ret, err := json.Marshal(data)
 	if err != nil {
-		logger.DbLog.Errorln("could not marshal data")
+		logger.AppLog.Errorln("could not marshal data")
 		return nil
 	}
 	return ret

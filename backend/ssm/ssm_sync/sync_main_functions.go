@@ -40,7 +40,7 @@ func SyncKeys(keyLabel, action string) {
 		return
 	}
 
-	//channels
+	// channels
 	k4listChanMDB := make(chan []configmodels.K4)
 	k4listChanSSM := make(chan []ssm_models.DataKeyInfo)
 
@@ -187,14 +187,12 @@ func coreUserSync() {
 					encryptDataAESCBC(subsData, user)
 				}
 			}
-
 		}()
 	}
 }
 
 func encryptDataAESCBC(subsData *configmodels.SubsData, user configmodels.SubsListIE) {
-
-	var encryptRequest ssm_models.EncryptRequest = ssm_models.EncryptRequest{
+	encryptRequest := ssm_models.EncryptRequest{
 		KeyLabel:            ssm_constants.LABEL_ENCRYPTION_KEY_AES256,
 		Plain:               subsData.AuthenticationSubscription.PermanentKey.PermanentKeyValue,
 		EncryptionAlgorithm: ssm_constants.ALGORITHM_AES256_OurUsers,
@@ -202,7 +200,6 @@ func encryptDataAESCBC(subsData *configmodels.SubsData, user configmodels.SubsLi
 
 	apiClient := apiclient.GetSSMAPIClient()
 	resp, r, err := apiClient.EncryptionAPI.EncryptData(apiclient.AuthContext).EncryptRequest(encryptRequest).Execute()
-
 	if err != nil {
 		logger.AppLog.Errorf("Error when calling `KeyManagementAPI.GenerateAESKey`: %v", err)
 		logger.AppLog.Errorf("Full HTTP response: %v", r)
@@ -232,7 +229,7 @@ func encryptDataAESGCM(subsData *configmodels.SubsData, user configmodels.SubsLi
 	aad := fmt.Sprintf("%s-%d-%d", subsData.UeId, subsData.AuthenticationSubscription.K4_SNO, subsData.AuthenticationSubscription.PermanentKey.EncryptionAlgorithm)
 	aadBytes := []byte(aad) // Convertir a bytes
 
-	var encryptRequest ssm_models.EncryptAESGCMRequest = ssm_models.EncryptAESGCMRequest{
+	encryptRequest := ssm_models.EncryptAESGCMRequest{
 		KeyLabel: ssm_constants.LABEL_ENCRYPTION_KEY_AES256,
 		Plain:    subsData.AuthenticationSubscription.PermanentKey.PermanentKeyValue,
 		Aad:      hex.EncodeToString(aadBytes), // Codificar a hex
@@ -240,7 +237,6 @@ func encryptDataAESGCM(subsData *configmodels.SubsData, user configmodels.SubsLi
 
 	apiClient := apiclient.GetSSMAPIClient()
 	resp, r, err := apiClient.EncryptionAPI.EncryptDataAESGCM(apiclient.AuthContext).EncryptAESGCMRequest(encryptRequest).Execute()
-
 	if err != nil {
 		logger.AppLog.Errorf("Error when calling `KeyManagementAPI.GenerateAESKey`: %v", err)
 		logger.AppLog.Errorf("Full HTTP response: %v", r)

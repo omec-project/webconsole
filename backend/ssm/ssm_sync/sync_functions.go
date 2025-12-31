@@ -28,7 +28,7 @@ func getSSMLabelFilter(keyLabel string, dataKeyInfoListChan chan []ssm_models.Da
 	// Logic to get keys from SSM based on keyLabel
 
 	logger.AppLog.Debugf("key label: %s", keyLabel)
-	var getDataKeysRequest ssm_models.GetDataKeysRequest = ssm_models.GetDataKeysRequest{
+	getDataKeysRequest := ssm_models.GetDataKeysRequest{
 		KeyLabel: keyLabel,
 	}
 	logger.AppLog.Debugf("Fetching keys from SSM with label: %s", getDataKeysRequest.KeyLabel)
@@ -36,7 +36,6 @@ func getSSMLabelFilter(keyLabel string, dataKeyInfoListChan chan []ssm_models.Da
 	apiClient := apiclient.GetSSMAPIClient()
 
 	resp, r, err := apiClient.KeyManagementAPI.GetDataKeys(apiclient.AuthContext).GetDataKeysRequest(getDataKeysRequest).Execute()
-
 	if err != nil {
 		logger.AppLog.Errorf("Error when calling `KeyManagementAPI.GetDataKeys`: %v", err)
 		logger.AppLog.Errorf("Full HTTP response: %v", r)
@@ -52,13 +51,12 @@ func deleteKeyToSSM(k4 configmodels.K4) error {
 	logger.AppLog.Infof("Deleting key SNO %d with label %s from SSM", k4.K4_SNO, k4.K4_Label)
 
 	apiClient := apiclient.GetSSMAPIClient()
-	var deleteDataKeyRequest ssm_models.DeleteKeyRequest = ssm_models.DeleteKeyRequest{
+	deleteDataKeyRequest := ssm_models.DeleteKeyRequest{
 		Id:       int32(k4.K4_SNO),
 		KeyLabel: k4.K4_Label,
 	}
 
 	_, r, err := apiClient.KeyManagementAPI.DeleteKey(apiclient.AuthContext).DeleteKeyRequest(deleteDataKeyRequest).Execute()
-
 	if err != nil {
 		logger.AppLog.Errorf("Error when calling `KeyManagementAPI.DeleteKey`: %v", err)
 		logger.AppLog.Errorf("Full HTTP response: %v", r)
@@ -154,7 +152,6 @@ func StoreInMongoDB(k4 configmodels.K4, keyLabel string) error {
 	logger.AppLog.Infof("Storing new key SNO %d in MongoDB with label %s", k4.K4_SNO, keyLabel)
 
 	r, err := dbadapter.AuthDBClient.RestfulAPIGetOne(configapi.K4KeysColl, bson.M{"k4_sno": k4.K4_SNO, "key_label": keyLabel})
-
 	if err != nil {
 		logger.AppLog.Errorf("error: store K4 key in MongoDB %s", err)
 		return err
@@ -270,7 +267,8 @@ func GetAllSubscriberData() ([]configmodels.SubsData, error) {
 			}
 			subData := configmodels.SubsData{
 				UeId:                       authdata["ueId"].(string),
-				AuthenticationSubscription: authSubsData}
+				AuthenticationSubscription: authSubsData,
+			}
 			subsDatas = append(subsDatas, subData)
 		}
 	}

@@ -3,6 +3,7 @@ package configapi
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -48,13 +49,16 @@ func TestHandleGetsK4(t *testing.T) {
 		}()
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/k4opt", nil)
+		req, err := http.NewRequest("GET", "/k4opt", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var response []models.K4
-		err := json.Unmarshal(w.Body.Bytes(), &response)
+		err = json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
 		assert.Len(t, response, 2)
 	})
@@ -77,7 +81,10 @@ func TestHandleGetsK4(t *testing.T) {
 		}()
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/k4opt", nil)
+		req, err := http.NewRequest("GET", "/k4opt", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -105,7 +112,10 @@ func TestHandleGetK4(t *testing.T) {
 		defer func() { dbadapter.AuthDBClient = oldClient }()
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/k4opt/1", nil)
+		req, err := http.NewRequest("GET", "/k4opt/1", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -123,7 +133,10 @@ func TestHandleGetK4(t *testing.T) {
 		defer func() { dbadapter.AuthDBClient = oldClient }()
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/k4opt/1", nil)
+		req, err := http.NewRequest("GET", "/k4opt/1", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -153,7 +166,10 @@ func TestHandlePostK4(t *testing.T) {
 			K4:     "1234ABCDEF",
 			K4_SNO: byte(1),
 		}
-		jsonData, _ := json.Marshal(k4Data)
+		jsonData, err := json.Marshal(k4Data)
+		if err != nil {
+			t.Fatalf("Failed to marshal JSON: %v", err)
+		}
 
 		// Mock the DB calls
 		oldAuthClient := dbadapter.AuthDBClient
@@ -180,7 +196,10 @@ func TestHandlePostK4(t *testing.T) {
 		}()
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/k4opt", bytes.NewBuffer(jsonData))
+		req, err := http.NewRequest("POST", "/k4opt", bytes.NewBuffer(jsonData))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
 		req.Header.Set("Content-Type", "application/json") // Añadido header Content-Type
 		router.ServeHTTP(w, req)
 
@@ -193,7 +212,10 @@ func TestHandlePostK4(t *testing.T) {
 	// Test case 2: Invalid JSON
 	t.Run("Invalid JSON", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/k4opt", bytes.NewBuffer([]byte("invalid json")))
+		req, err := http.NewRequest("POST", "/k4opt", bytes.NewBuffer([]byte("invalid json")))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -224,7 +246,10 @@ func TestHandlePutK4(t *testing.T) {
 			K4:     "1234ABCDEF",
 			K4_SNO: byte(1),
 		}
-		jsonData, _ := json.Marshal(k4Data)
+		jsonData, err := json.Marshal(k4Data)
+		if err != nil {
+			t.Fatalf("Failed to marshal JSON: %v", err)
+		}
 
 		// Mock the DB calls
 		oldAuthClient := dbadapter.AuthDBClient
@@ -248,7 +273,10 @@ func TestHandlePutK4(t *testing.T) {
 		}()
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("PUT", "/k4opt/1", bytes.NewBuffer(jsonData))
+		req, err := http.NewRequest("PUT", "/k4opt/1", bytes.NewBuffer(jsonData))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -260,19 +288,34 @@ func TestHandlePutK4(t *testing.T) {
 			K4:     "1234ABCDEF",
 			K4_SNO: byte(1),
 		}
-		jsonData, _ := json.Marshal(k4Data)
+		jsonData, err := json.Marshal(k4Data)
+		if err != nil {
+			t.Fatalf("Failed to marshal JSON: %v", err)
+		}
 
 		// Mock the DB calls
 		oldClient := dbadapter.AuthDBClient
+		oldCommonClient := dbadapter.CommonDBClient
 		dbadapter.AuthDBClient = &dbadapter.MockDBClient{
 			GetOneFn: func(collName string, filter bson.M) (map[string]any, error) {
 				return nil, nil
 			},
 		}
-		defer func() { dbadapter.AuthDBClient = oldClient }()
+		dbadapter.CommonDBClient = &dbadapter.MockDBClient{
+			PutOneFn: func(collName string, filter bson.M, data map[string]any) (bool, error) {
+				return false, errors.New("K4 not found")
+			},
+		}
+		defer func() {
+			dbadapter.AuthDBClient = oldClient
+			dbadapter.CommonDBClient = oldCommonClient
+		}()
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("PUT", "/k4opt/1", bytes.NewBuffer(jsonData))
+		req, err := http.NewRequest("PUT", "/k4opt/1", bytes.NewBuffer(jsonData))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -320,7 +363,10 @@ func TestHandleDeleteK4(t *testing.T) {
 		}()
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("DELETE", "/k4opt/1", nil)
+		req, err := http.NewRequest("DELETE", "/k4opt/1", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -330,15 +376,27 @@ func TestHandleDeleteK4(t *testing.T) {
 	t.Run("K4 not found", func(t *testing.T) {
 		// Mock the DB calls
 		oldClient := dbadapter.AuthDBClient
+		oldCommonClient := dbadapter.CommonDBClient
 		dbadapter.AuthDBClient = &dbadapter.MockDBClient{
 			GetOneFn: func(collName string, filter bson.M) (map[string]any, error) {
 				return nil, nil
 			},
 		}
-		defer func() { dbadapter.AuthDBClient = oldClient }()
+		dbadapter.CommonDBClient = &dbadapter.MockDBClient{
+			DeleteOneFn: func(collName string, filter bson.M) error {
+				return errors.New("K4 not found")
+			},
+		}
+		defer func() {
+			dbadapter.AuthDBClient = oldClient
+			dbadapter.CommonDBClient = oldCommonClient
+		}()
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("DELETE", "/k4opt/1", nil)
+		req, err := http.NewRequest("DELETE", "/k4opt/1", nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)

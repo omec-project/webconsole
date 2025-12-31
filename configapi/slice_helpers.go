@@ -27,8 +27,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var SyncSliceStop bool = false
-var syncSliceStopMutex sync.Mutex
+var (
+	SyncSliceStop      bool = false
+	syncSliceStopMutex sync.Mutex
+)
 
 var execCommand = exec.Command
 
@@ -300,12 +302,10 @@ func syncSubConcurrently(slice configmodels.Slice, prevSlice configmodels.Slice)
 			SyncSliceStop = false
 			syncSliceStopMutex.Unlock()
 		}()
-
 		_, err := syncSubscribersOnSliceCreateOrUpdate(slice, prevSlice)
 		if err != nil {
 			logger.AppLog.Errorf("error syncing subscribers: %s", err)
 		}
-
 	}()
 
 	return 0, nil
@@ -588,7 +588,7 @@ func cleanupDeviceGroups(slice, prevSlice configmodels.Slice) error {
 		}
 		// Compute with concurrency
 		g, ctx := errgroup.WithContext(context.Background())
-		g.SetLimit(int(factory.WebUIConfig.Configuration.Mongodb.ConcurrencyOps))
+		g.SetLimit(factory.WebUIConfig.Configuration.Mongodb.ConcurrencyOps)
 		for _, imsi := range devGroupConfig.Imsis {
 			g.Go(func() error {
 				// Verificar cancelación de contexto si hay error en otro lado

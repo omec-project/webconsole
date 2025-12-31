@@ -10,9 +10,11 @@ import (
 	"github.com/omec-project/webconsole/backend/ssm"
 )
 
-var SyncOurKeysMutex sync.Mutex
-var SyncExternalKeysMutex sync.Mutex
-var SyncUserMutex sync.Mutex
+var (
+	SyncOurKeysMutex      sync.Mutex
+	SyncExternalKeysMutex sync.Mutex
+	SyncUserMutex         sync.Mutex
+)
 
 func SyncKeyListen(ssmSyncMsg chan *ssm.SsmSyncMessage) {
 	// Check if we need to stop the sync function before initializing
@@ -23,12 +25,7 @@ func SyncKeyListen(ssmSyncMsg chan *ssm.SsmSyncMessage) {
 	period := time.Duration(factory.WebUIConfig.Configuration.SSM.SsmSync.IntervalMinute) * time.Minute
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
-	for {
-		// Check if we need to stop the sync function
-		if StopSSMsyncFunction {
-			break
-		}
-
+	for !StopSSMsyncFunction {
 		select {
 		case msg := <-ssmSyncMsg:
 			switch msg.Action {

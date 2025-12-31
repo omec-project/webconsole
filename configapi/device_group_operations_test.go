@@ -328,9 +328,11 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 
 	// check the sync condition
 	dbadapter.CommonDBClient = originalDBClient
-	SyncSliceStop = true
 
 	t.Run("Check the syncSliceCondition", func(t *testing.T) {
+		// Set SyncSliceStop to true to simulate running sync
+		SyncSliceStop = true
+
 		mockDB := &DeviceGroupMockDBClient{}
 		dbadapter.CommonDBClient = mockDB
 
@@ -341,9 +343,11 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error due to sync condition, got nil")
 		}
+
+		// Reset the sync flag
+		SyncSliceStop = false
 	})
 	dbadapter.CommonDBClient = originalDBClient
-	SyncSliceStop = false
 }
 
 func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {

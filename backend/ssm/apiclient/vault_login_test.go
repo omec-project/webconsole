@@ -17,7 +17,9 @@ func TestLoginVaultAppRoleSuccess(t *testing.T) {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"auth":{"client_token":"tok-approle","accessor":"acc"}}`))
+		if _, err := w.Write([]byte(`{"auth":{"client_token":"tok-approle","accessor":"acc"}}`)); err != nil {
+			t.Fatalf("Failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -43,7 +45,9 @@ func TestLoginVaultKubernetesSuccess(t *testing.T) {
 		t.Fatalf("cannot create temp jwt file: %v", err)
 	}
 	defer os.Remove(jwtFile.Name())
-	_, _ = jwtFile.WriteString("dummy-jwt")
+	if _, err = jwtFile.WriteString("dummy-jwt"); err != nil {
+		t.Fatalf("Failed to write JWT file: %v", err)
+	}
 	jwtFile.Close()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +55,10 @@ func TestLoginVaultKubernetesSuccess(t *testing.T) {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"auth":{"client_token":"tok-k8s","accessor":"acc"}}`))
+		_, err = w.Write([]byte(`{"auth":{"client_token":"tok-k8s","accessor":"acc"}}`))
+		if err != nil {
+			t.Fatalf("Failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -77,7 +84,10 @@ func TestLoginVaultMTLSSuccess(t *testing.T) {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"auth":{"client_token":"tok-mtls","accessor":"acc"}}`))
+		_, err := w.Write([]byte(`{"auth":{"client_token":"tok-mtls","accessor":"acc"}}`))
+		if err != nil {
+			t.Fatalf("Failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -104,17 +114,25 @@ func TestLoginVaultPrefersK8s(t *testing.T) {
 		t.Fatalf("cannot create temp jwt file: %v", err)
 	}
 	defer os.Remove(jwtFile.Name())
-	_, _ = jwtFile.WriteString("dummy-jwt")
+	if _, err = jwtFile.WriteString("dummy-jwt"); err != nil {
+		t.Fatalf("Failed to write JWT file: %v", err)
+	}
 	jwtFile.Close()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/auth/kubernetes/login":
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"auth":{"client_token":"tok-k8s","accessor":"acc"}}`))
+			_, err = w.Write([]byte(`{"auth":{"client_token":"tok-k8s","accessor":"acc"}}`))
+			if err != nil {
+				t.Fatalf("Failed to write response: %v", err)
+			}
 		case "/v1/auth/approle/login":
 			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(`{"errors":["should not hit approle"]}`))
+			_, err = w.Write([]byte(`{"errors":["should not hit approle"]}`))
+			if err != nil {
+				t.Fatalf("Failed to write response: %v", err)
+			}
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}

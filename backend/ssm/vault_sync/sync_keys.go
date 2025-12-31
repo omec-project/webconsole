@@ -7,16 +7,17 @@ import (
 
 	ssm_constants "github.com/networkgcorefullcode/ssm/const"
 	ssm_models "github.com/networkgcorefullcode/ssm/models"
-
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	ssmsync "github.com/omec-project/webconsole/backend/ssm/ssm_sync"
 	"github.com/omec-project/webconsole/configmodels"
 )
 
-var SyncOurKeysMutex sync.Mutex
-var SyncExternalKeysMutex sync.Mutex
-var SyncUserMutex sync.Mutex
+var (
+	SyncOurKeysMutex      sync.Mutex
+	SyncExternalKeysMutex sync.Mutex
+	SyncUserMutex         sync.Mutex
+)
 
 func syncOurKeys(action string) {
 	SyncOurKeysMutex.Lock()
@@ -52,7 +53,6 @@ func syncExternalKeysInternal(action string) {
 
 // syncOurKeys ensures our internal AES256-GCM key exists in Vault transit engine
 func SyncKeys(keyLabel, action string) {
-
 	// Logic to synchronize keys with SSM
 	if readStopCondition() {
 		logger.AppLog.Warn("The ssm is down or have a problem check if that component is running")
@@ -74,7 +74,7 @@ func SyncKeys(keyLabel, action string) {
 		return
 	}
 
-	//channels
+	// channels
 	k4listChanMDB := make(chan []configmodels.K4)
 	k4listChanSSM := make(chan []ssm_models.DataKeyInfo)
 
@@ -153,5 +153,4 @@ func SyncKeys(keyLabel, action string) {
 			}
 		}
 	}
-
 }

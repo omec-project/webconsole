@@ -23,7 +23,8 @@ func HealthCheckSSM() {
 		// Try to login again and retry the health check.
 		if r != nil && r.StatusCode == 401 {
 			logger.AppLog.Errorf("SSM returned 401 Unauthorized. Loggin in the service, and retrying healthcheck.")
-			serviceId, pass, err := utils.GetUserLogin()
+			var serviceId, pass string
+			serviceId, pass, err = utils.GetUserLogin()
 			if err != nil {
 				logger.AppLog.Errorf("Error getting SSM login credentials: %v", err)
 				StopSSMsyncFunction = true

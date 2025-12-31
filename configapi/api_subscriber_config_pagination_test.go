@@ -192,7 +192,9 @@ func TestGetSubscribers_FilterAndSearchAndExact(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 		var resp map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to unmarshal response: %v", err)
+		}
 		items := resp["items"].([]any)
 		if len(items) != 2 {
 			t.Fatalf("expected 2 items for plmn filter, got %d", len(items))
@@ -208,7 +210,9 @@ func TestGetSubscribers_FilterAndSearchAndExact(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 		var resp map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to unmarshal response: %v", err)
+		}
 		items := resp["items"].([]any)
 		if len(items) != 1 {
 			t.Fatalf("expected 1 item for q search, got %d", len(items))
@@ -224,7 +228,9 @@ func TestGetSubscribers_FilterAndSearchAndExact(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 		var resp map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to unmarshal response: %v", err)
+		}
 		items := resp["items"].([]any)
 		if len(items) != 1 {
 			t.Fatalf("expected 1 item for imsi exact, got %d", len(items))

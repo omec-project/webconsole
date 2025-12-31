@@ -59,7 +59,6 @@ func TestMockSSMLogin(t *testing.T) {
 	}
 
 	token, err := mock.Login()
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -110,7 +109,6 @@ func TestMockSSMInitDefault(t *testing.T) {
 	ch := make(chan *SsmSyncMessage, 1)
 
 	err := mock.InitDefault(ch)
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

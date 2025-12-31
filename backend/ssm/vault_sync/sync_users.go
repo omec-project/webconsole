@@ -20,8 +20,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var LatestKeyVersion int
-var AuthSubsDatasMap = make(map[string]configmodels.SubsData)
+var (
+	LatestKeyVersion int
+	AuthSubsDatasMap = make(map[string]configmodels.SubsData)
+)
 
 // SyncUsers synchronizes user data encryption using Vault transit engine
 func SyncUsers() {
@@ -49,7 +51,7 @@ func coreVaultUserSync() {
 	logger.AppLog.Infof("Len for authSubsDataMap: %d", len(AuthSubsDatasMap))
 
 	g, ctx := errgroup.WithContext(context.Background())
-	g.SetLimit(int(factory.WebUIConfig.Configuration.Mongodb.ConcurrencyOps))
+	g.SetLimit(factory.WebUIConfig.Configuration.Mongodb.ConcurrencyOps)
 	for _, subsData := range subsDatas {
 		logger.AppLog.Infof("Synchronizing user: %s", subsData.UeId)
 		g.Go(func() error {
@@ -101,7 +103,7 @@ func encryptUserDataVaultTransit(subsData configmodels.SubsData, ueId string) {
 	}
 
 	if apiclient.VaultAuthToken == "" {
-		if _, err := apiclient.LoginVault(); err != nil {
+		if _, err = apiclient.LoginVault(); err != nil {
 			logger.AppLog.Errorf("Failed to authenticate to Vault: %v", err)
 			setStopCondition(true)
 			return
@@ -167,7 +169,7 @@ func rewrapUserDataVaultTransit(subsData configmodels.SubsData, ueId string) {
 	}
 
 	if apiclient.VaultAuthToken == "" {
-		if _, err := apiclient.LoginVault(); err != nil {
+		if _, err = apiclient.LoginVault(); err != nil {
 			logger.AppLog.Errorf("Failed to authenticate to Vault: %v", err)
 			setStopCondition(true)
 			return
@@ -205,7 +207,11 @@ func rewrapUserDataVaultTransit(subsData configmodels.SubsData, ueId string) {
 	aad := subsData.AuthenticationSubscription.PermanentKey.Aad
 	var aadBytes []byte
 	if aad != "" {
-		aadBytes, _ = hex.DecodeString(aad)
+		aadBytes, err = hex.DecodeString(aad)
+		if err != nil {
+			logger.AppLog.Errorf("Failed to decode AAD hex string: %v", err)
+			return
+		}
 	} else {
 		// Fallback: rebuild AAD
 		aadStr := fmt.Sprintf("%s-%d-%d", subsData.UeId, subsData.AuthenticationSubscription.K4_SNO, subsData.AuthenticationSubscription.PermanentKey.EncryptionAlgorithm)

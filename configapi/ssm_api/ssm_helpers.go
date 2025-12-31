@@ -10,7 +10,7 @@ import (
 
 func StoreKeySSM(keyLabel, keyValue, keyType string, keyID int32) (*ssm.StoreKeyResponse, error) {
 	logger.AppLog.Debugf("key label: %s key id: %s key type: %s", keyLabel, keyID, keyType)
-	var storeKeyRequest ssm.StoreKeyRequest = ssm.StoreKeyRequest{
+	storeKeyRequest := ssm.StoreKeyRequest{
 		KeyLabel: keyLabel,
 		Id:       keyID,
 		KeyValue: keyValue,
@@ -32,7 +32,7 @@ func StoreKeySSM(keyLabel, keyValue, keyType string, keyID int32) (*ssm.StoreKey
 
 func UpdateKeySSM(keyLabel, keyValue, keyType string, keyID int32) (*ssm.UpdateKeyResponse, error) {
 	logger.AppLog.Debugf("key label: %s key id: %s key type: %s", keyLabel, keyID, keyType)
-	var updateKeyRequest ssm.UpdateKeyRequest = ssm.UpdateKeyRequest{
+	updateKeyRequest := ssm.UpdateKeyRequest{
 		KeyLabel: keyLabel,
 		Id:       keyID,
 		KeyValue: keyValue,
@@ -54,7 +54,7 @@ func UpdateKeySSM(keyLabel, keyValue, keyType string, keyID int32) (*ssm.UpdateK
 
 func DeleteKeySSM(keyLabel string, keyID int32) (*ssm.DeleteKeyResponse, error) {
 	logger.AppLog.Debugf("key label: %s key id: %s key type: %s", keyLabel, keyID)
-	var deleteKeyRequest ssm.DeleteKeyRequest = ssm.DeleteKeyRequest{
+	deleteKeyRequest := ssm.DeleteKeyRequest{
 		KeyLabel: keyLabel,
 		Id:       keyID,
 	}

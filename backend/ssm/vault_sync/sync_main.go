@@ -1,3 +1,11 @@
+// SPDX-FileCopyrightText: 2022-present Intel Corporation
+// SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
+// SPDX-FileCopyrightText: 2019 free5GC.org
+// SPDX-FileCopyrightText: 2024 Canonical Ltd
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+
 package vaultsync
 
 import (
@@ -94,7 +102,9 @@ func SyncKeyListen(ssmSyncMsg chan *ssm.SsmSyncMessage) {
 			// Handle incoming SSM sync messages
 		case <-ticker.C:
 			// Periodic synchronization logic
-			VaultSyncInitDefault(ssmSyncMsg)
+			if err := VaultSyncInitDefault(ssmSyncMsg); err != nil {
+				logger.AppLog.Errorf("VaultSyncInitDefault failed: %v", err)
+			}
 		}
 	}
 }

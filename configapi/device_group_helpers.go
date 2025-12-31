@@ -160,7 +160,6 @@ func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *co
 	logger.AppLog.Infof("DB operation result for device group %s: %v",
 		devGroup.DeviceGroupName, result)
 	statusCode, err := syncSubConcurrentlyInGroup(devGroup, prevDevGroup)
-
 	if err != nil {
 		logger.WebUILog.Errorln(err.Error())
 		return statusCode, err
@@ -189,7 +188,6 @@ func syncSubConcurrentlyInGroup(devGroup *configmodels.DeviceGroups, prevDevGrou
 		if err != nil {
 			logger.AppLog.Errorf("error syncing subscribers: %s", err)
 		}
-
 	}()
 
 	return 0, nil // Retorno inmediato, operación en background

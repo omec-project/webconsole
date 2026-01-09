@@ -22,12 +22,14 @@ type deviceGroupParams struct {
 func makeDeviceGroup(p deviceGroupParams) (string, configmodels.DeviceGroups) {
 	return p.name, configmodels.DeviceGroups{
 		Imsis: p.imsis,
-		IpDomainExpanded: configmodels.DeviceGroupsIpDomainExpanded{
-			Dnn:        p.dnn,
-			DnsPrimary: p.dnsPrimary,
-			UeIpPool:   p.ueIpPool,
-			Mtu:        p.mtu,
-			UeDnnQos:   p.qos,
+		IpDomainExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
+			{
+				Dnn:        p.dnn,
+				DnsPrimary: p.dnsPrimary,
+				UeIpPool:   p.ueIpPool,
+				Mtu:        p.mtu,
+				UeDnnQos:   p.qos,
+			},
 		},
 	}
 }

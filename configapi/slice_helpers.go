@@ -274,7 +274,6 @@ func processDeviceGroup(devGroupConfig *configmodels.DeviceGroups, snssai *model
 				logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %+v", imsi, err)
 				return http.StatusInternalServerError, err
 			}
-
 		}
 	}
 	return http.StatusOK, nil

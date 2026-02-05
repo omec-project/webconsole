@@ -74,28 +74,26 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, groupName string) (int, error) {
 	logger.ConfigLog.Infof("received device group: %s", groupName)
 
-	ipdomain := &requestDeviceGroup.IpDomainExpanded
-	logger.ConfigLog.Infof("imsis.size: %v, Imsis: %s", len(requestDeviceGroup.Imsis), requestDeviceGroup.Imsis)
-	logger.ConfigLog.Infof("IP Domain Name: %s", requestDeviceGroup.IpDomainName)
-	logger.ConfigLog.Infof("IP Domain details: %+v", ipdomain)
-	logger.ConfigLog.Infof("dnn name: %s", ipdomain.Dnn)
-	logger.ConfigLog.Infof("ue pool: %s", ipdomain.UeIpPool)
-	logger.ConfigLog.Infof("dns Primary: %s", ipdomain.DnsPrimary)
-	logger.ConfigLog.Infof("dns Secondary: %s", ipdomain.DnsSecondary)
-	logger.ConfigLog.Infof("ip mtu: %v", ipdomain.Mtu)
-	logger.ConfigLog.Infof("device Group Name: %s", groupName)
-
-	if ipdomain.UeDnnQos != nil {
-		ipdomain.UeDnnQos.DnnMbrDownlink = convertToBps(ipdomain.UeDnnQos.DnnMbrDownlink, ipdomain.UeDnnQos.BitrateUnit)
-		if ipdomain.UeDnnQos.DnnMbrDownlink < 0 {
-			ipdomain.UeDnnQos.DnnMbrDownlink = math.MaxInt64
+	ipdomains := &requestDeviceGroup.IpDomainExpanded
+	for i, ipdomain := range *ipdomains {
+		logger.ConfigLog.Infof("IP Domain details [%d]: %+v", i, ipdomain)
+		logger.ConfigLog.Infof("DNN Name : %v", ipdomain.Dnn)
+		logger.ConfigLog.Infof("UE Pool  : %v", ipdomain.UeIpPool)
+		logger.ConfigLog.Infof("DNS Primary : %v", ipdomain.DnsPrimary)
+		logger.ConfigLog.Infof("DNS Secondary : %v", ipdomain.DnsSecondary)
+		logger.ConfigLog.Infof("IP MTU : %v", ipdomain.Mtu)
+		if ipdomain.UeDnnQos != nil {
+			ipdomain.UeDnnQos.DnnMbrDownlink = convertToBps(ipdomain.UeDnnQos.DnnMbrDownlink, ipdomain.UeDnnQos.BitrateUnit)
+			if ipdomain.UeDnnQos.DnnMbrDownlink < 0 {
+				ipdomain.UeDnnQos.DnnMbrDownlink = math.MaxInt64
+			}
+			logger.ConfigLog.Infof("MBR DownLink : %v", ipdomain.UeDnnQos.DnnMbrDownlink)
+			ipdomain.UeDnnQos.DnnMbrUplink = convertToBps(ipdomain.UeDnnQos.DnnMbrUplink, ipdomain.UeDnnQos.BitrateUnit)
+			if ipdomain.UeDnnQos.DnnMbrUplink < 0 {
+				ipdomain.UeDnnQos.DnnMbrUplink = math.MaxInt64
+			}
+			logger.ConfigLog.Infof("MBR UpLink : %v", ipdomain.UeDnnQos.DnnMbrUplink)
 		}
-		logger.ConfigLog.Infof("MbrDownLink: %v", ipdomain.UeDnnQos.DnnMbrDownlink)
-		ipdomain.UeDnnQos.DnnMbrUplink = convertToBps(ipdomain.UeDnnQos.DnnMbrUplink, ipdomain.UeDnnQos.BitrateUnit)
-		if ipdomain.UeDnnQos.DnnMbrUplink < 0 {
-			ipdomain.UeDnnQos.DnnMbrUplink = math.MaxInt64
-		}
-		logger.ConfigLog.Infof("MbrUpLink: %v", ipdomain.UeDnnQos.DnnMbrUplink)
 	}
 
 	prevDevGroup := getDeviceGroupByName(groupName)
@@ -192,17 +190,41 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 		Sst: int32(sVal),
 	}
 	var errorOccured bool
-	for _, imsi := range devGroup.Imsis {
+	dnnMap := make(map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos)
+	for _, ipDomain := range devGroup.IpDomainExpanded {
+		if ipDomain.UeDnnQos != nil {
+			dnnMap[ipDomain.Dnn] = append(dnnMap[ipDomain.Dnn], *ipDomain.UeDnnQos)
+		}
+	}
+
+	// Calculate the aggregatedQoS
+	var allQosProfiles []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos
+	for _, qosList := range dnnMap {
+		allQosProfiles = append(allQosProfiles, qosList...)
+	}
+
+	aggregatedQoS := aggregateQoS(allQosProfiles)
+	for i, imsi := range devGroup.Imsis {
 		/* update all current IMSIs */
 		if subscriberAuthenticationDataGet("imsi-"+imsi) != nil {
-			dnn := devGroup.IpDomainExpanded.Dnn
+			var gpsi string
+			if devGroup.Msisdns != nil && i < len(devGroup.Msisdns) {
+				gpsi = devGroup.Msisdns[i]
+			}
+			dnnMap := make(map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos)
+			for _, ipDomain := range devGroup.IpDomainExpanded {
+				if ipDomain.UeDnnQos != nil {
+					dnnMap[ipDomain.Dnn] = append(dnnMap[ipDomain.Dnn], *ipDomain.UeDnnQos)
+				}
+			}
 			err = updatePolicyAndProvisionedData(
 				imsi,
+				gpsi,
+				snssai,
+				dnnMap,
 				slice.SiteInfo.Plmn.Mcc,
 				slice.SiteInfo.Plmn.Mnc,
-				snssai,
-				dnn,
-				devGroup.IpDomainExpanded.UeDnnQos,
+				aggregatedQoS,
 			)
 			if err != nil {
 				logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %+v", imsi, err)

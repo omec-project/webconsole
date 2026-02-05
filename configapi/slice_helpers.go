@@ -250,7 +250,7 @@ func processDeviceGroup(devGroupConfig *configmodels.DeviceGroups, snssai *model
 	for _, qosList := range dnnMap {
 		allQosProfiles = append(allQosProfiles, qosList...)
 	}
-	// Calculate aggragate QoS once for the entire group
+	// Calculate aggregate QoS once for the entire group
 	aggregatedQoS := aggregateQoS(allQosProfiles)
 	for i, imsi := range devGroupConfig.Imsis {
 		if subscriberAuthenticationDataGet("imsi-"+imsi) != nil {

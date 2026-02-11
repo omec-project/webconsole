@@ -280,7 +280,7 @@ func extractIpDomains(groupNames []string, deviceGroupMap map[string]configmodel
 			logger.NfConfigLog.Warnf("Device group %s not found", name)
 			continue
 		}
-		for _, ipDomainExp := range dg.IpDomainExpanded {
+		for _, ipDomainExp := range dg.IpDomainsExpanded {
 			ip := nfConfigApi.NewIpDomain(
 				ipDomainExp.Dnn,
 				ipDomainExp.DnsPrimary,
@@ -481,7 +481,7 @@ func getSupportedDnns(slice configmodels.Slice, deviceGroups map[string]configmo
 			logger.NfConfigLog.Warnf("DeviceGroup %s not found", dgName)
 			continue
 		}
-		for _, ipDomainExp := range deviceGroup.IpDomainExpanded {
+		for _, ipDomainExp := range deviceGroup.IpDomainsExpanded {
 			dnn := ipDomainExp.Dnn
 			dnns = append(dnns, dnn)
 		}
@@ -514,42 +514,48 @@ func (c *inMemoryConfig) syncImsiQos(deviceGroupMap map[string]configmodels.Devi
 
 	TODO: Remove this comment once Device Group validation is implemented.
 	*/
+
 	imsiQosConfigs := []imsiQosConfig{}
+
 	for _, dg := range deviceGroupMap {
-		if len(dg.IpDomainExpanded) == 0 {
+		if len(dg.IpDomainsExpanded) == 0 {
 			continue
 		}
-		for _, ipDom := range dg.IpDomainExpanded {
-			// Extract QoS for this device group
-			imsiQos := extractQosConfigFromDeviceGroup(dg)
 
-			newImsiQosConfig := imsiQosConfig{
-				imsis: dg.Imsis,                       // IMSI list
-				dnn:   ipDom.Dnn,                      // ✔ DNN from this entry
-				qos:   []nfConfigApi.ImsiQos{imsiQos}, // QoS from device group
+		for _, ipDom := range dg.IpDomainsExpanded {
+
+			imsiQos, ok := extractQosConfigFromIpDomain(ipDom)
+			if !ok {
+				continue
 			}
-			imsiQosConfigs = append(imsiQosConfigs, newImsiQosConfig)
+
+			imsiQosConfigs = append(imsiQosConfigs, imsiQosConfig{
+				imsis: dg.Imsis,
+				dnn:   ipDom.Dnn,
+				qos:   []nfConfigApi.ImsiQos{imsiQos},
+			})
 		}
 	}
+
 	c.imsiQos = imsiQosConfigs
-	logger.NfConfigLog.Debugf("Updated IMSI QoS in-memory configuration. New configuration: %+v", c.imsiQos)
+
+	logger.NfConfigLog.Debugf(
+		"Updated IMSI QoS in-memory configuration. New configuration: %+v",
+		c.imsiQos,
+	)
 }
 
-func extractQosConfigFromDeviceGroup(group configmodels.DeviceGroups) nfConfigApi.ImsiQos {
-	if len(group.IpDomainExpanded) == 0 {
-		return nfConfigApi.ImsiQos{}
+func extractQosConfigFromIpDomain(ipDomain configmodels.DeviceGroupsIpDomainExpanded) (nfConfigApi.ImsiQos, bool) {
+	if ipDomain.UeDnnQos == nil || ipDomain.UeDnnQos.TrafficClass == nil {
+		return nfConfigApi.ImsiQos{}, false
 	}
-	for _, ipDomain := range group.IpDomainExpanded {
-		if ipDomain.UeDnnQos == nil || ipDomain.UeDnnQos.TrafficClass == nil {
-			continue
-		}
-		qos := nfConfigApi.NewImsiQos(
-			configapi.ConvertToString(uint64(ipDomain.UeDnnQos.DnnMbrUplink)),
-			configapi.ConvertToString(uint64(ipDomain.UeDnnQos.DnnMbrDownlink)),
-			ipDomain.UeDnnQos.TrafficClass.Qci,
-			ipDomain.UeDnnQos.TrafficClass.Arp,
-		)
-		return *qos
-	}
-	return nfConfigApi.ImsiQos{}
+
+	qos := nfConfigApi.NewImsiQos(
+		configapi.ConvertToString(uint64(ipDomain.UeDnnQos.DnnMbrUplink)),
+		configapi.ConvertToString(uint64(ipDomain.UeDnnQos.DnnMbrDownlink)),
+		ipDomain.UeDnnQos.TrafficClass.Qci,
+		ipDomain.UeDnnQos.TrafficClass.Arp,
+	)
+
+	return *qos, true
 }

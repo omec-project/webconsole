@@ -52,7 +52,7 @@ var (
 	testDG                    = configmodels.DeviceGroups{
 		DeviceGroupName: testDeviceGroupName,
 		Imsis:           []string{"001010123456789"},
-		IpDomainExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
+		IpDomainsExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
 			{
 				Dnn: testDnnName,
 			},
@@ -61,7 +61,7 @@ var (
 	testDG2 = configmodels.DeviceGroups{
 		DeviceGroupName: "dg2",
 		Imsis:           []string{"001010123456789"},
-		IpDomainExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
+		IpDomainsExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
 			{
 				Dnn: "aDnn",
 			},

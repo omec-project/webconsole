@@ -74,7 +74,7 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, groupName string) (int, error) {
 	logger.ConfigLog.Infof("received device group: %s", groupName)
 
-	ipdomains := &requestDeviceGroup.IpDomainExpanded
+	ipdomains := &requestDeviceGroup.IpDomainsExpanded
 	for i, ipdomain := range *ipdomains {
 		logger.ConfigLog.Infof("IP Domain details [%d]: %+v", i, ipdomain)
 		logger.ConfigLog.Infof("DNN Name : %v", ipdomain.Dnn)
@@ -191,7 +191,7 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 	}
 	var errorOccured bool
 	dnnMap := make(map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos)
-	for _, ipDomain := range devGroup.IpDomainExpanded {
+	for _, ipDomain := range devGroup.IpDomainsExpanded {
 		if ipDomain.UeDnnQos != nil {
 			dnnMap[ipDomain.Dnn] = append(dnnMap[ipDomain.Dnn], *ipDomain.UeDnnQos)
 		}
@@ -210,12 +210,6 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 			var gpsi string
 			if devGroup.Msisdns != nil && i < len(devGroup.Msisdns) {
 				gpsi = devGroup.Msisdns[i]
-			}
-			dnnMap := make(map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos)
-			for _, ipDomain := range devGroup.IpDomainExpanded {
-				if ipDomain.UeDnnQos != nil {
-					dnnMap[ipDomain.Dnn] = append(dnnMap[ipDomain.Dnn], *ipDomain.UeDnnQos)
-				}
 			}
 			err = updatePolicyAndProvisionedData(
 				imsi,

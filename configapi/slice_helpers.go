@@ -5,11 +5,13 @@ package configapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"os/exec"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -20,6 +22,7 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var execCommand = exec.Command
@@ -220,7 +223,7 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 			continue
 		}
 
-		if len(devGroupConfig.IpDomainExpanded) == 0 {
+		if len(devGroupConfig.IpDomainsExpanded) == 0 {
 			logger.ConfigLog.Warnln("IPDomainExpanded is nil or empty for dgName:", dgName)
 			continue
 		}
@@ -237,12 +240,18 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 
 func processDeviceGroup(devGroupConfig *configmodels.DeviceGroups, snssai *models.Snssai, mcc, mnc string) (int, error) {
 	dnnMap := make(map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos) // Stores multiple DNNs & their QoS per IMSI
-	for _, ipDomain := range devGroupConfig.IpDomainExpanded {
+	for _, ipDomain := range devGroupConfig.IpDomainsExpanded {
 		dnn := ipDomain.Dnn
 
 		// Ensure UeDnnQos is not nil before appending
 		if ipDomain.UeDnnQos != nil {
-			dnnMap[dnn] = append(dnnMap[dnn], *ipDomain.UeDnnQos) // Directly append the UeDnnQos
+			// Append the QoS profile when present.
+			dnnMap[dnn] = append(dnnMap[dnn], *ipDomain.UeDnnQos)
+		} else {
+			// Initialize an entry for this DNN if it doesn't exist so it is not omitted downstream.
+			if _, exists := dnnMap[dnn]; !exists {
+				dnnMap[dnn] = nil
+			}
 		}
 	}
 	var allQosProfiles []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos // Create a slice to hold all QoS profiles from all DNNs in the device group.
@@ -410,9 +419,13 @@ func updateSmProvisionedData(snssai *models.Snssai, dnnMap map[string][]configmo
 
 	// Fetch the existing record from the database
 	existingRecord, err := dbadapter.CommonDBClient.RestfulAPIGetOne(smDataColl, filter)
-	if err != nil && err.Error() != "mongo: no documents in result" {
-		logger.DbLog.Warnf("Failed to fetch existing record for ueId: %s, error: %v", imsi, err)
-		return err
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			existingRecord = nil
+		} else {
+			logger.DbLog.Warnf("Failed to fetch existing record for ueId: %s, error: %v", imsi, err)
+			return err
+		}
 	}
 	var smData models.SessionManagementSubscriptionData
 	if existingRecord == nil {
@@ -485,7 +498,7 @@ func updateSmProvisionedData(snssai *models.Snssai, dnnMap map[string][]configmo
 	logger.DbLog.Infof("Data to be sent to database - SmProvisionedData: %+v", smDataBsonA)
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(smDataColl, filter, smDataBsonA)
 	if errPost != nil {
-		logger.DbLog.Errorf("failed to update SM provisioned Data for IMSI %s: %+v", imsi, err)
+		logger.DbLog.Errorf("failed to update SM provisioned Data for IMSI %s: %+v", imsi, errPost)
 		return errPost
 	}
 	logger.DbLog.Debugf("updated SM provisioned Data for IMSI %s", imsi)
@@ -499,6 +512,21 @@ func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc string, d
 
 	snssaiInfo := models.SnssaiInfo{
 		DnnInfos: []models.DnnInfo{},
+	}
+	// Collect DNN keys
+	dnns := make([]string, 0, len(dnnMap))
+	for dnn := range dnnMap {
+		dnns = append(dnns, dnn)
+	}
+
+	// Sort for deterministic ordering
+	sort.Strings(dnns)
+
+	// Append in sorted order
+	for _, dnn := range dnns {
+		snssaiInfo.DnnInfos = append(snssaiInfo.DnnInfos, models.DnnInfo{
+			Dnn: dnn,
+		})
 	}
 
 	for dnn := range dnnMap {

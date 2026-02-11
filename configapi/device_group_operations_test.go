@@ -104,7 +104,7 @@ func deviceGroup(name string) configmodels.DeviceGroups {
 		Imsis:           []string{"1234", "5678"},
 		SiteInfo:        "demo",
 		IpDomainName:    "pool1",
-		IpDomainExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
+		IpDomainsExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
 			ipdomain,
 		},
 	}
@@ -270,11 +270,11 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 		deviceGroup("group_no_qos"),
 	}
 	deviceGroups[2].Imsis = []string{}
-	if len(deviceGroups[3].IpDomainExpanded) > 0 {
-		deviceGroups[3].IpDomainExpanded[0].UeDnnQos.TrafficClass = nil
+	if len(deviceGroups[3].IpDomainsExpanded) > 0 {
+		deviceGroups[3].IpDomainsExpanded[0].UeDnnQos.TrafficClass = nil
 	}
-	if len(deviceGroups[4].IpDomainExpanded) > 0 {
-		deviceGroups[4].IpDomainExpanded[0].UeDnnQos = nil
+	if len(deviceGroups[4].IpDomainsExpanded) > 0 {
+		deviceGroups[4].IpDomainsExpanded[0].UeDnnQos = nil
 	}
 
 	for _, testGroup := range deviceGroups {
@@ -331,11 +331,11 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 		deviceGroup("group_no_qos"),
 	}
 	deviceGroups[2].Imsis = []string{}
-	if len(deviceGroups[3].IpDomainExpanded) > 0 {
-		deviceGroups[3].IpDomainExpanded[0].UeDnnQos.TrafficClass = nil
+	if len(deviceGroups[3].IpDomainsExpanded) > 0 {
+		deviceGroups[3].IpDomainsExpanded[0].UeDnnQos.TrafficClass = nil
 	}
-	if len(deviceGroups[4].IpDomainExpanded) > 0 {
-		deviceGroups[4].IpDomainExpanded[0].UeDnnQos = nil
+	if len(deviceGroups[4].IpDomainsExpanded) > 0 {
+		deviceGroups[4].IpDomainsExpanded[0].UeDnnQos = nil
 	}
 
 	for _, testGroup := range deviceGroups {

@@ -25,5 +25,5 @@ type DeviceGroups struct {
 
 	IpDomainName string `json:"ip-domain-name,omitempty"`
 
-	IpDomainExpanded []DeviceGroupsIpDomainExpanded `json:"ip-domains,omitempty"`
+	IpDomainsExpanded []DeviceGroupsIpDomainExpanded `json:"ip-domains,omitempty"`
 }

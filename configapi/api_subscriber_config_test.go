@@ -955,7 +955,7 @@ func deviceGroupWithImsis(name string, imsis []string) configmodels.DeviceGroups
 		Imsis:           imsis,
 		SiteInfo:        "demo",
 		IpDomainName:    "pool1",
-		IpDomainExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
+		IpDomainsExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
 			ipDomain,
 		},
 	}

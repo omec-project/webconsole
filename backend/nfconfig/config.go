@@ -523,7 +523,6 @@ func (c *inMemoryConfig) syncImsiQos(deviceGroupMap map[string]configmodels.Devi
 		}
 
 		for _, ipDom := range dg.IpDomainsExpanded {
-
 			imsiQos, ok := extractQosConfigFromIpDomain(ipDom)
 			if !ok {
 				continue

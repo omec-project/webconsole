@@ -8,7 +8,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
-	github.com/omec-project/openapi v1.6.5
+	github.com/omec-project/openapi v1.7.0
 	github.com/omec-project/util v1.7.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/swaggo/files v1.0.1

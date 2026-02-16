@@ -85,8 +85,8 @@ github.com/montanaflynn/stats v0.7.1 h1:etflOAAHORrCC44V+aR6Ftzort912ZU+YLiSTuV8
 github.com/montanaflynn/stats v0.7.1/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/omec-project/openapi v1.6.5 h1:qxpalZjiO7Ylvbx8ZpGknerkAecyG+cuHviFaPXx7AM=
-github.com/omec-project/openapi v1.6.5/go.mod h1:X9K4gkMBud7eHPJsAhRzeyZcn16rIiUxwzeDAEFDbVk=
+github.com/omec-project/openapi v1.7.0 h1:TF1hUTwN/hvDVMl7P7k/8JZJkjXF1ZmvlYJrozztaqs=
+github.com/omec-project/openapi v1.7.0/go.mod h1:D4fFvE+WmS2xdpdez7C5FEs/a3QfGaePk4O565sG/Tk=
 github.com/omec-project/util v1.7.0 h1:I2EQnojmn5o8KiYatGggIAsmhmwap+66VEgjI91Z7L4=
 github.com/omec-project/util v1.7.0/go.mod h1:4Uhass0/A0Q39GYS6javUZGLKAkIMZeoxrrUL0Wwsxg=
 github.com/pelletier/go-toml/v2 v2.2.4 h1:mye9XuhQ6gvn5h28+VilKrrPoQVanw5PMw/TB0t5Ec4=

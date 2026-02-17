@@ -39,6 +39,7 @@ DOCKER_LABEL_BUILD_DATE  ?= $(shell date -u "+%Y-%m-%dT%H:%M:%SZ")
 
 ## Build configuration
 BINARY_NAME              := $(PROJECT_NAME)
+UI_BINARY_NAME           := webconsole-ui
 GO_PACKAGES              ?= ./...
 
 ## Directory configuration
@@ -68,6 +69,12 @@ all: build ## Build binary (alias for compatibility)
 $(BIN_DIR)/$(BINARY_NAME): $(GO_FILES) | bin-dir
 	@echo "Building $(BINARY_NAME)..."
 	@CGO_ENABLED=0 go build -o $@ .
+
+webconsole-ui: $(BIN_DIR)/$(UI_BINARY_NAME)
+
+$(BIN_DIR)/$(UI_BINARY_NAME): $(GO_FILES) | bin-dir
+	@echo "Building $(BINARY_NAME)..."
+	@CGO_ENABLED=0 go build --tags ui -o $@ .
 
 bin-dir: ## Create binary directory
 	@mkdir -p $(BIN_DIR)

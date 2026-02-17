@@ -393,11 +393,6 @@ func buildPolicyControlConfig(slice configmodels.Slice, deviceGroups map[string]
 }
 
 func buildSlicePccRules(slice configmodels.Slice) []nfConfigApi.PccRule {
-	/* Implementation assumes that the validation of a Network Slice configuration is done upon group creation/modification.
-	At the time of implementing this, validation is not done, but planned.
-
-	TODO: Remove this comment once Device Group validation is implemented.
-	*/
 	pccRules := []nfConfigApi.PccRule{}
 
 	for _, ruleConfig := range slice.ApplicationFilteringRules {
@@ -505,11 +500,6 @@ func buildPccQos(ruleConfig configmodels.SliceApplicationFilteringRules) nfConfi
 }
 
 func (c *inMemoryConfig) syncImsiQos(deviceGroupMap map[string]configmodels.DeviceGroups) {
-	/* Implementation assumes that the validation of a Device Group configuration is done upon group creation/modification.
-	At the time of implementing this, validation is not done, but planned.
-
-	TODO: Remove this comment once Device Group validation is implemented.
-	*/
 	imsiQosConfigs := []imsiQosConfig{}
 	for _, dg := range deviceGroupMap {
 		imsiQos := extractQosConfigFromDeviceGroup(dg)
@@ -520,6 +510,10 @@ func (c *inMemoryConfig) syncImsiQos(deviceGroupMap map[string]configmodels.Devi
 		}
 		imsiQosConfigs = append(imsiQosConfigs, newImsiQosConfig)
 	}
+	// Sort by DNN to ensure deterministic order
+	sort.Slice(imsiQosConfigs, func(i, j int) bool {
+		return imsiQosConfigs[i].dnn < imsiQosConfigs[j].dnn
+	})
 	c.imsiQos = imsiQosConfigs
 	logger.NfConfigLog.Debugf("Updated IMSI QoS in-memory configuration. New configuration: %+v", c.imsiQos)
 }

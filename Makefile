@@ -1,98 +1,194 @@
+# SPDX-FileCopyrightText: 2026 Intel Corporation
 # SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
 # Copyright 2019 free5GC.org
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+#
 
+PROJECT_NAME             := webui
+VERSION                  ?= $(shell cat ./VERSION 2>/dev/null || echo "dev")
 
-PROJECT_NAME             := sdcore
-DOCKER_VERSION           ?= $(shell cat ./VERSION)
+# Extract minimum Go version from go.mod file
+GOLANG_MINIMUM_VERSION   ?= $(shell awk '/^go / {print $$2}' go.mod 2>/dev/null || echo "1.25")
 
-## Docker related
+# Number of processors for parallel builds (Linux only)
+NPROCS                   := $(shell nproc)
+
+## Docker configuration
 DOCKER_REGISTRY          ?=
 DOCKER_REPOSITORY        ?=
-DOCKER_TAG               ?= ${DOCKER_VERSION}
-DOCKER_IMAGENAME         := ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}${PROJECT_NAME}:${DOCKER_TAG}
+DOCKER_TAG               ?= $(VERSION)
+DOCKER_IMAGE_PREFIX      ?= 5gc-
+DOCKER_IMAGENAME         := $(DOCKER_REGISTRY)$(DOCKER_REPOSITORY)$(DOCKER_IMAGE_PREFIX)$(PROJECT_NAME):$(DOCKER_TAG)
 DOCKER_BUILDKIT          ?= 1
-DOCKER_BUILD_ARGS        ?=
+DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(NPROCS)
+DOCKER_PULL              ?= --pull
 
-## Docker labels. Only set ref and commit date if committed
-DOCKER_LABEL_VCS_URL     ?= $(shell git remote get-url $(shell git remote))
-DOCKER_LABEL_VCS_REF     ?= $(shell git diff-index --quiet HEAD -- && git rev-parse HEAD || echo "unknown")
-DOCKER_LABEL_COMMIT_DATE ?= $(shell git diff-index --quiet HEAD -- && git show -s --format=%cd --date=iso-strict HEAD || echo "unknown" )
+## Docker labels with better error handling
+DOCKER_LABEL_VCS_URL     ?= $(shell git remote get-url origin 2>/dev/null || echo "unknown")
+DOCKER_LABEL_VCS_REF     ?= $(shell \
+	echo "$${GIT_COMMIT:-$${GITHUB_SHA:-$${CI_COMMIT_SHA:-$(shell \
+		if git rev-parse --git-dir > /dev/null 2>&1; then \
+			git rev-parse HEAD 2>/dev/null; \
+		else \
+			echo "unknown"; \
+		fi \
+	)}}}")
 DOCKER_LABEL_BUILD_DATE  ?= $(shell date -u "+%Y-%m-%dT%H:%M:%SZ")
 
-DOCKER_TARGETS           ?= webui
+## Build configuration
+BINARY_NAME              := $(PROJECT_NAME)
+GO_PACKAGES              ?= ./...
 
-# https://docs.docker.com/engine/reference/commandline/build/#specifying-target-build-stage---target
-GO_BIN_PATH = bin
-GO_SRC_PATH = ./
-C_BUILD_PATH = build
-ROOT_PATH = $(shell pwd)
+## Directory configuration
+BIN_DIR                  := bin
+COVERAGE_DIR             := .coverage
 
-WEBCONSOLE = webconsole
+## Go build configuration
+GO_FILES                 := $(shell find . -name "*.go" ! -name "*_test.go" 2>/dev/null)
+GO_FILES_ALL             := $(shell find . -name "*.go" 2>/dev/null)
 
-WEBCONSOLE_GO_FILES = $(shell find ./ -name "*.go" ! -name "*_test.go")
+## Tool versions (for reproducible builds)
+GOLANGCI_LINT_VERSION    ?= latest
 
-VERSION = $(shell git describe --tags)
-BUILD_TIME = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-WEBCONSOLE_COMMIT_HASH = $(shell git submodule status | grep $(WEBCONSOLE) | awk '{print $$(1)}' | cut -c1-8)
-WEBCONSOLE_COMMIT_TIME = $(shell git log --pretty="%ai" -1 | awk '{time=$$(1)"T"$$(2)"Z"; print time}')
+# Default target
+.DEFAULT_GOAL := help
 
-.PHONY: $(NF) clean docker-build docker-push
+## Help target
+help: ## Show this help message
+	@echo "Available targets:"
+	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ { printf "  %-20s %s\n", $$1, $$2 }' $(MAKEFILE_LIST) | sort
 
-.DEFAULT_GOAL: nfs
+## Build targets
+build: $(BIN_DIR)/$(BINARY_NAME) ## Build binary
 
-all: $(WEBCONSOLE)
+all: build ## Build binary (alias for compatibility)
 
-$(WEBCONSOLE): $(GO_BIN_PATH)/$(WEBCONSOLE)
+$(BIN_DIR)/$(BINARY_NAME): $(GO_FILES) | bin-dir
+	@echo "Building $(BINARY_NAME)..."
+	@CGO_ENABLED=0 go build -o $@ .
 
-$(GO_BIN_PATH)/$(WEBCONSOLE): server.go  $(WEBCONSOLE_GO_FILES)
-	@echo "Start building $(@F)...."
-	go build -o $(ROOT_PATH)/$@ ./server.go
+bin-dir: ## Create binary directory
+	@mkdir -p $(BIN_DIR)
 
-vpath %.go $(addprefix $(GO_SRC_PATH)/, $(GO_NF))
-
-webconsole-ui: $(GO_BIN_PATH)/$(WEBCONSOLE)-ui
-
-$(GO_BIN_PATH)/$(WEBCONSOLE)-ui: server.go  $(WEBCONSOLE_GO_FILES)
-	@echo "Start building $(@F)...."
-	go build --tags ui -o $(ROOT_PATH)/$@ ./server.go
-
-clean:
-	rm -rf $(ROOT_PATH)/$(GO_BIN_PATH)/$(WEBCONSOLE)
-	rm -rf $(ROOT_PATH)/$(GO_BIN_PATH)/$(WEBCONSOLE)-ui
-
-docker-build:
+## Docker targets
+docker-build: ## Build Docker image
+	@echo "Building Docker image: $(DOCKER_IMAGENAME)"
 	@go mod vendor
-	for target in $(DOCKER_TARGETS); do \
-		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build  $(DOCKER_BUILD_ARGS) \
-			--target $$target \
-			--tag ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}5gc-$$target:${DOCKER_TAG} \
-			--build-arg org_label_schema_version="${DOCKER_VERSION}" \
-			--build-arg org_label_schema_vcs_url="${DOCKER_LABEL_VCS_URL}" \
-			--build-arg org_label_schema_vcs_ref="${DOCKER_LABEL_VCS_REF}" \
-			--build-arg org_label_schema_build_date="${DOCKER_LABEL_BUILD_DATE}" \
-			--build-arg org_opencord_vcs_commit_date="${DOCKER_LABEL_COMMIT_DATE}" \
-			. \
-			|| exit 1; \
-	done
-	rm -rf vendor
+	@DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build $(DOCKER_PULL) $(DOCKER_BUILD_ARGS) \
+		--build-arg VERSION="$(VERSION)" \
+		--build-arg VCS_URL="$(DOCKER_LABEL_VCS_URL)" \
+		--build-arg VCS_REF="$(DOCKER_LABEL_VCS_REF)" \
+		--build-arg BUILD_DATE="$(DOCKER_LABEL_BUILD_DATE)" \
+		--tag $(DOCKER_IMAGENAME) \
+		. \
+		|| exit 1
+	@rm -rf vendor
 
-docker-push:
-	for target in $(DOCKER_TARGETS); do \
-                docker push ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}5gc-$$target:${DOCKER_TAG}; \
-        done
+docker-push: ## Push Docker image to registry
+	@echo "Pushing Docker image: $(DOCKER_IMAGENAME)"
+	@docker push $(DOCKER_IMAGENAME)
 
-.coverage:
-	rm -rf $(CURDIR)/.coverage
-	mkdir -p $(CURDIR)/.coverage
+docker-clean: ## Remove local Docker image
+	@echo "Cleaning local Docker image..."
+	@docker rmi $(DOCKER_IMAGENAME) 2>/dev/null || true
 
-test: .coverage
-	docker run --rm -v $(CURDIR):/webconsole -w /webconsole golang:latest \
+## Testing targets
+$(COVERAGE_DIR): ## Create coverage directory
+	@mkdir -p $(COVERAGE_DIR)
+
+test: $(COVERAGE_DIR) ## Run unit tests with coverage
+	@echo "Running unit tests..."
+	@docker run --rm \
+		-v $(CURDIR):/$(PROJECT_NAME) \
+		-w /$(PROJECT_NAME) \
+		golang:$(GOLANG_MINIMUM_VERSION) \
 		go test \
+			-race \
 			-failfast \
-			-coverprofile=.coverage/coverage-unit.txt \
+			-coverprofile=$(COVERAGE_DIR)/coverage-unit.txt \
 			-covermode=atomic \
 			-v \
-			./ ./...
+			$(GO_PACKAGES)
+
+test-local: $(COVERAGE_DIR) ## Run unit tests locally (without Docker)
+	@echo "Running unit tests locally..."
+	@go test \
+		-race \
+		-failfast \
+		-coverprofile=$(COVERAGE_DIR)/coverage-unit.txt \
+		-covermode=atomic \
+		-v \
+		$(GO_PACKAGES)
+
+## Code quality targets
+fmt: ## Format Go code
+	@echo "Formatting Go code..."
+	@go fmt ./...
+
+lint: ## Run linter
+	@echo "Running linter..."
+	@docker run --rm \
+		-v $(CURDIR):/app \
+		-w /app \
+		golangci/golangci-lint:$(GOLANGCI_LINT_VERSION) \
+		golangci-lint run -v --config /app/.golangci.yml
+
+lint-local: ## Run linter locally (without Docker)
+	@echo "Running linter locally..."
+	@golangci-lint run -v --config .golangci.yml
+
+check-reuse: ## Check REUSE compliance
+	@echo "Checking REUSE compliance..."
+	@docker run --rm \
+		-v $(CURDIR):/$(PROJECT_NAME) \
+		-w /$(PROJECT_NAME) \
+		omecproject/reuse-verify:latest \
+		reuse lint
+
+check: fmt lint check-reuse ## Run all code quality checks
+
+## Utility targets
+clean: ## Clean build artifacts
+	@echo "Cleaning build artifacts..."
+	@rm -rf $(BIN_DIR)
+	@rm -rf $(COVERAGE_DIR)
+	@rm -rf vendor
+	@docker system prune -f --filter label=org.opencontainers.image.source="https://github.com/omec-project/$(PROJECT_NAME)" 2>/dev/null || true
+
+print-version: ## Print current version
+	@echo $(VERSION)
+
+env: ## Print environment variables
+	@echo "PROJECT_NAME=$(PROJECT_NAME)"
+	@echo "VERSION=$(VERSION)"
+	@echo "GOLANG_MINIMUM_VERSION=$(GOLANG_MINIMUM_VERSION)"
+	@echo "BINARY_NAME=$(BINARY_NAME)"
+	@echo "DOCKER_REGISTRY=$(DOCKER_REGISTRY)"
+	@echo "DOCKER_REPOSITORY=$(DOCKER_REPOSITORY)"
+	@echo "DOCKER_IMAGE_PREFIX=$(DOCKER_IMAGE_PREFIX)"
+	@echo "DOCKER_TAG=$(DOCKER_TAG)"
+	@echo "DOCKER_IMAGENAME=$(DOCKER_IMAGENAME)"
+	@echo "DOCKER_LABEL_VCS_URL=$(DOCKER_LABEL_VCS_URL)"
+	@echo "DOCKER_LABEL_VCS_REF=$(DOCKER_LABEL_VCS_REF)"
+	@echo "NPROCS=$(NPROCS)"
+
+## Phony targets
+.PHONY: all \
+        bin-dir \
+        build \
+        check \
+        check-reuse \
+        clean \
+        docker-build \
+        docker-clean \
+        docker-push \
+        env \
+        fmt \
+        help \
+        lint \
+        lint-local \
+        print-version \
+        test \
+        test-local

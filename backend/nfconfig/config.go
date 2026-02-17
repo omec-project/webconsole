@@ -520,6 +520,10 @@ func (c *inMemoryConfig) syncImsiQos(deviceGroupMap map[string]configmodels.Devi
 		}
 		imsiQosConfigs = append(imsiQosConfigs, newImsiQosConfig)
 	}
+	// Sort by DNN to ensure deterministic order
+	sort.Slice(imsiQosConfigs, func(i, j int) bool {
+		return imsiQosConfigs[i].dnn < imsiQosConfigs[j].dnn
+	})
 	c.imsiQos = imsiQosConfigs
 	logger.NfConfigLog.Debugf("Updated IMSI QoS in-memory configuration. New configuration: %+v", c.imsiQos)
 }

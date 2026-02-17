@@ -85,17 +85,17 @@ func TestSyncImsiQos(t *testing.T) {
 			},
 			expectedResponse: []imsiQosConfig{
 				{
-					imsis: []string{"001010123456789"},
-					dnn:   "internet",
-					qos: []nfConfigApi.ImsiQos{
-						*nfConfigApi.NewImsiQos("20 Mbps", "200 Mbps", 6, 9),
-					},
-				},
-				{
 					imsis: []string{"001010123456790", "001010123456791"},
 					dnn:   "connection",
 					qos: []nfConfigApi.ImsiQos{
 						*nfConfigApi.NewImsiQos("10 Mbps", "100 Mbps", 3, 6),
+					},
+				},
+				{
+					imsis: []string{"001010123456789"},
+					dnn:   "internet",
+					qos: []nfConfigApi.ImsiQos{
+						*nfConfigApi.NewImsiQos("20 Mbps", "200 Mbps", 6, 9),
 					},
 				},
 			},

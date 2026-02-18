@@ -10,7 +10,7 @@ PROJECT_NAME             := webui
 VERSION                  ?= $(shell cat ./VERSION 2>/dev/null || echo "dev")
 
 # Extract minimum Go version from go.mod file
-GOLANG_MINIMUM_VERSION   ?= $(shell awk '/^go / {print $$2}' go.mod 2>/dev/null || echo "1.25")
+GOLANG_MINIMUM_VERSION   ?= $(shell awk '/^go / {print $$2}' go.mod 2>/dev/null || echo "1.24")
 
 # Number of processors for parallel builds (Linux only)
 NPROCS                   := $(shell nproc)
@@ -48,7 +48,6 @@ COVERAGE_DIR             := .coverage
 
 ## Go build configuration
 GO_FILES                 := $(shell find . -name "*.go" ! -name "*_test.go" 2>/dev/null)
-GO_FILES_ALL             := $(shell find . -name "*.go" 2>/dev/null)
 
 ## Tool versions (for reproducible builds)
 GOLANGCI_LINT_VERSION    ?= latest
@@ -73,7 +72,7 @@ $(BIN_DIR)/$(BINARY_NAME): $(GO_FILES) | bin-dir
 webconsole-ui: $(BIN_DIR)/$(UI_BINARY_NAME)
 
 $(BIN_DIR)/$(UI_BINARY_NAME): $(GO_FILES) | bin-dir
-	@echo "Building $(BINARY_NAME)..."
+	@echo "Building $(UI_BINARY_NAME)..."
 	@CGO_ENABLED=0 go build --tags ui -o $@ .
 
 bin-dir: ## Create binary directory
@@ -162,7 +161,7 @@ clean: ## Clean build artifacts
 	@rm -rf $(BIN_DIR)
 	@rm -rf $(COVERAGE_DIR)
 	@rm -rf vendor
-	@docker system prune -f --filter label=org.opencontainers.image.source="https://github.com/omec-project/$(PROJECT_NAME)" 2>/dev/null || true
+	@docker system prune -f --filter label=org.opencontainers.image.source="$(DOCKER_LABEL_VCS_URL)" 2>/dev/null || true
 
 print-version: ## Print current version
 	@echo $(VERSION)
@@ -198,4 +197,5 @@ env: ## Print environment variables
         lint-local \
         print-version \
         test \
-        test-local
+        test-local \
+	webconsole-ui

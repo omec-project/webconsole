@@ -52,15 +52,19 @@ var (
 	testDG                    = configmodels.DeviceGroups{
 		DeviceGroupName: testDeviceGroupName,
 		Imsis:           []string{"001010123456789"},
-		IpDomainExpanded: configmodels.DeviceGroupsIpDomainExpanded{
-			Dnn: testDnnName,
+		IpDomainsExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
+			{
+				Dnn: testDnnName,
+			},
 		},
 	}
 	testDG2 = configmodels.DeviceGroups{
 		DeviceGroupName: "dg2",
 		Imsis:           []string{"001010123456789"},
-		IpDomainExpanded: configmodels.DeviceGroupsIpDomainExpanded{
-			Dnn: "aDnn",
+		IpDomainsExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
+			{
+				Dnn: "aDnn",
+			},
 		},
 	}
 	testDeviceGroups                   = map[string]configmodels.DeviceGroups{testDeviceGroupName: testDG}

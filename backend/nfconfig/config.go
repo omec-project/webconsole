@@ -280,13 +280,15 @@ func extractIpDomains(groupNames []string, deviceGroupMap map[string]configmodel
 			logger.NfConfigLog.Warnf("Device group %s not found", name)
 			continue
 		}
-		ip := nfConfigApi.NewIpDomain(
-			dg.IpDomainExpanded.Dnn,
-			dg.IpDomainExpanded.DnsPrimary,
-			dg.IpDomainExpanded.UeIpPool,
-			dg.IpDomainExpanded.Mtu,
-		)
-		ipDomains = append(ipDomains, *ip)
+		for _, ipDomainExp := range dg.IpDomainsExpanded {
+			ip := nfConfigApi.NewIpDomain(
+				ipDomainExp.Dnn,
+				ipDomainExp.DnsPrimary,
+				ipDomainExp.UeIpPool, // Now accessing the correct field from the slice element
+				ipDomainExp.Mtu,
+			)
+			ipDomains = append(ipDomains, *ip)
+		}
 	}
 	return ipDomains
 }
@@ -474,8 +476,10 @@ func getSupportedDnns(slice configmodels.Slice, deviceGroups map[string]configmo
 			logger.NfConfigLog.Warnf("DeviceGroup %s not found", dgName)
 			continue
 		}
-		dnn := deviceGroup.IpDomainExpanded.Dnn
-		dnns = append(dnns, dnn)
+		for _, ipDomainExp := range deviceGroup.IpDomainsExpanded {
+			dnn := ipDomainExp.Dnn
+			dnns = append(dnns, dnn)
+		}
 	}
 	sort.Strings(dnns)
 	return dnns
@@ -501,28 +505,44 @@ func buildPccQos(ruleConfig configmodels.SliceApplicationFilteringRules) nfConfi
 
 func (c *inMemoryConfig) syncImsiQos(deviceGroupMap map[string]configmodels.DeviceGroups) {
 	imsiQosConfigs := []imsiQosConfig{}
+
 	for _, dg := range deviceGroupMap {
-		imsiQos := extractQosConfigFromDeviceGroup(dg)
-		newImsiQosConfig := imsiQosConfig{
-			imsis: dg.Imsis,
-			dnn:   dg.IpDomainExpanded.Dnn,
-			qos:   []nfConfigApi.ImsiQos{imsiQos},
+		if len(dg.IpDomainsExpanded) == 0 {
+			continue
 		}
-		imsiQosConfigs = append(imsiQosConfigs, newImsiQosConfig)
+
+		for _, ipDom := range dg.IpDomainsExpanded {
+			imsiQos, ok := extractQosConfigFromIpDomain(ipDom)
+			if !ok {
+				continue
+			}
+
+			imsiQosConfigs = append(imsiQosConfigs, imsiQosConfig{
+				imsis: dg.Imsis,
+				dnn:   ipDom.Dnn,
+				qos:   []nfConfigApi.ImsiQos{imsiQos},
+			})
+		}
 	}
-	// Sort by DNN to ensure deterministic order
-	sort.Slice(imsiQosConfigs, func(i, j int) bool {
-		return imsiQosConfigs[i].dnn < imsiQosConfigs[j].dnn
-	})
 	c.imsiQos = imsiQosConfigs
-	logger.NfConfigLog.Debugf("Updated IMSI QoS in-memory configuration. New configuration: %+v", c.imsiQos)
+
+	logger.NfConfigLog.Debugf(
+		"Updated IMSI QoS in-memory configuration. New configuration: %+v",
+		c.imsiQos,
+	)
 }
 
-func extractQosConfigFromDeviceGroup(group configmodels.DeviceGroups) nfConfigApi.ImsiQos {
-	return *nfConfigApi.NewImsiQos(
-		configapi.ConvertToString(uint64(group.IpDomainExpanded.UeDnnQos.DnnMbrUplink)),
-		configapi.ConvertToString(uint64(group.IpDomainExpanded.UeDnnQos.DnnMbrDownlink)),
-		group.IpDomainExpanded.UeDnnQos.TrafficClass.Qci,
-		group.IpDomainExpanded.UeDnnQos.TrafficClass.Arp,
+func extractQosConfigFromIpDomain(ipDomain configmodels.DeviceGroupsIpDomainExpanded) (nfConfigApi.ImsiQos, bool) {
+	if ipDomain.UeDnnQos == nil || ipDomain.UeDnnQos.TrafficClass == nil {
+		return nfConfigApi.ImsiQos{}, false
+	}
+
+	qos := nfConfigApi.NewImsiQos(
+		configapi.ConvertToString(uint64(ipDomain.UeDnnQos.DnnMbrUplink)),
+		configapi.ConvertToString(uint64(ipDomain.UeDnnQos.DnnMbrDownlink)),
+		ipDomain.UeDnnQos.TrafficClass.Qci,
+		ipDomain.UeDnnQos.TrafficClass.Arp,
 	)
+
+	return *qos, true
 }

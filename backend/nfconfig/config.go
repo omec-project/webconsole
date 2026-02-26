@@ -524,6 +524,11 @@ func (c *inMemoryConfig) syncImsiQos(deviceGroupMap map[string]configmodels.Devi
 			})
 		}
 	}
+
+	sort.Slice(imsiQosConfigs, func(i, j int) bool {
+		return imsiQosConfigs[i].dnn < imsiQosConfigs[j].dnn
+	})
+
 	c.imsiQos = imsiQosConfigs
 
 	logger.NfConfigLog.Debugf(

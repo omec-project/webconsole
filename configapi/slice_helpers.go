@@ -655,13 +655,52 @@ func getDeletedDeviceGroupsList(slice, prevSlice configmodels.Slice) []string {
 
 func aggregateQoS(qosList []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos) configmodels.DeviceGroupsIpDomainExpandedUeDnnQos {
 	var aggregated configmodels.DeviceGroupsIpDomainExpandedUeDnnQos
+
+	if len(qosList) == 0 {
+		logger.ConfigLog.Debugln("aggregateQoS called with empty qosList")
+		return aggregated
+	}
+
+	// Track bitrate unit consistency
+	var firstNonEmptyUnit string
+	for _, qos := range qosList {
+		if qos.BitrateUnit != "" {
+			firstNonEmptyUnit = qos.BitrateUnit
+			break
+		}
+	}
+
+	unitConsistent := true
+
 	for _, qos := range qosList {
 		aggregated.DnnMbrUplink += qos.DnnMbrUplink
 		aggregated.DnnMbrDownlink += qos.DnnMbrDownlink
-		aggregated.BitrateUnit = qos.BitrateUnit
+
+		// Warn if units are inconsistent (ignoring empty units)
+		if qos.BitrateUnit != "" && firstNonEmptyUnit != "" && qos.BitrateUnit != firstNonEmptyUnit {
+			unitConsistent = false
+		}
+
+		// Use the first valid bitrate unit
+		if aggregated.BitrateUnit == "" && qos.BitrateUnit != "" {
+			aggregated.BitrateUnit = qos.BitrateUnit
+		}
+
+		// Use the first non-nil traffic class (prefer higher priority)
 		if qos.TrafficClass != nil {
-			aggregated.TrafficClass = qos.TrafficClass
+			if aggregated.TrafficClass == nil {
+				aggregated.TrafficClass = qos.TrafficClass
+			} else if qos.TrafficClass.Qci < aggregated.TrafficClass.Qci {
+				// Lower QCI value = higher priority, use higher priority class
+				aggregated.TrafficClass = qos.TrafficClass
+				logger.ConfigLog.Infof("using higher priority QoS class (QCI %d)", qos.TrafficClass.Qci)
+			}
 		}
 	}
+
+	if !unitConsistent {
+		logger.ConfigLog.Warnf("inconsistent bitrate units detected when aggregating QoS (using %s)", aggregated.BitrateUnit)
+	}
+
 	return aggregated
 }

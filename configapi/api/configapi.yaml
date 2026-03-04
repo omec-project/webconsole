@@ -118,14 +118,21 @@ components:
             example: "123456789123456"
             type: string
           type: array
+        msisdns:
+          items:
+            example: "1234567890"
+            type: string
+          type: array
         site-info:
           example: menlo..add site info
           type: string
         ip-domain-name:
           example: pool1
           type: string
-        ip-domain-expanded:
-          $ref: '#/components/schemas/device_groups_ip_domain_expanded'
+        ip-domains:
+          items:
+            $ref: '#/components/schemas/device_groups_ip_domain_expanded'
+          type: array
       type: object
     slice:
       properties:

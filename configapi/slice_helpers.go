@@ -451,6 +451,10 @@ func updateSmProvisionedData(snssai *models.Snssai, dnnMap map[string][]configmo
 	for dnn, ueDnnQosList := range dnnMap {
 		aggregatedQoS := aggregateQoS(ueDnnQosList)
 
+		if aggregatedQoS.TrafficClass == nil {
+			logger.DbLog.Errorf("TrafficClass is nil for DNN %s, IMSI %s", dnn, imsi)
+			return fmt.Errorf("traffic class missing for DNN %s", dnn)
+		}
 		smData.DnnConfigurations[dnn] = models.DnnConfiguration{
 			PduSessionTypes: &models.PduSessionTypes{
 				DefaultSessionType:  models.PduSessionType_IPV4,
@@ -524,13 +528,6 @@ func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc string, d
 
 	// Append in sorted order
 	for _, dnn := range dnns {
-		snssaiInfo.DnnInfos = append(snssaiInfo.DnnInfos, models.DnnInfo{
-			Dnn: dnn,
-		})
-	}
-
-	for dnn := range dnnMap {
-		// Append each DNN's info to DnnInfos
 		snssaiInfo.DnnInfos = append(snssaiInfo.DnnInfos, models.DnnInfo{
 			Dnn: dnn,
 		})

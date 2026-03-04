@@ -74,8 +74,8 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, groupName string) (int, error) {
 	logger.ConfigLog.Infof("received device group: %s", groupName)
 
-	ipdomains := &requestDeviceGroup.IpDomainsExpanded
-	for i, ipdomain := range *ipdomains {
+	for i := range requestDeviceGroup.IpDomainsExpanded {
+		ipdomain := &requestDeviceGroup.IpDomainsExpanded[i]
 		logger.ConfigLog.Infof("IP Domain details [%d]: %+v", i, ipdomain)
 		logger.ConfigLog.Infof("DNN Name : %v", ipdomain.Dnn)
 		logger.ConfigLog.Infof("UE Pool  : %v", ipdomain.UeIpPool)

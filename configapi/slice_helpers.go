@@ -657,20 +657,27 @@ func aggregateQoS(qosList []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos) c
 	var aggregated configmodels.DeviceGroupsIpDomainExpandedUeDnnQos
 
 	if len(qosList) == 0 {
-		logger.ConfigLog.Warnln("aggregateQoS called with empty qosList")
+		logger.ConfigLog.Debugln("aggregateQoS called with empty qosList")
 		return aggregated
 	}
 
 	// Track bitrate unit consistency
-	firstUnit := qosList[0].BitrateUnit
+	var firstNonEmptyUnit string
+	for _, qos := range qosList {
+		if qos.BitrateUnit != "" {
+			firstNonEmptyUnit = qos.BitrateUnit
+			break
+		}
+	}
+
 	unitConsistent := true
 
 	for _, qos := range qosList {
 		aggregated.DnnMbrUplink += qos.DnnMbrUplink
 		aggregated.DnnMbrDownlink += qos.DnnMbrDownlink
 
-		// Warn if units are inconsistent
-		if qos.BitrateUnit != firstUnit {
+		// Warn if units are inconsistent (ignoring empty units)
+		if qos.BitrateUnit != "" && firstNonEmptyUnit != "" && qos.BitrateUnit != firstNonEmptyUnit {
 			unitConsistent = false
 		}
 

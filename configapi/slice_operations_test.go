@@ -515,4 +515,35 @@ func TestAggregateQoS_SumsCorrectly(t *testing.T) {
 	if result.DnnMbrDownlink != 275 {
 		t.Fatalf("expected DL 275, got %d", result.DnnMbrDownlink)
 	}
+
+	if result.TrafficClass == nil || result.TrafficClass.Qci != 5 {
+		t.Fatalf("expected lowest QCI to win (5), got %v", result.TrafficClass)
+	}
+
+	if result.BitrateUnit != "Mbps" {
+		t.Fatalf("expected BitrateUnit Mbps, got %s", result.BitrateUnit)
+	}
+}
+
+func TestAggregateQoS_MixedUnits(t *testing.T) {
+	qosList := []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+		{DnnMbrUplink: 10, BitrateUnit: ""},
+		{DnnMbrUplink: 20, BitrateUnit: "Kbps"},
+		{DnnMbrUplink: 30, BitrateUnit: ""},
+	}
+
+	result := aggregateQoS(qosList)
+	if result.BitrateUnit != "Kbps" {
+		t.Fatalf("expected first non-empty unit 'Kbps', got %s", result.BitrateUnit)
+	}
+	if result.DnnMbrUplink != 60 {
+		t.Fatalf("expected UL 60, got %d", result.DnnMbrUplink)
+	}
+}
+
+func TestAggregateQoS_EmptyList(t *testing.T) {
+	result := aggregateQoS(nil)
+	if result.DnnMbrUplink != 0 || result.DnnMbrDownlink != 0 || result.BitrateUnit != "" || result.TrafficClass != nil {
+		t.Fatalf("expected zero value for empty list, got %+v", result)
+	}
 }

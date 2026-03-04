@@ -19,9 +19,11 @@ type DeviceGroups struct {
 
 	Imsis []string `json:"imsis"`
 
+	Msisdns []string `json:"msisdns,omitempty"`
+
 	SiteInfo string `json:"site-info,omitempty"`
 
 	IpDomainName string `json:"ip-domain-name,omitempty"`
 
-	IpDomainExpanded DeviceGroupsIpDomainExpanded `json:"ip-domain-expanded,omitempty"`
+	IpDomainsExpanded []DeviceGroupsIpDomainExpanded `json:"ip-domains,omitempty"`
 }

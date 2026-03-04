@@ -490,3 +490,29 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestAggregateQoS_SumsCorrectly(t *testing.T) {
+	qosList := []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+		{
+			DnnMbrUplink:   100,
+			DnnMbrDownlink: 200,
+			BitrateUnit:    "Mbps",
+			TrafficClass:   &configmodels.TrafficClassInfo{Qci: 9},
+		},
+		{
+			DnnMbrUplink:   50,
+			DnnMbrDownlink: 75,
+			BitrateUnit:    "Mbps",
+			TrafficClass:   &configmodels.TrafficClassInfo{Qci: 5},
+		},
+	}
+
+	result := aggregateQoS(qosList)
+
+	if result.DnnMbrUplink != 150 {
+		t.Fatalf("expected UL 150, got %d", result.DnnMbrUplink)
+	}
+	if result.DnnMbrDownlink != 275 {
+		t.Fatalf("expected DL 275, got %d", result.DnnMbrDownlink)
+	}
+}

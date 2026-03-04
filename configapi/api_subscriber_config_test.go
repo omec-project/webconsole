@@ -951,11 +951,13 @@ func deviceGroupWithImsis(name string, imsis []string) configmodels.DeviceGroups
 		UeDnnQos:     &qos,
 	}
 	deviceGroup := configmodels.DeviceGroups{
-		DeviceGroupName:  name,
-		Imsis:            imsis,
-		SiteInfo:         "demo",
-		IpDomainName:     "pool1",
-		IpDomainExpanded: ipDomain,
+		DeviceGroupName: name,
+		Imsis:           imsis,
+		SiteInfo:        "demo",
+		IpDomainName:    "pool1",
+		IpDomainsExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
+			ipDomain,
+		},
 	}
 	return deviceGroup
 }

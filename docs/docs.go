@@ -1257,11 +1257,20 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
-                "ip-domain-expanded": {
-                    "$ref": "#/definitions/configmodels.DeviceGroupsIpDomainExpanded"
-                },
                 "ip-domain-name": {
                     "type": "string"
+                },
+                "ip-domains": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/configmodels.DeviceGroupsIpDomainExpanded"
+                    }
+                },
+                "msisdns": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "site-info": {
                     "type": "string"

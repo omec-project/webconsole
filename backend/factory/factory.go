@@ -30,10 +30,6 @@ func init() {
 	WebUIConfig = &Config{Configuration: &Configuration{CfgPort: 5000}}
 }
 
-func GetConfig() *Config {
-	return WebUIConfig
-}
-
 // TODO: Support configuration update from REST api
 func InitConfigFactory(f string) error {
 	content, err := os.ReadFile(f)

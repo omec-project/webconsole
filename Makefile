@@ -10,7 +10,7 @@ PROJECT_NAME             := webui
 VERSION                  ?= $(shell cat ./VERSION 2>/dev/null || echo "dev")
 
 # Extract minimum Go version from go.mod file
-GOLANG_MINIMUM_VERSION   ?= $(shell awk '/^go / {print $$2}' go.mod 2>/dev/null || echo "1.24")
+GOLANG_MINIMUM_VERSION   ?= $(shell awk '/^go / {print $$2}' go.mod 2>/dev/null || echo "1.25")
 
 # Number of processors for parallel builds (Linux only)
 NPROCS                   := $(shell nproc)
@@ -22,7 +22,8 @@ DOCKER_TAG               ?= $(VERSION)
 DOCKER_IMAGE_PREFIX      ?= 5gc-
 DOCKER_IMAGENAME         := $(DOCKER_REGISTRY)$(DOCKER_REPOSITORY)$(DOCKER_IMAGE_PREFIX)$(PROJECT_NAME):$(DOCKER_TAG)
 DOCKER_BUILDKIT          ?= 1
-DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(NPROCS)
+DEBUG_TOOLS              ?= false
+DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j$(NPROCS) --build-arg DEBUG_TOOLS=$(DEBUG_TOOLS)
 DOCKER_PULL              ?= --pull
 
 ## Docker labels with better error handling
@@ -161,7 +162,7 @@ clean: ## Clean build artifacts
 	@rm -rf $(BIN_DIR)
 	@rm -rf $(COVERAGE_DIR)
 	@rm -rf vendor
-	@docker system prune -f --filter label=org.opencontainers.image.source="$(DOCKER_LABEL_VCS_URL)" 2>/dev/null || true
+	@docker system prune -f --filter label=org.opencontainers.image.source="https://github.com/omec-project/$(PROJECT_NAME)" 2>/dev/null || true
 
 print-version: ## Print current version
 	@echo $(VERSION)
@@ -175,6 +176,7 @@ env: ## Print environment variables
 	@echo "DOCKER_REPOSITORY=$(DOCKER_REPOSITORY)"
 	@echo "DOCKER_IMAGE_PREFIX=$(DOCKER_IMAGE_PREFIX)"
 	@echo "DOCKER_TAG=$(DOCKER_TAG)"
+	@echo "DEBUG_TOOLS=$(DEBUG_TOOLS)"
 	@echo "DOCKER_IMAGENAME=$(DOCKER_IMAGENAME)"
 	@echo "DOCKER_LABEL_VCS_URL=$(DOCKER_LABEL_VCS_URL)"
 	@echo "DOCKER_LABEL_VCS_REF=$(DOCKER_LABEL_VCS_REF)"
@@ -198,4 +200,4 @@ env: ## Print environment variables
         print-version \
         test \
         test-local \
-	webconsole-ui
+				webconsole-ui

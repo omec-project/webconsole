@@ -34,9 +34,9 @@ LABEL org.opencontainers.image.source="${VCS_URL}" \
 
 ARG DEBUG_TOOLS
 
-# Install debug tools ~85MB (if DEBUG_TOOLS is set to true)
+# Install debug tools only when explicitly requested.
 RUN if [ "$DEBUG_TOOLS" = "true" ]; then \
-        apk update && apk add --no-cache -U vim strace net-tools curl netcat-openbsd bind-tools; \
+    apk add --no-cache vim nano strace net-tools curl netcat-openbsd bind-tools; \
         fi
 
 # Copy executable

@@ -10,7 +10,7 @@ PROJECT_NAME             := webui
 VERSION                  ?= $(shell cat ./VERSION 2>/dev/null || echo "dev")
 
 # Extract minimum Go version from go.mod file
-GOLANG_MINIMUM_VERSION   ?= $(shell awk '/^go / {print $$2}' go.mod 2>/dev/null || echo "1.24")
+GOLANG_MINIMUM_VERSION   ?= $(shell awk '/^go / {print $$2}' go.mod 2>/dev/null || echo "1.25")
 
 # Number of processors for parallel builds (Linux only)
 NPROCS                   := $(shell nproc)
@@ -162,7 +162,7 @@ clean: ## Clean build artifacts
 	@rm -rf $(BIN_DIR)
 	@rm -rf $(COVERAGE_DIR)
 	@rm -rf vendor
-	@docker system prune -f --filter label=org.opencontainers.image.source="$(DOCKER_LABEL_VCS_URL)" 2>/dev/null || true
+	@docker system prune -f --filter label=org.opencontainers.image.source="https://github.com/omec-project/$(PROJECT_NAME)" 2>/dev/null || true
 
 print-version: ## Print current version
 	@echo $(VERSION)
@@ -200,4 +200,4 @@ env: ## Print environment variables
         print-version \
         test \
         test-local \
-	webconsole-ui
+				webconsole-ui

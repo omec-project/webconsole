@@ -8,6 +8,7 @@ FROM golang:1.26.2-bookworm@sha256:4f4ab2c90005e7e63cb631f0b4427f05422f241622ee3
 
 WORKDIR $GOPATH/src/webconsole
 COPY . .
+ARG MAKEFLAGS
 RUN make all && \
     CGO_ENABLED=0 go build -a -installsuffix nocgo -o webconsole -x server.go
 
@@ -34,10 +35,9 @@ LABEL org.opencontainers.image.source="${VCS_URL}" \
 
 ARG DEBUG_TOOLS
 
-# Install debug tools only when explicitly requested.
 RUN if [ "$DEBUG_TOOLS" = "true" ]; then \
-    apk add --no-cache vim nano strace net-tools curl netcat-openbsd bind-tools; \
-        fi
+        apk add --no-cache vim nano strace net-tools curl netcat-openbsd bind-tools; \
+    fi
 
 # Copy executable
 COPY --from=builder /go/src/webconsole/webconsole /usr/local/bin/.

@@ -16,7 +16,7 @@ require (
 	github.com/swaggo/swag v1.16.6
 	github.com/urfave/cli/v3 v3.8.0
 	go.mongodb.org/mongo-driver v1.17.9
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/crypto v0.50.0
 )

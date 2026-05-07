@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/openapi"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -101,26 +102,13 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 	})
 
 	authSubscription := configmodels.ToBsonM(models.AuthenticationSubscription{
-		AuthenticationManagementField: "8000",
-		AuthenticationMethod:          "5G_AKA",
-		Milenage: &models.Milenage{
-			Op: &models.Op{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-				OpValue:             "c9e8763286b5b9ffbdf56e1297d0887b",
-			},
+		AuthenticationManagementField: openapi.PtrString("8000"),
+		AuthenticationMethod:          "5G_AKA",                                              // "5G_AKA", "EAP_AKA_PRIME"
+		EncOpcKey:                     openapi.PtrString("981d464c7c52eb6e5036234984ad0bcf"), // Required
+		EncPermanentKey:               openapi.PtrString("5122250214c33e723a5dd523fc145fc0"), // Required
+		SequenceNumber: &models.SequenceNumber{
+			Sqn: openapi.PtrString("16f3b3f70fc2"),
 		},
-		Opc: &models.Opc{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			OpcValue:            "981d464c7c52eb6e5036234984ad0bcf",
-		},
-		PermanentKey: &models.PermanentKey{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			PermanentKeyValue:   "5122250214c33e723a5dd523fc145fc0",
-		},
-		SequenceNumber: "16f3b3f70fc2",
 	})
 	if authSubscription == nil {
 		logger.DbLog.Fatalln("failed to convert subscriber to BsonM")
@@ -170,28 +158,27 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 
 	switch coll {
 	case "subscriptionData.provisionedData.amData":
+		nssais := models.NewNssaiWithDefaults()
+		nssais.SetDefaultSingleNssais([]models.Snssai{
+			{
+				Sd:  openapi.PtrString("010203"),
+				Sst: 1,
+			},
+		})
+		nssais.SetSingleNssais([]models.Snssai{
+			{
+				Sd:  openapi.PtrString("010203"),
+				Sst: 1,
+			},
+		})
+		nullableNssai := models.NewNullableNssai(nssais)
+
 		amDataData := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{
 			Gpsis: []string{
 				"msisdn-0900000000",
 			},
-			Nssai: &models.Nssai{
-				DefaultSingleNssais: []models.Snssai{
-					{
-						Sd:  "010203",
-						Sst: 1,
-					},
-				},
-				SingleNssais: []models.Snssai{
-					{
-						Sd:  "010203",
-						Sst: 1,
-					},
-				},
-			},
-			SubscribedUeAmbr: &models.AmbrRm{
-				Downlink: "1000 Kbps",
-				Uplink:   "1000 Kbps",
-			},
+			Nssai:            *nullableNssai,
+			SubscribedUeAmbr: models.NewAmbr("1000 Kbps", "1000 Kbps"),
 		})
 		if amDataData == nil {
 			logger.DbLog.Fatalln("failed to convert amDataData to BsonM")
@@ -213,11 +200,11 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 		smPolicyData := configmodels.ToBsonM(models.SmPolicyData{
 			SmPolicySnssaiData: map[string]models.SmPolicySnssaiData{
 				"01010203": {
-					Snssai: &models.Snssai{
-						Sd:  "010203",
+					Snssai: models.Snssai{
+						Sd:  openapi.PtrString("010203"),
 						Sst: 1,
 					},
-					SmPolicyDnnData: map[string]models.SmPolicyDnnData{
+					SmPolicyDnnData: &map[string]models.SmPolicyDnnData{
 						"internet": {
 							Dnn: "internet",
 						},
@@ -232,11 +219,13 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 
 	case "subscriptionData.provisionedData.smfSelectionSubscriptionData":
 		smfSelData := configmodels.ToBsonM(models.SmfSelectionSubscriptionData{
-			SubscribedSnssaiInfos: map[string]models.SnssaiInfo{
+			SubscribedSnssaiInfos: &map[string]models.SnssaiInfo{
 				"01010203": {
 					DnnInfos: []models.DnnInfo{
 						{
-							Dnn: "internet",
+							Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
+								String: openapi.PtrString("internet"),
+							},
 						},
 					},
 				},
@@ -258,21 +247,23 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.
 		"filter": filter,
 	})
 
+	val := int32(8)
+	nullableInt32 := openapi.NewNullableInt32(&val)
 	smDataData := []models.SessionManagementSubscriptionData{
 		{
-			SingleNssai: &models.Snssai{
+			SingleNssai: models.Snssai{
 				Sst: 1,
-				Sd:  "010203",
+				Sd:  openapi.PtrString("010203"),
 			},
-			DnnConfigurations: map[string]models.DnnConfiguration{
+			DnnConfigurations: &map[string]models.DnnConfiguration{
 				"internet": {
-					PduSessionTypes: &models.PduSessionTypes{
-						DefaultSessionType:  models.PduSessionType_IPV4,
-						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
+					PduSessionTypes: models.PduSessionTypes{
+						DefaultSessionType:  models.PDUSESSIONTYPE_IPV4.Ptr(),
+						AllowedSessionTypes: []models.PduSessionType{models.PDUSESSIONTYPE_IPV4},
 					},
-					SscModes: &models.SscModes{
-						DefaultSscMode:  models.SscMode__1,
-						AllowedSscModes: []models.SscMode{models.SscMode__1},
+					SscModes: models.SscModes{
+						DefaultSscMode:  models.SSCMODE_SSC_MODE_1,
+						AllowedSscModes: []models.SscMode{models.SSCMODE_SSC_MODE_1},
 					},
 					SessionAmbr: &models.Ambr{
 						Downlink: "1000 Kbps",
@@ -280,10 +271,12 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.
 					},
 					Var5gQosProfile: &models.SubscribedDefaultQos{
 						Var5qi: 9,
-						Arp: &models.Arp{
-							PriorityLevel: 8,
+						Arp: models.Arp{
+							PriorityLevel: *nullableInt32,
+							PreemptCap:    models.PREEMPTIONCAPABILITY_MAY_PREEMPT,
+							PreemptVuln:   models.PREEMPTIONVULNERABILITY_PREEMPTABLE,
 						},
-						PriorityLevel: 8,
+						PriorityLevel: openapi.PtrInt32(8),
 					},
 				},
 			},
@@ -344,7 +337,9 @@ func TestGetSubscriberByID(t *testing.T) {
 			expectedHTTPStatus: http.StatusOK,
 			expectedFullResponse: map[string]any{
 				"AccessAndMobilitySubscriptionData": map[string]any{
-					"gpsis": []any{"msisdn-0900000000"},
+					"activeTime":          nil,
+					"ecRestrictionDataWb": nil,
+					"gpsis":               []any{"msisdn-0900000000"},
 					"nssai": map[string]any{
 						"defaultSingleNssais": []any{
 							map[string]any{"sd": "010203", "sst": 1},
@@ -353,10 +348,14 @@ func TestGetSubscriberByID(t *testing.T) {
 							map[string]any{"sd": "010203", "sst": 1},
 						},
 					},
+					"odbPacketServices": nil,
+					"rfspIndex":         nil,
+					"subsRegTimer":      nil,
 					"subscribedUeAmbr": map[string]any{
 						"downlink": "1000 Kbps",
 						"uplink":   "1000 Kbps",
 					},
+					"traceData": nil,
 				},
 				"AmPolicyData": map[string]any{
 					"subscCats": []any{"aether"},
@@ -364,24 +363,9 @@ func TestGetSubscriberByID(t *testing.T) {
 				"AuthenticationSubscription": map[string]any{
 					"authenticationManagementField": "8000",
 					"authenticationMethod":          "5G_AKA",
-					"milenage": map[string]any{
-						"op": map[string]any{
-							"encryptionAlgorithm": 0,
-							"encryptionKey":       0,
-							"opValue":             "c9e8763286b5b9ffbdf56e1297d0887b",
-						},
-					},
-					"opc": map[string]any{
-						"encryptionAlgorithm": 0,
-						"encryptionKey":       0,
-						"opcValue":            "981d464c7c52eb6e5036234984ad0bcf",
-					},
-					"permanentKey": map[string]any{
-						"encryptionAlgorithm": 0,
-						"encryptionKey":       0,
-						"permanentKeyValue":   "5122250214c33e723a5dd523fc145fc0",
-					},
-					"sequenceNumber": "16f3b3f70fc2",
+					"encOpcKey":                     "981d464c7c52eb6e5036234984ad0bcf",
+					"encPermanentKey":               "5122250214c33e723a5dd523fc145fc0",
+					"sequenceNumber":                map[string]any{"sqn": "16f3b3f70fc2"},
 				},
 				"FlowRules": nil,
 				"SessionManagementSubscriptionData": []any{
@@ -390,9 +374,11 @@ func TestGetSubscriberByID(t *testing.T) {
 							"internet": map[string]any{
 								"5gQosProfile": map[string]any{
 									"5qi":           9,
-									"arp":           map[string]any{"preemptCap": "", "preemptVuln": "", "priorityLevel": 8},
+									"arp":           map[string]any{"preemptCap": "MAY_PREEMPT", "preemptVuln": "PREEMPTABLE", "priorityLevel": 8},
 									"priorityLevel": 8,
 								},
+								"dnAaaAddress":      nil,
+								"ecsAddrConfigInfo": nil,
 								"pduSessionTypes": map[string]any{
 									"allowedSessionTypes": []any{"IPV4"},
 									"defaultSessionType":  "IPV4",
@@ -407,10 +393,12 @@ func TestGetSubscriberByID(t *testing.T) {
 								},
 							},
 						},
+						"odbPacketServices": nil,
 						"singleNssai": map[string]any{
 							"sd":  "010203",
 							"sst": 1,
 						},
+						"traceData": nil,
 					},
 				},
 				"SmPolicyData": map[string]any{
@@ -595,25 +583,13 @@ func (db *AuthDBMockDBClient) RestfulAPIGetOne(collName string, filter bson.M) (
 		return nil, nil
 	}
 	s := models.AuthenticationSubscription{
-		AuthenticationManagementField: "8000",
+		AuthenticationManagementField: openapi.PtrString("8000"),
 		AuthenticationMethod:          "5G_AKA",
-		Milenage: &models.Milenage{
-			Op: &models.Op{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-			},
+		EncOpcKey:                     openapi.PtrString("8e27b6af0e692e750f32667a3b14605d"),
+		EncPermanentKey:               openapi.PtrString("8baf473f2f8fd09487cccbd7097c6862"),
+		SequenceNumber: &models.SequenceNumber{
+			Sqn: openapi.PtrString("16f3b3f70fc2"),
 		},
-		Opc: &models.Opc{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
-		},
-		PermanentKey: &models.PermanentKey{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
-		},
-		SequenceNumber: "16f3b3f70fc2",
 	}
 
 	subscriber := configmodels.ToBsonM(s)

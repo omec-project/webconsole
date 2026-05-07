@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/openapi"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -209,10 +210,8 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 		logger.DbLog.Errorf("could not parse SST %s", slice.SliceId.Sst)
 		return http.StatusBadRequest, err
 	}
-	snssai := &models.Snssai{
-		Sd:  slice.SliceId.Sd,
-		Sst: int32(sVal),
-	}
+	snssai := models.NewSnssai(int32(sVal))
+	snssai.SetSd(slice.SliceId.Sd)
 	mcc := slice.SiteInfo.Plmn.Mcc
 	mnc := slice.SiteInfo.Plmn.Mnc
 	for _, dgName := range slice.SiteDeviceGroup {
@@ -351,15 +350,15 @@ func updateSmPolicyData(snssai *models.Snssai, dnnMap map[string][]configmodels.
 	var smPolicyData models.SmPolicyData
 	var smPolicySnssaiData models.SmPolicySnssaiData
 	// Iterate over all DNNs in the map
-	dnnData := make(map[string]models.SmPolicyDnnData)
+	dnnData := &map[string]models.SmPolicyDnnData{}
 
 	for dnn := range dnnMap { // Extract each DNN from the map
-		dnnData[dnn] = models.SmPolicyDnnData{
+		(*dnnData)[dnn] = models.SmPolicyDnnData{
 			Dnn: dnn,
 		}
 	}
 	// smpolicydata
-	smPolicySnssaiData.Snssai = snssai
+	smPolicySnssaiData.Snssai = *snssai
 	smPolicySnssaiData.SmPolicyDnnData = dnnData
 	smPolicyData.SmPolicySnssaiData = make(map[string]models.SmPolicySnssaiData)
 	smPolicyData.SmPolicySnssaiData[SnssaiModelsToHex(*snssai)] = smPolicySnssaiData
@@ -382,14 +381,11 @@ func updateAmProvisionedData(gpsi string, snssai *models.Snssai, aggregatedQoS c
 	}
 	amData := models.AccessAndMobilitySubscriptionData{
 		Gpsis: gpsiSlice,
-		Nssai: &models.Nssai{
+		Nssai: *models.NewNullableNssai(&models.Nssai{
 			DefaultSingleNssais: []models.Snssai{*snssai},
 			SingleNssais:        []models.Snssai{*snssai},
-		},
-		SubscribedUeAmbr: &models.AmbrRm{
-			Downlink: ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink)),
-			Uplink:   ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)),
-		},
+		}),
+		SubscribedUeAmbr: models.NewAmbr(ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)), ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink))),
 	}
 	amDataBsonA := configmodels.ToBsonM(amData)
 	amDataBsonA["ueId"] = "imsi-" + imsi
@@ -411,94 +407,21 @@ func updateAmProvisionedData(gpsi string, snssai *models.Snssai, aggregatedQoS c
 }
 
 func updateSmProvisionedData(snssai *models.Snssai, dnnMap map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string) error {
-	// Define the filter to find the existing record for this UE
 	filter := bson.M{
 		"ueId":          "imsi-" + imsi,
 		"servingPlmnId": mcc + mnc,
 	}
 
-	// Fetch the existing record from the database
-	existingRecord, err := dbadapter.CommonDBClient.RestfulAPIGetOne(smDataColl, filter)
+	smDataBsonA, err := buildSmProvisionedDataDocument(snssai, dnnMap, mcc, mnc, imsi)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			existingRecord = nil
-		} else {
-			logger.DbLog.Warnf("Failed to fetch existing record for ueId: %s, error: %v", imsi, err)
-			return err
-		}
-	}
-	var smData models.SessionManagementSubscriptionData
-	if existingRecord == nil {
-		// No existing record, create a new one
-		smData = models.SessionManagementSubscriptionData{
-			SingleNssai:       snssai,
-			DnnConfigurations: make(map[string]models.DnnConfiguration),
-		}
-	} else {
-		bsonBytes, errMarshal := bson.Marshal(existingRecord) // Use a different name for error
-		if errMarshal != nil {
-			logger.DbLog.Errorf("Failed to marshal existing record: %v", errMarshal)
-			return errMarshal
-		}
-
-		// Unmarshal BSON into struct
-		errUnmarshal := bson.Unmarshal(bsonBytes, &smData) // Use a different name for error
-		if errUnmarshal != nil {
-			logger.DbLog.Errorf("Failed to unmarshal existing record: %v", errUnmarshal)
-			return errUnmarshal
-		}
-	}
-	for dnn, ueDnnQosList := range dnnMap {
-		aggregatedQoS := aggregateQoS(ueDnnQosList)
-
-		if aggregatedQoS.TrafficClass == nil {
-			logger.DbLog.Errorf("TrafficClass is nil for DNN %s, IMSI %s", dnn, imsi)
-			return fmt.Errorf("traffic class missing for DNN %s", dnn)
-		}
-		smData.DnnConfigurations[dnn] = models.DnnConfiguration{
-			PduSessionTypes: &models.PduSessionTypes{
-				DefaultSessionType:  models.PduSessionType_IPV4,
-				AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
-			},
-			SscModes: &models.SscModes{
-				DefaultSscMode: models.SscMode__1,
-				AllowedSscModes: []models.SscMode{
-					"SSC_MODE_2",
-					"SSC_MODE_3",
-				},
-			},
-			SessionAmbr: &models.Ambr{
-				Downlink: ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink)),
-				Uplink:   ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)),
-			},
-			Var5gQosProfile: &models.SubscribedDefaultQos{
-				Var5qi: aggregatedQoS.TrafficClass.Qci,
-				Arp: &models.Arp{
-					PriorityLevel: 8,
-				},
-				PriorityLevel: 8,
-			},
-		}
-	}
-
-	bsonBytes, err := bson.Marshal(smData)
-	if err != nil {
-		logger.DbLog.Errorf("Failed to marshal smData: %v", err)
 		return err
 	}
 
-	var smDataBsonA map[string]interface{}
-	err = bson.Unmarshal(bsonBytes, &smDataBsonA)
-	if err != nil {
-		logger.DbLog.Errorf("Failed to unmarshal smData BSON: %v", err)
-		return err
+	// Replace any malformed legacy document with a clean schema-compliant one.
+	if err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(smDataColl, filter); err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		logger.DbLog.Warnf("Failed to delete existing SM provisioned data for IMSI %s: %v", imsi, err)
 	}
 
-	// Add required fields
-	smDataBsonA["ueId"] = "imsi-" + imsi
-	smDataBsonA["servingPlmnId"] = mcc + mnc
-
-	// Update the database
 	logger.DbLog.Infof("Data to be sent to database - SmProvisionedData: %+v", smDataBsonA)
 	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(smDataColl, filter, smDataBsonA)
 	if errPost != nil {
@@ -509,9 +432,59 @@ func updateSmProvisionedData(snssai *models.Snssai, dnnMap map[string][]configmo
 	return nil
 }
 
+func buildSmProvisionedDataDocument(snssai *models.Snssai, dnnMap map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string) (map[string]interface{}, error) {
+	dnnConfigurations := make(map[string]interface{}, len(dnnMap))
+
+	for dnn, ueDnnQosList := range dnnMap {
+		aggregatedQoS := aggregateQoS(ueDnnQosList)
+		if aggregatedQoS.TrafficClass == nil {
+			logger.DbLog.Errorf("TrafficClass is nil for DNN %s, IMSI %s", dnn, imsi)
+			return nil, fmt.Errorf("traffic class missing for DNN %s", dnn)
+		}
+
+		dnnConfigurations[dnn] = map[string]interface{}{
+			"pduSessionTypes": map[string]interface{}{
+				"defaultSessionType":  models.PDUSESSIONTYPE_IPV4,
+				"allowedSessionTypes": []models.PduSessionType{models.PDUSESSIONTYPE_IPV4},
+			},
+			"sscModes": map[string]interface{}{
+				"defaultSscMode":  models.SSCMODE_SSC_MODE_1,
+				"allowedSscModes": []models.SscMode{models.SSCMODE_SSC_MODE_2, models.SSCMODE_SSC_MODE_3},
+			},
+			"sessionAmbr": map[string]interface{}{
+				"downlink": ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink)),
+				"uplink":   ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)),
+			},
+			"5gQosProfile": map[string]interface{}{
+				"5qi": aggregatedQoS.TrafficClass.Qci,
+				"arp": map[string]interface{}{
+					"priorityLevel": int32(8),
+					"preemptCap":    models.PREEMPTIONCAPABILITY_NOT_PREEMPT,
+					"preemptVuln":   models.PREEMPTIONVULNERABILITY_NOT_PREEMPTABLE,
+				},
+				"priorityLevel": int32(8),
+			},
+		}
+	}
+
+	singleNssai := map[string]interface{}{
+		"sst": snssai.Sst,
+	}
+	if snssai.Sd != nil {
+		singleNssai["sd"] = *snssai.Sd
+	}
+
+	return map[string]interface{}{
+		"ueId":              "imsi-" + imsi,
+		"servingPlmnId":     mcc + mnc,
+		"singlenssai":       singleNssai,
+		"dnnconfigurations": dnnConfigurations,
+	}, nil
+}
+
 func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc string, dnnMap map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, imsi string) error {
 	smfSelData := models.SmfSelectionSubscriptionData{
-		SubscribedSnssaiInfos: map[string]models.SnssaiInfo{},
+		SubscribedSnssaiInfos: &map[string]models.SnssaiInfo{},
 	}
 
 	snssaiInfo := models.SnssaiInfo{
@@ -529,10 +502,12 @@ func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc string, d
 	// Append in sorted order
 	for _, dnn := range dnns {
 		snssaiInfo.DnnInfos = append(snssaiInfo.DnnInfos, models.DnnInfo{
-			Dnn: dnn,
+			Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
+				String: openapi.PtrString(dnn),
+			},
 		})
 	}
-	smfSelData.SubscribedSnssaiInfos[SnssaiModelsToHex(*snssai)] = snssaiInfo
+	(*smfSelData.SubscribedSnssaiInfos)[SnssaiModelsToHex(*snssai)] = snssaiInfo
 	smfSelecDataBsonA := configmodels.ToBsonM(smfSelData)
 	smfSelecDataBsonA["ueId"] = "imsi-" + imsi
 	smfSelecDataBsonA["servingPlmnId"] = mcc + mnc
@@ -558,7 +533,7 @@ func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc string, d
 
 func SnssaiModelsToHex(snssai models.Snssai) string {
 	sst := fmt.Sprintf("%02x", snssai.Sst)
-	return sst + snssai.Sd
+	return sst + snssai.GetSd()
 }
 
 func ConvertToString(val uint64) string {

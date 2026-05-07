@@ -98,7 +98,6 @@ func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 			}
 		}
 
-		logger.InitLog.Infoln("Starting HTTP server on", httpAddr)
 		if tlsConfig != nil {
 			logger.InitLog.Infoln("Starting HTTPS server with TLS on", httpAddr)
 			err = server.ListenAndServeTLS(tlsConfig.PEM, tlsConfig.Key)

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/omec-project/openapi"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -186,7 +187,7 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 		return http.StatusBadRequest, err
 	}
 	snssai := &models.Snssai{
-		Sd:  slice.SliceId.Sd,
+		Sd:  openapi.PtrString(slice.SliceId.Sd),
 		Sst: int32(sVal),
 	}
 	var errorOccured bool

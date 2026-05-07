@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/omec-project/openapi"
 	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
@@ -18,25 +19,13 @@ import (
 
 func authenticationSubscription() *models.AuthenticationSubscription {
 	return &models.AuthenticationSubscription{
-		AuthenticationManagementField: "8000",
+		AuthenticationManagementField: openapi.PtrString("8000"),
 		AuthenticationMethod:          "5G_AKA",
-		Milenage: &models.Milenage{
-			Op: &models.Op{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-			},
+		EncOpcKey:                     openapi.PtrString("8e27b6af0e692e750f32667a3b14605d"), // Required
+		EncPermanentKey:               openapi.PtrString("8baf473f2f8fd09487cccbd7097c6862"), // Required
+		SequenceNumber: &models.SequenceNumber{
+			Sqn: openapi.PtrString("16f3b3f70fc2"),
 		},
-		Opc: &models.Opc{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			OpcValue:            "8e27b6af0e692e750f32667a3b14605d",
-		},
-		PermanentKey: &models.PermanentKey{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			PermanentKeyValue:   "8baf473f2f8fd09487cccbd7097c6862",
-		},
-		SequenceNumber: "16f3b3f70fc2",
 	}
 }
 

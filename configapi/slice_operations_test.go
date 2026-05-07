@@ -17,6 +17,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/openapi"
+	"github.com/omec-project/openapi/models"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -545,5 +547,69 @@ func TestAggregateQoS_EmptyList(t *testing.T) {
 	result := aggregateQoS(nil)
 	if result.DnnMbrUplink != 0 || result.DnnMbrDownlink != 0 || result.BitrateUnit != "" || result.TrafficClass != nil {
 		t.Fatalf("expected zero value for empty list, got %+v", result)
+	}
+}
+
+func TestBuildSmProvisionedDataDocument(t *testing.T) {
+	snssai := &models.Snssai{Sst: 1, Sd: openapi.PtrString("010203")}
+	dnnMap := map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+		"internet": {
+			{
+				DnnMbrUplink:   2000000,
+				DnnMbrDownlink: 5000000,
+				TrafficClass: &configmodels.TrafficClassInfo{
+					Qci: 9,
+				},
+			},
+		},
+	}
+
+	doc, err := buildSmProvisionedDataDocument(snssai, dnnMap, "208", "93", "208930100007487")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := doc["ueId"]; got != "imsi-208930100007487" {
+		t.Fatalf("unexpected ueId: %v", got)
+	}
+
+	singleNssai, ok := doc["singlenssai"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("singlenssai has unexpected type: %T", doc["singlenssai"])
+	}
+	if singleNssai["sd"] != "010203" {
+		t.Fatalf("unexpected sd: %v", singleNssai["sd"])
+	}
+
+	dnnConfigurations, ok := doc["dnnconfigurations"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("dnnconfigurations has unexpected type: %T", doc["dnnconfigurations"])
+	}
+	internet, ok := dnnConfigurations["internet"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("internet dnn config has unexpected type: %T", dnnConfigurations["internet"])
+	}
+
+	qos, ok := internet["5gQosProfile"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("5gQosProfile has unexpected type: %T", internet["5gQosProfile"])
+	}
+	arp, ok := qos["arp"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("arp has unexpected type: %T", qos["arp"])
+	}
+	if arp["preemptCap"] != models.PREEMPTIONCAPABILITY_NOT_PREEMPT {
+		t.Fatalf("unexpected preemptCap: %v", arp["preemptCap"])
+	}
+	if arp["priorityLevel"] != int32(8) {
+		t.Fatalf("unexpected arp priorityLevel: %v", arp["priorityLevel"])
+	}
+
+	encoded, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("failed to marshal document: %v", err)
+	}
+	if strings.Contains(string(encoded), "{}") {
+		t.Fatalf("document should not contain empty objects: %s", encoded)
 	}
 }

@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omec-project/openapi/nfConfigApi"
+	"github.com/omec-project/openapi/v2/nfConfigApi"
 )
 
 func TestGetImsiQosConfig(t *testing.T) {

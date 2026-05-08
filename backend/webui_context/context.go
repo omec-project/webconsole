@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/omec-project/openapi/models"
+	"github.com/omec-project/openapi/v2/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/dbadapter"
 )

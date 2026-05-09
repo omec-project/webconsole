@@ -1,5 +1,6 @@
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Intel Corporation
 // Copyright 2025 Canonical Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
 package configapi
 
@@ -67,6 +68,7 @@ type NetworkSliceMockDBClient struct {
 	dbadapter.DBInterface
 	slices   []configmodels.Slice
 	postData []map[string]any
+	putData  []map[string]any
 	err      error
 }
 
@@ -107,6 +109,16 @@ func (db *NetworkSliceMockDBClient) RestfulAPIPost(collName string, filter bson.
 	}
 	db.postData = append(db.postData, params)
 	return true, nil
+}
+
+func (db *NetworkSliceMockDBClient) RestfulAPIPutOne(collName string, filter bson.M, putData map[string]any) (bool, error) {
+	params := map[string]any{
+		"coll":   collName,
+		"filter": filter,
+		"data":   putData,
+	}
+	db.putData = append(db.putData, params)
+	return true, db.err
 }
 
 func TestGetNetworkSlices(t *testing.T) {
@@ -611,5 +623,44 @@ func TestBuildSmProvisionedDataDocument(t *testing.T) {
 	}
 	if strings.Contains(string(encoded), "{}") {
 		t.Fatalf("document should not contain empty objects: %s", encoded)
+	}
+}
+
+func TestUpdateSmProvisionedData_UsesPutOne(t *testing.T) {
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+
+	mock := &NetworkSliceMockDBClient{}
+	dbadapter.CommonDBClient = mock
+
+	snssai := &models.Snssai{Sst: 1, Sd: openapi.PtrString("010203")}
+	dnnMap := map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+		"internet": {
+			{
+				DnnMbrUplink:   2000000,
+				DnnMbrDownlink: 5000000,
+				TrafficClass:   &configmodels.TrafficClassInfo{Qci: 9},
+			},
+		},
+	}
+
+	if err := updateSmProvisionedData(snssai, dnnMap, "208", "93", "208930100007487"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(mock.postData) != 0 {
+		t.Fatalf("expected no post calls, got %d", len(mock.postData))
+	}
+	if len(mock.putData) != 1 {
+		t.Fatalf("expected one put call, got %d", len(mock.putData))
+	}
+	data, ok := mock.putData[0]["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected put payload type: %T", mock.putData[0]["data"])
+	}
+	if _, ok = data["singlenssai"]; !ok {
+		t.Fatal("expected singlenssai key in put payload")
+	}
+	if _, ok = data["dnnconfigurations"]; !ok {
+		t.Fatal("expected dnnconfigurations key in put payload")
 	}
 }

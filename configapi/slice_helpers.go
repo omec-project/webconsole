@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Intel Corporation
 // Copyright 2025 Canonical Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
 package configapi
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -23,7 +23,6 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var execCommand = exec.Command
@@ -417,16 +416,11 @@ func updateSmProvisionedData(snssai *models.Snssai, dnnMap map[string][]configmo
 		return err
 	}
 
-	// Replace any malformed legacy document with a clean schema-compliant one.
-	if err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(smDataColl, filter); err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
-		logger.DbLog.Warnf("Failed to delete existing SM provisioned data for IMSI %s: %v", imsi, err)
-	}
-
 	logger.DbLog.Infof("Data to be sent to database - SmProvisionedData: %+v", smDataBsonA)
-	_, errPost := dbadapter.CommonDBClient.RestfulAPIPost(smDataColl, filter, smDataBsonA)
-	if errPost != nil {
-		logger.DbLog.Errorf("failed to update SM provisioned Data for IMSI %s: %+v", imsi, errPost)
-		return errPost
+	_, errPut := dbadapter.CommonDBClient.RestfulAPIPutOne(smDataColl, filter, smDataBsonA)
+	if errPut != nil {
+		logger.DbLog.Errorf("failed to update SM provisioned Data for IMSI %s: %+v", imsi, errPut)
+		return errPut
 	}
 	logger.DbLog.Debugf("updated SM provisioned Data for IMSI %s", imsi)
 	return nil

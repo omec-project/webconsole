@@ -85,7 +85,7 @@ func getNfOamUri(nfProfile models.NFProfile, serviceName models.ServiceName) (nf
 				nfOamUri = service.GetFqdn()
 			} else if service.GetApiPrefix() != "" {
 				nfOamUri = service.GetApiPrefix()
-			} else if service.IpEndPoints != nil {
+			} else if len(service.IpEndPoints) > 0 {
 				point := (service.IpEndPoints)[0]
 				if point.GetIpv4Address() != "" {
 					nfOamUri = getSbiUri(service.Scheme, point.GetIpv4Address(), point.GetPort())

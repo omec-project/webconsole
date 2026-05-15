@@ -39,7 +39,7 @@ docker build --network=host -t configapi .
 
 Once the image is built, just run
 ```
-docker run --rm -it configapi 
+docker run --rm -it configapi
 ```
 
 ### Known Issue

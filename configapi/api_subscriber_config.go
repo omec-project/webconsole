@@ -16,7 +16,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/omec-project/openapi/models"
+	"github.com/omec-project/openapi/v2"
+	"github.com/omec-project/openapi/v2/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
 	"github.com/omec-project/webconsole/configmodels"
@@ -67,75 +68,60 @@ func GetSampleJSON(c *gin.Context) {
 	var subsData configmodels.SubsData
 
 	authSubsData := models.AuthenticationSubscription{
-		AuthenticationManagementField: "8000",
-		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
-		Milenage: &models.Milenage{
-			Op: &models.Op{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-				OpValue:             "c9e8763286b5b9ffbdf56e1297d0887b", // Required
-			},
-		},
-		Opc: &models.Opc{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			OpcValue:            "981d464c7c52eb6e5036234984ad0bcf", // Required
-		},
-		PermanentKey: &models.PermanentKey{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			PermanentKeyValue:   "5122250214c33e723a5dd523fc145fc0", // Required
-		},
-		SequenceNumber: "16f3b3f70fc2",
+		AuthenticationManagementField: openapi.PtrString("8000"),
+		AuthenticationMethod:          "5G_AKA",                                              // "5G_AKA", "EAP_AKA_PRIME"
+		EncOpcKey:                     openapi.PtrString("981d464c7c52eb6e5036234984ad0bcf"), // Required
+		EncPermanentKey:               openapi.PtrString("5122250214c33e723a5dd523fc145fc0"), // Required
 	}
+
+	nssais := models.NewNssaiWithDefaults()
+	nssais.SetDefaultSingleNssais([]models.Snssai{
+		{
+			Sst: 1,
+			Sd:  openapi.PtrString("010203"),
+		},
+		{
+			Sst: 1,
+			Sd:  openapi.PtrString("112233"),
+		},
+	})
+	nssais.SetSingleNssais([]models.Snssai{
+		{
+			Sst: 1,
+			Sd:  openapi.PtrString("010203"),
+		},
+		{
+			Sst: 1,
+			Sd:  openapi.PtrString("112233"),
+		},
+	})
+	nullableNssai := models.NewNullableNssai(nssais)
 
 	amDataData := models.AccessAndMobilitySubscriptionData{
 		Gpsis: []string{
 			"msisdn-0900000000",
 		},
-		Nssai: &models.Nssai{
-			DefaultSingleNssais: []models.Snssai{
-				{
-					Sd:  "010203",
-					Sst: 1,
-				},
-				{
-					Sd:  "112233",
-					Sst: 1,
-				},
-			},
-			SingleNssais: []models.Snssai{
-				{
-					Sd:  "010203",
-					Sst: 1,
-				},
-				{
-					Sd:  "112233",
-					Sst: 1,
-				},
-			},
-		},
-		SubscribedUeAmbr: &models.AmbrRm{
-			Downlink: "1000 Kbps",
-			Uplink:   "1000 Kbps",
-		},
+		Nssai:            *nullableNssai,
+		SubscribedUeAmbr: models.NewAmbr("1000 Kbps", "1000 Kbps"),
 	}
 
+	val := int32(8)
+	nullableInt32 := openapi.NewNullableInt32(&val)
 	smDataData := []models.SessionManagementSubscriptionData{
 		{
-			SingleNssai: &models.Snssai{
+			SingleNssai: models.Snssai{
 				Sst: 1,
-				Sd:  "010203",
+				Sd:  openapi.PtrString("010203"),
 			},
-			DnnConfigurations: map[string]models.DnnConfiguration{
+			DnnConfigurations: &map[string]models.DnnConfiguration{
 				"internet": {
-					PduSessionTypes: &models.PduSessionTypes{
-						DefaultSessionType:  models.PduSessionType_IPV4,
-						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
+					PduSessionTypes: models.PduSessionTypes{
+						DefaultSessionType:  models.PDUSESSIONTYPE_IPV4.Ptr(),
+						AllowedSessionTypes: []models.PduSessionType{models.PDUSESSIONTYPE_IPV4},
 					},
-					SscModes: &models.SscModes{
-						DefaultSscMode:  models.SscMode__1,
-						AllowedSscModes: []models.SscMode{models.SscMode__1},
+					SscModes: models.SscModes{
+						DefaultSscMode:  models.SSCMODE_SSC_MODE_1,
+						AllowedSscModes: []models.SscMode{models.SSCMODE_SSC_MODE_1},
 					},
 					SessionAmbr: &models.Ambr{
 						Downlink: "1000 Kbps",
@@ -143,28 +129,30 @@ func GetSampleJSON(c *gin.Context) {
 					},
 					Var5gQosProfile: &models.SubscribedDefaultQos{
 						Var5qi: 9,
-						Arp: &models.Arp{
-							PriorityLevel: 8,
+						Arp: models.Arp{
+							PriorityLevel: *nullableInt32,
+							PreemptCap:    models.PREEMPTIONCAPABILITY_MAY_PREEMPT,
+							PreemptVuln:   models.PREEMPTIONVULNERABILITY_PREEMPTABLE,
 						},
-						PriorityLevel: 8,
+						PriorityLevel: openapi.PtrInt32(8),
 					},
 				},
 			},
 		},
 		{
-			SingleNssai: &models.Snssai{
+			SingleNssai: models.Snssai{
 				Sst: 1,
-				Sd:  "112233",
+				Sd:  openapi.PtrString("112233"),
 			},
-			DnnConfigurations: map[string]models.DnnConfiguration{
+			DnnConfigurations: &map[string]models.DnnConfiguration{
 				"internet": {
-					PduSessionTypes: &models.PduSessionTypes{
-						DefaultSessionType:  models.PduSessionType_IPV4,
-						AllowedSessionTypes: []models.PduSessionType{models.PduSessionType_IPV4},
+					PduSessionTypes: models.PduSessionTypes{
+						DefaultSessionType:  models.PDUSESSIONTYPE_IPV4.Ptr(),
+						AllowedSessionTypes: []models.PduSessionType{models.PDUSESSIONTYPE_IPV4},
 					},
-					SscModes: &models.SscModes{
-						DefaultSscMode:  models.SscMode__1,
-						AllowedSscModes: []models.SscMode{models.SscMode__1},
+					SscModes: models.SscModes{
+						DefaultSscMode:  models.SSCMODE_SSC_MODE_1,
+						AllowedSscModes: []models.SscMode{models.SSCMODE_SSC_MODE_1},
 					},
 					SessionAmbr: &models.Ambr{
 						Downlink: "1000 Kbps",
@@ -172,10 +160,12 @@ func GetSampleJSON(c *gin.Context) {
 					},
 					Var5gQosProfile: &models.SubscribedDefaultQos{
 						Var5qi: 9,
-						Arp: &models.Arp{
-							PriorityLevel: 8,
+						Arp: models.Arp{
+							PriorityLevel: *nullableInt32,
+							PreemptCap:    models.PREEMPTIONCAPABILITY_MAY_PREEMPT,
+							PreemptVuln:   models.PREEMPTIONVULNERABILITY_PREEMPTABLE,
 						},
-						PriorityLevel: 8,
+						PriorityLevel: openapi.PtrInt32(8),
 					},
 				},
 			},
@@ -183,18 +173,22 @@ func GetSampleJSON(c *gin.Context) {
 	}
 
 	smfSelData := models.SmfSelectionSubscriptionData{
-		SubscribedSnssaiInfos: map[string]models.SnssaiInfo{
+		SubscribedSnssaiInfos: &map[string]models.SnssaiInfo{
 			"01010203": {
 				DnnInfos: []models.DnnInfo{
 					{
-						Dnn: "internet",
+						Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
+							String: openapi.PtrString("internet"),
+						},
 					},
 				},
 			},
 			"01112233": {
 				DnnInfos: []models.DnnInfo{
 					{
-						Dnn: "internet",
+						Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
+							String: openapi.PtrString("internet"),
+						},
 					},
 				},
 			},
@@ -210,22 +204,22 @@ func GetSampleJSON(c *gin.Context) {
 	smPolicyData := models.SmPolicyData{
 		SmPolicySnssaiData: map[string]models.SmPolicySnssaiData{
 			"01010203": {
-				Snssai: &models.Snssai{
-					Sd:  "010203",
+				Snssai: models.Snssai{
+					Sd:  openapi.PtrString("010203"),
 					Sst: 1,
 				},
-				SmPolicyDnnData: map[string]models.SmPolicyDnnData{
+				SmPolicyDnnData: &map[string]models.SmPolicyDnnData{
 					"internet": {
 						Dnn: "internet",
 					},
 				},
 			},
 			"01112233": {
-				Snssai: &models.Snssai{
-					Sd:  "112233",
+				Snssai: models.Snssai{
+					Sd:  openapi.PtrString("112233"),
 					Sst: 1,
 				},
-				SmPolicyDnnData: map[string]models.SmPolicyDnnData{
+				SmPolicyDnnData: &map[string]models.SmPolicyDnnData{
 					"internet": {
 						Dnn: "internet",
 					},
@@ -490,26 +484,13 @@ func PostSubscriberByID(c *gin.Context) {
 	}
 
 	authSubsData := models.AuthenticationSubscription{
-		AuthenticationManagementField: "8000",
-		AuthenticationMethod:          "5G_AKA",
-		Milenage: &models.Milenage{
-			Op: &models.Op{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-				OpValue:             "",
-			},
+		AuthenticationManagementField: openapi.PtrString("8000"),
+		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
+		EncOpcKey:                     openapi.PtrString(subsOverrideData.OPc),
+		EncPermanentKey:               openapi.PtrString(subsOverrideData.Key),
+		SequenceNumber: &models.SequenceNumber{
+			Sqn: openapi.PtrString(subsOverrideData.SequenceNumber),
 		},
-		Opc: &models.Opc{
-			OpcValue:            subsOverrideData.OPc,
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-		},
-		PermanentKey: &models.PermanentKey{
-			PermanentKeyValue:   subsOverrideData.Key,
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-		},
-		SequenceNumber: subsOverrideData.SequenceNumber,
 	}
 
 	logger.WebUILog.Infof("%+v", authSubsData)
@@ -575,26 +556,13 @@ func PutSubscriberByID(c *gin.Context) {
 		return
 	}
 	authSubsData := models.AuthenticationSubscription{
-		AuthenticationManagementField: "8000",
+		AuthenticationManagementField: openapi.PtrString("8000"),
 		AuthenticationMethod:          "5G_AKA",
-		Milenage: &models.Milenage{
-			Op: &models.Op{
-				EncryptionAlgorithm: 0,
-				EncryptionKey:       0,
-				OpValue:             "",
-			},
+		EncOpcKey:                     openapi.PtrString(subsOverrideData.OPc),
+		EncPermanentKey:               openapi.PtrString(subsOverrideData.Key),
+		SequenceNumber: &models.SequenceNumber{
+			Sqn: openapi.PtrString(subsOverrideData.SequenceNumber),
 		},
-		Opc: &models.Opc{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			OpcValue:            subsOverrideData.OPc,
-		},
-		PermanentKey: &models.PermanentKey{
-			EncryptionAlgorithm: 0,
-			EncryptionKey:       0,
-			PermanentKeyValue:   subsOverrideData.Key,
-		},
-		SequenceNumber: subsOverrideData.SequenceNumber,
 	}
 
 	err = subscriberAuthenticationDataUpdate(ueId, &authSubsData)
@@ -666,7 +634,7 @@ func GetRegisteredUEContext(c *gin.Context) {
 	supi, supiExists := c.Params.Get("supi")
 
 	// TODO: support fetching data from multiple AMFs
-	if amfUris := webuiSelf.GetOamUris(models.NfType_AMF); amfUris != nil {
+	if amfUris := webuiSelf.GetOamUris(models.NFTYPE_AMF); amfUris != nil {
 		var requestUri string
 
 		if supiExists {
@@ -704,7 +672,7 @@ func GetUEPDUSessionInfo(c *gin.Context) {
 	}
 
 	// TODO: support fetching data from multiple SMF
-	if smfUris := webuiSelf.GetOamUris(models.NfType_SMF); smfUris != nil {
+	if smfUris := webuiSelf.GetOamUris(models.NFTYPE_SMF); smfUris != nil {
 		requestUri := fmt.Sprintf("%s/nsmf-oam/v1/ue-pdu-session-info/%s", smfUris[0], smContextRef)
 		resp, err := httpsClient.Get(requestUri)
 		if err != nil {

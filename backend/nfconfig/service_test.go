@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omec-project/openapi/nfConfigApi"
+	"github.com/omec-project/openapi/v2/nfConfigApi"
 	"github.com/omec-project/util/logger"
 	"github.com/omec-project/webconsole/backend/factory"
 	webconsoleLogger "github.com/omec-project/webconsole/backend/logger"

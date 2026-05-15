@@ -1,5 +1,6 @@
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Intel Corporation
 // Copyright 2025 Canonical Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
 package configapi
 
@@ -17,6 +18,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omec-project/openapi/v2"
+	"github.com/omec-project/openapi/v2/models"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -65,6 +68,7 @@ type NetworkSliceMockDBClient struct {
 	dbadapter.DBInterface
 	slices   []configmodels.Slice
 	postData []map[string]any
+	putData  []map[string]any
 	err      error
 }
 
@@ -105,6 +109,16 @@ func (db *NetworkSliceMockDBClient) RestfulAPIPost(collName string, filter bson.
 	}
 	db.postData = append(db.postData, params)
 	return true, nil
+}
+
+func (db *NetworkSliceMockDBClient) RestfulAPIPutOne(collName string, filter bson.M, putData map[string]any) (bool, error) {
+	params := map[string]any{
+		"coll":   collName,
+		"filter": filter,
+		"data":   putData,
+	}
+	db.putData = append(db.putData, params)
+	return true, db.err
 }
 
 func TestGetNetworkSlices(t *testing.T) {
@@ -545,5 +559,108 @@ func TestAggregateQoS_EmptyList(t *testing.T) {
 	result := aggregateQoS(nil)
 	if result.DnnMbrUplink != 0 || result.DnnMbrDownlink != 0 || result.BitrateUnit != "" || result.TrafficClass != nil {
 		t.Fatalf("expected zero value for empty list, got %+v", result)
+	}
+}
+
+func TestBuildSmProvisionedDataDocument(t *testing.T) {
+	snssai := &models.Snssai{Sst: 1, Sd: openapi.PtrString("010203")}
+	dnnMap := map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+		"internet": {
+			{
+				DnnMbrUplink:   2000000,
+				DnnMbrDownlink: 5000000,
+				TrafficClass: &configmodels.TrafficClassInfo{
+					Qci: 9,
+				},
+			},
+		},
+	}
+
+	doc, err := buildSmProvisionedDataDocument(snssai, dnnMap, "208", "93", "208930100007487")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := doc["ueId"]; got != "imsi-208930100007487" {
+		t.Fatalf("unexpected ueId: %v", got)
+	}
+
+	singleNssai, ok := doc["singlenssai"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("singlenssai has unexpected type: %T", doc["singlenssai"])
+	}
+	if singleNssai["sd"] != "010203" {
+		t.Fatalf("unexpected sd: %v", singleNssai["sd"])
+	}
+
+	dnnConfigurations, ok := doc["dnnconfigurations"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("dnnconfigurations has unexpected type: %T", doc["dnnconfigurations"])
+	}
+	internet, ok := dnnConfigurations["internet"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("internet dnn config has unexpected type: %T", dnnConfigurations["internet"])
+	}
+
+	qos, ok := internet["5gQosProfile"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("5gQosProfile has unexpected type: %T", internet["5gQosProfile"])
+	}
+	arp, ok := qos["arp"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("arp has unexpected type: %T", qos["arp"])
+	}
+	if arp["preemptCap"] != models.PREEMPTIONCAPABILITY_NOT_PREEMPT {
+		t.Fatalf("unexpected preemptCap: %v", arp["preemptCap"])
+	}
+	if arp["priorityLevel"] != int32(8) {
+		t.Fatalf("unexpected arp priorityLevel: %v", arp["priorityLevel"])
+	}
+
+	encoded, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("failed to marshal document: %v", err)
+	}
+	if strings.Contains(string(encoded), "{}") {
+		t.Fatalf("document should not contain empty objects: %s", encoded)
+	}
+}
+
+func TestUpdateSmProvisionedData_UsesPutOne(t *testing.T) {
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+
+	mock := &NetworkSliceMockDBClient{}
+	dbadapter.CommonDBClient = mock
+
+	snssai := &models.Snssai{Sst: 1, Sd: openapi.PtrString("010203")}
+	dnnMap := map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+		"internet": {
+			{
+				DnnMbrUplink:   2000000,
+				DnnMbrDownlink: 5000000,
+				TrafficClass:   &configmodels.TrafficClassInfo{Qci: 9},
+			},
+		},
+	}
+
+	if err := updateSmProvisionedData(snssai, dnnMap, "208", "93", "208930100007487"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(mock.postData) != 0 {
+		t.Fatalf("expected no post calls, got %d", len(mock.postData))
+	}
+	if len(mock.putData) != 1 {
+		t.Fatalf("expected one put call, got %d", len(mock.putData))
+	}
+	data, ok := mock.putData[0]["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected put payload type: %T", mock.putData[0]["data"])
+	}
+	if _, ok = data["singlenssai"]; !ok {
+		t.Fatal("expected singlenssai key in put payload")
+	}
+	if _, ok = data["dnnconfigurations"]; !ok {
+		t.Fatal("expected dnnconfigurations key in put payload")
 	}
 }

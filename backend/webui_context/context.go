@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/omec-project/openapi/models"
+	"github.com/omec-project/openapi/v2/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/dbadapter"
 )
@@ -19,13 +19,13 @@ import (
 var webuiContext = WEBUIContext{}
 
 type WEBUIContext struct {
-	NFProfiles     []models.NfProfile
+	NFProfiles     []models.NFProfile
 	NFOamInstances []NfOamInstance
 }
 
 type NfOamInstance struct {
 	NfId   string
-	NfType models.NfType
+	NfType models.NFType
 	Uri    string
 }
 
@@ -52,9 +52,9 @@ func (context *WEBUIContext) UpdateNfProfiles() {
 
 		var uri string
 		switch nfProfile.NfType {
-		case models.NfType_AMF:
+		case models.NFTYPE_AMF:
 			uri = getNfOamUri(nfProfile, models.ServiceName("namf-oam"))
-		case models.NfType_SMF:
+		case models.NFTYPE_SMF:
 			uri = getNfOamUri(nfProfile, models.ServiceName("nsmf-oam"))
 		}
 		if uri != "" {
@@ -67,7 +67,7 @@ func (context *WEBUIContext) UpdateNfProfiles() {
 	}
 }
 
-func (context *WEBUIContext) NfProfileAlreadyExists(nfProfile models.NfProfile) bool {
+func (context *WEBUIContext) NfProfileAlreadyExists(nfProfile models.NFProfile) bool {
 	for _, instance := range context.NFOamInstances {
 		if instance.NfId == nfProfile.NfInstanceId {
 			return true
@@ -76,21 +76,21 @@ func (context *WEBUIContext) NfProfileAlreadyExists(nfProfile models.NfProfile) 
 	return false
 }
 
-func getNfOamUri(nfProfile models.NfProfile, serviceName models.ServiceName) (nfOamUri string) {
-	for _, service := range *nfProfile.NfServices {
-		if service.ServiceName == serviceName && service.NfServiceStatus == models.NfServiceStatus_REGISTERED {
-			if nfProfile.Fqdn != "" {
-				nfOamUri = nfProfile.Fqdn
-			} else if service.Fqdn != "" {
-				nfOamUri = service.Fqdn
-			} else if service.ApiPrefix != "" {
-				nfOamUri = service.ApiPrefix
-			} else if service.IpEndPoints != nil {
-				point := (*service.IpEndPoints)[0]
-				if point.Ipv4Address != "" {
-					nfOamUri = getSbiUri(service.Scheme, point.Ipv4Address, point.Port)
+func getNfOamUri(nfProfile models.NFProfile, serviceName models.ServiceName) (nfOamUri string) {
+	for _, service := range nfProfile.NfServices {
+		if service.ServiceName == serviceName && service.NfServiceStatus == models.NFSERVICESTATUS_REGISTERED {
+			if nfProfile.GetFqdn() != "" {
+				nfOamUri = nfProfile.GetFqdn()
+			} else if service.GetFqdn() != "" {
+				nfOamUri = service.GetFqdn()
+			} else if service.GetApiPrefix() != "" {
+				nfOamUri = service.GetApiPrefix()
+			} else if len(service.IpEndPoints) > 0 {
+				point := (service.IpEndPoints)[0]
+				if point.GetIpv4Address() != "" {
+					nfOamUri = getSbiUri(service.Scheme, point.GetIpv4Address(), point.GetPort())
 				} else if len(nfProfile.Ipv4Addresses) != 0 {
-					nfOamUri = getSbiUri(service.Scheme, nfProfile.Ipv4Addresses[0], point.Port)
+					nfOamUri = getSbiUri(service.Scheme, nfProfile.Ipv4Addresses[0], point.GetPort())
 				}
 			}
 		}
@@ -101,7 +101,7 @@ func getNfOamUri(nfProfile models.NfProfile, serviceName models.ServiceName) (nf
 	return
 }
 
-func (context *WEBUIContext) GetOamUris(targetNfType models.NfType) (uris []string) {
+func (context *WEBUIContext) GetOamUris(targetNfType models.NFType) (uris []string) {
 	for _, oamInstance := range context.NFOamInstances {
 		if oamInstance.NfType == targetNfType {
 			uris = append(uris, oamInstance.Uri)
@@ -115,8 +115,8 @@ func WEBUI_Self() *WEBUIContext {
 	return &webuiContext
 }
 
-func decode(source interface{}, format string) ([]models.NfProfile, error) {
-	var target []models.NfProfile
+func decode(source interface{}, format string) ([]models.NFProfile, error) {
+	var target []models.NFProfile
 
 	// config mapstruct
 	stringToDateTimeHook := func(
@@ -153,9 +153,9 @@ func getSbiUri(scheme models.UriScheme, ipv4Address string, port int32) (uri str
 		uri = fmt.Sprintf("%s://%s:%d", scheme, ipv4Address, port)
 	} else {
 		switch scheme {
-		case models.UriScheme_HTTP:
+		case models.URISCHEME_HTTP:
 			uri = fmt.Sprintf("%s://%s:80", scheme, ipv4Address)
-		case models.UriScheme_HTTPS:
+		case models.URISCHEME_HTTPS:
 			uri = fmt.Sprintf("%s://%s:443", scheme, ipv4Address)
 		}
 	}

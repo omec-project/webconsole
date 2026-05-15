@@ -8,7 +8,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
-	github.com/omec-project/openapi v1.7.1
+	github.com/omec-project/openapi/v2 v2.0.0
 	github.com/omec-project/util v1.7.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/swaggo/files v1.0.1
@@ -81,4 +81,5 @@ require (
 	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/tools v0.43.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
+	gopkg.in/validator.v2 v2.0.1 // indirect
 )

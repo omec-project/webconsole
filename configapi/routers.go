@@ -49,6 +49,8 @@ func addRoutes(group *gin.RouterGroup, routes Routes) {
 		switch route.Method {
 		case http.MethodGet:
 			group.GET(route.Pattern, route.HandlerFunc)
+		case http.MethodOptions:
+			group.OPTIONS(route.Pattern, route.HandlerFunc)
 		case http.MethodPost:
 			group.POST(route.Pattern, route.HandlerFunc)
 		case http.MethodPut:

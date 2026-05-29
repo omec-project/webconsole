@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,11 +20,20 @@ import (
 )
 
 type mockWebUI struct {
-	started bool
+	started     atomic.Bool
+	startedCh   chan struct{}
+	startedOnce sync.Once
+}
+
+func newMockWebUI() *mockWebUI {
+	return &mockWebUI{startedCh: make(chan struct{})}
 }
 
 func (m *mockWebUI) Start(ctx context.Context, syncChan chan<- struct{}) {
-	m.started = true
+	m.started.Store(true)
+	m.startedOnce.Do(func() {
+		close(m.startedCh)
+	})
 }
 
 type mockNFConfigSuccess struct{}
@@ -45,7 +56,7 @@ func (m *mockNFConfig) Start(ctx context.Context, syncChan <-chan struct{}) erro
 }
 
 func TestRunWebUIAndNFConfig_Success_ExpectNoError(t *testing.T) {
-	webui := &mockWebUI{}
+	webui := newMockWebUI()
 	nf := &mockNFConfigSuccess{}
 
 	err := runWebUIAndNFConfig(webui, nf)
@@ -53,13 +64,19 @@ func TestRunWebUIAndNFConfig_Success_ExpectNoError(t *testing.T) {
 		t.Errorf("expected no error, got %v", err)
 	}
 
-	if !webui.started {
+	select {
+	case <-webui.startedCh:
+	case <-time.After(time.Second):
+		t.Fatal("webui.Start was not called in time")
+	}
+
+	if !webui.started.Load() {
 		t.Errorf("webui.Start was not called in time")
 	}
 }
 
 func TestRunWebUIAndNFConfig_GivenFailureInNfConfigServiceExpectError(t *testing.T) {
-	webui := &mockWebUI{}
+	webui := newMockWebUI()
 	nf := &mockNFConfigFail{}
 
 	err := runWebUIAndNFConfig(webui, nf)

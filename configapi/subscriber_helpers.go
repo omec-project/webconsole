@@ -6,10 +6,10 @@ package configapi
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/omec-project/openapi/v2/models"
+	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
@@ -33,105 +33,70 @@ func subscriberAuthenticationDataGet(imsi string) (authSubData *models.Authentic
 }
 
 func subscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
-	rwLock.Lock()
-	defer rwLock.Unlock()
 	filter := bson.M{"ueId": imsi}
 	logger.WebUILog.Infof("%+v", authSubData)
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
-	// write to AuthDB
-	if _, err := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA); err != nil {
-		logger.DbLog.Errorf("failed to update authentication subscription error: %+v", err)
-		return err
-	}
-	logger.WebUILog.Infof("updated authentication subscription in authenticationSubscription collection: %s", imsi)
-	// write to CommonDB
 	basicAmData := map[string]any{"ueId": imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
-	if _, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson); err != nil {
-		logger.DbLog.Errorf("failed to update amData error: %+v", err)
-		// rollback AuthDB operation
-		if cleanupErr := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter); cleanupErr != nil {
-			logger.DbLog.Errorf("rollback failed after authData op error: %+v", cleanupErr)
-			return fmt.Errorf("authData update failed: %w, rollback failed: %+v", err, cleanupErr)
+	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
+	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
+	return sessionRunner(context.TODO(), func(sc mongo.SessionContext) error {
+		if _, err := dbadapter.CommonDBClient.RestfulAPIPostOnDB(sc, authDbName, authSubsDataColl, filter, authDataBsonA); err != nil {
+			logger.DbLog.Errorf("failed to create authentication subscription error: %+v", err)
+			return err
 		}
-		return fmt.Errorf("authData update failed, rolled back AuthDB change: %w", err)
-	}
-	logger.WebUILog.Infof("successfully updated authentication subscription in amData collection: %s", imsi)
-	return nil
+		logger.WebUILog.Infof("created authentication subscription in authenticationSubscription collection: %s", imsi)
+		if _, err := dbadapter.CommonDBClient.RestfulAPIPostWithContext(sc, amDataColl, filter, basicDataBson); err != nil {
+			logger.DbLog.Errorf("failed to create amData error: %+v", err)
+			return err
+		}
+		logger.WebUILog.Infof("successfully created authentication subscription in amData collection: %s", imsi)
+		return nil
+	})
 }
 
 func subscriberAuthenticationDataUpdate(imsi string, authSubData *models.AuthenticationSubscription) error {
-	rwLock.Lock()
-	defer rwLock.Unlock()
 	filter := bson.M{"ueId": imsi}
 	authDataBsonA := configmodels.ToBsonM(authSubData)
 	authDataBsonA["ueId"] = imsi
-	// get backup
-	backup, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
-	if err != nil {
-		logger.DbLog.Errorf("failed to get backup data for authentication subscription: %+v", err)
-	}
-	// write to AuthDB
-	if _, err = dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, authDataBsonA); err != nil {
-		logger.DbLog.Errorf("failed to update authentication subscription error: %+v", err)
-		return err
-	}
-	logger.WebUILog.Debugf("updated authentication subscription in authenticationSubscription collection: %s", imsi)
-	// write to CommonDB
 	basicAmData := map[string]any{"ueId": imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
-	if _, err = dbadapter.CommonDBClient.RestfulAPIPutOne(amDataColl, filter, basicDataBson); err != nil {
-		logger.DbLog.Errorf("failed to update amData error: %+v", err)
-		// restore old auth data if any
-		if backup != nil {
-			_, err = dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, backup)
-			if err != nil {
-				logger.DbLog.Errorf("failed to restore backup data for authentication subscription error: %+v", err)
-			}
+	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
+	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
+	return sessionRunner(context.TODO(), func(sc mongo.SessionContext) error {
+		if _, err := dbadapter.CommonDBClient.RestfulAPIPutOneOnDB(sc, authDbName, authSubsDataColl, filter, authDataBsonA); err != nil {
+			logger.DbLog.Errorf("failed to update authentication subscription error: %+v", err)
+			return err
 		}
-		return fmt.Errorf("authData update failed, rolled back AuthDB change: %w", err)
-	}
-	logger.WebUILog.Debugf("successfully updated authentication subscription in amData collection: %s", imsi)
-	return nil
+		logger.WebUILog.Debugf("updated authentication subscription in authenticationSubscription collection: %s", imsi)
+		if _, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, amDataColl, filter, basicDataBson); err != nil {
+			logger.DbLog.Errorf("failed to update amData error: %+v", err)
+			return err
+		}
+		logger.WebUILog.Debugf("successfully updated authentication subscription in amData collection: %s", imsi)
+		return nil
+	})
 }
 
 func subscriberAuthenticationDataDelete(imsi string) error {
-	rwLock.Lock()
-	defer rwLock.Unlock()
 	logger.WebUILog.Debugf("delete authentication subscription from authenticationSubscription collection: %s", imsi)
 	filter := bson.M{"ueId": imsi}
-
-	origAuthData, getErr := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
-	if getErr != nil {
-		logger.DbLog.Errorln("failed to fetch original AuthDB record before delete:", getErr)
-		return getErr
-	}
-
-	// delete in AuthDB
-	err := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter)
-	if err != nil {
-		logger.DbLog.Errorln(err)
-		return err
-	}
-	logger.WebUILog.Debugf("successfully deleted authentication subscription from authenticationSubscription collection: %v", imsi)
-
-	err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter)
-	if err != nil {
-		logger.DbLog.Errorln(err)
-		// rollback AuthDB operation
-		if origAuthData != nil {
-			_, restoreErr := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, origAuthData)
-			if restoreErr != nil {
-				logger.DbLog.Errorf("rollback failed after amData delete error error: %+v", restoreErr)
-				return fmt.Errorf("amData delete failed: %w, rollback failed: %w", err, restoreErr)
-			}
-			return fmt.Errorf("amData delete failed, rolled back AuthDB change: %w", err)
+	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
+	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
+	return sessionRunner(context.TODO(), func(sc mongo.SessionContext) error {
+		if err := dbadapter.CommonDBClient.RestfulAPIDeleteOneOnDB(sc, authDbName, authSubsDataColl, filter); err != nil {
+			logger.DbLog.Errorf("failed to delete authentication subscription: %+v", err)
+			return err
 		}
-		return fmt.Errorf("amData delete failed, unable to rollback AuthDB change: %w", err)
-	}
-	logger.WebUILog.Debugf("successfully deleted authentication subscription from amData collection: %s", imsi)
-	return nil
+		logger.WebUILog.Debugf("successfully deleted authentication subscription from authenticationSubscription collection: %v", imsi)
+		if err := dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, amDataColl, filter); err != nil {
+			logger.DbLog.Errorf("failed to delete amData: %+v", err)
+			return err
+		}
+		logger.WebUILog.Debugf("successfully deleted authentication subscription from amData collection: %s", imsi)
+		return nil
+	})
 }
 
 func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []string) {

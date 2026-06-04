@@ -5,6 +5,7 @@ package configapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type PostDataTracker interface {
@@ -621,10 +623,12 @@ func (db *AuthDBMockDBClient) RestfulAPIDeleteOne(collName string, filter bson.M
 
 type PostSubscriberMockDBClient struct {
 	dbadapter.DBInterface
-	subscribers      []string
-	receivedGetData  []map[string]any
-	receivedPostData []map[string]any
-	err              error
+	subscribers         []string
+	receivedGetData     []map[string]any
+	receivedPostData    []map[string]any
+	receivedPostOnDB    []map[string]any
+	receivedPostWithCtx []map[string]any
+	err                 error
 }
 
 func (db *PostSubscriberMockDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
@@ -655,7 +659,33 @@ func (db *PostSubscriberMockDBClient) RestfulAPIPost(collName string, filter bso
 	return true, nil
 }
 
+func (db *PostSubscriberMockDBClient) StartSession() (mongo.Session, error) {
+	return &MockSession{}, nil
+}
+
+func (db *PostSubscriberMockDBClient) RestfulAPIPostOnDB(ctx context.Context, dbName string, collName string, filter bson.M, postData map[string]any) (bool, error) {
+	db.receivedPostOnDB = append(db.receivedPostOnDB, map[string]any{
+		"dbName": dbName,
+		"coll":   collName,
+		"filter": filter,
+		"data":   postData,
+	})
+	return true, nil
+}
+
+func (db *PostSubscriberMockDBClient) RestfulAPIPostWithContext(ctx context.Context, collName string, filter bson.M, postData map[string]any) (bool, error) {
+	db.receivedPostWithCtx = append(db.receivedPostWithCtx, map[string]any{
+		"coll":   collName,
+		"filter": filter,
+		"data":   postData,
+	})
+	return true, nil
+}
+
 func TestSubscriberPost(t *testing.T) {
+	cleanupFactory := setupTestFactory()
+	defer cleanupFactory()
+
 	tests := []struct {
 		name             string
 		commonDbAdapter  PostSubscriberMockDBClient
@@ -747,16 +777,22 @@ func TestSubscriberPost(t *testing.T) {
 			}
 
 			if tc.expectedPostData != nil {
-				expectedAmDataCollection := amDataColl
-				if tc.commonDbAdapter.receivedPostData[0]["coll"] != expectedAmDataCollection {
-					t.Errorf("expected collection %v, got %v", expectedAmDataCollection, tc.commonDbAdapter.receivedPostData[0]["coll"])
+				if len(tc.commonDbAdapter.receivedPostOnDB) != 1 {
+					t.Fatalf("expected 1 PostOnDB call, got %d", len(tc.commonDbAdapter.receivedPostOnDB))
 				}
-				if !reflect.DeepEqual(tc.commonDbAdapter.receivedPostData[0]["filter"], tc.expectedPostData[0]["filter"]) {
-					t.Errorf("expected filter %t, got %t", tc.expectedPostData[0]["filter"], tc.commonDbAdapter.receivedPostData[0]["filter"])
+				if tc.commonDbAdapter.receivedPostOnDB[0]["coll"] != authSubsDataColl {
+					t.Errorf("expected auth collection %v, got %v", authSubsDataColl, tc.commonDbAdapter.receivedPostOnDB[0]["coll"])
+				}
+				expectedAmDataCollection := amDataColl
+				if len(tc.commonDbAdapter.receivedPostWithCtx) != 1 {
+					t.Fatalf("expected 1 PostWithContext call, got %d", len(tc.commonDbAdapter.receivedPostWithCtx))
+				}
+				if tc.commonDbAdapter.receivedPostWithCtx[0]["coll"] != expectedAmDataCollection {
+					t.Errorf("expected collection %v, got %v", expectedAmDataCollection, tc.commonDbAdapter.receivedPostWithCtx[0]["coll"])
 				}
 				expectedFilter := bson.M{"ueId": "imsi-208930100007487"}
-				if !reflect.DeepEqual(tc.commonDbAdapter.receivedPostData[0]["filter"], expectedFilter) {
-					t.Errorf("expected filter %v, got %v", expectedFilter, tc.commonDbAdapter.receivedPostData[0]["filter"])
+				if !reflect.DeepEqual(tc.commonDbAdapter.receivedPostWithCtx[0]["filter"], expectedFilter) {
+					t.Errorf("expected filter %v, got %v", expectedFilter, tc.commonDbAdapter.receivedPostWithCtx[0]["filter"])
 				}
 			}
 		})
@@ -765,9 +801,11 @@ func TestSubscriberPost(t *testing.T) {
 
 type DeleteSubscriberMockDBClient struct {
 	dbadapter.DBInterface
-	deviceGroups []configmodels.DeviceGroups
-	deleteData   []map[string]any
-	err          error
+	deviceGroups      []configmodels.DeviceGroups
+	deleteData        []map[string]any
+	deleteOnDBData    []map[string]any
+	deleteWithCtxData []map[string]any
+	err               error
 }
 
 func (db *DeleteSubscriberMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
@@ -815,7 +853,37 @@ func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOne(coll string, filter 
 	return nil
 }
 
+func (db *DeleteSubscriberMockDBClient) StartSession() (mongo.Session, error) {
+	return &MockSession{}, nil
+}
+
+func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M) error {
+	if db.err != nil {
+		return db.err
+	}
+	db.deleteOnDBData = append(db.deleteOnDBData, map[string]any{
+		"dbName": dbName,
+		"coll":   collName,
+		"filter": filter,
+	})
+	return nil
+}
+
+func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOneWithContext(ctx context.Context, collName string, filter bson.M) error {
+	if db.err != nil {
+		return db.err
+	}
+	db.deleteWithCtxData = append(db.deleteWithCtxData, map[string]any{
+		"coll":   collName,
+		"filter": filter,
+	})
+	return nil
+}
+
 func TestSubscriberDelete(t *testing.T) {
+	cleanupFactory := setupTestFactory()
+	defer cleanupFactory()
+
 	tests := []struct {
 		name            string
 		commonDbAdapter dbadapter.DBInterface
@@ -875,6 +943,9 @@ func TestSubscriberDelete(t *testing.T) {
 }
 
 func TestSubscriberDeleteFailure(t *testing.T) {
+	cleanupFactory := setupTestFactory()
+	defer cleanupFactory()
+
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddApiService(router)

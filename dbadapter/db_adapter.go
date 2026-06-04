@@ -46,6 +46,9 @@ type DBInterface interface {
 	CreateIndex(collName string, keyField string) (bool, error)
 	StartSession() (mongo.Session, error)
 	SupportsTransactions() (bool, error)
+	RestfulAPIPostOnDB(ctx context.Context, dbName string, collName string, filter bson.M, postData map[string]interface{}) (bool, error)
+	RestfulAPIPutOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M, putData map[string]interface{}) (bool, error)
+	RestfulAPIDeleteOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M) error
 }
 
 type indexCreator interface {
@@ -71,15 +74,10 @@ func GetSessionRunner(client DBInterface) SessionRunner {
 		}
 		defer session.EndSession(ctx)
 		return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
-			if err := session.StartTransaction(); err != nil {
-				return err
-			}
-			if err := fn(sc); err != nil {
-				abortErr := session.AbortTransaction(sc)
-				logger.DbLog.Warnf("failed to abort transaction: %v", abortErr)
-				return err
-			}
-			return session.CommitTransaction(sc)
+			_, err = session.WithTransaction(sc, func(sc mongo.SessionContext) (interface{}, error) {
+				return nil, fn(sc)
+			})
+			return err
 		})
 	}
 }
@@ -386,4 +384,50 @@ func (db *MongoDBClient) StartSession() (mongo.Session, error) {
 
 func (db *MongoDBClient) SupportsTransactions() (bool, error) {
 	return db.MongoClient.SupportsTransactions()
+}
+
+func (db *MongoDBClient) RestfulAPIPostOnDB(ctx context.Context, dbName string, collName string, filter bson.M, postData map[string]interface{}) (bool, error) {
+	collection := db.Client.Database(dbName).Collection(collName)
+	var existing bson.M
+	err := collection.FindOne(ctx, filter).Decode(&existing)
+	if err != nil && err != mongo.ErrNoDocuments {
+		return false, fmt.Errorf("RestfulAPIPostOnDB FindOne err: %+v", err)
+	}
+	if existing != nil {
+		if _, err := collection.UpdateOne(ctx, filter, bson.M{"$set": postData}); err != nil {
+			return false, fmt.Errorf("RestfulAPIPostOnDB UpdateOne err: %+v", err)
+		}
+		return true, nil
+	}
+	if _, err := collection.InsertOne(ctx, postData); err != nil {
+		return false, fmt.Errorf("RestfulAPIPostOnDB InsertOne err: %+v", err)
+	}
+	return false, nil
+}
+
+func (db *MongoDBClient) RestfulAPIPutOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M, putData map[string]interface{}) (bool, error) {
+	collection := db.Client.Database(dbName).Collection(collName)
+	var existing bson.M
+	err := collection.FindOne(ctx, filter).Decode(&existing)
+	if err != nil && err != mongo.ErrNoDocuments {
+		return false, fmt.Errorf("RestfulAPIPutOneOnDB FindOne err: %+v", err)
+	}
+	if existing != nil {
+		if _, err := collection.UpdateOne(ctx, filter, bson.M{"$set": putData}); err != nil {
+			return false, fmt.Errorf("RestfulAPIPutOneOnDB UpdateOne err: %+v", err)
+		}
+		return true, nil
+	}
+	if _, err := collection.InsertOne(ctx, putData); err != nil {
+		return false, fmt.Errorf("RestfulAPIPutOneOnDB InsertOne err: %+v", err)
+	}
+	return false, nil
+}
+
+func (db *MongoDBClient) RestfulAPIDeleteOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M) error {
+	collection := db.Client.Database(dbName).Collection(collName)
+	if _, err := collection.DeleteOne(ctx, filter); err != nil {
+		return fmt.Errorf("RestfulAPIDeleteOneOnDB err: %+v", err)
+	}
+	return nil
 }

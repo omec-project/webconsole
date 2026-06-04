@@ -171,18 +171,18 @@ func InitMongoDB() error {
 		"url", mongodb.AuthUrl,
 		"dbName", mongodb.AuthKeysDbName)
 
-	if err := createIndexWithRetry(CommonDBClient, configmodels.UpfDataColl, "hostname", 180*time.Second); err != nil {
+	if err := createIndexWithRetry(CommonDBClient, configmodels.UpfDataColl, "hostname", 180*time.Second, 2*time.Second); err != nil {
 		logger.InitLog.Errorf("error creating UPF index in commonDB %v", err)
 		return err
 	}
-	if err := createIndexWithRetry(CommonDBClient, configmodels.GnbDataColl, "name", 180*time.Second); err != nil {
+	if err := createIndexWithRetry(CommonDBClient, configmodels.GnbDataColl, "name", 180*time.Second, 2*time.Second); err != nil {
 		logger.InitLog.Errorf("error creating gNB index in commonDB %v", err)
 		return err
 	}
 
 	if factory.WebUIConfig.Configuration.EnableAuthentication {
 		ConnectMongo(mongodb.WebuiDBUrl, mongodb.WebuiDBName, &WebuiDBClient)
-		if err := createIndexWithRetry(WebuiDBClient, configmodels.UserAccountDataColl, "username", 180*time.Second); err != nil {
+		if err := createIndexWithRetry(WebuiDBClient, configmodels.UserAccountDataColl, "username", 180*time.Second, 2*time.Second); err != nil {
 			logger.InitLog.Errorf("error initializing webuiDB %v", err)
 			return err
 		}
@@ -192,12 +192,12 @@ func InitMongoDB() error {
 	return nil
 }
 
-func createIndexWithRetry(client indexCreator, collName string, keyField string, timeout time.Duration) error {
+func createIndexWithRetry(client indexCreator, collName string, keyField string, timeout, retryInterval time.Duration) error {
 	if client == nil {
 		return fmt.Errorf("mongoDB client has not been initialized")
 	}
 
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(retryInterval)
 	defer ticker.Stop()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
@@ -228,10 +228,6 @@ func createIndexWithRetry(client indexCreator, collName string, keyField string,
 			return fmt.Errorf("timed out creating index for %s.%s: %w", collName, keyField, err)
 		}
 	}
-}
-
-func CreateIndexWithRetryForTest(client indexCreator, collName string, keyField string, timeout time.Duration) error {
-	return createIndexWithRetry(client, collName, keyField, timeout)
 }
 
 func isRetryableIndexError(err error) bool {

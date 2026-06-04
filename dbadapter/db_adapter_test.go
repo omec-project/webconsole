@@ -52,7 +52,7 @@ func TestCreateIndexWithRetry(t *testing.T) {
 			},
 		}
 
-		err := CreateIndexWithRetryForTest(client, "upf", "hostname", 3*time.Second)
+		err := createIndexWithRetry(client, "upf", "hostname", 100*time.Millisecond, 5*time.Millisecond)
 		if err != nil {
 			t.Fatalf("expected retry to succeed, got %v", err)
 		}
@@ -68,7 +68,7 @@ func TestCreateIndexWithRetry(t *testing.T) {
 			},
 		}
 
-		err := CreateIndexWithRetryForTest(client, "upf", "hostname", 3*time.Second)
+		err := createIndexWithRetry(client, "upf", "hostname", 100*time.Millisecond, 5*time.Millisecond)
 		if err == nil {
 			t.Fatal("expected permanent error")
 		}
@@ -87,7 +87,7 @@ func TestCreateIndexWithRetry(t *testing.T) {
 			},
 		}
 
-		err := CreateIndexWithRetryForTest(client, "upf", "hostname", 1500*time.Millisecond)
+		err := createIndexWithRetry(client, "upf", "hostname", 30*time.Millisecond, 5*time.Millisecond)
 		if err == nil {
 			t.Fatal("expected timeout error")
 		}

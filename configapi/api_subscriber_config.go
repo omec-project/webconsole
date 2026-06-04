@@ -498,6 +498,7 @@ func PostSubscriberByID(c *gin.Context) {
 
 	err = subscriberAuthenticationDataCreate(ueId, &authSubsData)
 	if err != nil {
+		logger.WebUILog.Errorf("Failed to create subscriber %s: %+v request ID: %s", ueId, err, requestID)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":      fmt.Sprintf("Failed to create subscriber %s", ueId),
 			"request_id": requestID,

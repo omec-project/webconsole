@@ -17,6 +17,10 @@ type MockSession struct {
 	mongo.Session
 }
 
+func (m *MockSession) WithTransaction(ctx context.Context, fn func(mongo.SessionContext) (interface{}, error), opts ...*options.TransactionOptions) (interface{}, error) {
+	return fn(mongo.NewSessionContext(ctx, m))
+}
+
 func (m *MockSession) StartTransaction(opts ...*options.TransactionOptions) error {
 	return nil
 }
@@ -59,6 +63,10 @@ func (db *MockMongoClientDBError) RestfulAPIPost(collName string, filter bson.M,
 	return false, errors.New("DB error")
 }
 
+func (db *MockMongoClientDBError) RestfulAPIPostWithContext(context context.Context, collName string, filter bson.M, postData map[string]any) (bool, error) {
+	return false, errors.New("DB error")
+}
+
 func (db *MockMongoClientDBError) RestfulAPIPostMany(collName string, filter bson.M, postDataArray []any) error {
 	return errors.New("DB error")
 }
@@ -73,6 +81,18 @@ func (db *MockMongoClientDBError) RestfulAPICount(collName string, filter bson.M
 
 func (m *MockMongoClientDBError) StartSession() (mongo.Session, error) {
 	return &MockSession{}, nil
+}
+
+func (db *MockMongoClientDBError) RestfulAPIPostOnDB(ctx context.Context, dbName string, collName string, filter bson.M, postData map[string]any) (bool, error) {
+	return false, errors.New("DB error")
+}
+
+func (db *MockMongoClientDBError) RestfulAPIPutOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M, putData map[string]any) (bool, error) {
+	return false, errors.New("DB error")
+}
+
+func (db *MockMongoClientDBError) RestfulAPIDeleteOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M) error {
+	return errors.New("DB error")
 }
 
 type MockMongoClientEmptyDB struct {
@@ -93,6 +113,10 @@ func (db *MockMongoClientEmptyDB) RestfulAPIPutOneWithContext(context context.Co
 }
 
 func (db *MockMongoClientEmptyDB) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
+	return true, nil
+}
+
+func (db *MockMongoClientEmptyDB) RestfulAPIPostWithContext(context context.Context, collName string, filter bson.M, postData map[string]any) (bool, error) {
 	return true, nil
 }
 
@@ -125,5 +149,17 @@ func (m *MockMongoClientEmptyDB) RestfulAPIDeleteOne(coll string, filter bson.M)
 }
 
 func (m *MockMongoClientEmptyDB) Client() *mongo.Client {
+	return nil
+}
+
+func (db *MockMongoClientEmptyDB) RestfulAPIPostOnDB(ctx context.Context, dbName string, collName string, filter bson.M, postData map[string]any) (bool, error) {
+	return true, nil
+}
+
+func (db *MockMongoClientEmptyDB) RestfulAPIPutOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M, putData map[string]any) (bool, error) {
+	return false, nil
+}
+
+func (db *MockMongoClientEmptyDB) RestfulAPIDeleteOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M) error {
 	return nil
 }

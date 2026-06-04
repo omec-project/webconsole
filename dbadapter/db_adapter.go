@@ -1,13 +1,15 @@
+// Copyright (C) 2026 Intel Corporation
+// SPDX-FileCopyrightText: 2024 Canonical Ltd
 // SPDX-FileCopyrightText: 2024 Open Networking Foundation <info@opennetworking.org>
 // SPDX-FileCopyrightText: 2019 free5GC.org
-// SPDX-FileCopyrightText: 2024 Canonical Ltd
-//
 // SPDX-License-Identifier: Apache-2.0
 package dbadapter
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/omec-project/util/mongoapi"
@@ -44,6 +46,10 @@ type DBInterface interface {
 	CreateIndex(collName string, keyField string) (bool, error)
 	StartSession() (mongo.Session, error)
 	SupportsTransactions() (bool, error)
+}
+
+type indexCreator interface {
+	CreateIndex(collName string, keyField string) (bool, error)
 }
 
 var (
@@ -165,18 +171,18 @@ func InitMongoDB() error {
 		"url", mongodb.AuthUrl,
 		"dbName", mongodb.AuthKeysDbName)
 
-	if resp, err := CommonDBClient.CreateIndex(configmodels.UpfDataColl, "hostname"); !resp || err != nil {
+	if err := createIndexWithRetry(CommonDBClient, configmodels.UpfDataColl, "hostname", 180*time.Second, 2*time.Second); err != nil {
 		logger.InitLog.Errorf("error creating UPF index in commonDB %v", err)
 		return err
 	}
-	if resp, err := CommonDBClient.CreateIndex(configmodels.GnbDataColl, "name"); !resp || err != nil {
+	if err := createIndexWithRetry(CommonDBClient, configmodels.GnbDataColl, "name", 180*time.Second, 2*time.Second); err != nil {
 		logger.InitLog.Errorf("error creating gNB index in commonDB %v", err)
 		return err
 	}
 
 	if factory.WebUIConfig.Configuration.EnableAuthentication {
 		ConnectMongo(mongodb.WebuiDBUrl, mongodb.WebuiDBName, &WebuiDBClient)
-		if resp, err := WebuiDBClient.CreateIndex(configmodels.UserAccountDataColl, "username"); !resp || err != nil {
+		if err := createIndexWithRetry(WebuiDBClient, configmodels.UserAccountDataColl, "username", 180*time.Second, 2*time.Second); err != nil {
 			logger.InitLog.Errorf("error initializing webuiDB %v", err)
 			return err
 		}
@@ -184,6 +190,106 @@ func InitMongoDB() error {
 
 	logger.InitLog.Info("MongoDB initialization completed successfully")
 	return nil
+}
+
+func createIndexWithRetry(client indexCreator, collName string, keyField string, timeout, retryInterval time.Duration) error {
+	if client == nil {
+		return fmt.Errorf("mongoDB client has not been initialized")
+	}
+
+	ticker := time.NewTicker(retryInterval)
+	defer ticker.Stop()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for {
+		resp, err := client.CreateIndex(collName, keyField)
+		if err == nil && resp {
+			return nil
+		}
+
+		if err == nil && !resp {
+			err = fmt.Errorf("CreateIndex returned false for %s.%s", collName, keyField)
+		}
+
+		if !isRetryableIndexError(err) {
+			return err
+		}
+
+		logger.InitLog.Warnw("retrying MongoDB index creation",
+			"collection", collName,
+			"keyField", keyField,
+			"error", err)
+
+		select {
+		case <-ticker.C:
+			continue
+		case <-timer.C:
+			return fmt.Errorf("timed out creating index for %s.%s: %w", collName, keyField, err)
+		}
+	}
+}
+
+func isRetryableIndexError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var commandErr mongo.CommandError
+	if errors.As(err, &commandErr) {
+		if commandErr.HasErrorLabel("RetryableWriteError") || commandErr.HasErrorLabel("TransientTransactionError") {
+			return true
+		}
+	}
+
+	var writeException mongo.WriteException
+	if errors.As(err, &writeException) {
+		if writeException.HasErrorLabel("RetryableWriteError") || writeException.HasErrorLabel("TransientTransactionError") {
+			return true
+		}
+		if writeException.WriteConcernError != nil && isRetryableMongoMessage(writeException.WriteConcernError.Message) {
+			return true
+		}
+		for _, writeErr := range writeException.WriteErrors {
+			if isRetryableMongoMessage(writeErr.Message) {
+				return true
+			}
+		}
+	}
+
+	var serverErr mongo.ServerError
+	if errors.As(err, &serverErr) {
+		if serverErr.HasErrorLabel("RetryableWriteError") || serverErr.HasErrorLabel("TransientTransactionError") {
+			return true
+		}
+	}
+
+	return isRetryableMongoMessage(err.Error())
+}
+
+func isRetryableMongoMessage(message string) bool {
+	lowerMsg := strings.ToLower(message)
+	transientFragments := []string{
+		"interruptedatshutdown",
+		"interrupted at shutdown",
+		"notwritableprimary",
+		"not primary",
+		"node is recovering",
+		"primary stepped down",
+		"connection",
+		"server selection",
+		"topology",
+		"context deadline exceeded",
+		"election",
+	}
+
+	for _, fragment := range transientFragments {
+		if strings.Contains(lowerMsg, fragment) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (db *MongoDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error) {

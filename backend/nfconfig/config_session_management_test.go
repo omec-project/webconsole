@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/omec-project/openapi/v2"
 	"github.com/omec-project/openapi/v2/nfConfigApi"
 	"github.com/omec-project/webconsole/configmodels"
 )
@@ -99,11 +100,12 @@ func TestSyncSessionManagement(t *testing.T) {
 			},
 			deviceGroups: []deviceGroupParams{
 				{
-					name:       "dg-1",
-					dnn:        "internet",
-					dnsPrimary: "8.8.8.8",
-					ueIpPool:   "10.1.1.0/24",
-					mtu:        1500,
+					name:         "dg-1",
+					dnn:          "internet",
+					dnsPrimary:   "8.8.8.8",
+					pcscfPrimary: "10.10.10.10",
+					ueIpPool:     "10.1.1.0/24",
+					mtu:          1500,
 				},
 			},
 			expectedResponse: []nfConfigApi.SessionManagement{
@@ -119,10 +121,11 @@ func TestSyncSessionManagement(t *testing.T) {
 					},
 					IpDomain: []nfConfigApi.IpDomain{
 						{
-							DnnName:  "internet",
-							DnsIpv4:  "8.8.8.8",
-							UeSubnet: "10.1.1.0/24",
-							Mtu:      1500,
+							DnnName:   "internet",
+							DnsIpv4:   "8.8.8.8",
+							PcscfIpv4: openapi.PtrString("10.10.10.10"),
+							UeSubnet:  "10.1.1.0/24",
+							Mtu:       1500,
 						},
 					},
 					Upf: &nfConfigApi.Upf{

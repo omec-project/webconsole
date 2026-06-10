@@ -177,6 +177,9 @@ components:
         dns-primary:
           example: 8.8.8.8
           type: string
+        pcscf-primary:
+          example: 10.10.10.10
+          type: string
         dns-secondary:
           nullable: false
           example: 8.8.4.4

@@ -65,12 +65,13 @@ var defaultPccRule = nfConfigApi.NewPccRule(
 )
 
 func (c *inMemoryConfig) syncPlmn(slices []configmodels.Slice) {
-	plmnSet := make(map[nfConfigApi.PlmnId]bool)
+	plmnSet := make(map[string]struct{})
 	newPlmnConfig := []nfConfigApi.PlmnId{}
 	for _, s := range slices {
 		plmn := *nfConfigApi.NewPlmnId(s.SiteInfo.Plmn.Mcc, s.SiteInfo.Plmn.Mnc)
-		if !plmnSet[plmn] {
-			plmnSet[plmn] = true
+		plmnKey := plmn.GetMcc() + ":" + plmn.GetMnc()
+		if _, exists := plmnSet[plmnKey]; !exists {
+			plmnSet[plmnKey] = struct{}{}
 			newPlmnConfig = append(newPlmnConfig, plmn)
 		}
 	}
@@ -287,6 +288,9 @@ func extractIpDomains(groupNames []string, deviceGroupMap map[string]configmodel
 				ipDomainExp.UeIpPool, // Now accessing the correct field from the slice element
 				ipDomainExp.Mtu,
 			)
+			if ipDomainExp.PcscfPrimary != "" {
+				ip.SetPcscfIpv4(ipDomainExp.PcscfPrimary)
+			}
 			ipDomains = append(ipDomains, *ip)
 		}
 	}

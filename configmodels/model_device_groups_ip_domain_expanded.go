@@ -22,6 +22,8 @@ type DeviceGroupsIpDomainExpanded struct {
 
 	DnsPrimary string `json:"dns-primary,omitempty"`
 
+	PcscfPrimary string `json:"pcscf-primary,omitempty"`
+
 	DnsSecondary string `json:"dns-secondary,omitempty"`
 
 	Mtu int32 `json:"mtu,omitempty"`

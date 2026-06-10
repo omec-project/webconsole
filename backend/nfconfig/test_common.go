@@ -10,13 +10,14 @@ import (
 )
 
 type deviceGroupParams struct {
-	name       string
-	imsis      []string
-	dnn        string
-	dnsPrimary string
-	ueIpPool   string
-	mtu        int32
-	qos        *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos
+	name         string
+	imsis        []string
+	dnn          string
+	dnsPrimary   string
+	pcscfPrimary string
+	ueIpPool     string
+	mtu          int32
+	qos          *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos
 }
 
 func makeDeviceGroup(p deviceGroupParams) (string, configmodels.DeviceGroups) {
@@ -24,11 +25,12 @@ func makeDeviceGroup(p deviceGroupParams) (string, configmodels.DeviceGroups) {
 		Imsis: p.imsis,
 		IpDomainsExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
 			{
-				Dnn:        p.dnn,
-				DnsPrimary: p.dnsPrimary,
-				UeIpPool:   p.ueIpPool,
-				Mtu:        p.mtu,
-				UeDnnQos:   p.qos,
+				Dnn:          p.dnn,
+				DnsPrimary:   p.dnsPrimary,
+				PcscfPrimary: p.pcscfPrimary,
+				UeIpPool:     p.ueIpPool,
+				Mtu:          p.mtu,
+				UeDnnQos:     p.qos,
 			},
 		},
 	}

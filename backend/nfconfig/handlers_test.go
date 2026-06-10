@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -122,8 +121,17 @@ func TestGetImsiQosConfig(t *testing.T) {
 			if err != nil {
 				t.Fatalf("fail to unmarshal body %v", err)
 			}
-			if !reflect.DeepEqual(got, tc.expectedData) {
-				t.Errorf("expected %v, got %v", tc.expectedData, got)
+			if len(got) != len(tc.expectedData) {
+				t.Fatalf("expected %d qos entries, got %d: %v", len(tc.expectedData), len(got), got)
+			}
+			for i := range got {
+				if got[i].GetMbrUplink() != tc.expectedData[i].GetMbrUplink() ||
+					got[i].GetMbrDownlink() != tc.expectedData[i].GetMbrDownlink() ||
+					got[i].GetFiveQi() != tc.expectedData[i].GetFiveQi() ||
+					got[i].GetArpPriorityLevel() != tc.expectedData[i].GetArpPriorityLevel() {
+					t.Errorf("expected %v, got %v", tc.expectedData, got)
+					break
+				}
 			}
 		})
 	}

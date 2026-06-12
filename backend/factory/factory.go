@@ -16,11 +16,10 @@ import (
 	"fmt"
 	"os"
 
+	openapiLogger "github.com/omec-project/openapi/v2/logger"
 	utilLogger "github.com/omec-project/util/logger"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/urfave/cli/v3"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -76,38 +75,15 @@ func InitConfigFactory(f string) error {
 }
 
 func SetLogLevelsFromConfig(cfg *Config) {
-	if cfg.Logger == nil {
+	cfgLogger := cfg.Logger
+	if cfgLogger == nil {
 		logger.InitLog.Warnln("webconsole config without log level setting")
 		return
 	}
-	if cfg.Logger.WEBUI != nil {
-		if cfg.Logger.WEBUI.DebugLevel != "" {
-			if level, err := zapcore.ParseLevel(cfg.Logger.WEBUI.DebugLevel); err != nil {
-				logger.InitLog.Warnf("WebUI Log level [%s] is invalid, set to [info] level", cfg.Logger.WEBUI.DebugLevel)
-				logger.SetLogLevel(zap.InfoLevel)
-			} else {
-				logger.InitLog.Infof("WebUI Log level is set to [%s] level", level)
-				logger.SetLogLevel(level)
-			}
-		} else {
-			logger.InitLog.Warnln("WebUI Log level not set. Default set to [info] level")
-			logger.SetLogLevel(zap.InfoLevel)
-		}
-	}
 
-	if cfg.Logger.Util != nil {
-		if cfg.Logger.Util.DebugLevel != "" {
-			if level, err := zapcore.ParseLevel(cfg.Logger.Util.DebugLevel); err != nil {
-				utilLogger.UtilLog.Warnf("Util Log level [%s] is invalid, set to [info] level", cfg.Logger.Util.DebugLevel)
-				utilLogger.SetLogLevel(zap.InfoLevel)
-			} else {
-				utilLogger.SetLogLevel(level)
-			}
-		} else {
-			utilLogger.UtilLog.Warnln("Util Log level not set. Default set to [info] level")
-			utilLogger.SetLogLevel(zap.InfoLevel)
-		}
-	}
+	utilLogger.ApplyLogSetting("WEBUI", cfgLogger.WEBUI, logger.InitLog, logger.SetLogLevel)
+	utilLogger.ApplyLogSetting("OpenApi", cfgLogger.OpenApi, openapiLogger.OpenapiLog, openapiLogger.SetLogLevel)
+	utilLogger.ApplyLogSetting("Util", cfgLogger.Util, utilLogger.UtilLog, utilLogger.SetLogLevel)
 }
 
 func GetCliFlags() []cli.Flag {

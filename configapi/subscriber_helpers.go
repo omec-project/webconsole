@@ -13,8 +13,7 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func subscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
@@ -41,7 +40,7 @@ func subscriberAuthenticationDataCreate(imsi string, authSubData *models.Authent
 	basicDataBson := configmodels.ToBsonM(basicAmData)
 	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
 	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
-	return sessionRunner(context.TODO(), func(sc mongo.SessionContext) error {
+	return sessionRunner(context.TODO(), func(sc context.Context) error {
 		if _, err := dbadapter.CommonDBClient.RestfulAPIPostOnDB(sc, authDbName, authSubsDataColl, filter, authDataBsonA); err != nil {
 			logger.DbLog.Errorf("failed to create authentication subscription error: %+v", err)
 			return err
@@ -64,7 +63,7 @@ func subscriberAuthenticationDataUpdate(imsi string, authSubData *models.Authent
 	basicDataBson := configmodels.ToBsonM(basicAmData)
 	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
 	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
-	return sessionRunner(context.TODO(), func(sc mongo.SessionContext) error {
+	return sessionRunner(context.TODO(), func(sc context.Context) error {
 		if _, err := dbadapter.CommonDBClient.RestfulAPIPutOneOnDB(sc, authDbName, authSubsDataColl, filter, authDataBsonA); err != nil {
 			logger.DbLog.Errorf("failed to update authentication subscription error: %+v", err)
 			return err
@@ -84,7 +83,7 @@ func subscriberAuthenticationDataDelete(imsi string) error {
 	filter := bson.M{"ueId": imsi}
 	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
 	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
-	return sessionRunner(context.TODO(), func(sc mongo.SessionContext) error {
+	return sessionRunner(context.TODO(), func(sc context.Context) error {
 		if err := dbadapter.CommonDBClient.RestfulAPIDeleteOneOnDB(sc, authDbName, authSubsDataColl, filter); err != nil {
 			logger.DbLog.Errorf("failed to delete authentication subscription: %+v", err)
 			return err
@@ -127,7 +126,7 @@ func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string) error {
 	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
 	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
 
-	err := sessionRunner(context.TODO(), func(sc mongo.SessionContext) error {
+	err := sessionRunner(context.TODO(), func(sc context.Context) error {
 		// AM policy
 		err := dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, amPolicyDataColl, filterImsiOnly)
 		if err != nil {

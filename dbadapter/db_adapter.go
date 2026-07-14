@@ -16,10 +16,47 @@ import (
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
+
+type DBSession interface {
+	EndSession(ctx context.Context)
+	WithTransaction(ctx context.Context, fn func(ctx context.Context) (any, error), opts ...options.Lister[options.TransactionOptions]) (any, error)
+	StartTransaction(opts ...options.Lister[options.TransactionOptions]) error
+	AbortTransaction(ctx context.Context) error
+	CommitTransaction(ctx context.Context) error
+	WithSession(ctx context.Context, fn func(context.Context) error) error
+}
+
+type MongoDBSession struct {
+	session *mongo.Session
+}
+
+func (s *MongoDBSession) EndSession(ctx context.Context) {
+	s.session.EndSession(ctx)
+}
+
+func (s *MongoDBSession) WithTransaction(ctx context.Context, fn func(ctx context.Context) (any, error), opts ...options.Lister[options.TransactionOptions]) (any, error) {
+	return s.session.WithTransaction(ctx, fn, opts...)
+}
+
+func (s *MongoDBSession) StartTransaction(opts ...options.Lister[options.TransactionOptions]) error {
+	return s.session.StartTransaction(opts...)
+}
+
+func (s *MongoDBSession) AbortTransaction(ctx context.Context) error {
+	return s.session.AbortTransaction(ctx)
+}
+
+func (s *MongoDBSession) CommitTransaction(ctx context.Context) error {
+	return s.session.CommitTransaction(ctx)
+}
+
+func (s *MongoDBSession) WithSession(ctx context.Context, fn func(context.Context) error) error {
+	return mongo.WithSession(ctx, s.session, fn)
+}
 
 type DBInterface interface {
 	RestfulAPIGetOne(collName string, filter bson.M) (map[string]interface{}, error)
@@ -28,7 +65,7 @@ type DBInterface interface {
 	RestfulAPIPutOne(collName string, filter bson.M, putData map[string]interface{}) (bool, error)
 	RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]interface{}) (bool, error)
 	RestfulAPIPutOneNotUpdate(collName string, filter bson.M, putData map[string]interface{}) (bool, error)
-	RestfulAPIPutMany(collName string, filterArray []primitive.M, putDataArray []map[string]interface{}) error
+	RestfulAPIPutMany(collName string, filterArray []bson.M, putDataArray []map[string]interface{}) error
 	RestfulAPIDeleteOne(collName string, filter bson.M) error
 	RestfulAPIDeleteOneWithContext(context context.Context, collName string, filter bson.M) error
 	RestfulAPIDeleteMany(collName string, filter bson.M) error
@@ -44,7 +81,7 @@ type DBInterface interface {
 	RestfulAPIPullOne(collName string, filter bson.M, putData map[string]interface{}) error
 	RestfulAPIPullOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]interface{}) error
 	CreateIndex(collName string, keyField string) (bool, error)
-	StartSession() (mongo.Session, error)
+	StartSession() (DBSession, error)
 	SupportsTransactions() (bool, error)
 	RestfulAPIPostOnDB(ctx context.Context, dbName string, collName string, filter bson.M, postData map[string]interface{}) (bool, error)
 	RestfulAPIPutOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M, putData map[string]interface{}) (bool, error)
@@ -64,17 +101,20 @@ var (
 type MongoDBClient struct {
 	mongoapi.MongoClient
 }
-type SessionRunner func(ctx context.Context, fn func(sc mongo.SessionContext) error) error
+type SessionRunner func(ctx context.Context, fn func(sc context.Context) error) error
 
 func GetSessionRunner(client DBInterface) SessionRunner {
-	return func(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+	return func(ctx context.Context, fn func(sc context.Context) error) error {
 		session, err := client.StartSession()
 		if err != nil {
 			return err
 		}
+		if session == nil {
+			return fn(ctx)
+		}
 		defer session.EndSession(ctx)
-		return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
-			_, err = session.WithTransaction(sc, func(sc mongo.SessionContext) (interface{}, error) {
+		return session.WithSession(ctx, func(sc context.Context) error {
+			_, err = session.WithTransaction(sc, func(sc context.Context) (interface{}, error) {
 				return nil, fn(sc)
 			})
 			return err
@@ -314,7 +354,7 @@ func (db *MongoDBClient) RestfulAPIPutOneNotUpdate(collName string, filter bson.
 	return db.MongoClient.RestfulAPIPutOneNotUpdate(collName, filter, putData)
 }
 
-func (db *MongoDBClient) RestfulAPIPutMany(collName string, filterArray []primitive.M, putDataArray []map[string]interface{}) error {
+func (db *MongoDBClient) RestfulAPIPutMany(collName string, filterArray []bson.M, putDataArray []map[string]interface{}) error {
 	return db.MongoClient.RestfulAPIPutMany(collName, filterArray, putDataArray)
 }
 
@@ -378,8 +418,12 @@ func (db *MongoDBClient) CreateIndex(collName string, keyField string) (bool, er
 	return db.MongoClient.CreateIndex(collName, keyField)
 }
 
-func (db *MongoDBClient) StartSession() (mongo.Session, error) {
-	return db.MongoClient.StartSession()
+func (db *MongoDBClient) StartSession() (DBSession, error) {
+	session, err := db.MongoClient.StartSession()
+	if err != nil || session == nil {
+		return nil, err
+	}
+	return &MongoDBSession{session: session}, nil
 }
 
 func (db *MongoDBClient) SupportsTransactions() (bool, error) {

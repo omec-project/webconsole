@@ -20,8 +20,7 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type PostDataTracker interface {
@@ -659,7 +658,7 @@ func (db *PostSubscriberMockDBClient) RestfulAPIPost(collName string, filter bso
 	return true, nil
 }
 
-func (db *PostSubscriberMockDBClient) StartSession() (mongo.Session, error) {
+func (db *PostSubscriberMockDBClient) StartSession() (dbadapter.DBSession, error) {
 	return &MockSession{}, nil
 }
 
@@ -853,7 +852,7 @@ func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOne(coll string, filter 
 	return nil
 }
 
-func (db *DeleteSubscriberMockDBClient) StartSession() (mongo.Session, error) {
+func (db *DeleteSubscriberMockDBClient) StartSession() (dbadapter.DBSession, error) {
 	return &MockSession{}, nil
 }
 

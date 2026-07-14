@@ -15,8 +15,7 @@ import (
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func authenticationSubscription() *models.AuthenticationSubscription {
@@ -63,7 +62,7 @@ type txMockDB struct {
 	deleteWithCtxErr      error
 }
 
-func (m *txMockDB) StartSession() (mongo.Session, error) {
+func (m *txMockDB) StartSession() (dbadapter.DBSession, error) {
 	return &MockSession{}, nil
 }
 

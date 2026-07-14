@@ -15,8 +15,7 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func setInventoryCorsHeader(c *gin.Context) {
@@ -113,7 +112,7 @@ func PostGnb(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{})
 }
 
-func postGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
+func postGnbOperation(sc context.Context, gnb configmodels.Gnb) error {
 	filter := bson.M{"name": gnb.Name}
 	gnbDataBson := configmodels.ToBsonM(gnb)
 	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.GnbDataColl, filter, []any{gnbDataBson})
@@ -168,7 +167,7 @@ func PutGnb(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func putGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
+func putGnbOperation(sc context.Context, gnb configmodels.Gnb) error {
 	filter := bson.M{"name": gnb.Name}
 	gnbDataBson := configmodels.ToBsonM(gnb)
 	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.GnbDataColl, filter, gnbDataBson)
@@ -229,7 +228,7 @@ func DeleteGnb(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func deleteGnbOperation(sc mongo.SessionContext, gnb configmodels.Gnb) error {
+func deleteGnbOperation(sc context.Context, gnb configmodels.Gnb) error {
 	filter := bson.M{"name": gnb.Name}
 	return dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.GnbDataColl, filter)
 }
@@ -250,14 +249,23 @@ func removeGnbFromNetworkSlices(gnb configmodels.Gnb) error {
 	return err
 }
 
-func executeGnbTransaction(ctx context.Context, gnb configmodels.Gnb, nsOperation func(configmodels.Gnb) error, gnbOperation func(mongo.SessionContext, configmodels.Gnb) error) error {
+func executeGnbTransaction(ctx context.Context, gnb configmodels.Gnb, nsOperation func(configmodels.Gnb) error, gnbOperation func(context.Context, configmodels.Gnb) error) error {
 	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DB session: %w", err)
 	}
+	if session == nil {
+		if err = gnbOperation(ctx, gnb); err != nil {
+			return err
+		}
+		if err = nsOperation(gnb); err != nil {
+			return fmt.Errorf("failed to update network slices: %w", err)
+		}
+		return nil
+	}
 	defer session.EndSession(ctx)
 
-	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+	return session.WithSession(ctx, func(sc context.Context) error {
 		if err = session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
@@ -364,7 +372,7 @@ func PostUpf(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{})
 }
 
-func postUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
+func postUpfOperation(sc context.Context, upf configmodels.Upf) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	upfDataBson := configmodels.ToBsonM(upf)
 	if upfDataBson == nil {
@@ -423,7 +431,7 @@ func PutUpf(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func putUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
+func putUpfOperation(sc context.Context, upf configmodels.Upf) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	upfDataBson := configmodels.ToBsonM(upf)
 	if upfDataBson == nil {
@@ -483,7 +491,7 @@ func DeleteUpf(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func deleteUpfOperation(sc mongo.SessionContext, upf configmodels.Upf) error {
+func deleteUpfOperation(sc context.Context, upf configmodels.Upf) error {
 	filter := bson.M{"hostname": upf.Hostname}
 	return dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.UpfDataColl, filter)
 }
@@ -500,14 +508,23 @@ func removeUpfFromNetworkSlices(upf configmodels.Upf) error {
 	return err
 }
 
-func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, nsOperation func(configmodels.Upf) error, upfOperation func(mongo.SessionContext, configmodels.Upf) error) error {
+func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, nsOperation func(configmodels.Upf) error, upfOperation func(context.Context, configmodels.Upf) error) error {
 	session, err := dbadapter.CommonDBClient.StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DB session: %w", err)
 	}
+	if session == nil {
+		if err = upfOperation(ctx, upf); err != nil {
+			return err
+		}
+		if err = nsOperation(upf); err != nil {
+			return fmt.Errorf("failed to update network slices: %w", err)
+		}
+		return nil
+	}
 	defer session.EndSession(ctx)
 
-	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+	return session.WithSession(ctx, func(sc context.Context) error {
 		if err = session.StartTransaction(); err != nil {
 			return fmt.Errorf("failed to start transaction: %w", err)
 		}
@@ -522,7 +539,7 @@ func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, nsOperatio
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorf("failed to abort transaction with error: %+v", abortErr)
 			}
-			return fmt.Errorf("failed to update network slices: %+v", err)
+			return fmt.Errorf("failed to update network slices: %w", err)
 		}
 		return session.CommitTransaction(sc)
 	})

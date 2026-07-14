@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 
 	"github.com/omec-project/webconsole/backend/logger"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func ToBsonM(data any) (ret bson.M) {

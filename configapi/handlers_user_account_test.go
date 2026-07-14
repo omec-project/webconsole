@@ -14,8 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/webconsole/dbadapter"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -111,8 +110,8 @@ func (db *MockMongoClientDuplicateCreation) RestfulAPICount(collName string, fil
 	return 1, nil
 }
 
-func (m *MockMongoClientDuplicateCreation) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
+func (m *MockMongoClientDuplicateCreation) StartSession() (dbadapter.DBSession, error) {
+	return nil, nil
 }
 
 func TestGetUserAccountsHandler(t *testing.T) {

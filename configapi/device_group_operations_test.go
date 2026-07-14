@@ -17,8 +17,7 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type DeviceGroupMockDBClient struct {
@@ -68,7 +67,7 @@ func (db *DeviceGroupMockDBClient) RestfulAPIPost(collName string, filter bson.M
 	return true, nil
 }
 
-func (db *DeviceGroupMockDBClient) RestfulAPIDeleteOne(coll string, filter primitive.M) error {
+func (db *DeviceGroupMockDBClient) RestfulAPIDeleteOne(coll string, filter bson.M) error {
 	params := map[string]any{
 		"coll":   coll,
 		"filter": filter,

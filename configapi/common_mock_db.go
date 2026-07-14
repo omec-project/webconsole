@@ -8,20 +8,24 @@ import (
 	"errors"
 
 	"github.com/omec-project/webconsole/dbadapter"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type MockSession struct {
 	mongo.Session
 }
 
-func (m *MockSession) WithTransaction(ctx context.Context, fn func(mongo.SessionContext) (interface{}, error), opts ...*options.TransactionOptions) (interface{}, error) {
-	return fn(mongo.NewSessionContext(ctx, m))
+func (m *MockSession) WithTransaction(ctx context.Context, fn func(ctx context.Context) (interface{}, error), opts ...options.Lister[options.TransactionOptions]) (interface{}, error) {
+	return fn(ctx)
 }
 
-func (m *MockSession) StartTransaction(opts ...*options.TransactionOptions) error {
+func (m *MockSession) WithSession(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
+func (m *MockSession) StartTransaction(opts ...options.Lister[options.TransactionOptions]) error {
 	return nil
 }
 
@@ -79,8 +83,8 @@ func (db *MockMongoClientDBError) RestfulAPICount(collName string, filter bson.M
 	return 0, errors.New("DB error")
 }
 
-func (m *MockMongoClientDBError) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
+func (m *MockMongoClientDBError) StartSession() (dbadapter.DBSession, error) {
+	return nil, nil
 }
 
 func (db *MockMongoClientDBError) RestfulAPIPostOnDB(ctx context.Context, dbName string, collName string, filter bson.M, postData map[string]any) (bool, error) {
@@ -140,8 +144,8 @@ func (db *MockMongoClientEmptyDB) RestfulAPICount(collName string, filter bson.M
 	return 0, nil
 }
 
-func (m *MockMongoClientEmptyDB) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
+func (m *MockMongoClientEmptyDB) StartSession() (dbadapter.DBSession, error) {
+	return nil, nil
 }
 
 func (m *MockMongoClientEmptyDB) RestfulAPIDeleteOne(coll string, filter bson.M) error {

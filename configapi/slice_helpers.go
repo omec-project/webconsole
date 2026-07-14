@@ -22,7 +22,7 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 var execCommand = exec.Command
@@ -71,7 +71,7 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		return request, fmt.Errorf("JSON bind error: %+v", err)
+		return request, fmt.Errorf("JSON bind error: %w", err)
 	}
 
 	for _, gnb := range request.SiteInfo.GNodeBs {
@@ -179,7 +179,7 @@ func handleNetworkSlicePost(slice configmodels.Slice, prevSlice configmodels.Sli
 func sendPebbleNotification(key string) error {
 	cmd := execCommand("pebble", "notify", key)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("couldn't execute a pebble notify: %+v", err)
+		return fmt.Errorf("couldn't execute a pebble notify: %w", err)
 	}
 	logger.ConfigLog.Infoln("custom Pebble notification sent")
 	return nil

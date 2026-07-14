@@ -19,8 +19,7 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func gnb(name string, tac int32) configmodels.Gnb {
@@ -64,8 +63,8 @@ func (db *GnbMockDBClient) RestfulAPIPutOneWithContext(context context.Context, 
 	return true, nil // Return true if data exists
 }
 
-func (db *GnbMockDBClient) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
+func (db *GnbMockDBClient) StartSession() (dbadapter.DBSession, error) {
+	return nil, nil
 }
 
 func (db *GnbMockDBClient) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []any) error {
@@ -126,8 +125,8 @@ func (db *UpfMockDBClient) RestfulAPIPutOneWithContext(context context.Context, 
 	return true, nil // Return true if data exists
 }
 
-func (db *UpfMockDBClient) StartSession() (mongo.Session, error) {
-	return &MockSession{}, nil
+func (db *UpfMockDBClient) StartSession() (dbadapter.DBSession, error) {
+	return nil, nil
 }
 
 func (db *UpfMockDBClient) RestfulAPIPostManyWithContext(context context.Context, collName string, filter bson.M, postDataArray []any) error {

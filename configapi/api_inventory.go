@@ -518,7 +518,7 @@ func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, nsOperatio
 			return err
 		}
 		if err = nsOperation(upf); err != nil {
-			return fmt.Errorf("failed to update network slices: %+v", err)
+			return fmt.Errorf("failed to update network slices: %w", err)
 		}
 		return nil
 	}
@@ -539,7 +539,7 @@ func executeUpfTransaction(ctx context.Context, upf configmodels.Upf, nsOperatio
 			if abortErr := session.AbortTransaction(sc); abortErr != nil {
 				logger.DbLog.Errorf("failed to abort transaction with error: %+v", abortErr)
 			}
-			return fmt.Errorf("failed to update network slices: %+v", err)
+			return fmt.Errorf("failed to update network slices: %w", err)
 		}
 		return session.CommitTransaction(sc)
 	})

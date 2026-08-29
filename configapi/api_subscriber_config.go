@@ -644,12 +644,19 @@ func GetRegisteredUEContext(c *gin.Context) {
 			requestUri = fmt.Sprintf("%s/namf-oam/v1/registered-ue-context", amfUris[0])
 		}
 
-		resp, err := httpsClient.Get(requestUri)
+		req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, requestUri, nil)
 		if err != nil {
 			logger.WebUILog.Error(err)
 			c.JSON(http.StatusInternalServerError, gin.H{})
 			return
 		}
+		resp, err := httpsClient.Do(req)
+		if err != nil {
+			logger.WebUILog.Error(err)
+			c.JSON(http.StatusInternalServerError, gin.H{})
+			return
+		}
+		defer resp.Body.Close()
 		sendResponseToClient(c, resp)
 	} else {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -675,12 +682,19 @@ func GetUEPDUSessionInfo(c *gin.Context) {
 	// TODO: support fetching data from multiple SMF
 	if smfUris := webuiSelf.GetOamUris(models.NFTYPE_SMF); smfUris != nil {
 		requestUri := fmt.Sprintf("%s/nsmf-oam/v1/ue-pdu-session-info/%s", smfUris[0], smContextRef)
-		resp, err := httpsClient.Get(requestUri)
+		req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, requestUri, nil)
 		if err != nil {
 			logger.WebUILog.Error(err)
 			c.JSON(http.StatusInternalServerError, gin.H{})
 			return
 		}
+		resp, err := httpsClient.Do(req)
+		if err != nil {
+			logger.WebUILog.Error(err)
+			c.JSON(http.StatusInternalServerError, gin.H{})
+			return
+		}
+		defer resp.Body.Close()
 
 		sendResponseToClient(c, resp)
 	} else {

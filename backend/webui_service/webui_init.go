@@ -131,7 +131,7 @@ func fetchConfigAdapater() {
 	for {
 		client := &http.Client{}
 		httpend := factory.WebUIConfig.Configuration.RocEnd.SyncUrl
-		req, err := http.NewRequest(http.MethodPost, httpend, nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, httpend, nil)
 		// Handle Error
 		if err != nil {
 			logger.InitLog.Errorf("an error occurred %v", err)

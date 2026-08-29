@@ -188,7 +188,7 @@ func TestInventoryGetGnbHandler(t *testing.T) {
 			dbadapter.CommonDBClient = &GnbMockDBClient{
 				gnbs: tc.configuredGnbs,
 			}
-			req, err := http.NewRequest(http.MethodGet, tc.route, nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tc.route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -257,7 +257,7 @@ func TestInventoryGetUPFHandler(t *testing.T) {
 			dbadapter.CommonDBClient = &UpfMockDBClient{
 				upfs: tc.configuredUpfs,
 			}
-			req, err := http.NewRequest(http.MethodGet, tc.route, nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tc.route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -317,7 +317,7 @@ func TestGetInventory_DBError(t *testing.T) {
 			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 
 			dbadapter.CommonDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodGet, tc.route, nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tc.route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -435,7 +435,7 @@ func TestGnbPostHandler(t *testing.T) {
 			originalDBClient := dbadapter.CommonDBClient
 			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			dbadapter.CommonDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -529,7 +529,7 @@ func TestGnbPutHandler(t *testing.T) {
 			originalDBClient := dbadapter.CommonDBClient
 			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			dbadapter.CommonDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodPut, tc.route, strings.NewReader(tc.inputData))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -639,7 +639,7 @@ func TestUpfPostHandler(t *testing.T) {
 			originalDBClient := dbadapter.CommonDBClient
 			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			dbadapter.CommonDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodPost, tc.route, strings.NewReader(tc.inputData))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -741,7 +741,7 @@ func TestUpfPutHandler(t *testing.T) {
 			originalDBClient := dbadapter.CommonDBClient
 			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			dbadapter.CommonDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodPut, tc.route, strings.NewReader(tc.inputData))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, tc.route, strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -814,7 +814,7 @@ func TestInventoryDeleteHandlers(t *testing.T) {
 			originalDBClient := dbadapter.CommonDBClient
 			defer func() { dbadapter.CommonDBClient = originalDBClient }()
 			dbadapter.CommonDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodDelete, tc.route, nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, tc.route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}

@@ -15,13 +15,14 @@ output:
 linters:
   enable:
     - asciicheck
-    - errcheck
+    - bodyclose
     - dogsled
-    - godox
-    - gomodguard
     - govet
+    - godox
+    - gomodguard_v2
     - misspell
     - nakedret
+    - noctx
     - predeclared
     - staticcheck
     - unconvert

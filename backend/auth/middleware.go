@@ -38,12 +38,12 @@ func AdminOrUserAuthMiddleware(jwtSecret []byte) gin.HandlerFunc {
 		claims, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())
-			c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("auth failed: %s", err.Error())})
+			c.JSON(http.StatusUnauthorized, gin.H{errorKey: fmt.Sprintf("auth failed: %s", err.Error())})
 			c.Abort()
 			return
 		}
 		if claims.Role != configmodels.AdminRole && claims.Role != configmodels.UserRole {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: admin or user access required"})
+			c.JSON(http.StatusForbidden, gin.H{errorKey: "forbidden: admin or user access required"})
 			c.Abort()
 		}
 		c.Next()
@@ -57,12 +57,12 @@ func AdminOnly(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Conte
 		claims, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())
-			c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("auth failed: %s", err.Error())})
+			c.JSON(http.StatusUnauthorized, gin.H{errorKey: fmt.Sprintf("auth failed: %s", err.Error())})
 			c.Abort()
 			return
 		}
 		if claims.Role != configmodels.AdminRole {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: admin access required"})
+			c.JSON(http.StatusForbidden, gin.H{errorKey: "forbidden: admin access required"})
 			c.Abort()
 			return
 		}
@@ -78,15 +78,15 @@ func AdminOrMe(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Conte
 		claims, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())
-			c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("auth failed: %s", err.Error())})
+			c.JSON(http.StatusUnauthorized, gin.H{errorKey: fmt.Sprintf("auth failed: %s", err.Error())})
 			c.Abort()
 			return
 		}
-		if claims.Role == configmodels.AdminRole || (claims.Role == configmodels.UserRole && claims.Username == c.Param("username")) {
+		if claims.Role == configmodels.AdminRole || (claims.Role == configmodels.UserRole && claims.Username == c.Param(usernameFilterKey)) {
 			handler(c)
 			return
 		}
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: admin or me access required"})
+		c.JSON(http.StatusForbidden, gin.H{errorKey: "forbidden: admin or me access required"})
 		c.Abort()
 	}
 }
@@ -98,19 +98,19 @@ func AdminOrFirstUser(jwtSecret []byte, handler func(c *gin.Context)) func(c *gi
 		numOfUserAccounts, err := dbadapter.WebuiDBClient.RestfulAPICount(configmodels.UserAccountDataColl, bson.M{})
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to authorize"})
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: "failed to authorize"})
 			c.Abort()
 			return
 		}
 		if numOfUserAccounts > 0 {
 			claims, err := getClaimsFromAuthorizationHeader(c.Request.Header.Get("Authorization"), jwtSecret)
 			if err != nil {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("auth failed: %s", err.Error())})
+				c.JSON(http.StatusUnauthorized, gin.H{errorKey: fmt.Sprintf("auth failed: %s", err.Error())})
 				c.Abort()
 				return
 			}
 			if claims.Role != configmodels.AdminRole {
-				c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: admin access required"})
+				c.JSON(http.StatusForbidden, gin.H{errorKey: "forbidden: admin access required"})
 				c.Abort()
 				return
 			}

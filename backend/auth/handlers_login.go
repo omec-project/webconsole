@@ -25,7 +25,7 @@ const (
 	errorMissingUsername      = "username is required"
 	errorRetrieveUserAccount  = "failed to retrieve user account"
 	errorKey                  = "error"
-	usernameFilterKey         = "username"
+	usernameKey               = "username"
 )
 
 type LoginParams struct {
@@ -66,7 +66,7 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 			return
 		}
 
-		filter := bson.M{usernameFilterKey: loginParams.Username}
+		filter := bson.M{usernameKey: loginParams.Username}
 		rawUserAccount, err := dbadapter.WebuiDBClient.RestfulAPIGetOne(configmodels.UserAccountDataColl, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveUserAccount})

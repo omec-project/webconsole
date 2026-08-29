@@ -82,7 +82,7 @@ func AdminOrMe(jwtSecret []byte, handler func(c *gin.Context)) func(c *gin.Conte
 			c.Abort()
 			return
 		}
-		if claims.Role == configmodels.AdminRole || (claims.Role == configmodels.UserRole && claims.Username == c.Param(usernameFilterKey)) {
+		if claims.Role == configmodels.AdminRole || (claims.Role == configmodels.UserRole && claims.Username == c.Param(usernameKey)) {
 			handler(c)
 			return
 		}

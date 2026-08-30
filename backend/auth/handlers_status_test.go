@@ -40,7 +40,7 @@ func TestStatus(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodGet, "/status", nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/status", nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}

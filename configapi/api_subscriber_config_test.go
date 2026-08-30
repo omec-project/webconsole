@@ -454,7 +454,7 @@ func TestGetSubscriberByID(t *testing.T) {
 				dbadapter.AuthDBClient = originalAuthDBClient
 			}()
 
-			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/subscriber/%s", tt.ueId), nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, fmt.Sprintf("/api/subscriber/%s", tt.ueId), nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -553,7 +553,7 @@ func TestSubscriberGetHandlers(t *testing.T) {
 			origDBClient := dbadapter.CommonDBClient
 			dbadapter.CommonDBClient = tc.dbAdapter
 			defer func() { dbadapter.CommonDBClient = origDBClient }()
-			req, err := http.NewRequest(http.MethodGet, tc.route, nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tc.route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -752,7 +752,7 @@ func TestSubscriberPost(t *testing.T) {
 				t.Fatalf("failed to marshal expected get data details: %v", err)
 			}
 
-			req, err := http.NewRequest(http.MethodPost, route, bytes.NewBuffer(jsonData))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, route, bytes.NewBuffer(jsonData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -922,7 +922,7 @@ func TestSubscriberDelete(t *testing.T) {
 			expectedCode := tc.expectedCode
 			expectedBody := ""
 
-			req, err := http.NewRequest(http.MethodDelete, route, nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, route, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -957,7 +957,7 @@ func TestSubscriberDeleteFailure(t *testing.T) {
 	expectedCode := http.StatusInternalServerError
 	expectedBody := "error deleting subscriber. Please check the log for details"
 
-	req, err := http.NewRequest(http.MethodDelete, route, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, route, nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}

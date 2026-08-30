@@ -24,6 +24,8 @@ const (
 	errorMissingPassword      = "password is required"
 	errorMissingUsername      = "username is required"
 	errorRetrieveUserAccount  = "failed to retrieve user account"
+	errorKey                  = "error"
+	usernameKey               = "username"
 )
 
 type LoginParams struct {
@@ -52,43 +54,43 @@ func Login(jwtSecret []byte) gin.HandlerFunc {
 		err := c.ShouldBindJSON(&loginParams)
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())
-			c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidDataProvided})
+			c.JSON(http.StatusBadRequest, gin.H{errorKey: errorInvalidDataProvided})
 			return
 		}
 		if loginParams.Username == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingUsername})
+			c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMissingUsername})
 			return
 		}
 		if loginParams.Password == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingPassword})
+			c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMissingPassword})
 			return
 		}
 
-		filter := bson.M{"username": loginParams.Username}
+		filter := bson.M{usernameKey: loginParams.Username}
 		rawUserAccount, err := dbadapter.WebuiDBClient.RestfulAPIGetOne(configmodels.UserAccountDataColl, filter)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveUserAccount})
 			return
 		}
 		if len(rawUserAccount) == 0 {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
+			c.JSON(http.StatusUnauthorized, gin.H{errorKey: errorIncorrectCredentials})
 			return
 		}
 		var dbUser configmodels.DBUserAccount
 		err = json.Unmarshal(configmodels.MapToByte(rawUserAccount), &dbUser)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveUserAccount})
 			return
 		}
 		if err = bcrypt.CompareHashAndPassword([]byte(dbUser.HashedPassword), []byte(loginParams.Password)); err != nil {
 			logger.AuthLog.Errorln(err.Error())
-			c.JSON(http.StatusUnauthorized, gin.H{"error": errorIncorrectCredentials})
+			c.JSON(http.StatusUnauthorized, gin.H{errorKey: errorIncorrectCredentials})
 			return
 		}
 		token, err := GenerateJWT(dbUser.Username, dbUser.Role, jwtSecret)
 		if err != nil {
 			logger.AuthLog.Errorln(err.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{"error": errorLogin})
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorLogin})
 			return
 		}
 		loginResponse := LoginResponse{

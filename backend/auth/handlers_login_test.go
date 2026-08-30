@@ -202,7 +202,7 @@ func TestLogin_FailureCases(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodPost, "/login", strings.NewReader(tc.inputData))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/login", strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -254,7 +254,7 @@ func TestLogin_SuccessCases(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodPost, "/login", strings.NewReader(tc.inputData))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/login", strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}

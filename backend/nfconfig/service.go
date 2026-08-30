@@ -237,13 +237,15 @@ func (n *NFConfigServer) getRoutes() []Route {
 	}
 }
 
+const acceptHeaderJSON = "application/json"
+
 func enforceAcceptJSON() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		acceptHeader := c.GetHeader("Accept")
-		if acceptHeader != "application/json" {
-			logger.NfConfigLog.Warnf("Invalid Accept header value: '%s'. Expected 'application/json'", acceptHeader)
+		if acceptHeader != acceptHeaderJSON {
+			logger.NfConfigLog.Warnf("Invalid Accept header value: '%s'. Expected '%s'", acceptHeader, acceptHeaderJSON)
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-				"error": "Accept header must be 'application/json'",
+				"error": fmt.Sprintf("Accept header must be '%s'", acceptHeaderJSON),
 			})
 			return
 		}

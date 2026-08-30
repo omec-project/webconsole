@@ -153,7 +153,7 @@ func TestGetUserAccountsHandler(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodGet, "/config/v1/account", nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/config/v1/account", nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -212,7 +212,7 @@ func TestGetUserAccountHandler(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodGet, "/config/v1/account/janedoe", nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/config/v1/account/janedoe", nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -295,7 +295,7 @@ func TestCreateUserAccountHandler(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(tc.inputData))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/account", strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -359,7 +359,7 @@ func TestDeleteUserAccountHandler(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodDelete, "/config/v1/account/janedoe", nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, "/config/v1/account/janedoe", nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -434,7 +434,7 @@ func TestChangePasswordHandler(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dbadapter.WebuiDBClient = tc.dbAdapter
-			req, err := http.NewRequest(http.MethodPost, "/config/v1/account/janedoe/change_password", strings.NewReader(tc.inputData))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/account/janedoe/change_password", strings.NewReader(tc.inputData))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}

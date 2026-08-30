@@ -195,7 +195,7 @@ func TestAdminOrUserAuthorizationMiddleware_NoHeaderRequest(t *testing.T) {
 
 	for _, tc := range protectedPaths {
 		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(tc.method, tc.url, nil)
+			req, err := http.NewRequestWithContext(t.Context(), tc.method, tc.url, nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -247,7 +247,7 @@ func TestAdminOrUserAuthorizationMiddleware_TokenValidation(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodGet, "/config/v1/", nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/config/v1/", nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -293,7 +293,7 @@ func TestGetUserAccounts_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodGet, "/config/v1/account", nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/config/v1/account", nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -358,7 +358,7 @@ func TestGetUserAccount_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodGet, "/config/v1/account/janedoe", nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/config/v1/account/janedoe", nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -385,7 +385,7 @@ func TestGetUserAccount_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 func TestCreateUserAccount_CreateFirstUserWithoutHeaderAuthorization(t *testing.T) {
 	router := setUpMockedRouter()
 	dbadapter.WebuiDBClient = &MockMongoClientEmptyDB{}
-	req, err := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
@@ -430,7 +430,7 @@ func TestCreateUserAccount_AdminAuthorizationMiddleware(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/account", strings.NewReader(`{"username": "adminadmin", "password":"ValidPass123!"}`))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -495,7 +495,7 @@ func TestDeleteUserAccount_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodDelete, "/config/v1/account/janedoe", nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, "/config/v1/account/janedoe", nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -560,7 +560,7 @@ func TestChangePassword_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodPost, "/config/v1/account/janedoe/change_password", nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/account/janedoe/change_password", nil)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}

@@ -6,6 +6,7 @@ package configapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -274,7 +275,7 @@ func TestGetNetworkSliceByName_NetworkSliceExists(t *testing.T) {
 func mockExecCommand(command string, args ...string) *exec.Cmd {
 	cs := []string{"-test.run=TestExecCommandHelper", "--", "YOUR COMMAND"}
 	cs = append(cs, args...)
-	cmd := exec.Command(os.Args[0], cs...)
+	cmd := exec.CommandContext(context.Background(), os.Args[0], cs...)
 	execCommandTimesCalled += 1
 	return cmd
 }
@@ -438,7 +439,7 @@ func TestNetworkSlicePostHandler_NetworkSliceNameValidation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal device group %v", err)
 			}
-			req, err := http.NewRequest(http.MethodPost, tc.route, bytes.NewReader(jsonBody))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, tc.route, bytes.NewReader(jsonBody))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -487,7 +488,7 @@ func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal device group %v", err)
 			}
-			req, err := http.NewRequest(http.MethodPost, tc.route, bytes.NewReader(jsonBody))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, tc.route, bytes.NewReader(jsonBody))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}

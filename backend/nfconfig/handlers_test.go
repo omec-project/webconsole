@@ -107,7 +107,7 @@ func TestGetImsiQosConfig(t *testing.T) {
 			}
 			nfServer.setupRoutes()
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/nfconfig/qos/"+"internet/"+tc.imsi, nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/nfconfig/qos/"+"internet/"+tc.imsi, nil)
 			if err != nil {
 				t.Fatalf("fail create a request %v", err)
 			}

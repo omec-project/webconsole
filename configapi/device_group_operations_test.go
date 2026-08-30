@@ -449,7 +449,7 @@ func TestDeviceGroupPostHandler_DeviceGroupNameValidation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal device group %v", err)
 			}
-			req, err := http.NewRequest(http.MethodPost, tc.route, bytes.NewReader(jsonBody))
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, tc.route, bytes.NewReader(jsonBody))
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}

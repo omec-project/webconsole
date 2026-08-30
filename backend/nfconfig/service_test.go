@@ -312,7 +312,7 @@ func TestNFConfigRoutes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, err := http.NewRequest("GET", tc.path, nil)
+			req, err := http.NewRequestWithContext(t.Context(), "GET", tc.path, nil)
 			req.Header.Set("Accept", tc.acceptHeader)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)

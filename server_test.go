@@ -19,6 +19,12 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+const (
+	cliAppName     = "webconsole"
+	cfgFlag        = "-cfg"
+	testConfigFile = "test.conf"
+)
+
 type mockWebUI struct {
 	started     atomic.Bool
 	startedCh   chan struct{}
@@ -93,27 +99,27 @@ func TestMainValidateCLIFlags(t *testing.T) {
 	}{
 		{
 			name:        "missing required flag",
-			args:        []string{"webconsole"},
+			args:        []string{cliAppName},
 			expectError: true,
 		},
 		{
 			name:        "valid config flag",
-			args:        []string{"webconsole", "-cfg", "test.conf"},
+			args:        []string{cliAppName, cfgFlag, testConfigFile},
 			expectError: false,
 		},
 		{
 			name:        "empty config value",
-			args:        []string{"webconsole", "-cfg", ""},
+			args:        []string{cliAppName, cfgFlag, ""},
 			expectError: true,
 		},
 		{
 			name:        "invalid flag",
-			args:        []string{"webconsole", "-invalid", "test.conf"},
+			args:        []string{cliAppName, "-invalid", testConfigFile},
 			expectError: true,
 		},
 		{
 			name:        "multiple flags with valid config",
-			args:        []string{"webconsole", "-cfg", "test.conf", "-verbose"},
+			args:        []string{cliAppName, cfgFlag, testConfigFile, "-verbose"},
 			expectError: true,
 		},
 	}

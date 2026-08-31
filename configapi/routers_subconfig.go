@@ -40,35 +40,35 @@ var apiRoutes = Routes{
 	{
 		"GetSubscriberByID",
 		http.MethodGet,
-		"/subscriber/:ueId",
+		subscriberByIDPath,
 		GetSubscriberByID,
 	},
 
 	{
 		"PostSubscriberByID",
 		http.MethodPost,
-		"/subscriber/:ueId",
+		subscriberByIDPath,
 		PostSubscriberByID,
 	},
 
 	{
 		"PutSubscriberByID",
 		http.MethodPut,
-		"/subscriber/:ueId",
+		subscriberByIDPath,
 		PutSubscriberByID,
 	},
 
 	{
 		"DeleteSubscriberByID",
 		http.MethodDelete,
-		"/subscriber/:ueId",
+		subscriberByIDPath,
 		DeleteSubscriberByID,
 	},
 
 	{
 		"PatchSubscriberByID",
 		http.MethodPatch,
-		"/subscriber/:ueId",
+		subscriberByIDPath,
 		PatchSubscriberByID,
 	},
 

@@ -18,6 +18,12 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
+const (
+	errMsgInvalidJSONFormat = "invalid JSON format"
+	gnbNameKey              = "name"
+	upfHostnameKey          = "hostname"
+)
+
 func setInventoryCorsHeader(c *gin.Context) {
 	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -44,7 +50,7 @@ func GetGnbs(c *gin.Context) {
 	rawGnbs, err := dbadapter.CommonDBClient.RestfulAPIGetMany(configmodels.GnbDataColl, bson.M{})
 	if err != nil {
 		logger.DbLog.Errorf("failed to retrieve gNBs with error: %+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve gNBs"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: "failed to retrieve gNBs"})
 		return
 	}
 
@@ -80,20 +86,20 @@ func PostGnb(c *gin.Context) {
 	var postGnbParams configmodels.PostGnbRequest
 	if err := c.ShouldBindJSON(&postGnbParams); err != nil {
 		logger.WebUILog.Errorf("invalid UPF gNB input parameters with error: %+v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errMsgInvalidJSONFormat})
 		return
 	}
 	if !isValidName(postGnbParams.Name) {
 		errorMessage := fmt.Sprintf("invalid gNB name '%s'. Name needs to match the following regular expression: %s", postGnbParams.Name, NAME_PATTERN)
 		logger.WebUILog.Errorln(errorMessage)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMessage})
 		return
 	}
 	if postGnbParams.Tac != nil {
 		if !isValidGnbTac(*postGnbParams.Tac) {
 			errorMessage := fmt.Sprintf("invalid gNB TAC '%+v'. TAC must be an integer within the range [1, 16777215]", *postGnbParams.Tac)
 			logger.WebUILog.Errorln(errorMessage)
-			c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+			c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMessage})
 			return
 		}
 	}
@@ -101,11 +107,11 @@ func PostGnb(c *gin.Context) {
 	if err := executeGnbTransaction(c.Request.Context(), gnb, updateGnbInNetworkSlices, postGnbOperation); err != nil {
 		if strings.Contains(err.Error(), "E11000") {
 			logger.WebUILog.Errorf("duplicate gNB name found error: %+v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "gNB already exists"})
+			c.JSON(http.StatusBadRequest, gin.H{errorKey: "gNB already exists"})
 			return
 		}
 		logger.WebUILog.Errorf("failed to create gNB with name: %s with error: %+v", postGnbParams.Name, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create gNB"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: "failed to create gNB"})
 		return
 	}
 	logger.WebUILog.Infof("successfully executed POST gNB %s request", postGnbParams.Name)
@@ -113,7 +119,7 @@ func PostGnb(c *gin.Context) {
 }
 
 func postGnbOperation(sc context.Context, gnb configmodels.Gnb) error {
-	filter := bson.M{"name": gnb.Name}
+	filter := bson.M{gnbNameKey: gnb.Name}
 	gnbDataBson := configmodels.ToBsonM(gnb)
 	return dbadapter.CommonDBClient.RestfulAPIPostManyWithContext(sc, configmodels.GnbDataColl, filter, []any{gnbDataBson})
 }
@@ -139,19 +145,19 @@ func PutGnb(c *gin.Context) {
 	if !isValidName(gnbName) {
 		errorMessage := fmt.Sprintf("invalid gNB name '%s'. Name needs to match the following regular expression: %s", gnbName, NAME_PATTERN)
 		logger.WebUILog.Errorln(errorMessage)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMessage})
 		return
 	}
 	var putGnbParams configmodels.PutGnbRequest
 	if err := c.ShouldBindJSON(&putGnbParams); err != nil {
 		logger.WebUILog.Errorf("invalid gNB PUT input parameters for gnbname: %s error: %+v", gnbName, err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errMsgInvalidJSONFormat})
 		return
 	}
 	if !isValidGnbTac(putGnbParams.Tac) {
 		errorMessage := fmt.Sprintf("invalid gNB TAC '%+v'. TAC must be an integer within the range [1, 16777215]", putGnbParams.Tac)
 		logger.WebUILog.Errorln(errorMessage)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMessage})
 		return
 	}
 	putGnb := configmodels.Gnb{
@@ -160,7 +166,7 @@ func PutGnb(c *gin.Context) {
 	}
 	if err := executeGnbTransaction(c.Request.Context(), putGnb, updateGnbInNetworkSlices, putGnbOperation); err != nil {
 		logger.WebUILog.Errorf("failed to PUT gNB name: %s error: %+v", gnbName, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT gNB"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: "failed to PUT gNB"})
 		return
 	}
 	logger.WebUILog.Infof("successfully executed PUT gNB request for hostname: %s", gnbName)
@@ -168,7 +174,7 @@ func PutGnb(c *gin.Context) {
 }
 
 func putGnbOperation(sc context.Context, gnb configmodels.Gnb) error {
-	filter := bson.M{"name": gnb.Name}
+	filter := bson.M{gnbNameKey: gnb.Name}
 	gnbDataBson := configmodels.ToBsonM(gnb)
 	_, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, configmodels.GnbDataColl, filter, gnbDataBson)
 	return err
@@ -212,7 +218,7 @@ func DeleteGnb(c *gin.Context) {
 	if !exists {
 		errorMessage := "delete gNB request is missing path param `gnb-name`"
 		logger.WebUILog.Errorln(errorMessage)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMessage})
 		return
 	}
 	gnb := configmodels.Gnb{
@@ -221,7 +227,7 @@ func DeleteGnb(c *gin.Context) {
 	err := executeGnbTransaction(c.Request.Context(), gnb, removeGnbFromNetworkSlices, deleteGnbOperation)
 	if err != nil {
 		logger.WebUILog.Errorf("failed to delete GNB with name %s error: %+v", gnbName, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete gNB"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: "failed to delete gNB"})
 		return
 	}
 	logger.WebUILog.Infof("successfully executed DELETE gNB %s request", gnbName)
@@ -229,7 +235,7 @@ func DeleteGnb(c *gin.Context) {
 }
 
 func deleteGnbOperation(sc context.Context, gnb configmodels.Gnb) error {
-	filter := bson.M{"name": gnb.Name}
+	filter := bson.M{gnbNameKey: gnb.Name}
 	return dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.GnbDataColl, filter)
 }
 
@@ -305,7 +311,7 @@ func GetUpfs(c *gin.Context) {
 	rawUpfs, err := dbadapter.CommonDBClient.RestfulAPIGetMany(configmodels.UpfDataColl, bson.M{})
 	if err != nil {
 		logger.DbLog.Errorf("failed to retrieve UPFs with error: %+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve UPFs"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: "failed to retrieve UPFs"})
 		return
 	}
 
@@ -342,30 +348,30 @@ func PostUpf(c *gin.Context) {
 	err := c.ShouldBindJSON(&postUpfParams)
 	if err != nil {
 		logger.WebUILog.Errorf("invalid UPF POST input parameters error: %v+", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errMsgInvalidJSONFormat})
 		return
 	}
 	if !isValidFQDN(postUpfParams.Hostname) {
 		errorMessage := fmt.Sprintf("invalid UPF hostname '%s'. Hostname needs to represent a valid FQDN", postUpfParams.Hostname)
 		logger.WebUILog.Errorln(errorMessage)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMessage})
 		return
 	}
 	if !isValidUpfPort(postUpfParams.Port) {
 		errorMessage := fmt.Sprintf("invalid UPF port '%s'. Port must be a numeric string within the range [0, 65535]", postUpfParams.Port)
 		logger.WebUILog.Errorln(errorMessage)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMessage})
 		return
 	}
 	upf := configmodels.Upf(postUpfParams)
 	if err = executeUpfTransaction(c.Request.Context(), upf, updateUpfInNetworkSlices, postUpfOperation); err != nil {
 		if strings.Contains(err.Error(), "E11000") {
 			logger.WebUILog.Errorf("duplicate hostname found with error: %+v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "UPF already exists"})
+			c.JSON(http.StatusBadRequest, gin.H{errorKey: "UPF already exists"})
 			return
 		}
 		logger.WebUILog.Errorf("failed to create UPF with hostname: %s with error: %+v", postUpfParams.Hostname, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create UPF"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: "failed to create UPF"})
 		return
 	}
 	logger.WebUILog.Infof("successfully executed POST UPF %s request", postUpfParams.Hostname)
@@ -373,7 +379,7 @@ func PostUpf(c *gin.Context) {
 }
 
 func postUpfOperation(sc context.Context, upf configmodels.Upf) error {
-	filter := bson.M{"hostname": upf.Hostname}
+	filter := bson.M{upfHostnameKey: upf.Hostname}
 	upfDataBson := configmodels.ToBsonM(upf)
 	if upfDataBson == nil {
 		return fmt.Errorf("failed to serialize UPF")
@@ -402,20 +408,20 @@ func PutUpf(c *gin.Context) {
 	if !isValidFQDN(hostname) {
 		errorMessage := fmt.Sprintf("invalid UPF hostname '%s'. Hostname needs to represent a valid FQDN", hostname)
 		logger.WebUILog.Errorln(errorMessage)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMessage})
 		return
 	}
 	var putUpfParams configmodels.PutUpfRequest
 	err := c.ShouldBindJSON(&putUpfParams)
 	if err != nil {
 		logger.WebUILog.Errorf("invalid UPF PUT input parameters with hostname: %s with error: %+v", hostname, err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON format"})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errMsgInvalidJSONFormat})
 		return
 	}
 	if !isValidUpfPort(putUpfParams.Port) {
 		errorMessage := fmt.Sprintf("invalid UPF port '%s'. Port must be a numeric string within the range [0, 65535]", putUpfParams.Port)
 		logger.WebUILog.Errorln(errorMessage)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMessage})
 		return
 	}
 	putUpf := configmodels.Upf{
@@ -424,7 +430,7 @@ func PutUpf(c *gin.Context) {
 	}
 	if err := executeUpfTransaction(c.Request.Context(), putUpf, updateUpfInNetworkSlices, putUpfOperation); err != nil {
 		logger.WebUILog.Errorf("failed to PUT UPF with hostname: %s with error: %+v", hostname, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to PUT UPF"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: "failed to PUT UPF"})
 		return
 	}
 	logger.WebUILog.Infof("successfully executed PUT UPF request for hostname: %s", hostname)
@@ -432,7 +438,7 @@ func PutUpf(c *gin.Context) {
 }
 
 func putUpfOperation(sc context.Context, upf configmodels.Upf) error {
-	filter := bson.M{"hostname": upf.Hostname}
+	filter := bson.M{upfHostnameKey: upf.Hostname}
 	upfDataBson := configmodels.ToBsonM(upf)
 	if upfDataBson == nil {
 		return fmt.Errorf("failed to serialize UPF")
@@ -476,7 +482,7 @@ func DeleteUpf(c *gin.Context) {
 	if !exists {
 		errorMessage := "delete gNB request is missing path param `upf-hostname`"
 		logger.WebUILog.Errorln(errorMessage)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMessage})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMessage})
 		return
 	}
 	upf := configmodels.Upf{
@@ -484,7 +490,7 @@ func DeleteUpf(c *gin.Context) {
 	}
 	if err := executeUpfTransaction(c.Request.Context(), upf, removeUpfFromNetworkSlices, deleteUpfOperation); err != nil {
 		logger.WebUILog.Errorf("failed to delete UPF with hostname: %s with error: %+v", hostname, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete UPF"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: "failed to delete UPF"})
 		return
 	}
 	logger.WebUILog.Infof("successfully executed DELETE UPF request for hostname: %s", hostname)
@@ -492,7 +498,7 @@ func DeleteUpf(c *gin.Context) {
 }
 
 func deleteUpfOperation(sc context.Context, upf configmodels.Upf) error {
-	filter := bson.M{"hostname": upf.Hostname}
+	filter := bson.M{upfHostnameKey: upf.Hostname}
 	return dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, configmodels.UpfDataColl, filter)
 }
 

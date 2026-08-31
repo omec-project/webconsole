@@ -17,6 +17,19 @@ type MockSession struct {
 	mongo.Session
 }
 
+const (
+	collKey            = "coll"
+	filterKey          = "filter"
+	dataKey            = "data"
+	dbNameKey          = "dbName"
+	demoSiteName       = "demo"
+	gnbInventoryPath   = "/config/v1/inventory/gnb"
+	upfInventoryPath   = "/config/v1/inventory/upf"
+	subscriberPath     = "/api/subscriber"
+	testGroupName      = "group1"
+	testSubscriberImsi = "imsi-208930100007487"
+)
+
 func (m *MockSession) WithTransaction(ctx context.Context, fn func(ctx context.Context) (interface{}, error), opts ...options.Lister[options.TransactionOptions]) (interface{}, error) {
 	return fn(ctx)
 }

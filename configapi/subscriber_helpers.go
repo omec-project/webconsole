@@ -17,7 +17,7 @@ import (
 )
 
 func subscriberAuthenticationDataGet(imsi string) (authSubData *models.AuthenticationSubscription) {
-	filter := bson.M{"ueId": imsi}
+	filter := bson.M{ueIdKey: imsi}
 	authSubDataInterface, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln(err)
@@ -32,11 +32,11 @@ func subscriberAuthenticationDataGet(imsi string) (authSubData *models.Authentic
 }
 
 func subscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
-	filter := bson.M{"ueId": imsi}
+	filter := bson.M{ueIdKey: imsi}
 	logger.WebUILog.Infof("%+v", authSubData)
 	authDataBsonA := configmodels.ToBsonM(authSubData)
-	authDataBsonA["ueId"] = imsi
-	basicAmData := map[string]any{"ueId": imsi}
+	authDataBsonA[ueIdKey] = imsi
+	basicAmData := map[string]any{ueIdKey: imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
 	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
 	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
@@ -56,10 +56,10 @@ func subscriberAuthenticationDataCreate(imsi string, authSubData *models.Authent
 }
 
 func subscriberAuthenticationDataUpdate(imsi string, authSubData *models.AuthenticationSubscription) error {
-	filter := bson.M{"ueId": imsi}
+	filter := bson.M{ueIdKey: imsi}
 	authDataBsonA := configmodels.ToBsonM(authSubData)
-	authDataBsonA["ueId"] = imsi
-	basicAmData := map[string]any{"ueId": imsi}
+	authDataBsonA[ueIdKey] = imsi
+	basicAmData := map[string]any{ueIdKey: imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
 	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
 	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
@@ -80,7 +80,7 @@ func subscriberAuthenticationDataUpdate(imsi string, authSubData *models.Authent
 
 func subscriberAuthenticationDataDelete(imsi string) error {
 	logger.WebUILog.Debugf("delete authentication subscription from authenticationSubscription collection: %s", imsi)
-	filter := bson.M{"ueId": imsi}
+	filter := bson.M{ueIdKey: imsi}
 	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
 	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
 	return sessionRunner(context.TODO(), func(sc context.Context) error {
@@ -122,8 +122,8 @@ func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []
 }
 
 func removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi string) error {
-	filterImsiOnly := bson.M{"ueId": "imsi-" + imsi}
-	filter := bson.M{"ueId": "imsi-" + imsi, "servingPlmnId": mcc + mnc}
+	filterImsiOnly := bson.M{ueIdKey: "imsi-" + imsi}
+	filter := bson.M{ueIdKey: "imsi-" + imsi, servingPlmnIdKey: mcc + mnc}
 	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
 
 	err := sessionRunner(context.TODO(), func(sc context.Context) error {

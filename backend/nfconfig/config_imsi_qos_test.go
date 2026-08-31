@@ -21,11 +21,11 @@ func TestSyncImsiQos(t *testing.T) {
 			name: "Single DeviceGroup produces one imsiQosConfig",
 			deviceGroups: []deviceGroupParams{
 				{
-					name:       "dg-1",
-					dnn:        "internet",
-					imsis:      []string{"001010123456789"},
-					dnsPrimary: "8.8.8.8",
-					ueIpPool:   "10.1.1.0/24",
+					name:       deviceGroupNameDG1,
+					dnn:        dnnInternet,
+					imsis:      []string{imsiTest},
+					dnsPrimary: dnsPrimaryTest,
+					ueIpPool:   ueIpPoolTest,
 					mtu:        1500,
 					qos: &configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
 						DnnMbrUplink:   20000000,
@@ -39,8 +39,8 @@ func TestSyncImsiQos(t *testing.T) {
 			},
 			expectedResponse: []imsiQosConfig{
 				{
-					imsis: []string{"001010123456789"},
-					dnn:   "internet",
+					imsis: []string{imsiTest},
+					dnn:   dnnInternet,
 					qos: []nfConfigApi.ImsiQos{
 						*nfConfigApi.NewImsiQos("20 Mbps", "200 Mbps", 6, 9),
 					},
@@ -51,11 +51,11 @@ func TestSyncImsiQos(t *testing.T) {
 			name: "Multiple DeviceGroups produce multiple imsiQosConfigs",
 			deviceGroups: []deviceGroupParams{
 				{
-					name:       "dg-1",
-					dnn:        "internet",
-					imsis:      []string{"001010123456789"},
-					dnsPrimary: "8.8.8.8",
-					ueIpPool:   "10.1.1.0/24",
+					name:       deviceGroupNameDG1,
+					dnn:        dnnInternet,
+					imsis:      []string{imsiTest},
+					dnsPrimary: dnsPrimaryTest,
+					ueIpPool:   ueIpPoolTest,
 					mtu:        1500,
 					qos: &configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
 						DnnMbrUplink:   20000000,
@@ -70,8 +70,8 @@ func TestSyncImsiQos(t *testing.T) {
 					name:       "dg-2",
 					dnn:        "connection",
 					imsis:      []string{"001010123456790", "001010123456791"},
-					dnsPrimary: "8.8.8.8",
-					ueIpPool:   "10.1.1.0/24",
+					dnsPrimary: dnsPrimaryTest,
+					ueIpPool:   ueIpPoolTest,
 					mtu:        1500,
 					qos: &configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
 						DnnMbrUplink:   10000000,
@@ -92,8 +92,8 @@ func TestSyncImsiQos(t *testing.T) {
 					},
 				},
 				{
-					imsis: []string{"001010123456789"},
-					dnn:   "internet",
+					imsis: []string{imsiTest},
+					dnn:   dnnInternet,
 					qos: []nfConfigApi.ImsiQos{
 						*nfConfigApi.NewImsiQos("20 Mbps", "200 Mbps", 6, 9),
 					},

@@ -18,6 +18,18 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	testChangePasswordBody = `{"password": "Admin1234"}`
+	testCaseDBError        = "DBError"
+)
+
+const (
+	testUserJohndoe = "johndoe"
+	testUserJanedoe = "janedoe"
+	passwordKey     = "password"
+	roleKey         = "role"
+)
+
 type MockMongoClientInvalidUser struct {
 	dbadapter.DBInterface
 }
@@ -40,32 +52,32 @@ func hashPassword(password string) string {
 
 func (db *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
 	rawUser := map[string]any{
-		"username": "johndoe",
-		"password": 1234,
-		"role":     "a",
+		usernameKey: testUserJohndoe,
+		passwordKey: 1234,
+		roleKey:     "a",
 	}
 	return rawUser, nil
 }
 
 func (db *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
 	rawUsers := []map[string]any{
-		{"username": "johndoe", "password": 1234, "role": "a"},
-		{"username": "janedoe", "password": hashPassword("Password123"), "role": 1},
+		{usernameKey: testUserJohndoe, passwordKey: 1234, roleKey: "a"},
+		{usernameKey: testUserJanedoe, passwordKey: hashPassword("Password123"), roleKey: 1},
 	}
 	return rawUsers, nil
 }
 
 func (db *MockMongoClientSuccess) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	rawUser := map[string]any{
-		"username": "janedoe", "password": hashPassword("password123!"), "role": 1,
+		usernameKey: testUserJanedoe, passwordKey: hashPassword("password123!"), roleKey: 1,
 	}
 	return rawUser, nil
 }
 
 func (db *MockMongoClientSuccess) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
 	rawUsers := []map[string]any{
-		{"username": "johndoe", "password": hashPassword(".password123"), "role": 0},
-		{"username": "janedoe", "password": hashPassword("password123"), "role": 1},
+		{usernameKey: testUserJohndoe, passwordKey: hashPassword(".password123"), roleKey: 0},
+		{usernameKey: testUserJanedoe, passwordKey: hashPassword("password123"), roleKey: 1},
 	}
 	return rawUsers, nil
 }
@@ -80,7 +92,7 @@ func (db *MockMongoClientSuccess) RestfulAPICount(collName string, filter bson.M
 
 func (db *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	rawUser := map[string]any{
-		"username": "johndoe", "password": hashPassword("password-123"), "role": 0,
+		usernameKey: testUserJohndoe, passwordKey: hashPassword("password-123"), roleKey: 0,
 	}
 	return rawUser, nil
 }
@@ -126,7 +138,7 @@ func TestGetUserAccountsHandler(t *testing.T) {
 		expectedBody string
 	}{
 		{
-			name:         "DBError",
+			name:         testCaseDBError,
 			dbAdapter:    &MockMongoClientDBError{},
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorRetrieveUserAccounts),
@@ -191,7 +203,7 @@ func TestGetUserAccountHandler(t *testing.T) {
 			expectedBody: `{"username":"janedoe","role":1}`,
 		},
 		{
-			name:         "DBError",
+			name:         testCaseDBError,
 			dbAdapter:    &MockMongoClientDBError{},
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorRetrieveUserAccount),
@@ -271,7 +283,7 @@ func TestCreateUserAccountHandler(t *testing.T) {
 			expectedBody: `{}`,
 		},
 		{
-			name:         "DBError",
+			name:         testCaseDBError,
 			dbAdapter:    &MockMongoClientDBError{},
 			inputData:    `{"username": "adminadmin", "password" : "Admin1234"}`,
 			expectedCode: http.StatusInternalServerError,
@@ -350,7 +362,7 @@ func TestDeleteUserAccountHandler(t *testing.T) {
 			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorUsernameNotFound),
 		},
 		{
-			name:         "DBError",
+			name:         testCaseDBError,
 			dbAdapter:    &MockMongoClientDBError{},
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorRetrieveUserAccount),
@@ -391,21 +403,21 @@ func TestChangePasswordHandler(t *testing.T) {
 		{
 			name:         "Success",
 			dbAdapter:    &MockMongoClientSuccess{},
-			inputData:    `{"password": "Admin1234"}`,
+			inputData:    testChangePasswordBody,
 			expectedCode: http.StatusOK,
 			expectedBody: "{}",
 		},
 		{
-			name:         "DBError",
+			name:         testCaseDBError,
 			dbAdapter:    &MockMongoClientDBError{},
-			inputData:    `{"password": "Admin1234"}`,
+			inputData:    testChangePasswordBody,
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorRetrieveUserAccount),
 		},
 		{
 			name:         "UserDoesNotExist",
 			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"password": "Admin1234"}`,
+			inputData:    testChangePasswordBody,
 			expectedCode: http.StatusNotFound,
 			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorUsernameNotFound),
 		},

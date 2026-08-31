@@ -20,6 +20,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	testUserJohndoe = "johndoe"
+	testUserJanedoe = "janedoe"
+	passwordKey     = "password"
+	roleKey         = "role"
+	testLoginBody   = `{"username":"testuser", "password":"password123"}`
+)
+
 type MockMongoClientEmptyDB struct {
 	dbadapter.DBInterface
 }
@@ -87,32 +95,32 @@ func (db *MockMongoClientDBError) RestfulAPICount(collName string, filter bson.M
 
 func (db *MockMongoClientInvalidUser) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
 	rawUser := map[string]any{
-		"username": "johndoe",
-		"password": 1234,
-		"role":     "a",
+		usernameKey: testUserJohndoe,
+		passwordKey: 1234,
+		roleKey:     "a",
 	}
 	return rawUser, nil
 }
 
 func (db *MockMongoClientInvalidUser) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
 	rawUsers := []map[string]any{
-		{"username": "johndoe", "password": 1234, "role": "a"},
-		{"username": "janedoe", "password": hashPassword("Password123"), "role": 1},
+		{usernameKey: testUserJohndoe, passwordKey: 1234, roleKey: "a"},
+		{usernameKey: testUserJanedoe, passwordKey: hashPassword("Password123"), roleKey: 1},
 	}
 	return rawUsers, nil
 }
 
 func (db *MockMongoClientSuccess) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	rawUser := map[string]any{
-		"username": "janedoe", "password": hashPassword("password123!"), "role": 1,
+		usernameKey: testUserJanedoe, passwordKey: hashPassword("password123!"), roleKey: 1,
 	}
 	return rawUser, nil
 }
 
 func (db *MockMongoClientSuccess) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
 	rawUsers := []map[string]any{
-		{"username": "johndoe", "password": hashPassword(".password123"), "role": 0},
-		{"username": "janedoe", "password": hashPassword("password123"), "role": 1},
+		{usernameKey: testUserJohndoe, passwordKey: hashPassword(".password123"), roleKey: 0},
+		{usernameKey: testUserJanedoe, passwordKey: hashPassword("password123"), roleKey: 1},
 	}
 	return rawUsers, nil
 }
@@ -127,7 +135,7 @@ func (db *MockMongoClientSuccess) RestfulAPICount(collName string, filter bson.M
 
 func (db *MockMongoClientRegularUser) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	rawUser := map[string]any{
-		"username": "johndoe", "password": hashPassword("password-123"), "role": 0,
+		usernameKey: testUserJohndoe, passwordKey: hashPassword("password-123"), roleKey: 0,
 	}
 	return rawUser, nil
 }
@@ -173,21 +181,21 @@ func TestLogin_FailureCases(t *testing.T) {
 		{
 			name:         "DBError",
 			dbAdapter:    &MockMongoClientDBError{},
-			inputData:    `{"username":"testuser", "password":"password123"}`,
+			inputData:    testLoginBody,
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorRetrieveUserAccount),
 		},
 		{
 			name:         "UserNotFound",
 			dbAdapter:    &MockMongoClientEmptyDB{},
-			inputData:    `{"username":"testuser", "password":"password123"}`,
+			inputData:    testLoginBody,
 			expectedCode: http.StatusUnauthorized,
 			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorIncorrectCredentials),
 		},
 		{
 			name:         "InvalidUserObtainedFromDB",
 			dbAdapter:    &MockMongoClientInvalidUser{},
-			inputData:    `{"username":"testuser", "password":"password123"}`,
+			inputData:    testLoginBody,
 			expectedCode: http.StatusInternalServerError,
 			expectedBody: fmt.Sprintf(`{"error":"%s"}`, errorRetrieveUserAccount),
 		},
@@ -239,7 +247,7 @@ func TestLogin_SuccessCases(t *testing.T) {
 			dbAdapter:        &MockMongoClientSuccess{},
 			inputData:        `{"username":"janedoe", "password":"password123!"}`,
 			expectedCode:     http.StatusOK,
-			expectedUsername: "janedoe",
+			expectedUsername: testUserJanedoe,
 			expectedRole:     configmodels.AdminRole,
 		},
 		{
@@ -247,7 +255,7 @@ func TestLogin_SuccessCases(t *testing.T) {
 			dbAdapter:        &MockMongoClientRegularUser{},
 			inputData:        `{"username":"johndoe", "password":"password-123"}`,
 			expectedCode:     http.StatusOK,
-			expectedUsername: "johndoe",
+			expectedUsername: testUserJohndoe,
 			expectedRole:     configmodels.UserRole,
 		},
 	}

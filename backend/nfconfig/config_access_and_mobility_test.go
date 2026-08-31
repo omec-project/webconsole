@@ -19,7 +19,7 @@ func makeAccessAndMobilityNetworkSlice(mcc, mnc, sst string, sd string, tacs []i
 		Mnc: mnc,
 	}
 	siteInfo := configmodels.SliceSiteInfo{
-		SiteName: "test",
+		SiteName: testSiteName,
 		Plmn:     plmnId,
 		GNodeBs:  []configmodels.SliceSiteInfoGNodeBs{},
 	}
@@ -35,7 +35,7 @@ func makeAccessAndMobilityNetworkSlice(mcc, mnc, sst string, sd string, tacs []i
 		Sd:  sd,
 	}
 	networkSlice := configmodels.Slice{
-		SliceName: "slice1",
+		SliceName: testSliceName1,
 		SliceId:   sliceId,
 		SiteInfo:  siteInfo,
 	}
@@ -120,7 +120,7 @@ func TestAccessAndMobilityConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "Several slices different PLMN are ordered",
+			name: nameSeveralSlicesDifferentPLMN,
 			networkSlices: []configmodels.Slice{
 				makeAccessAndMobilityNetworkSlice("999", "455", "2", "abcd", []int32{2, 1}),
 				makeAccessAndMobilityNetworkSlice("123", "23", "3", "3333", []int32{4, 5, 1}),
@@ -151,7 +151,7 @@ func TestAccessAndMobilityConfig(t *testing.T) {
 			},
 		},
 		{
-			name:                      "Empty slices",
+			name:                      nameEmptySlices,
 			networkSlices:             []configmodels.Slice{},
 			expectedAccessAndMobility: []nfConfigApi.AccessAndMobility{},
 		},

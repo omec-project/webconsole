@@ -66,7 +66,7 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 	var request configmodels.Slice
 
 	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
-	if ct != "application/json" {
+	if ct != jsonContentType {
 		return request, fmt.Errorf("unsupported content-type: %s", ct)
 	}
 
@@ -154,7 +154,7 @@ func updateNS(slice, prevSlice configmodels.Slice) (int, error) {
 }
 
 func handleNetworkSlicePost(slice configmodels.Slice, prevSlice configmodels.Slice) (int, error) {
-	filter := bson.M{"slice-name": slice.SliceName}
+	filter := bson.M{sliceNameKey: slice.SliceName}
 	sliceDataBsonA := configmodels.ToBsonM(slice)
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(sliceDataColl, filter, sliceDataBsonA)
 	if err != nil {
@@ -332,10 +332,10 @@ func updatePolicyAndProvisionedData(imsi string, gpsi string, snssai *models.Sns
 
 func updateAmPolicyData(imsi string) error {
 	var amPolicy models.AmPolicyData
-	amPolicy.SubscCats = append(amPolicy.SubscCats, "aether")
+	amPolicy.SubscCats = append(amPolicy.SubscCats, subscCatAether)
 	amPolicyDatBsonA := configmodels.ToBsonM(amPolicy)
-	amPolicyDatBsonA["ueId"] = "imsi-" + imsi
-	filter := bson.M{"ueId": "imsi-" + imsi}
+	amPolicyDatBsonA[ueIdKey] = "imsi-" + imsi
+	filter := bson.M{ueIdKey: "imsi-" + imsi}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amPolicyDataColl, filter, amPolicyDatBsonA)
 	if err != nil {
 		logger.DbLog.Errorf("failed to update AM Policy Data for IMSI %s: %+v", imsi, err)
@@ -362,8 +362,8 @@ func updateSmPolicyData(snssai *models.Snssai, dnnMap map[string][]configmodels.
 	smPolicyData.SmPolicySnssaiData = make(map[string]models.SmPolicySnssaiData)
 	smPolicyData.SmPolicySnssaiData[SnssaiModelsToHex(*snssai)] = smPolicySnssaiData
 	smPolicyDatBsonA := configmodels.ToBsonM(smPolicyData)
-	smPolicyDatBsonA["ueId"] = "imsi-" + imsi
-	filter := bson.M{"ueId": "imsi-" + imsi}
+	smPolicyDatBsonA[ueIdKey] = "imsi-" + imsi
+	filter := bson.M{ueIdKey: "imsi-" + imsi}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(smPolicyDataColl, filter, smPolicyDatBsonA)
 	if err != nil {
 		logger.DbLog.Errorf("failed to update SM Policy Data for IMSI %s: %+v", imsi, err)
@@ -387,13 +387,13 @@ func updateAmProvisionedData(gpsi string, snssai *models.Snssai, aggregatedQoS c
 		SubscribedUeAmbr: models.NewAmbr(ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)), ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink))),
 	}
 	amDataBsonA := configmodels.ToBsonM(amData)
-	amDataBsonA["ueId"] = "imsi-" + imsi
-	amDataBsonA["servingPlmnId"] = mcc + mnc
+	amDataBsonA[ueIdKey] = "imsi-" + imsi
+	amDataBsonA[servingPlmnIdKey] = mcc + mnc
 	filter := bson.M{
-		"ueId": "imsi-" + imsi,
+		ueIdKey: "imsi-" + imsi,
 		"$or": []bson.M{
-			{"servingPlmnId": mcc + mnc},
-			{"servingPlmnId": bson.M{"$exists": false}},
+			{servingPlmnIdKey: mcc + mnc},
+			{servingPlmnIdKey: bson.M{"$exists": false}},
 		},
 	}
 	_, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, amDataBsonA)
@@ -407,8 +407,8 @@ func updateAmProvisionedData(gpsi string, snssai *models.Snssai, aggregatedQoS c
 
 func updateSmProvisionedData(snssai *models.Snssai, dnnMap map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string) error {
 	filter := bson.M{
-		"ueId":          "imsi-" + imsi,
-		"servingPlmnId": mcc + mnc,
+		ueIdKey:          "imsi-" + imsi,
+		servingPlmnIdKey: mcc + mnc,
 	}
 
 	smDataBsonA, err := buildSmProvisionedDataDocument(snssai, dnnMap, mcc, mnc, imsi)
@@ -446,17 +446,17 @@ func buildSmProvisionedDataDocument(snssai *models.Snssai, dnnMap map[string][]c
 				"allowedSscModes": []models.SscMode{models.SSCMODE_SSC_MODE_2, models.SSCMODE_SSC_MODE_3},
 			},
 			"sessionAmbr": map[string]interface{}{
-				"downlink": ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink)),
-				"uplink":   ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)),
+				downlinkKey: ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink)),
+				uplinkKey:   ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)),
 			},
 			"5gQosProfile": map[string]interface{}{
 				"5qi": aggregatedQoS.TrafficClass.Qci,
 				"arp": map[string]interface{}{
-					"priorityLevel": int32(8),
-					"preemptCap":    models.PREEMPTIONCAPABILITY_NOT_PREEMPT,
-					"preemptVuln":   models.PREEMPTIONVULNERABILITY_NOT_PREEMPTABLE,
+					priorityLevelKey: int32(8),
+					"preemptCap":     models.PREEMPTIONCAPABILITY_NOT_PREEMPT,
+					"preemptVuln":    models.PREEMPTIONVULNERABILITY_NOT_PREEMPTABLE,
 				},
-				"priorityLevel": int32(8),
+				priorityLevelKey: int32(8),
 			},
 		}
 	}
@@ -469,8 +469,8 @@ func buildSmProvisionedDataDocument(snssai *models.Snssai, dnnMap map[string][]c
 	}
 
 	return map[string]interface{}{
-		"ueId":              "imsi-" + imsi,
-		"servingPlmnId":     mcc + mnc,
+		ueIdKey:             "imsi-" + imsi,
+		servingPlmnIdKey:    mcc + mnc,
 		"singlenssai":       singleNssai,
 		"dnnconfigurations": dnnConfigurations,
 	}, nil
@@ -503,13 +503,13 @@ func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc string, d
 	}
 	(*smfSelData.SubscribedSnssaiInfos)[SnssaiModelsToHex(*snssai)] = snssaiInfo
 	smfSelecDataBsonA := configmodels.ToBsonM(smfSelData)
-	smfSelecDataBsonA["ueId"] = "imsi-" + imsi
-	smfSelecDataBsonA["servingPlmnId"] = mcc + mnc
+	smfSelecDataBsonA[ueIdKey] = "imsi-" + imsi
+	smfSelecDataBsonA[servingPlmnIdKey] = mcc + mnc
 
 	// Define the filter for the database operation
 	filter := bson.M{
-		"ueId":          "imsi-" + imsi,
-		"servingPlmnId": mcc + mnc,
+		ueIdKey:          "imsi-" + imsi,
+		servingPlmnIdKey: mcc + mnc,
 	}
 
 	// Log the data to be sent to the database
@@ -567,7 +567,7 @@ func getSlices() []*configmodels.Slice {
 }
 
 func getSliceByName(name string) *configmodels.Slice {
-	filter := bson.M{"slice-name": name}
+	filter := bson.M{sliceNameKey: name}
 	sliceDataInterface, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(sliceDataColl, filter)
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)
@@ -584,7 +584,7 @@ func getSliceByName(name string) *configmodels.Slice {
 
 func handleNetworkSliceDelete(sliceName string) error {
 	prevSlice := getSliceByName(sliceName)
-	filter := bson.M{"slice-name": sliceName}
+	filter := bson.M{sliceNameKey: sliceName}
 	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorf("failed to delete slice data for %+v: %+v", sliceName, err)

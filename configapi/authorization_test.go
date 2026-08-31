@@ -16,8 +16,13 @@ import (
 )
 
 const (
-	successBody = `{"Result":"Operation Executed"}`
-	bearer      = "Bearer "
+	deviceGroupSomeNamePath   = "/config/v1/device-group/some-name"
+	networkSliceSomeSlicePath = "/config/v1/network-slice/some-slice"
+	subscriberSomeSubsPath    = "/api/subscriber/some-subs"
+	successBody               = `{"Result":"Operation Executed"}`
+	forbiddenAdminBody        = `{"error":"forbidden: admin access required"}`
+	bearer                    = "Bearer "
+	testUserSomeuser          = "someuser"
 )
 
 var mockJWTSecret = []byte("mockSecret")
@@ -69,27 +74,27 @@ func TestAdminOrUserAuthorizationMiddleware_NoHeaderRequest(t *testing.T) {
 		{
 			name:   "GetDeviceGroupByName",
 			method: http.MethodGet,
-			url:    "/config/v1/device-group/some-name",
+			url:    deviceGroupSomeNamePath,
 		},
 		{
 			name:   "DeviceGroupGroupNameDelete",
 			method: http.MethodDelete,
-			url:    "/config/v1/device-group/some-name",
+			url:    deviceGroupSomeNamePath,
 		},
 		{
 			name:   "DeviceGroupGroupNamePatch",
 			method: http.MethodPatch,
-			url:    "/config/v1/device-group/some-name",
+			url:    deviceGroupSomeNamePath,
 		},
 		{
 			name:   "DeviceGroupGroupNamePut",
 			method: http.MethodPut,
-			url:    "/config/v1/device-group/some-name",
+			url:    deviceGroupSomeNamePath,
 		},
 		{
 			name:   "DeviceGroupGroupNamePost",
 			method: http.MethodPost,
-			url:    "/config/v1/device-group/some-name",
+			url:    deviceGroupSomeNamePath,
 		},
 		{
 			name:   "GetNetworkSlices",
@@ -99,27 +104,27 @@ func TestAdminOrUserAuthorizationMiddleware_NoHeaderRequest(t *testing.T) {
 		{
 			name:   "GetNetworkSliceByName",
 			method: http.MethodGet,
-			url:    "/config/v1/network-slice/some-slice",
+			url:    networkSliceSomeSlicePath,
 		},
 		{
 			name:   "NetworkSliceSliceNameDelete",
 			method: http.MethodDelete,
-			url:    "/config/v1/network-slice/some-slice",
+			url:    networkSliceSomeSlicePath,
 		},
 		{
 			name:   "NetworkSliceSliceNamePost",
 			method: http.MethodPost,
-			url:    "/config/v1/network-slice/some-slice",
+			url:    networkSliceSomeSlicePath,
 		},
 		{
 			name:   "NetworkSliceSliceNamePut",
 			method: http.MethodPut,
-			url:    "/config/v1/network-slice/some-slice",
+			url:    networkSliceSomeSlicePath,
 		},
 		{
 			name:   "GetGnbs",
 			method: http.MethodGet,
-			url:    "/config/v1/inventory/gnb",
+			url:    gnbInventoryPath,
 		},
 		{
 			name:   "PostGnb",
@@ -134,7 +139,7 @@ func TestAdminOrUserAuthorizationMiddleware_NoHeaderRequest(t *testing.T) {
 		{
 			name:   "GetUpfs",
 			method: http.MethodGet,
-			url:    "/config/v1/inventory/upf",
+			url:    upfInventoryPath,
 		},
 		{
 			name:   "PostUpf",
@@ -154,17 +159,17 @@ func TestAdminOrUserAuthorizationMiddleware_NoHeaderRequest(t *testing.T) {
 		{
 			name:   "GetSubscribers",
 			method: http.MethodGet,
-			url:    "/api/subscriber",
+			url:    subscriberPath,
 		},
 		{
 			name:   "GetSubscriberByID",
 			method: http.MethodGet,
-			url:    "/api/subscriber/some-subs",
+			url:    subscriberSomeSubsPath,
 		},
 		{
 			name:   "PostSubscriberByID",
 			method: http.MethodPost,
-			url:    "/api/subscriber/some-subs",
+			url:    subscriberSomeSubsPath,
 		},
 		{
 			name:   "PutSubscriberByID",
@@ -174,7 +179,7 @@ func TestAdminOrUserAuthorizationMiddleware_NoHeaderRequest(t *testing.T) {
 		{
 			name:   "DeleteSubscriberByID",
 			method: http.MethodDelete,
-			url:    "/api/subscriber/some-subs",
+			url:    subscriberSomeSubsPath,
 		},
 		{
 			name:   "RegisteredUEContext",
@@ -278,17 +283,17 @@ func TestGetUserAccounts_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 	}{
 		{
 			name:         "AdminUser_GetUserAccounts",
-			username:     "janedoe",
+			username:     testUserJanedoe,
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: successBody,
 		},
 		{
 			name:         "RegularUser_GetUserAccounts",
-			username:     "someuser",
+			username:     testUserSomeuser,
 			role:         configmodels.UserRole,
 			expectedCode: http.StatusForbidden,
-			expectedBody: `{"error":"forbidden: admin access required"}`,
+			expectedBody: forbiddenAdminBody,
 		},
 	}
 	for _, tc := range testCases {
@@ -329,28 +334,28 @@ func TestGetUserAccount_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 	}{
 		{
 			name:         "RegularUser_GetOwnUserAccount",
-			username:     "janedoe",
+			username:     testUserJanedoe,
 			role:         configmodels.UserRole,
 			expectedCode: http.StatusOK,
 			expectedBody: successBody,
 		},
 		{
 			name:         "AdminUser_GetOwnUserAccount",
-			username:     "janedoe",
+			username:     testUserJanedoe,
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: successBody,
 		},
 		{
 			name:         "RegularUser_GetOtherUserAccount",
-			username:     "someuser",
+			username:     testUserSomeuser,
 			role:         configmodels.UserRole,
 			expectedCode: http.StatusForbidden,
 			expectedBody: `{"error":"forbidden: admin or me access required"}`,
 		},
 		{
 			name:         "AdminUser_GetOtherUserAccount",
-			username:     "someuser",
+			username:     testUserSomeuser,
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: successBody,
@@ -415,17 +420,17 @@ func TestCreateUserAccount_AdminAuthorizationMiddleware(t *testing.T) {
 	}{
 		{
 			name:         "AdminUser_CreateUserAccount",
-			username:     "janedoe",
+			username:     testUserJanedoe,
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: successBody,
 		},
 		{
 			name:         "RegularUser_CreateUserAccoun",
-			username:     "someuser",
+			username:     testUserSomeuser,
 			role:         configmodels.UserRole,
 			expectedCode: http.StatusForbidden,
-			expectedBody: `{"error":"forbidden: admin access required"}`,
+			expectedBody: forbiddenAdminBody,
 		},
 	}
 	for _, tc := range testCases {
@@ -466,28 +471,28 @@ func TestDeleteUserAccount_AdminOnlyAuthorizationMiddleware(t *testing.T) {
 	}{
 		{
 			name:         "RegularUser_DeleteOwnUserAccount",
-			username:     "janedoe",
+			username:     testUserJanedoe,
 			role:         configmodels.UserRole,
 			expectedCode: http.StatusForbidden,
-			expectedBody: `{"error":"forbidden: admin access required"}`,
+			expectedBody: forbiddenAdminBody,
 		},
 		{
 			name:         "AdminUser_DeleteOwnUserAccount",
-			username:     "janedoe",
+			username:     testUserJanedoe,
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: successBody,
 		},
 		{
 			name:         "RegularUser_DeleteOtherUserAccount",
-			username:     "someuser",
+			username:     testUserSomeuser,
 			role:         configmodels.UserRole,
 			expectedCode: http.StatusForbidden,
-			expectedBody: `{"error":"forbidden: admin access required"}`,
+			expectedBody: forbiddenAdminBody,
 		},
 		{
 			name:         "AdminUser_DeleteOtherUserAccount",
-			username:     "someuser",
+			username:     testUserSomeuser,
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: successBody,
@@ -531,28 +536,28 @@ func TestChangePassword_AdminOrMeAuthorizationMiddleware(t *testing.T) {
 	}{
 		{
 			name:         "RegularUser_OwnUserAccount",
-			username:     "janedoe",
+			username:     testUserJanedoe,
 			role:         configmodels.UserRole,
 			expectedCode: http.StatusOK,
 			expectedBody: successBody,
 		},
 		{
 			name:         "AdminUser_OwnUserAccount",
-			username:     "janedoe",
+			username:     testUserJanedoe,
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: successBody,
 		},
 		{
 			name:         "RegularUser_OtherUserAccount",
-			username:     "someuser",
+			username:     testUserSomeuser,
 			role:         configmodels.UserRole,
 			expectedCode: http.StatusForbidden,
 			expectedBody: `{"error":"forbidden: admin or me access required"}`,
 		},
 		{
 			name:         "AdminUser_OtherUserAccount",
-			username:     "someuser",
+			username:     testUserSomeuser,
 			role:         configmodels.AdminRole,
 			expectedCode: http.StatusOK,
 			expectedBody: successBody,

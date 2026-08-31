@@ -59,7 +59,7 @@ func GetDeviceGroups(c *gin.Context) {
 		logger.DbLog.Warnln(errGetMany)
 	}
 	for _, rawDeviceGroup := range rawDeviceGroups {
-		deviceGroups = append(deviceGroups, rawDeviceGroup["group-name"].(string))
+		deviceGroups = append(deviceGroups, rawDeviceGroup[groupNameKey].(string))
 	}
 
 	c.JSON(http.StatusOK, deviceGroups)
@@ -83,17 +83,17 @@ func GetDeviceGroupByName(c *gin.Context) {
 	logger.WebUILog.Infoln("Get Device Group by name")
 
 	var deviceGroup configmodels.DeviceGroups
-	filter := bson.M{"group-name": c.Param("group-name")}
+	filter := bson.M{groupNameKey: c.Param(groupNameKey)}
 	rawDeviceGroup, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(devGroupDataColl, filter)
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve device group"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errMsgRetrieveDeviceGroup})
 		return
 	}
 	err := json.Unmarshal(configmodels.MapToByte(rawDeviceGroup), &deviceGroup)
 	if err != nil {
 		logger.WebUILog.Errorf("failed to unmarshal device group error: %+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve device group"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errMsgRetrieveDeviceGroup})
 		return
 	}
 	if deviceGroup.DeviceGroupName == "" {
@@ -118,12 +118,12 @@ func GetDeviceGroupByName(c *gin.Context) {
 func DeviceGroupGroupNameDelete(c *gin.Context) {
 	requestID := uuid.New().String()
 	logger.WebUILog.Debugln("DeviceGroupGroupNameDelete")
-	groupName, ok := c.Params.Get("group-name")
+	groupName, ok := c.Params.Get(groupNameKey)
 	if !ok {
 		logger.ConfigLog.Errorf("group-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":      "group-name parameter is missing",
-			"request_id": requestID,
+			errorKey:     errMsgGroupNameMissing,
+			requestIDKey: requestID,
 		})
 		return
 	}
@@ -131,9 +131,9 @@ func DeviceGroupGroupNameDelete(c *gin.Context) {
 	if err := deviceGroupDeleteHelper(groupName); err != nil {
 		logger.WebUILog.Errorf("Request ID: %s Device group delete failed: %+v", requestID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":      fmt.Sprintf("Failed to delete device group %s with error: %+v.", groupName, err),
-			"request_id": requestID,
-			"message":    "Please refer to the log with the provided Request ID for details.",
+			errorKey:     fmt.Sprintf("Failed to delete device group %s with error: %+v.", groupName, err),
+			requestIDKey: requestID,
+			messageKey:   "Please refer to the log with the provided Request ID for details.",
 		})
 		return
 	}
@@ -144,23 +144,23 @@ func DeviceGroupGroupNameDelete(c *gin.Context) {
 func DeviceGroupGroupNamePut(c *gin.Context) {
 	requestID := uuid.New().String()
 	logger.WebUILog.Debugln("DeviceGroupGroupNamePut")
-	groupName, ok := c.Params.Get("group-name")
+	groupName, ok := c.Params.Get(groupNameKey)
 	if !ok {
 		logger.ConfigLog.Errorf("group-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":      "group-name parameter is missing",
-			"request_id": requestID,
+			errorKey:     errMsgGroupNameMissing,
+			requestIDKey: requestID,
 		})
 		return
 	}
 	if !isValidName(groupName) {
 		logger.ConfigLog.Errorf("Request ID: %s invalid Device Group name %s. Name needs to match regular expression: %s", requestID, groupName, NAME_PATTERN)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf(
+			errorKey: fmt.Sprintf(
 				"Invalid Device Group name %s. Name needs to match regular expression: %s",
 				groupName, NAME_PATTERN,
 			),
-			"request_id": requestID,
+			requestIDKey: requestID,
 		})
 		return
 	}
@@ -170,31 +170,31 @@ func DeviceGroupGroupNamePut(c *gin.Context) {
 	if ct == "" {
 		err := "missing Content-Type header"
 		logger.ConfigLog.Errorln(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err, "request_id": requestID})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: err, requestIDKey: requestID})
 		return
 	}
 
 	ct = strings.Split(ct, ";")[0]
-	if ct != "application/json" {
+	if ct != jsonContentType {
 		err := fmt.Sprintf("unsupported content-type: %s", ct)
 		logger.ConfigLog.Errorln(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err, "request_id": requestID})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: err, requestIDKey: requestID})
 		return
 	}
 
 	if err := c.ShouldBindJSON(&requestDeviceGroup); err != nil {
 		err = fmt.Errorf("JSON bind error: %w", err)
 		logger.ConfigLog.Errorln(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "request_id": requestID})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: err.Error(), requestIDKey: requestID})
 		return
 	}
 
 	if statusCode, err := deviceGroupPostHelper(requestDeviceGroup, groupName); err != nil {
 		logger.WebUILog.Errorf("Device group update failed: %+v", err)
 		c.JSON(statusCode, gin.H{
-			"error":      fmt.Sprintf("Failed to update device group %s with error: %+v.", groupName, err),
-			"request_id": requestID,
-			"message":    "Please refer to the log with the provided Request ID for details.",
+			errorKey:     fmt.Sprintf("Failed to update device group %s with error: %+v.", groupName, err),
+			requestIDKey: requestID,
+			messageKey:   "Please refer to the log with the provided Request ID for details.",
 		})
 		return
 	}
@@ -218,23 +218,23 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 	// TODO: Return 409 if device group already exists
 	requestID := uuid.New().String()
 	logger.WebUILog.Debugln("DeviceGroupGroupNamePost")
-	groupName, ok := c.Params.Get("group-name")
+	groupName, ok := c.Params.Get(groupNameKey)
 	if !ok {
 		logger.ConfigLog.Errorf("group-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":      "group-name parameter is missing",
-			"request_id": requestID,
+			errorKey:     errMsgGroupNameMissing,
+			requestIDKey: requestID,
 		})
 		return
 	}
 	if !isValidName(groupName) {
 		logger.ConfigLog.Errorf("invalid Device Group name %s. Name needs to match regular expression: %s", groupName, NAME_PATTERN)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf(
+			errorKey: fmt.Sprintf(
 				"Invalid Device Group name %s. Name needs to match regular expression: %s",
 				groupName, NAME_PATTERN,
 			),
-			"request_id": requestID,
+			requestIDKey: requestID,
 		})
 		return
 	}
@@ -244,31 +244,31 @@ func DeviceGroupGroupNamePost(c *gin.Context) {
 	if ct == "" {
 		err := "missing Content-Type header"
 		logger.ConfigLog.Errorln(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err, "request_id": requestID})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: err, requestIDKey: requestID})
 		return
 	}
 
 	ct = strings.Split(ct, ";")[0]
-	if ct != "application/json" {
+	if ct != jsonContentType {
 		err := fmt.Sprintf("unsupported content-type: %s", ct)
 		logger.ConfigLog.Errorln(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err, "request_id": requestID})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: err, requestIDKey: requestID})
 		return
 	}
 
 	if err := c.ShouldBindJSON(&requestDeviceGroup); err != nil {
 		err = fmt.Errorf("JSON bind error: %w", err)
 		logger.ConfigLog.Errorln(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "request_id": requestID})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: err.Error(), requestIDKey: requestID})
 		return
 	}
 
 	if statusCode, err := deviceGroupPostHelper(requestDeviceGroup, groupName); err != nil {
 		logger.WebUILog.Errorf("Device group create failed: %+v", err)
 		c.JSON(statusCode, gin.H{
-			"error":      fmt.Sprintf("Failed to create device group %s with error: %+v.", groupName, err),
-			"request_id": requestID,
-			"message":    "Please refer to the log with the provided Request ID for details",
+			errorKey:     fmt.Sprintf("Failed to create device group %s with error: %+v.", groupName, err),
+			requestIDKey: requestID,
+			messageKey:   messageRequestIDDetails,
 		})
 		return
 	}
@@ -294,12 +294,12 @@ func GetNetworkSlices(c *gin.Context) {
 	rawNetworkSlices, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, bson.M{})
 	if errGetMany != nil {
 		logger.DbLog.Errorln(errGetMany)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slices"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: "Failed to fetch slices"})
 		return
 	}
 
 	for _, rawNetworkSlice := range rawNetworkSlices {
-		if name, ok := rawNetworkSlice["slice-name"].(string); ok && name != "" {
+		if name, ok := rawNetworkSlice[sliceNameKey].(string); ok && name != "" {
 			networkSlices = append(networkSlices, name)
 		} else {
 			logger.WebUILog.Warnf("Skipping invalid or missing slice-name field: %+v", rawNetworkSlice)
@@ -326,17 +326,17 @@ func GetNetworkSliceByName(c *gin.Context) {
 	setCorsHeader(c)
 	logger.WebUILog.Infoln("Get Network Slice by name")
 	var networkSlice configmodels.Slice
-	filter := bson.M{"slice-name": c.Param("slice-name")}
+	filter := bson.M{sliceNameKey: c.Param(sliceNameKey)}
 	rawNetworkSlice, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(sliceDataColl, filter)
 	if errGetOne != nil {
 		logger.DbLog.Warnln(errGetOne)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve network slice"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errMsgRetrieveNetworkSlice})
 		return
 	}
 	err := json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice)
 	if err != nil {
 		logger.WebUILog.Errorf("failed to unmarshal network slice error: %+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve network slice"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errMsgRetrieveNetworkSlice})
 		return
 	}
 	if networkSlice.SliceName == "" {
@@ -362,32 +362,32 @@ func GetNetworkSliceByName(c *gin.Context) {
 func NetworkSliceSliceNameDelete(c *gin.Context) {
 	logger.WebUILog.Debugln("Received NetworkSliceSliceNameDelete")
 	requestID := uuid.New().String()
-	sliceName, ok := c.Params.Get("slice-name")
+	sliceName, ok := c.Params.Get(sliceNameKey)
 	if !ok {
 		logger.ConfigLog.Errorf("slice-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":      "slice-name parameter is missing",
-			"request_id": requestID,
+			errorKey:     errMsgSliceNameMissing,
+			requestIDKey: requestID,
 		})
 		return
 	}
 	if !isValidName(sliceName) {
 		logger.ConfigLog.Errorf("invalid Network Slice name %s. Name needs to match regular expression: %s", sliceName, NAME_PATTERN)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf(
+			errorKey: fmt.Sprintf(
 				"Invalid slice name %s. Name needs to match regular expression: %s",
 				sliceName, NAME_PATTERN,
 			),
-			"request_id": requestID,
+			requestIDKey: requestID,
 		})
 		return
 	}
 	if err := networkSliceDeleteHelper(sliceName); err != nil {
 		logger.WebUILog.Errorf("Network slice delete failed: %+v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":      fmt.Sprintf("Failed to delete network slice %s with error: %+v.", sliceName, err),
-			"request_id": requestID,
-			"message":    "Please refer to the log with the provided Request ID for details",
+			errorKey:     fmt.Sprintf("Failed to delete network slice %s with error: %+v.", sliceName, err),
+			requestIDKey: requestID,
+			messageKey:   messageRequestIDDetails,
 		})
 		return
 	}
@@ -411,32 +411,32 @@ func NetworkSliceSliceNamePost(c *gin.Context) {
 	// TODO: Return 409 if network slices already exist
 	logger.ConfigLog.Debugln("Received NetworkSliceSliceNamePost")
 	requestID := uuid.New().String()
-	sliceName, ok := c.Params.Get("slice-name")
+	sliceName, ok := c.Params.Get(sliceNameKey)
 	if !ok {
 		logger.ConfigLog.Errorf("slice-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":      "slice-name parameter is missing",
-			"request_id": requestID,
+			errorKey:     errMsgSliceNameMissing,
+			requestIDKey: requestID,
 		})
 		return
 	}
 	if !isValidName(sliceName) {
 		logger.ConfigLog.Errorf("invalid Network Slice name %s. Name needs to match regular expression: %s", sliceName, NAME_PATTERN)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf(
+			errorKey: fmt.Sprintf(
 				"Invalid slice name %s. Name needs to match regular expression: %s",
 				sliceName, NAME_PATTERN,
 			),
-			"request_id": requestID,
+			requestIDKey: requestID,
 		})
 		return
 	}
 	statusCode, err := networkSlicePostHelper(c, sliceName)
 	if err != nil {
 		c.JSON(statusCode, gin.H{
-			"error":      fmt.Sprintf("Failed to create network slice %s with error: %+v", sliceName, err),
-			"request_id": requestID,
-			"message":    "Please refer to the log with the provided Request ID for details",
+			errorKey:     fmt.Sprintf("Failed to create network slice %s with error: %+v", sliceName, err),
+			requestIDKey: requestID,
+			messageKey:   messageRequestIDDetails,
 		})
 		return
 	}
@@ -447,32 +447,32 @@ func NetworkSliceSliceNamePost(c *gin.Context) {
 func NetworkSliceSliceNamePut(c *gin.Context) {
 	logger.ConfigLog.Debugln("Received NetworkSliceSliceNamePut")
 	requestID := uuid.New().String()
-	sliceName, ok := c.Params.Get("slice-name")
+	sliceName, ok := c.Params.Get(sliceNameKey)
 	if !ok {
 		logger.ConfigLog.Errorf("slice-name parameter is missing in the request: %s", requestID)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":      "slice-name parameter is missing",
-			"request_id": requestID,
+			errorKey:     errMsgSliceNameMissing,
+			requestIDKey: requestID,
 		})
 		return
 	}
 	if !isValidName(sliceName) {
 		logger.ConfigLog.Errorf("invalid Network Slice name %s. Name needs to match regular expression: %s", sliceName, NAME_PATTERN)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf(
+			errorKey: fmt.Sprintf(
 				"Invalid slice name %s. Name needs to match regular expression: %s",
 				sliceName, NAME_PATTERN,
 			),
-			"request_id": requestID,
+			requestIDKey: requestID,
 		})
 		return
 	}
 	statusCode, err := networkSlicePostHelper(c, sliceName)
 	if err != nil {
 		c.JSON(statusCode, gin.H{
-			"error":      fmt.Sprintf("Failed to update network slice %s with error: %+v.", sliceName, err),
-			"request_id": requestID,
-			"message":    "Please refer to the log with the provided Request ID for details",
+			errorKey:     fmt.Sprintf("Failed to update network slice %s with error: %+v.", sliceName, err),
+			requestIDKey: requestID,
+			messageKey:   messageRequestIDDetails,
 		})
 		return
 	}

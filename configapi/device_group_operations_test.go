@@ -28,7 +28,7 @@ type DeviceGroupMockDBClient struct {
 	err                    error
 }
 
-const deviceNameParamKey = "device-name"
+const deviceNameParamKey = groupNameKey
 
 func (db *DeviceGroupMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	if db.err != nil {

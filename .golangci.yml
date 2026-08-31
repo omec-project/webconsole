@@ -18,6 +18,7 @@ linters:
     - bodyclose
     - dogsled
     - govet
+    - goconst
     - godox
     - gomodguard_v2
     - misspell

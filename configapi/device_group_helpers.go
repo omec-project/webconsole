@@ -28,6 +28,8 @@ const (
 	KBPS = 1000
 	MBPS = 1000000
 	GBPS = 1000000000
+
+	bitrateUnitKbps = "kbps"
 )
 
 func deviceGroupDeleteHelper(groupName string) error {
@@ -135,7 +137,7 @@ func convertToBps(val int64, unit string) int64 {
 	switch strings.ToLower(unit) {
 	case "bps":
 		return val
-	case "kbps":
+	case bitrateUnitKbps:
 		return val * KBPS
 	case "mbps":
 		return val * MBPS
@@ -148,7 +150,7 @@ func convertToBps(val int64, unit string) int64 {
 }
 
 func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
-	filter := bson.M{"group-name": devGroup.DeviceGroupName}
+	filter := bson.M{groupNameKey: devGroup.DeviceGroupName}
 	devGroupDataBsonA := configmodels.ToBsonM(devGroup)
 	result, err := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
 	if err != nil {
@@ -247,7 +249,7 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 func handleDeviceGroupDelete(groupName string) error {
 	rwLock.Lock()
 	defer rwLock.Unlock()
-	filter := bson.M{"group-name": groupName}
+	filter := bson.M{groupNameKey: groupName}
 	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(devGroupDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorf("failed to delete device group data for %s: %+v", groupName, err)
@@ -258,7 +260,7 @@ func handleDeviceGroupDelete(groupName string) error {
 }
 
 func getDeviceGroupByName(name string) *configmodels.DeviceGroups {
-	filter := bson.M{"group-name": name}
+	filter := bson.M{groupNameKey: name}
 	devGroupDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(devGroupDataColl, filter)
 	if err != nil {
 		logger.DbLog.Warnln(err)

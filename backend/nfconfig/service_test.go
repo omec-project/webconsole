@@ -23,6 +23,11 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
+const (
+	testPemFile = "test.pem"
+	testKeyFile = "test.key"
+)
+
 type MockDBClient struct {
 	dbadapter.DBInterface
 	Slices []configmodels.Slice
@@ -47,7 +52,7 @@ func makeNetworkSlice(mcc, mnc, sst string, sd string, tacs []int32) configmodel
 		Mnc: mnc,
 	}
 	siteInfo := configmodels.SliceSiteInfo{
-		SiteName: "test",
+		SiteName: testSiteName,
 		Plmn:     plmnId,
 		GNodeBs:  []configmodels.SliceSiteInfoGNodeBs{},
 	}
@@ -92,8 +97,8 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 				},
 				Configuration: &factory.Configuration{
 					NfConfigTLS: &factory.TLS{
-						PEM: "test.pem",
-						Key: "test.key",
+						PEM: testPemFile,
+						Key: testKeyFile,
 					},
 				},
 			},
@@ -108,8 +113,8 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 				},
 				Configuration: &factory.Configuration{
 					NfConfigTLS: &factory.TLS{
-						PEM: "test.pem",
-						Key: "test.key",
+						PEM: testPemFile,
+						Key: testKeyFile,
 					},
 				},
 			},
@@ -124,7 +129,7 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 				},
 				Configuration: &factory.Configuration{
 					NfConfigTLS: &factory.TLS{
-						PEM: "test.pem",
+						PEM: testPemFile,
 					},
 				},
 			},
@@ -139,7 +144,7 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 				},
 				Configuration: &factory.Configuration{
 					NfConfigTLS: &factory.TLS{
-						Key: "test.key",
+						Key: testKeyFile,
 					},
 				},
 			},
@@ -154,8 +159,8 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 				},
 				Configuration: &factory.Configuration{
 					NfConfigTLS: &factory.TLS{
-						PEM: "test.pem",
-						Key: "test.key",
+						PEM: testPemFile,
+						Key: testKeyFile,
 					},
 				},
 			},
@@ -170,8 +175,8 @@ func TestNewNFConfig_various_configs(t *testing.T) {
 				},
 				Configuration: &factory.Configuration{
 					NfConfigTLS: &factory.TLS{
-						PEM: "test.pem",
-						Key: "test.key",
+						PEM: testPemFile,
+						Key: testKeyFile,
 					},
 				},
 			},
@@ -207,8 +212,8 @@ func TestNFConfigRoutes(t *testing.T) {
 		},
 		Configuration: &factory.Configuration{
 			NfConfigTLS: &factory.TLS{
-				PEM: "test.pem",
-				Key: "test.key",
+				PEM: testPemFile,
+				Key: testKeyFile,
 			},
 		},
 	}
@@ -239,37 +244,37 @@ func TestNFConfigRoutes(t *testing.T) {
 		{
 			name:         "access mobility endpoint status OK",
 			path:         "/nfconfig/access-mobility",
-			acceptHeader: "application/json",
+			acceptHeader: acceptHeaderJSON,
 			wantStatus:   http.StatusOK,
 		},
 		{
 			name:         "plmn endpoint status OK",
 			path:         "/nfconfig/plmn",
-			acceptHeader: "application/json",
+			acceptHeader: acceptHeaderJSON,
 			wantStatus:   http.StatusOK,
 		},
 		{
 			name:         "plmn-snssai endpoint status OK",
 			path:         "/nfconfig/plmn-snssai",
-			acceptHeader: "application/json",
+			acceptHeader: acceptHeaderJSON,
 			wantStatus:   http.StatusOK,
 		},
 		{
 			name:         "policy control endpoint status OK",
 			path:         "/nfconfig/policy-control",
-			acceptHeader: "application/json",
+			acceptHeader: acceptHeaderJSON,
 			wantStatus:   http.StatusOK,
 		},
 		{
 			name:         "session management endpoint status OK",
 			path:         "/nfconfig/session-management",
-			acceptHeader: "application/json",
+			acceptHeader: acceptHeaderJSON,
 			wantStatus:   http.StatusOK,
 		},
 		{
 			name:         "imsi qos endpoint for missing configuraion returns not found",
 			path:         "/nfconfig/qos/internet/imsi-001011234567890",
-			acceptHeader: "application/json",
+			acceptHeader: acceptHeaderJSON,
 			wantStatus:   http.StatusNotFound,
 		},
 		{
@@ -560,7 +565,7 @@ func TestSyncInMemoryConfig_UpdateAllConfigs(t *testing.T) {
 			},
 		},
 		{
-			name:                      "Empty slices",
+			name:                      nameEmptySlices,
 			slices:                    []configmodels.Slice{},
 			expectedPlmn:              []nfConfigApi.PlmnId{},
 			expectedPlmnSnssai:        []nfConfigApi.PlmnSnssai{},

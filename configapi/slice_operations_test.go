@@ -28,6 +28,11 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
+const (
+	testSliceName   = "slice1"
+	bitrateUnitMbps = "Mbps"
+)
+
 var execCommandTimesCalled = 0
 
 func networkSlice(name string) configmodels.Slice {
@@ -51,7 +56,7 @@ func networkSliceWithGnbParams(name string, gnbName string, gnbTac int32) config
 		Sd:  "010203",
 	}
 	site_info := configmodels.SliceSiteInfo{
-		SiteName: "demo",
+		SiteName: demoSiteName,
 		Plmn:     plmn,
 		GNodeBs:  []configmodels.SliceSiteInfoGNodeBs{gnodeb},
 		Upf:      upf,
@@ -59,7 +64,7 @@ func networkSliceWithGnbParams(name string, gnbName string, gnbTac int32) config
 	slice := configmodels.Slice{
 		SliceName:       name,
 		SliceId:         slice_id,
-		SiteDeviceGroup: []string{"group1", "group2"},
+		SiteDeviceGroup: []string{testGroupName, "group2"},
 		SiteInfo:        site_info,
 	}
 	return slice
@@ -104,9 +109,9 @@ func (db *NetworkSliceMockDBClient) RestfulAPIGetMany(coll string, filter bson.M
 
 func (db *NetworkSliceMockDBClient) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
 	params := map[string]any{
-		"coll":   collName,
-		"filter": filter,
-		"data":   postData,
+		collKey:   collName,
+		filterKey: filter,
+		dataKey:   postData,
 	}
 	db.postData = append(db.postData, params)
 	return true, nil
@@ -114,9 +119,9 @@ func (db *NetworkSliceMockDBClient) RestfulAPIPost(collName string, filter bson.
 
 func (db *NetworkSliceMockDBClient) RestfulAPIPutOne(collName string, filter bson.M, putData map[string]any) (bool, error) {
 	params := map[string]any{
-		"coll":   collName,
-		"filter": filter,
-		"data":   putData,
+		collKey:   collName,
+		filterKey: filter,
+		dataKey:   putData,
 	}
 	db.putData = append(db.putData, params)
 	return true, db.err
@@ -138,20 +143,20 @@ func TestGetNetworkSlices(t *testing.T) {
 		{
 			name: "One network slice returns a list with one name",
 			configuredSlices: []configmodels.Slice{
-				networkSlice("slice1"),
+				networkSlice(testSliceName),
 			},
 			expectedCode:   http.StatusOK,
-			expectedResult: []string{"slice1"},
+			expectedResult: []string{testSliceName},
 		},
 		{
 			name: "Many slices returns a list with many slices names",
 			configuredSlices: []configmodels.Slice{
-				networkSlice("slice1"),
+				networkSlice(testSliceName),
 				networkSlice("slice2"),
 				networkSlice("slice3"),
 			},
 			expectedCode:   http.StatusOK,
-			expectedResult: []string{"slice1", "slice2", "slice3"},
+			expectedResult: []string{testSliceName, "slice2", "slice3"},
 		},
 	}
 	for _, tc := range tests {
@@ -195,7 +200,7 @@ func TestGetNetworkSliceByName_NetworkSliceDoesNotExist(t *testing.T) {
 	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{
 		slices: []configmodels.Slice{},
 	}
-	c.Params = append(c.Params, gin.Param{Key: "slice-name", Value: "slice1"})
+	c.Params = append(c.Params, gin.Param{Key: sliceNameKey, Value: testSliceName})
 	GetNetworkSliceByName(c)
 	resp := w.Result()
 
@@ -220,7 +225,7 @@ func TestGetNetworkSliceByName_DBError(t *testing.T) {
 	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{
 		err: fmt.Errorf("mock error"),
 	}
-	c.Params = append(c.Params, gin.Param{Key: "slice-name", Value: "slice1"})
+	c.Params = append(c.Params, gin.Param{Key: sliceNameKey, Value: testSliceName})
 	GetNetworkSliceByName(c)
 	resp := w.Result()
 
@@ -236,7 +241,7 @@ func TestGetNetworkSliceByName_DBError(t *testing.T) {
 		t.Fatalf("failed to unmarshal JSON: %v", err)
 	}
 
-	expected := map[string]string{"error": "failed to retrieve network slice"}
+	expected := map[string]string{errorKey: errMsgRetrieveNetworkSlice}
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("expected response body %v, got %v", expected, actual)
 	}
@@ -249,9 +254,9 @@ func TestGetNetworkSliceByName_NetworkSliceExists(t *testing.T) {
 	originalDBClient := dbadapter.CommonDBClient
 	defer func() { dbadapter.CommonDBClient = originalDBClient }()
 	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{
-		slices: []configmodels.Slice{networkSlice("slice1")},
+		slices: []configmodels.Slice{networkSlice(testSliceName)},
 	}
-	c.Params = append(c.Params, gin.Param{Key: "slice-name", Value: "slice1"})
+	c.Params = append(c.Params, gin.Param{Key: sliceNameKey, Value: testSliceName})
 	GetNetworkSliceByName(c)
 	resp := w.Result()
 
@@ -266,7 +271,7 @@ func TestGetNetworkSliceByName_NetworkSliceExists(t *testing.T) {
 	if err := json.Unmarshal(bodyBytes, &actual); err != nil {
 		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
-	expected := networkSlice("slice1")
+	expected := networkSlice(testSliceName)
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("expected %+v, got %+v", expected, actual)
 	}
@@ -292,7 +297,7 @@ func Test_sendPebbleNotification_on_when_handleNetworkSlicePost(t *testing.T) {
 
 	numPebbleNotificationsSent := execCommandTimesCalled
 
-	slice := networkSlice("slice1")
+	slice := networkSlice(testSliceName)
 	prevSlice := configmodels.Slice{}
 
 	factory.WebUIConfig.Configuration.SendPebbleNotifications = true
@@ -328,7 +333,7 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 		},
 	}
 
-	slice := configmodels.Slice{SliceName: "slice1"}
+	slice := configmodels.Slice{SliceName: testSliceName}
 	prevSlice := configmodels.Slice{}
 	originalDBClient := dbadapter.CommonDBClient
 	defer func() {
@@ -348,7 +353,7 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 
 func Test_handleNetworkSlicePost(t *testing.T) {
 	networkSlices := []configmodels.Slice{
-		networkSlice("slice1"),
+		networkSlice(testSliceName),
 		networkSlice("slice2"),
 		networkSlice("slice_no_gnodeb"),
 		networkSlice("slice_no_device_groups"),
@@ -376,16 +381,16 @@ func Test_handleNetworkSlicePost(t *testing.T) {
 				t.Fatal("expected a post operation but none was recorded")
 			}
 
-			if mock.postData[0]["coll"] != sliceDataColl {
-				t.Errorf("expected collection %v, got %v", sliceDataColl, mock.postData[0]["coll"])
+			if mock.postData[0][collKey] != sliceDataColl {
+				t.Errorf("expected collection %v, got %v", sliceDataColl, mock.postData[0][collKey])
 			}
 
-			expectedFilter := bson.M{"slice-name": ts.SliceName}
-			if !reflect.DeepEqual(mock.postData[0]["filter"], expectedFilter) {
-				t.Errorf("expected filter %v, got %v", expectedFilter, mock.postData[0]["filter"])
+			expectedFilter := bson.M{sliceNameKey: ts.SliceName}
+			if !reflect.DeepEqual(mock.postData[0][filterKey], expectedFilter) {
+				t.Errorf("expected filter %v, got %v", expectedFilter, mock.postData[0][filterKey])
 			}
 
-			result := mock.postData[0]["data"].(map[string]any)
+			result := mock.postData[0][dataKey].(map[string]any)
 			bytes, err := json.Marshal(result)
 			if err != nil {
 				t.Fatalf("Failed to marshal result data: %v", err)
@@ -511,13 +516,13 @@ func TestAggregateQoS_SumsCorrectly(t *testing.T) {
 		{
 			DnnMbrUplink:   100,
 			DnnMbrDownlink: 200,
-			BitrateUnit:    "Mbps",
+			BitrateUnit:    bitrateUnitMbps,
 			TrafficClass:   &configmodels.TrafficClassInfo{Qci: 9},
 		},
 		{
 			DnnMbrUplink:   50,
 			DnnMbrDownlink: 75,
-			BitrateUnit:    "Mbps",
+			BitrateUnit:    bitrateUnitMbps,
 			TrafficClass:   &configmodels.TrafficClassInfo{Qci: 5},
 		},
 	}
@@ -535,7 +540,7 @@ func TestAggregateQoS_SumsCorrectly(t *testing.T) {
 		t.Fatalf("expected lowest QCI to win (5), got %v", result.TrafficClass)
 	}
 
-	if result.BitrateUnit != "Mbps" {
+	if result.BitrateUnit != bitrateUnitMbps {
 		t.Fatalf("expected BitrateUnit Mbps, got %s", result.BitrateUnit)
 	}
 }
@@ -566,7 +571,7 @@ func TestAggregateQoS_EmptyList(t *testing.T) {
 func TestBuildSmProvisionedDataDocument(t *testing.T) {
 	snssai := &models.Snssai{Sst: 1, Sd: openapi.PtrString("010203")}
 	dnnMap := map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
-		"internet": {
+		dnnInternet: {
 			{
 				DnnMbrUplink:   2000000,
 				DnnMbrDownlink: 5000000,
@@ -582,7 +587,7 @@ func TestBuildSmProvisionedDataDocument(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if got := doc["ueId"]; got != "imsi-208930100007487" {
+	if got := doc[ueIdKey]; got != testSubscriberImsi {
 		t.Fatalf("unexpected ueId: %v", got)
 	}
 
@@ -598,9 +603,9 @@ func TestBuildSmProvisionedDataDocument(t *testing.T) {
 	if !ok {
 		t.Fatalf("dnnconfigurations has unexpected type: %T", doc["dnnconfigurations"])
 	}
-	internet, ok := dnnConfigurations["internet"].(map[string]interface{})
+	internet, ok := dnnConfigurations[dnnInternet].(map[string]interface{})
 	if !ok {
-		t.Fatalf("internet dnn config has unexpected type: %T", dnnConfigurations["internet"])
+		t.Fatalf("internet dnn config has unexpected type: %T", dnnConfigurations[dnnInternet])
 	}
 
 	qos, ok := internet["5gQosProfile"].(map[string]interface{})
@@ -614,8 +619,8 @@ func TestBuildSmProvisionedDataDocument(t *testing.T) {
 	if arp["preemptCap"] != models.PREEMPTIONCAPABILITY_NOT_PREEMPT {
 		t.Fatalf("unexpected preemptCap: %v", arp["preemptCap"])
 	}
-	if arp["priorityLevel"] != int32(8) {
-		t.Fatalf("unexpected arp priorityLevel: %v", arp["priorityLevel"])
+	if arp[priorityLevelKey] != int32(8) {
+		t.Fatalf("unexpected arp priorityLevel: %v", arp[priorityLevelKey])
 	}
 
 	encoded, err := json.Marshal(doc)
@@ -636,7 +641,7 @@ func TestUpdateSmProvisionedData_UsesPutOne(t *testing.T) {
 
 	snssai := &models.Snssai{Sst: 1, Sd: openapi.PtrString("010203")}
 	dnnMap := map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
-		"internet": {
+		dnnInternet: {
 			{
 				DnnMbrUplink:   2000000,
 				DnnMbrDownlink: 5000000,
@@ -654,9 +659,9 @@ func TestUpdateSmProvisionedData_UsesPutOne(t *testing.T) {
 	if len(mock.putData) != 1 {
 		t.Fatalf("expected one put call, got %d", len(mock.putData))
 	}
-	data, ok := mock.putData[0]["data"].(map[string]any)
+	data, ok := mock.putData[0][dataKey].(map[string]any)
 	if !ok {
-		t.Fatalf("unexpected put payload type: %T", mock.putData[0]["data"])
+		t.Fatalf("unexpected put payload type: %T", mock.putData[0][dataKey])
 	}
 	if _, ok = data["singlenssai"]; !ok {
 		t.Fatal("expected singlenssai key in put payload")

@@ -18,7 +18,7 @@ func makeNetworkSliceWithPlmnSnssai(mcc, mnc, sst string, sd string) configmodel
 		Mnc: mnc,
 	}
 	siteInfo := configmodels.SliceSiteInfo{
-		SiteName: "test",
+		SiteName: testSiteName,
 		Plmn:     plmnId,
 		GNodeBs:  []configmodels.SliceSiteInfoGNodeBs{},
 	}
@@ -27,7 +27,7 @@ func makeNetworkSliceWithPlmnSnssai(mcc, mnc, sst string, sd string) configmodel
 		Sd:  sd,
 	}
 	networkSlice := configmodels.Slice{
-		SliceName: "slice1",
+		SliceName: testSliceName1,
 		SliceId:   sliceId,
 		SiteInfo:  siteInfo,
 	}
@@ -72,7 +72,7 @@ func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {
 			},
 		},
 		{
-			name: "Several slices different PLMN are ordered",
+			name: nameSeveralSlicesDifferentPLMN,
 			slices: []configmodels.Slice{
 				makeNetworkSliceWithPlmnSnssai("999", "455", "2", "abcd"),
 				makeNetworkSliceWithPlmnSnssai("123", "23", "3", "3333"),
@@ -111,7 +111,7 @@ func TestSyncPlmnSnssaiConfig_Success(t *testing.T) {
 			},
 		},
 		{
-			name:               "Empty slices",
+			name:               nameEmptySlices,
 			slices:             []configmodels.Slice{},
 			expectedPlmnSnssai: []nfConfigApi.PlmnSnssai{},
 		},

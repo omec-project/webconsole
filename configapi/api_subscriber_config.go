@@ -27,6 +27,14 @@ import (
 
 var httpsClient *http.Client
 
+const (
+	ambr1000Kbps               = "1000 Kbps"
+	errorFetchSubscriberRecord = "failed to fetch the requested subscriber record from DB"
+	errorRetrieveSubscriber    = "failed to retrieve subscriber"
+	sampleMsisdn               = "msisdn-0900000000"
+	subscCatAether             = "aether"
+)
+
 func init() {
 	httpsClient = &http.Client{
 		Transport: &http.Transport{
@@ -54,7 +62,7 @@ func sendResponseToClient(c *gin.Context, response *http.Response) {
 	var jsonData any
 	if err := json.NewDecoder(response.Body).Decode(&jsonData); err != nil {
 		logger.DbLog.Errorf("failed to decode response: %+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode response"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: "failed to decode response"})
 		return
 	}
 	c.JSON(response.StatusCode, jsonData)
@@ -69,7 +77,7 @@ func GetSampleJSON(c *gin.Context) {
 
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          "5G_AKA",                                              // "5G_AKA", "EAP_AKA_PRIME"
+		AuthenticationMethod:          authMethod5GAKA,                                       // "5G_AKA", "EAP_AKA_PRIME"
 		EncOpcKey:                     openapi.PtrString("981d464c7c52eb6e5036234984ad0bcf"), // Required
 		EncPermanentKey:               openapi.PtrString("5122250214c33e723a5dd523fc145fc0"), // Required
 	}
@@ -99,10 +107,10 @@ func GetSampleJSON(c *gin.Context) {
 
 	amDataData := models.AccessAndMobilitySubscriptionData{
 		Gpsis: []string{
-			"msisdn-0900000000",
+			sampleMsisdn,
 		},
 		Nssai:            *nullableNssai,
-		SubscribedUeAmbr: models.NewAmbr("1000 Kbps", "1000 Kbps"),
+		SubscribedUeAmbr: models.NewAmbr(ambr1000Kbps, ambr1000Kbps),
 	}
 
 	val := int32(8)
@@ -114,7 +122,7 @@ func GetSampleJSON(c *gin.Context) {
 				Sd:  openapi.PtrString("010203"),
 			},
 			DnnConfigurations: &map[string]models.DnnConfiguration{
-				"internet": {
+				dnnInternet: {
 					PduSessionTypes: models.PduSessionTypes{
 						DefaultSessionType:  models.PDUSESSIONTYPE_IPV4.Ptr(),
 						AllowedSessionTypes: []models.PduSessionType{models.PDUSESSIONTYPE_IPV4},
@@ -124,8 +132,8 @@ func GetSampleJSON(c *gin.Context) {
 						AllowedSscModes: []models.SscMode{models.SSCMODE_SSC_MODE_1},
 					},
 					SessionAmbr: &models.Ambr{
-						Downlink: "1000 Kbps",
-						Uplink:   "1000 Kbps",
+						Downlink: ambr1000Kbps,
+						Uplink:   ambr1000Kbps,
 					},
 					Var5gQosProfile: &models.SubscribedDefaultQos{
 						Var5qi: 9,
@@ -145,7 +153,7 @@ func GetSampleJSON(c *gin.Context) {
 				Sd:  openapi.PtrString("112233"),
 			},
 			DnnConfigurations: &map[string]models.DnnConfiguration{
-				"internet": {
+				dnnInternet: {
 					PduSessionTypes: models.PduSessionTypes{
 						DefaultSessionType:  models.PDUSESSIONTYPE_IPV4.Ptr(),
 						AllowedSessionTypes: []models.PduSessionType{models.PDUSESSIONTYPE_IPV4},
@@ -155,8 +163,8 @@ func GetSampleJSON(c *gin.Context) {
 						AllowedSscModes: []models.SscMode{models.SSCMODE_SSC_MODE_1},
 					},
 					SessionAmbr: &models.Ambr{
-						Downlink: "1000 Kbps",
-						Uplink:   "1000 Kbps",
+						Downlink: ambr1000Kbps,
+						Uplink:   ambr1000Kbps,
 					},
 					Var5gQosProfile: &models.SubscribedDefaultQos{
 						Var5qi: 9,
@@ -178,7 +186,7 @@ func GetSampleJSON(c *gin.Context) {
 				DnnInfos: []models.DnnInfo{
 					{
 						Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
-							String: openapi.PtrString("internet"),
+							String: openapi.PtrString(dnnInternet),
 						},
 					},
 				},
@@ -187,7 +195,7 @@ func GetSampleJSON(c *gin.Context) {
 				DnnInfos: []models.DnnInfo{
 					{
 						Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
-							String: openapi.PtrString("internet"),
+							String: openapi.PtrString(dnnInternet),
 						},
 					},
 				},
@@ -197,7 +205,7 @@ func GetSampleJSON(c *gin.Context) {
 
 	amPolicyData := models.AmPolicyData{
 		SubscCats: []string{
-			"aether",
+			subscCatAether,
 		},
 	}
 
@@ -209,8 +217,8 @@ func GetSampleJSON(c *gin.Context) {
 					Sst: 1,
 				},
 				SmPolicyDnnData: &map[string]models.SmPolicyDnnData{
-					"internet": {
-						Dnn: "internet",
+					dnnInternet: {
+						Dnn: dnnInternet,
 					},
 				},
 			},
@@ -220,8 +228,8 @@ func GetSampleJSON(c *gin.Context) {
 					Sst: 1,
 				},
 				SmPolicyDnnData: &map[string]models.SmPolicyDnnData{
-					"internet": {
-						Dnn: "internet",
+					dnnInternet: {
+						Dnn: dnnInternet,
 					},
 				},
 			},
@@ -264,15 +272,15 @@ func GetSubscribers(c *gin.Context) {
 	amDataList, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(amDataColl, bson.M{})
 	if errGetMany != nil {
 		logger.DbLog.Errorf("failed to retrieve subscribers list with error: %+v", errGetMany)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscribers list"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: "failed to retrieve subscribers list"})
 		return
 	}
 	for _, amData := range amDataList {
 		tmp := configmodels.SubsListIE{
-			UeId: amData["ueId"].(string),
+			UeId: amData[ueIdKey].(string),
 		}
 
-		if servingPlmnId, plmnIdExists := amData["servingPlmnId"]; plmnIdExists {
+		if servingPlmnId, plmnIdExists := amData[servingPlmnIdKey]; plmnIdExists {
 			tmp.PlmnID = servingPlmnId.(string)
 		}
 
@@ -300,45 +308,45 @@ func GetSubscriberByID(c *gin.Context) {
 
 	logger.WebUILog.Infoln("Get One Subscriber Data")
 
-	ueId := c.Param("ueId")
-	filterUeIdOnly := bson.M{"ueId": ueId}
+	ueId := c.Param(ueIdKey)
+	filterUeIdOnly := bson.M{ueIdKey: ueId}
 
 	var subsData configmodels.SubsData
 
 	authSubsDataInterface, err := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch authentication subscription data from DB: %+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorFetchSubscriberRecord})
 		return
 	}
 	amDataDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch am data from DB: %+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorFetchSubscriberRecord})
 		return
 	}
 	smDataDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetMany(smDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch sm data from DB: %+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorFetchSubscriberRecord})
 		return
 	}
 	smfSelDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(smfSelDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch smf selection data from DB: %+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorFetchSubscriberRecord})
 		return
 	}
 	amPolicyDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amPolicyDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch am policy data from DB: %+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorFetchSubscriberRecord})
 		return
 	}
 	smPolicyDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(smPolicyDataColl, filterUeIdOnly)
 	if err != nil {
 		logger.DbLog.Errorf("failed to fetch sm policy data from DB: %+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch the requested subscriber record from DB"})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorFetchSubscriberRecord})
 		return
 	}
 	// If all fetched data is empty, return 404 error
@@ -349,7 +357,7 @@ func GetSubscriberByID(c *gin.Context) {
 		amPolicyDataInterface == nil &&
 		smPolicyDataInterface == nil {
 		logger.WebUILog.Errorf("subscriber with ID %s not found", ueId)
-		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("subscriber with ID %s not found", ueId)})
+		c.JSON(http.StatusNotFound, gin.H{errorKey: fmt.Sprintf("subscriber with ID %s not found", ueId)})
 		return
 	}
 
@@ -358,7 +366,7 @@ func GetSubscriberByID(c *gin.Context) {
 		err := json.Unmarshal(configmodels.MapToByte(authSubsDataInterface), &authSubsData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling authentication subscription data: %+v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveSubscriber})
 			return
 		}
 	}
@@ -368,7 +376,7 @@ func GetSubscriberByID(c *gin.Context) {
 		err := json.Unmarshal(configmodels.MapToByte(amDataDataInterface), &amDataData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling access and mobility subscription data: %+v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveSubscriber})
 			return
 		}
 	}
@@ -378,13 +386,13 @@ func GetSubscriberByID(c *gin.Context) {
 		bytesData, err := sliceToByte(smDataDataInterface)
 		if err != nil {
 			logger.WebUILog.Errorf("failed to convert slice to byte: %+v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveSubscriber})
 			return
 		}
 		err = json.Unmarshal(bytesData, &smDataData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling session management subscription data: %+v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveSubscriber})
 			return
 		}
 	}
@@ -394,7 +402,7 @@ func GetSubscriberByID(c *gin.Context) {
 		err := json.Unmarshal(configmodels.MapToByte(smfSelDataInterface), &smfSelData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling smf selection subscription data: %+v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveSubscriber})
 			return
 		}
 	}
@@ -404,7 +412,7 @@ func GetSubscriberByID(c *gin.Context) {
 		err := json.Unmarshal(configmodels.MapToByte(amPolicyDataInterface), &amPolicyData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling am policy data: %+v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveSubscriber})
 			return
 		}
 	}
@@ -414,7 +422,7 @@ func GetSubscriberByID(c *gin.Context) {
 		err := json.Unmarshal(configmodels.MapToByte(smPolicyDataInterface), &smPolicyData)
 		if err != nil {
 			logger.WebUILog.Errorf("error unmarshalling sm policy data: %+v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve subscriber"})
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveSubscriber})
 			return
 		}
 	}
@@ -452,14 +460,14 @@ func PostSubscriberByID(c *gin.Context) {
 	var subsOverrideData configmodels.SubsOverrideData
 	if err := c.ShouldBindJSON(&subsOverrideData); err != nil {
 		logger.WebUILog.Errorf("Post One Subscriber Data - ShouldBindJSON failed: %+v request ID: %s", err, requestID)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: failed to parse JSON.", "request_id": requestID})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: "Invalid request body: failed to parse JSON.", requestIDKey: requestID})
 		return
 	}
 	logger.WebUILog.Infof("%+v", subsOverrideData)
 
-	ueId := c.Param("ueId")
+	ueId := c.Param(ueIdKey)
 	if ueId == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing ueId in request URL", "request_id": requestID})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: "Missing ueId in request URL", requestIDKey: requestID})
 		return
 	}
 
@@ -467,25 +475,25 @@ func PostSubscriberByID(c *gin.Context) {
 	logger.WebUILog.Debugf("Override Data: %+v", subsOverrideData)
 
 	// Check if the IMSI already exists in the database
-	filter := bson.M{"ueId": ueId}
+	filter := bson.M{ueIdKey: ueId}
 	subscriber, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorf("failed querying subscriber existence for IMSI: %s; Error: %+v", ueId, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to check subscriber: %s existence", ueId), "request_id": requestID})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: fmt.Sprintf("failed to check subscriber: %s existence", ueId), requestIDKey: requestID})
 		return
 	} else if subscriber != nil {
 		logger.WebUILog.Errorf("subscriber %s already exists", ueId)
-		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("subscriber %s already exists", ueId), "request_id": requestID})
+		c.JSON(http.StatusConflict, gin.H{errorKey: fmt.Sprintf("subscriber %s already exists", ueId), requestIDKey: requestID})
 		return
 	}
 	if subsOverrideData.OPc == "" || subsOverrideData.Key == "" || subsOverrideData.SequenceNumber == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required authentication data: OPc and Key must be provided", "request_id": requestID})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: "Missing required authentication data: OPc and Key must be provided", requestIDKey: requestID})
 		return
 	}
 
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          "5G_AKA", // "5G_AKA", "EAP_AKA_PRIME"
+		AuthenticationMethod:          authMethod5GAKA, // "5G_AKA", "EAP_AKA_PRIME"
 		EncOpcKey:                     openapi.PtrString(subsOverrideData.OPc),
 		EncPermanentKey:               openapi.PtrString(subsOverrideData.Key),
 		SequenceNumber: &models.SequenceNumber{
@@ -500,9 +508,9 @@ func PostSubscriberByID(c *gin.Context) {
 	if err != nil {
 		logger.WebUILog.Errorf("Failed to create subscriber %s: %+v request ID: %s", ueId, err, requestID)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":      fmt.Sprintf("Failed to create subscriber %s", ueId),
-			"request_id": requestID,
-			"message":    "Please refer to the log with the provided Request ID for details",
+			errorKey:     fmt.Sprintf("Failed to create subscriber %s", ueId),
+			requestIDKey: requestID,
+			messageKey:   messageRequestIDDetails,
 		})
 		return
 	}
@@ -533,32 +541,32 @@ func PutSubscriberByID(c *gin.Context) {
 	var subsOverrideData configmodels.SubsOverrideData
 	if err := c.ShouldBindJSON(&subsOverrideData); err != nil {
 		logger.WebUILog.Errorf("Put One Subscriber Data - ShouldBindJSON failed: %+v request ID: %s", err, requestID)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: failed to parse JSON.", "request_id": requestID})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: "Invalid request body: failed to parse JSON.", requestIDKey: requestID})
 		return
 	}
 
-	ueId := c.Param("ueId")
+	ueId := c.Param(ueIdKey)
 	logger.WebUILog.Infoln("Received Put Subscriber Data from Roc/Simapp:", ueId)
 
-	filter := bson.M{"ueId": ueId}
+	filter := bson.M{ueIdKey: ueId}
 	subscriber, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorf("failed querying subscriber existence for IMSI: %s; Error: %+v", ueId, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to check subscriber: %s existence", ueId), "request_id": requestID})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: fmt.Sprintf("failed to check subscriber: %s existence", ueId), requestIDKey: requestID})
 		return
 	}
 	if subscriber == nil {
 		logger.WebUILog.Errorf("subscriber %s does not exist", ueId)
-		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("subscriber %s does not exist", ueId)})
+		c.JSON(http.StatusNotFound, gin.H{errorKey: fmt.Sprintf("subscriber %s does not exist", ueId)})
 		return
 	}
 	if subsOverrideData.OPc == "" || subsOverrideData.Key == "" || subsOverrideData.SequenceNumber == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required authentication data: OPc, Key and Sequence number must be provided", "request_id": requestID})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: "Missing required authentication data: OPc, Key and Sequence number must be provided", requestIDKey: requestID})
 		return
 	}
 	authSubsData := models.AuthenticationSubscription{
 		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          "5G_AKA",
+		AuthenticationMethod:          authMethod5GAKA,
 		EncOpcKey:                     openapi.PtrString(subsOverrideData.OPc),
 		EncPermanentKey:               openapi.PtrString(subsOverrideData.Key),
 		SequenceNumber: &models.SequenceNumber{
@@ -569,9 +577,9 @@ func PutSubscriberByID(c *gin.Context) {
 	err = subscriberAuthenticationDataUpdate(ueId, &authSubsData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":      fmt.Sprintf("Failed to update subscriber %s", ueId),
-			"request_id": requestID,
-			"message":    "Please refer to the log with the provided Request ID for details",
+			errorKey:     fmt.Sprintf("Failed to update subscriber %s", ueId),
+			requestIDKey: requestID,
+			messageKey:   messageRequestIDDetails,
 		})
 		return
 	}
@@ -601,21 +609,21 @@ func DeleteSubscriberByID(c *gin.Context) {
 	logger.WebUILog.Infoln("Delete One Subscriber Data")
 	requestID := uuid.New().String()
 
-	ueId := c.Param("ueId")
+	ueId := c.Param(ueIdKey)
 
 	imsi := strings.TrimPrefix(ueId, "imsi-")
 	statusCode, err := updateSubscriberInDeviceGroups(imsi)
 	if err != nil {
 		logger.WebUILog.Errorf("Failed to update subscriber: %+v request ID: %s", err, requestID)
-		c.JSON(statusCode, gin.H{"error": "error deleting subscriber. Please check the log for details.", "request_id": requestID})
+		c.JSON(statusCode, gin.H{errorKey: "error deleting subscriber. Please check the log for details.", requestIDKey: requestID})
 		return
 	}
 	if err = subscriberAuthenticationDataDelete(ueId); err != nil {
 		logger.WebUILog.Errorf("Error deleting subscriber: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":      fmt.Sprintf("Failed to delete subscriber %s", ueId),
-			"request_id": requestID,
-			"message":    "Please refer to the log with the provided Request ID for details",
+			errorKey:     fmt.Sprintf("Failed to delete subscriber %s", ueId),
+			requestIDKey: requestID,
+			messageKey:   messageRequestIDDetails,
 		})
 		return
 	}

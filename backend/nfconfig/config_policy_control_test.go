@@ -12,13 +12,30 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 )
 
+const (
+	testSst                int32 = 1
+	testSd                       = "12345"
+	testSd2                      = "010203"
+	testRuleName                 = "TestRule"
+	testRulePriority       int32 = 12
+	testRuleQci            int32 = 8
+	testRuleArp            int32 = 100
+	testDeviceGroupName          = "testDG"
+	testDeviceGroupNameDG2       = "dg2"
+	testDnnName                  = "testDnn"
+	testMaxBrUl1                 = "12 Kbps"
+	testMaxBrDl1                 = "67 Kbps"
+	testMaxBrUl2                 = "45 Kbps"
+	testMaxBrDl2                 = "12 Kbps"
+)
+
 func makePolicyControlNetworkSlice(mcc, mnc, sst, sd string, dgs []string, filteringRules []configmodels.SliceApplicationFilteringRules) configmodels.Slice {
 	plmnId := configmodels.SliceSiteInfoPlmn{
 		Mcc: mcc,
 		Mnc: mnc,
 	}
 	siteInfo := configmodels.SliceSiteInfo{
-		SiteName: "test",
+		SiteName: testSiteName,
 		Plmn:     plmnId,
 		GNodeBs:  []configmodels.SliceSiteInfoGNodeBs{},
 	}
@@ -27,7 +44,7 @@ func makePolicyControlNetworkSlice(mcc, mnc, sst, sd string, dgs []string, filte
 		Sd:  sd,
 	}
 	networkSlice := configmodels.Slice{
-		SliceName:                 "slice1",
+		SliceName:                 testSliceName1,
 		SiteDeviceGroup:           dgs,
 		SiteInfo:                  siteInfo,
 		SliceId:                   sliceId,
@@ -37,21 +54,9 @@ func makePolicyControlNetworkSlice(mcc, mnc, sst, sd string, dgs []string, filte
 }
 
 var (
-	testSst             int32 = 1
-	testSd                    = "12345"
-	testRuleName              = "TestRule"
-	testRulePriority    int32 = 12
-	testRuleQci         int32 = 8
-	testRuleArp         int32 = 100
-	testMaxBrUl1              = "12 Kbps"
-	testMaxBrDl1              = "67 Kbps"
-	testMaxBrUl2              = "45 Kbps"
-	testMaxBrDl2              = "12 Kbps"
-	testDeviceGroupName       = "testDG"
-	testDnnName               = "testDnn"
-	testDG                    = configmodels.DeviceGroups{
+	testDG = configmodels.DeviceGroups{
 		DeviceGroupName: testDeviceGroupName,
-		Imsis:           []string{"001010123456789"},
+		Imsis:           []string{imsiTest},
 		IpDomainsExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
 			{
 				Dnn: testDnnName,
@@ -59,8 +64,8 @@ var (
 		},
 	}
 	testDG2 = configmodels.DeviceGroups{
-		DeviceGroupName: "dg2",
-		Imsis:           []string{"001010123456789"},
+		DeviceGroupName: testDeviceGroupNameDG2,
+		Imsis:           []string{imsiTest},
 		IpDomainsExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
 			{
 				Dnn: "aDnn",
@@ -112,13 +117,13 @@ func TestSyncPolicyControl(t *testing.T) {
 		{
 			name: "Network Slice with valid SliceApplicationFilteringRules produces valid Policy Control config",
 			networkSlices: []configmodels.Slice{
-				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []string{"testDG"}, []configmodels.SliceApplicationFilteringRules{validSliceApplicationFilteringRule}),
+				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd2, []string{testDeviceGroupName}, []configmodels.SliceApplicationFilteringRules{validSliceApplicationFilteringRule}),
 			},
 			deviceGroups: testDeviceGroups,
 			expectedResponse: []nfConfigApi.PolicyControl{
 				{
 					PlmnId: *nfConfigApi.NewPlmnId("001", "01"),
-					Snssai: makeSnssaiWithSd(testSst, testSd),
+					Snssai: makeSnssaiWithSd(testSst, testSd2),
 					Dnns:   []string{testDnnName},
 					PccRules: []nfConfigApi.PccRule{
 						{
@@ -132,8 +137,8 @@ func TestSyncPolicyControl(t *testing.T) {
 							},
 							Qos: nfConfigApi.PccQos{
 								FiveQi:  testRuleQci,
-								MaxBrUl: &testMaxBrUl1,
-								MaxBrDl: &testMaxBrDl1,
+								MaxBrUl: nfConfigApi.PtrString(testMaxBrUl1),
+								MaxBrDl: nfConfigApi.PtrString(testMaxBrDl1),
 								Arp: nfConfigApi.Arp{
 									PriorityLevel: testRuleArp,
 									PreemptCap:    nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
@@ -149,10 +154,10 @@ func TestSyncPolicyControl(t *testing.T) {
 		{
 			name: "Two network slices with valid SliceApplicationFilteringRules produces ordered valid Policy Control config",
 			networkSlices: []configmodels.Slice{
-				makePolicyControlNetworkSlice("128", "01", fmt.Sprintf("%d", testSst), testSd, []string{"testDG", "dg2"}, []configmodels.SliceApplicationFilteringRules{validSliceApplicationFilteringRule, anotherSliceApplicationFilteringRule}),
-				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []string{"testDG"}, []configmodels.SliceApplicationFilteringRules{}),
+				makePolicyControlNetworkSlice("128", "01", fmt.Sprintf("%d", testSst), testSd, []string{testDeviceGroupName, testDeviceGroupNameDG2}, []configmodels.SliceApplicationFilteringRules{validSliceApplicationFilteringRule, anotherSliceApplicationFilteringRule}),
+				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []string{testDeviceGroupName}, []configmodels.SliceApplicationFilteringRules{}),
 			},
-			deviceGroups: map[string]configmodels.DeviceGroups{"dg2": testDG2, testDeviceGroupName: testDG},
+			deviceGroups: map[string]configmodels.DeviceGroups{testDeviceGroupNameDG2: testDG2, testDeviceGroupName: testDG},
 			expectedResponse: []nfConfigApi.PolicyControl{
 				{
 					PlmnId:   *nfConfigApi.NewPlmnId("001", "01"),
@@ -176,8 +181,8 @@ func TestSyncPolicyControl(t *testing.T) {
 							},
 							Qos: nfConfigApi.PccQos{
 								FiveQi:  9,
-								MaxBrUl: &testMaxBrUl2,
-								MaxBrDl: &testMaxBrDl2,
+								MaxBrUl: nfConfigApi.PtrString(testMaxBrUl2),
+								MaxBrDl: nfConfigApi.PtrString(testMaxBrDl2),
 								Arp: nfConfigApi.Arp{
 									PriorityLevel: 1,
 									PreemptCap:    nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
@@ -197,8 +202,8 @@ func TestSyncPolicyControl(t *testing.T) {
 							},
 							Qos: nfConfigApi.PccQos{
 								FiveQi:  testRuleQci,
-								MaxBrUl: &testMaxBrUl1,
-								MaxBrDl: &testMaxBrDl1,
+								MaxBrUl: nfConfigApi.PtrString(testMaxBrUl1),
+								MaxBrDl: nfConfigApi.PtrString(testMaxBrDl1),
 								Arp: nfConfigApi.Arp{
 									PriorityLevel: testRuleArp,
 									PreemptCap:    nfConfigApi.PREEMPTCAP_MAY_PREEMPT,
@@ -214,7 +219,7 @@ func TestSyncPolicyControl(t *testing.T) {
 		{
 			name: "Network Slice without SliceApplicationFilteringRules produces default Policy Control config",
 			networkSlices: []configmodels.Slice{
-				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []string{"testDG"}, []configmodels.SliceApplicationFilteringRules{}),
+				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []string{testDeviceGroupName}, []configmodels.SliceApplicationFilteringRules{}),
 			},
 			deviceGroups: testDeviceGroups,
 			expectedResponse: []nfConfigApi.PolicyControl{
@@ -229,7 +234,7 @@ func TestSyncPolicyControl(t *testing.T) {
 		{
 			name: "Network Slice without SliceApplicationFilteringRules produces default Policy Control config",
 			networkSlices: []configmodels.Slice{
-				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []string{"testDG"}, []configmodels.SliceApplicationFilteringRules{}),
+				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []string{testDeviceGroupName}, []configmodels.SliceApplicationFilteringRules{}),
 			},
 			deviceGroups: testDeviceGroups,
 			expectedResponse: []nfConfigApi.PolicyControl{
@@ -244,7 +249,7 @@ func TestSyncPolicyControl(t *testing.T) {
 		{
 			name: "Network Slice with invalid SNSSAI is ignored",
 			networkSlices: []configmodels.Slice{
-				makePolicyControlNetworkSlice("999", "99", "a", testSd, []string{"testDG"}, []configmodels.SliceApplicationFilteringRules{}),
+				makePolicyControlNetworkSlice("999", "99", "a", testSd2, []string{testDeviceGroupName}, []configmodels.SliceApplicationFilteringRules{}),
 			},
 			deviceGroups:     testDeviceGroups,
 			expectedResponse: []nfConfigApi.PolicyControl{},
@@ -252,13 +257,13 @@ func TestSyncPolicyControl(t *testing.T) {
 		{
 			name: "Network Slice with non-existent Device Group returns empty DNNs in Policy Control",
 			networkSlices: []configmodels.Slice{
-				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd, []string{"testDG"}, []configmodels.SliceApplicationFilteringRules{}),
+				makePolicyControlNetworkSlice("001", "01", fmt.Sprintf("%d", testSst), testSd2, []string{testDeviceGroupName}, []configmodels.SliceApplicationFilteringRules{}),
 			},
 			deviceGroups: map[string]configmodels.DeviceGroups{},
 			expectedResponse: []nfConfigApi.PolicyControl{
 				{
 					PlmnId:   *nfConfigApi.NewPlmnId("001", "01"),
-					Snssai:   makeSnssaiWithSd(testSst, testSd),
+					Snssai:   makeSnssaiWithSd(testSst, testSd2),
 					Dnns:     []string{},
 					PccRules: []nfConfigApi.PccRule{*defaultPccRule},
 				},

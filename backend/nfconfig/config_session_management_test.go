@@ -14,6 +14,17 @@ import (
 	"github.com/omec-project/webconsole/configmodels"
 )
 
+const (
+	sliceNameSlice1    = "slice-1"
+	sliceNameSlice4    = "slice-4"
+	upfHostnameLocal   = "upf.local"
+	gnbNameGnb1        = "gnb-1"
+	deviceGroupNameDG9 = "dg-9"
+	upfHostnameB       = "upf-b.local"
+	dnsPrimaryAlt      = "1.1.1.1"
+	upfHostnameCom     = "hostname.com"
+)
+
 type networkSliceParams struct {
 	sliceName    string
 	mcc          string
@@ -87,30 +98,30 @@ func TestSyncSessionManagement(t *testing.T) {
 			name: "valid slice with all fields",
 			sliceParams: []networkSliceParams{
 				{
-					sliceName:    "slice-1",
+					sliceName:    sliceNameSlice1,
 					mcc:          "001",
 					mnc:          "01",
 					sst:          "1",
 					sd:           "010203",
-					deviceGroups: []string{"dg-1"},
-					upfHostname:  "upf.local",
+					deviceGroups: []string{deviceGroupNameDG1},
+					upfHostname:  upfHostnameLocal,
 					upfPort:      "8805",
-					gnbNames:     []string{"gnb-1"},
+					gnbNames:     []string{gnbNameGnb1},
 				},
 			},
 			deviceGroups: []deviceGroupParams{
 				{
-					name:         "dg-1",
-					dnn:          "internet",
-					dnsPrimary:   "8.8.8.8",
+					name:         deviceGroupNameDG1,
+					dnn:          dnnInternet,
+					dnsPrimary:   dnsPrimaryTest,
 					pcscfPrimary: "10.10.10.10",
-					ueIpPool:     "10.1.1.0/24",
+					ueIpPool:     ueIpPoolTest,
 					mtu:          1500,
 				},
 			},
 			expectedResponse: []nfConfigApi.SessionManagement{
 				{
-					SliceName: "slice-1",
+					SliceName: sliceNameSlice1,
 					PlmnId: nfConfigApi.PlmnId{
 						Mcc: "001",
 						Mnc: "01",
@@ -121,18 +132,18 @@ func TestSyncSessionManagement(t *testing.T) {
 					},
 					IpDomain: []nfConfigApi.IpDomain{
 						{
-							DnnName:   "internet",
-							DnsIpv4:   "8.8.8.8",
+							DnnName:   dnnInternet,
+							DnsIpv4:   dnsPrimaryTest,
 							PcscfIpv4: openapi.PtrString("10.10.10.10"),
-							UeSubnet:  "10.1.1.0/24",
+							UeSubnet:  ueIpPoolTest,
 							Mtu:       1500,
 						},
 					},
 					Upf: &nfConfigApi.Upf{
-						Hostname: "upf.local",
+						Hostname: upfHostnameLocal,
 						Port:     ptr(int32(8805)),
 					},
-					GnbNames: []string{"gnb-1"},
+					GnbNames: []string{gnbNameGnb1},
 				},
 			},
 		},
@@ -153,27 +164,27 @@ func TestSyncSessionManagement(t *testing.T) {
 			name: "Slice missing UPF",
 			sliceParams: []networkSliceParams{
 				{
-					sliceName:    "slice-1",
+					sliceName:    sliceNameSlice1,
 					mcc:          "001",
 					mnc:          "01",
 					sst:          "1",
 					sd:           "010203",
-					deviceGroups: []string{"dg-1"},
-					gnbNames:     []string{"gnb-1"},
+					deviceGroups: []string{deviceGroupNameDG1},
+					gnbNames:     []string{gnbNameGnb1},
 				},
 			},
 			deviceGroups: []deviceGroupParams{
 				{
-					name:       "dg-1",
-					dnn:        "internet",
-					dnsPrimary: "8.8.8.8",
-					ueIpPool:   "10.1.1.0/24",
+					name:       deviceGroupNameDG1,
+					dnn:        dnnInternet,
+					dnsPrimary: dnsPrimaryTest,
+					ueIpPool:   ueIpPoolTest,
 					mtu:        1500,
 				},
 			},
 			expectedResponse: []nfConfigApi.SessionManagement{
 				{
-					SliceName: "slice-1",
+					SliceName: sliceNameSlice1,
 					PlmnId: nfConfigApi.PlmnId{
 						Mcc: "001",
 						Mnc: "01",
@@ -184,13 +195,13 @@ func TestSyncSessionManagement(t *testing.T) {
 					},
 					IpDomain: []nfConfigApi.IpDomain{
 						{
-							DnnName:  "internet",
-							DnsIpv4:  "8.8.8.8",
-							UeSubnet: "10.1.1.0/24",
+							DnnName:  dnnInternet,
+							DnsIpv4:  dnsPrimaryTest,
+							UeSubnet: ueIpPoolTest,
 							Mtu:      1500,
 						},
 					},
-					GnbNames: []string{"gnb-1"},
+					GnbNames: []string{gnbNameGnb1},
 				},
 			},
 		},
@@ -198,28 +209,28 @@ func TestSyncSessionManagement(t *testing.T) {
 			name: "Slice missing device group",
 			sliceParams: []networkSliceParams{
 				{
-					sliceName:   "slice-1",
+					sliceName:   sliceNameSlice1,
 					mcc:         "001",
 					mnc:         "01",
 					sst:         "1",
 					sd:          "010203",
-					upfHostname: "upf.local",
+					upfHostname: upfHostnameLocal,
 					upfPort:     "8805",
-					gnbNames:    []string{"gnb-1"},
+					gnbNames:    []string{gnbNameGnb1},
 				},
 			},
 			deviceGroups: []deviceGroupParams{
 				{
-					name:       "dg-1",
-					dnn:        "internet",
-					dnsPrimary: "8.8.8.8",
-					ueIpPool:   "10.1.1.0/24",
+					name:       deviceGroupNameDG1,
+					dnn:        dnnInternet,
+					dnsPrimary: dnsPrimaryTest,
+					ueIpPool:   ueIpPoolTest,
 					mtu:        1500,
 				},
 			},
 			expectedResponse: []nfConfigApi.SessionManagement{
 				{
-					SliceName: "slice-1",
+					SliceName: sliceNameSlice1,
 					PlmnId: nfConfigApi.PlmnId{
 						Mcc: "001",
 						Mnc: "01",
@@ -229,10 +240,10 @@ func TestSyncSessionManagement(t *testing.T) {
 						Sd:  sharedSd,
 					},
 					Upf: &nfConfigApi.Upf{
-						Hostname: "upf.local",
+						Hostname: upfHostnameLocal,
 						Port:     ptr(int32(8805)),
 					},
-					GnbNames: []string{"gnb-1"},
+					GnbNames: []string{gnbNameGnb1},
 				},
 			},
 		},
@@ -245,8 +256,8 @@ func TestSyncSessionManagement(t *testing.T) {
 					mnc:          "01",
 					sst:          "1",
 					sd:           "010203",
-					deviceGroups: []string{"dg-9"},
-					upfHostname:  "upf-b.local",
+					deviceGroups: []string{deviceGroupNameDG9},
+					upfHostname:  upfHostnameB,
 				},
 				{
 					sliceName:    "slice-e",
@@ -254,16 +265,16 @@ func TestSyncSessionManagement(t *testing.T) {
 					mnc:          "01",
 					sst:          "1",
 					sd:           "010203",
-					deviceGroups: []string{"dg-9"},
-					upfHostname:  "upf-b.local",
+					deviceGroups: []string{deviceGroupNameDG9},
+					upfHostname:  upfHostnameB,
 				},
 			},
 			deviceGroups: []deviceGroupParams{
 				{
-					name:       "dg-9",
-					dnn:        "internet",
-					dnsPrimary: "1.1.1.1",
-					ueIpPool:   "10.1.1.0/24",
+					name:       deviceGroupNameDG9,
+					dnn:        dnnInternet,
+					dnsPrimary: dnsPrimaryAlt,
+					ueIpPool:   ueIpPoolTest,
 					mtu:        1400,
 				},
 			},
@@ -280,14 +291,14 @@ func TestSyncSessionManagement(t *testing.T) {
 					},
 					IpDomain: []nfConfigApi.IpDomain{
 						{
-							DnnName:  "internet",
-							DnsIpv4:  "1.1.1.1",
-							UeSubnet: "10.1.1.0/24",
+							DnnName:  dnnInternet,
+							DnsIpv4:  dnsPrimaryAlt,
+							UeSubnet: ueIpPoolTest,
 							Mtu:      1400,
 						},
 					},
 					Upf: &nfConfigApi.Upf{
-						Hostname: "upf-b.local",
+						Hostname: upfHostnameB,
 					},
 				},
 				{
@@ -302,14 +313,14 @@ func TestSyncSessionManagement(t *testing.T) {
 					},
 					IpDomain: []nfConfigApi.IpDomain{
 						{
-							DnnName:  "internet",
-							DnsIpv4:  "1.1.1.1",
-							UeSubnet: "10.1.1.0/24",
+							DnnName:  dnnInternet,
+							DnsIpv4:  dnsPrimaryAlt,
+							UeSubnet: ueIpPoolTest,
 							Mtu:      1400,
 						},
 					},
 					Upf: &nfConfigApi.Upf{
-						Hostname: "upf-b.local",
+						Hostname: upfHostnameB,
 					},
 				},
 			},
@@ -323,15 +334,15 @@ func TestSyncSessionManagement(t *testing.T) {
 					mnc:          "01",
 					sst:          "1",
 					sd:           "010203",
-					upfHostname:  "upf.local",
+					upfHostname:  upfHostnameLocal,
 					upfPort:      "invalid",
-					deviceGroups: []string{"dg-1"},
+					deviceGroups: []string{deviceGroupNameDG1},
 				},
 			},
 			deviceGroups: []deviceGroupParams{
 				{
-					name:       "dg-1",
-					dnn:        "internet",
+					name:       deviceGroupNameDG1,
+					dnn:        dnnInternet,
 					dnsPrimary: "9.9.9.9",
 					ueIpPool:   "10.2.2.0/24",
 					mtu:        1500,
@@ -350,14 +361,14 @@ func TestSyncSessionManagement(t *testing.T) {
 					},
 					IpDomain: []nfConfigApi.IpDomain{
 						{
-							DnnName:  "internet",
+							DnnName:  dnnInternet,
 							DnsIpv4:  "9.9.9.9",
 							UeSubnet: "10.2.2.0/24",
 							Mtu:      1500,
 						},
 					},
 					Upf: &nfConfigApi.Upf{
-						Hostname: "upf.local",
+						Hostname: upfHostnameLocal,
 					},
 				},
 			},
@@ -371,15 +382,15 @@ func TestSyncSessionManagement(t *testing.T) {
 					mnc:          "01",
 					sst:          "1",
 					sd:           "010203",
-					upfHostname:  "upf.local",
+					upfHostname:  upfHostnameLocal,
 					upfPort:      "2152",
-					deviceGroups: []string{"dg-1"},
+					deviceGroups: []string{deviceGroupNameDG1},
 				},
 			},
 			deviceGroups: []deviceGroupParams{
 				{
-					name:       "dg-1",
-					dnn:        "internet",
+					name:       deviceGroupNameDG1,
+					dnn:        dnnInternet,
 					dnsPrimary: "4.4.4.4",
 					ueIpPool:   "10.3.3.0/24",
 					mtu:        1400,
@@ -398,14 +409,14 @@ func TestSyncSessionManagement(t *testing.T) {
 					},
 					IpDomain: []nfConfigApi.IpDomain{
 						{
-							DnnName:  "internet",
+							DnnName:  dnnInternet,
 							DnsIpv4:  "4.4.4.4",
 							UeSubnet: "10.3.3.0/24",
 							Mtu:      1400,
 						},
 					},
 					Upf: &nfConfigApi.Upf{
-						Hostname: "upf.local",
+						Hostname: upfHostnameLocal,
 						Port:     ptr(int32(2152)),
 					},
 				},
@@ -415,19 +426,19 @@ func TestSyncSessionManagement(t *testing.T) {
 			name: "invalid upf hostname (non-string)",
 			sliceParams: []networkSliceParams{
 				{
-					sliceName:    "slice-4",
+					sliceName:    sliceNameSlice4,
 					mcc:          "001",
 					mnc:          "01",
 					sst:          "1",
 					sd:           "010203",
 					upfHostname:  1234,
-					deviceGroups: []string{"dg-1"},
-					gnbNames:     []string{"gnb-1"},
+					deviceGroups: []string{deviceGroupNameDG1},
+					gnbNames:     []string{gnbNameGnb1},
 				},
 			},
 			expectedResponse: []nfConfigApi.SessionManagement{
 				{
-					SliceName: "slice-4",
+					SliceName: sliceNameSlice4,
 					PlmnId: nfConfigApi.PlmnId{
 						Mcc: "001",
 						Mnc: "01",
@@ -437,7 +448,7 @@ func TestSyncSessionManagement(t *testing.T) {
 						Sd:  sharedSd,
 					},
 					Upf:      nil,
-					GnbNames: []string{"gnb-1"},
+					GnbNames: []string{gnbNameGnb1},
 				},
 			},
 		},
@@ -445,20 +456,20 @@ func TestSyncSessionManagement(t *testing.T) {
 			name: "int upf port is valid",
 			sliceParams: []networkSliceParams{
 				{
-					sliceName:    "slice-4",
+					sliceName:    sliceNameSlice4,
 					mcc:          "001",
 					mnc:          "01",
 					sst:          "1",
 					sd:           "010203",
-					upfHostname:  "hostname.com",
+					upfHostname:  upfHostnameCom,
 					upfPort:      5677,
-					deviceGroups: []string{"dg-1"},
-					gnbNames:     []string{"gnb-1"},
+					deviceGroups: []string{deviceGroupNameDG1},
+					gnbNames:     []string{gnbNameGnb1},
 				},
 			},
 			expectedResponse: []nfConfigApi.SessionManagement{
 				{
-					SliceName: "slice-4",
+					SliceName: sliceNameSlice4,
 					PlmnId: nfConfigApi.PlmnId{
 						Mcc: "001",
 						Mnc: "01",
@@ -468,10 +479,10 @@ func TestSyncSessionManagement(t *testing.T) {
 						Sd:  sharedSd,
 					},
 					Upf: &nfConfigApi.Upf{
-						Hostname: "hostname.com",
+						Hostname: upfHostnameCom,
 						Port:     ptr(int32(5677)),
 					},
-					GnbNames: []string{"gnb-1"},
+					GnbNames: []string{gnbNameGnb1},
 				},
 			},
 		},
@@ -479,20 +490,20 @@ func TestSyncSessionManagement(t *testing.T) {
 			name: "float upf port is valid",
 			sliceParams: []networkSliceParams{
 				{
-					sliceName:    "slice-4",
+					sliceName:    sliceNameSlice4,
 					mcc:          "001",
 					mnc:          "01",
 					sst:          "1",
 					sd:           "010203",
-					upfHostname:  "hostname.com",
+					upfHostname:  upfHostnameCom,
 					upfPort:      1234.00,
-					deviceGroups: []string{"dg-1"},
-					gnbNames:     []string{"gnb-1"},
+					deviceGroups: []string{deviceGroupNameDG1},
+					gnbNames:     []string{gnbNameGnb1},
 				},
 			},
 			expectedResponse: []nfConfigApi.SessionManagement{
 				{
-					SliceName: "slice-4",
+					SliceName: sliceNameSlice4,
 					PlmnId: nfConfigApi.PlmnId{
 						Mcc: "001",
 						Mnc: "01",
@@ -502,10 +513,10 @@ func TestSyncSessionManagement(t *testing.T) {
 						Sd:  sharedSd,
 					},
 					Upf: &nfConfigApi.Upf{
-						Hostname: "hostname.com",
+						Hostname: upfHostnameCom,
 						Port:     ptr(int32(1234)),
 					},
-					GnbNames: []string{"gnb-1"},
+					GnbNames: []string{gnbNameGnb1},
 				},
 			},
 		},
@@ -513,19 +524,19 @@ func TestSyncSessionManagement(t *testing.T) {
 			name: "empty device group list",
 			sliceParams: []networkSliceParams{
 				{
-					sliceName:    "slice-1",
+					sliceName:    sliceNameSlice1,
 					mcc:          "001",
 					mnc:          "01",
 					sst:          "1",
 					sd:           "010203",
 					deviceGroups: []string{},
-					upfHostname:  "upf.local",
+					upfHostname:  upfHostnameLocal,
 				},
 			},
 			deviceGroups: nil,
 			expectedResponse: []nfConfigApi.SessionManagement{
 				{
-					SliceName: "slice-1",
+					SliceName: sliceNameSlice1,
 					PlmnId: nfConfigApi.PlmnId{
 						Mcc: "001",
 						Mnc: "01",
@@ -535,7 +546,7 @@ func TestSyncSessionManagement(t *testing.T) {
 						Sd:  sharedSd,
 					},
 					Upf: &nfConfigApi.Upf{
-						Hostname: "upf.local",
+						Hostname: upfHostnameLocal,
 					},
 				},
 			},

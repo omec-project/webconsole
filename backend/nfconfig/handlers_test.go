@@ -13,6 +13,12 @@ import (
 	"github.com/omec-project/openapi/v2/nfConfigApi"
 )
 
+const (
+	testImsiHandlers = "imsi-001010000000001"
+	testMbrUplink    = "20 Kbps"
+	testMbrDownlink  = "100 Kbps"
+)
+
 func TestGetImsiQosConfig(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -23,15 +29,15 @@ func TestGetImsiQosConfig(t *testing.T) {
 	}{
 		{
 			name: "matching dnn and imsi found",
-			imsi: "imsi-001010000000001",
+			imsi: testImsiHandlers,
 			inMemoryData: []imsiQosConfig{
 				{
-					dnn:   "internet",
+					dnn:   dnnInternet,
 					imsis: []string{"001010000000001"},
 					qos: []nfConfigApi.ImsiQos{
 						{
-							MbrUplink:        "20 Kbps",
-							MbrDownlink:      "100 Kbps",
+							MbrUplink:        testMbrUplink,
+							MbrDownlink:      testMbrDownlink,
 							FiveQi:           7,
 							ArpPriorityLevel: 32,
 						},
@@ -41,8 +47,8 @@ func TestGetImsiQosConfig(t *testing.T) {
 			expectedCode: http.StatusOK,
 			expectedData: []nfConfigApi.ImsiQos{
 				{
-					MbrUplink:        "20 Kbps",
-					MbrDownlink:      "100 Kbps",
+					MbrUplink:        testMbrUplink,
+					MbrDownlink:      testMbrDownlink,
 					FiveQi:           7,
 					ArpPriorityLevel: 32,
 				},
@@ -50,15 +56,15 @@ func TestGetImsiQosConfig(t *testing.T) {
 		},
 		{
 			name: "matching dnn but no imsi found",
-			imsi: "imsi-001010000000001",
+			imsi: testImsiHandlers,
 			inMemoryData: []imsiQosConfig{
 				{
-					dnn:   "internet",
+					dnn:   dnnInternet,
 					imsis: []string{"999990000000000"},
 					qos: []nfConfigApi.ImsiQos{
 						{
-							MbrUplink:        "20 Kbps",
-							MbrDownlink:      "100 Kbps",
+							MbrUplink:        testMbrUplink,
+							MbrDownlink:      testMbrDownlink,
 							FiveQi:           7,
 							ArpPriorityLevel: 32,
 						},
@@ -70,15 +76,15 @@ func TestGetImsiQosConfig(t *testing.T) {
 		},
 		{
 			name: "matching imsi but dnn not found",
-			imsi: "imsi-001010000000001",
+			imsi: testImsiHandlers,
 			inMemoryData: []imsiQosConfig{
 				{
 					dnn:   "internet2",
 					imsis: []string{"001010000000001"},
 					qos: []nfConfigApi.ImsiQos{
 						{
-							MbrUplink:        "20 Kbps",
-							MbrDownlink:      "100 Kbps",
+							MbrUplink:        testMbrUplink,
+							MbrDownlink:      testMbrDownlink,
 							FiveQi:           7,
 							ArpPriorityLevel: 32,
 						},

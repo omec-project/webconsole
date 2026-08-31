@@ -48,7 +48,7 @@ func GetUserAccounts(c *gin.Context) {
 	rawUsers, err := dbadapter.WebuiDBClient.RestfulAPIGetMany(configmodels.UserAccountDataColl, bson.M{})
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccounts})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveUserAccounts})
 		return
 	}
 	userResponses := make([]*configmodels.GetUserAccountResponse, 0, len(rawUsers))
@@ -83,14 +83,14 @@ func GetUserAccounts(c *gin.Context) {
 // @Router      /config/v1/account/{username}  [get]
 func GetUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("get user account")
-	username := c.Param("username")
+	username := c.Param(usernameKey)
 	dbUserAccount, err := fetchDBUserAccount(username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveUserAccount})
 		return
 	}
 	if dbUserAccount == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": errorUsernameNotFound})
+		c.JSON(http.StatusNotFound, gin.H{errorKey: errorUsernameNotFound})
 		return
 	}
 	userResponse := configmodels.GetUserAccountResponse{
@@ -101,7 +101,7 @@ func GetUserAccount(c *gin.Context) {
 }
 
 func fetchDBUserAccount(username string) (*configmodels.DBUserAccount, error) {
-	filter := bson.M{"username": username}
+	filter := bson.M{usernameKey: username}
 	rawUserAccount, err := dbadapter.WebuiDBClient.RestfulAPIGetOne(configmodels.UserAccountDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
@@ -140,25 +140,25 @@ func CreateUserAccount(c *gin.Context) {
 	err := c.ShouldBindJSON(&createUserParams)
 	if err != nil {
 		logger.WebUILog.Errorln(err.Error())
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidDataProvided})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorInvalidDataProvided})
 		return
 	}
 	if createUserParams.Username == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingUsername})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMissingUsername})
 		return
 	}
 	if createUserParams.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingPassword})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMissingPassword})
 		return
 	}
 	if !validatePassword(createUserParams.Password) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidPassword})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorInvalidPassword})
 		return
 	}
 	newUserRole := configmodels.UserRole
 	isFirstAccountIssued, err := isFirstAccountIssued()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccounts})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveUserAccounts})
 		return
 	}
 	if !isFirstAccountIssued {
@@ -167,20 +167,20 @@ func CreateUserAccount(c *gin.Context) {
 	dbUser, err := configmodels.CreateNewDBUserAccount(createUserParams.Username, createUserParams.Password, newUserRole)
 	if err != nil {
 		logger.WebUILog.Errorln(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errorCreateUserAccount})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorCreateUserAccount})
 		return
 	}
 
-	filter := bson.M{"username": dbUser.Username}
+	filter := bson.M{usernameKey: dbUser.Username}
 	err = dbadapter.WebuiDBClient.RestfulAPIPostMany(configmodels.UserAccountDataColl, filter, []any{configmodels.ToBsonM(dbUser)})
 	if err != nil {
 		if strings.Contains(err.Error(), "E11000") {
 			logger.DbLog.Errorln("duplicate username found:", err)
-			c.JSON(http.StatusConflict, gin.H{"error": "user account already exists"})
+			c.JSON(http.StatusConflict, gin.H{errorKey: "user account already exists"})
 			return
 		}
 		logger.DbLog.Errorln(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errorCreateUserAccount})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorCreateUserAccount})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{})
@@ -202,25 +202,25 @@ func CreateUserAccount(c *gin.Context) {
 // @Router      /config/v1/account/{username}  [delete]
 func DeleteUserAccount(c *gin.Context) {
 	logger.WebUILog.Infoln("delete user account")
-	username := c.Param("username")
+	username := c.Param(usernameKey)
 	dbUserAccount, err := fetchDBUserAccount(username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveUserAccount})
 		return
 	}
 	if dbUserAccount == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": errorUsernameNotFound})
+		c.JSON(http.StatusNotFound, gin.H{errorKey: errorUsernameNotFound})
 		return
 	}
 	if dbUserAccount.Role == configmodels.AdminRole {
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorDeleteAdminAccount})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorDeleteAdminAccount})
 		return
 	}
-	filter := bson.M{"username": username}
+	filter := bson.M{usernameKey: username}
 	err = dbadapter.WebuiDBClient.RestfulAPIDeleteOne(configmodels.UserAccountDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorln(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errorDeleteUserAccount})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorDeleteUserAccount})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{})
@@ -243,42 +243,42 @@ func DeleteUserAccount(c *gin.Context) {
 // @Router      /config/v1/account/{username}/change_password  [post]
 func ChangeUserAccountPasssword(c *gin.Context) {
 	logger.WebUILog.Infoln("change user password")
-	username := c.Param("username")
+	username := c.Param(usernameKey)
 	var changePasswordParams configmodels.ChangePasswordParams
 	err := c.ShouldBindJSON(&changePasswordParams)
 	if err != nil {
 		logger.WebUILog.Errorln(err.Error())
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidDataProvided})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorInvalidDataProvided})
 		return
 	}
 	if changePasswordParams.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorMissingPassword})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorMissingPassword})
 		return
 	}
 	if !validatePassword(changePasswordParams.Password) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": errorInvalidPassword})
+		c.JSON(http.StatusBadRequest, gin.H{errorKey: errorInvalidPassword})
 		return
 	}
 	dbUser, err := fetchDBUserAccount(username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errorRetrieveUserAccount})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorRetrieveUserAccount})
 		return
 	}
 	if dbUser == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": errorUsernameNotFound})
+		c.JSON(http.StatusNotFound, gin.H{errorKey: errorUsernameNotFound})
 		return
 	}
 	newPasswordDbUser, err := configmodels.CreateNewDBUserAccount(dbUser.Username, changePasswordParams.Password, dbUser.Role)
 	if err != nil {
 		logger.WebUILog.Errorln(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errorUpdateUserAccount})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorUpdateUserAccount})
 		return
 	}
-	filter := bson.M{"username": newPasswordDbUser.Username}
+	filter := bson.M{usernameKey: newPasswordDbUser.Username}
 	_, err = dbadapter.WebuiDBClient.RestfulAPIPost(configmodels.UserAccountDataColl, filter, configmodels.ToBsonM(newPasswordDbUser))
 	if err != nil {
 		logger.DbLog.Errorln(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errorUpdateUserAccount})
+		c.JSON(http.StatusInternalServerError, gin.H{errorKey: errorUpdateUserAccount})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{})

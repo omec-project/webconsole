@@ -28,6 +28,8 @@ type DeviceGroupMockDBClient struct {
 	err                    error
 }
 
+const deviceNameParamKey = "device-name"
+
 func (db *DeviceGroupMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	if db.err != nil {
 		return nil, db.err
@@ -59,9 +61,9 @@ func (db *DeviceGroupMockDBClient) RestfulAPIGetMany(coll string, filter bson.M)
 
 func (db *DeviceGroupMockDBClient) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
 	params := map[string]any{
-		"coll":   collName,
-		"filter": filter,
-		"data":   postData,
+		collKey:   collName,
+		filterKey: filter,
+		dataKey:   postData,
 	}
 	db.postData = append(db.postData, params)
 	return true, nil
@@ -69,8 +71,8 @@ func (db *DeviceGroupMockDBClient) RestfulAPIPost(collName string, filter bson.M
 
 func (db *DeviceGroupMockDBClient) RestfulAPIDeleteOne(coll string, filter bson.M) error {
 	params := map[string]any{
-		"coll":   coll,
-		"filter": filter,
+		collKey:   coll,
+		filterKey: filter,
 	}
 	db.deleteData = append(db.deleteData, params)
 	return nil
@@ -87,11 +89,11 @@ func deviceGroup(name string) configmodels.DeviceGroups {
 	qos := configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
 		DnnMbrUplink:   10000000,
 		DnnMbrDownlink: 10000000,
-		BitrateUnit:    "kbps",
+		BitrateUnit:    bitrateUnitKbps,
 		TrafficClass:   &traffic_class,
 	}
 	ipdomain := configmodels.DeviceGroupsIpDomainExpanded{
-		Dnn:          "internet",
+		Dnn:          dnnInternet,
 		UeIpPool:     "172.250.1.0/16",
 		DnsPrimary:   "1.1.1.1",
 		DnsSecondary: "8.8.8.8",
@@ -101,7 +103,7 @@ func deviceGroup(name string) configmodels.DeviceGroups {
 	deviceGroup := configmodels.DeviceGroups{
 		DeviceGroupName: name,
 		Imsis:           []string{"1234", "5678"},
-		SiteInfo:        "demo",
+		SiteInfo:        demoSiteName,
 		IpDomainName:    "pool1",
 		IpDomainsExpanded: []configmodels.DeviceGroupsIpDomainExpanded{
 			ipdomain,
@@ -126,20 +128,20 @@ func TestGetDeviceGroups(t *testing.T) {
 		{
 			name: "One device group returns a list with one name",
 			configuredDeviceGroups: []configmodels.DeviceGroups{
-				deviceGroup("group1"),
+				deviceGroup(testGroupName),
 			},
 			expectedCode:   http.StatusOK,
-			expectedResult: []string{"group1"},
+			expectedResult: []string{testGroupName},
 		},
 		{
 			name: "Many device groups returns a list with many names",
 			configuredDeviceGroups: []configmodels.DeviceGroups{
-				deviceGroup("group1"),
+				deviceGroup(testGroupName),
 				deviceGroup("group2"),
 				deviceGroup("group3"),
 			},
 			expectedCode:   http.StatusOK,
-			expectedResult: []string{"group1", "group2", "group3"},
+			expectedResult: []string{testGroupName, "group2", "group3"},
 		},
 	}
 	for _, tc := range tests {
@@ -183,7 +185,7 @@ func TestGetDeviceGroupByName_DeviceGroupDoesNotExist(t *testing.T) {
 	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
 		configuredDeviceGroups: []configmodels.DeviceGroups{},
 	}
-	c.Params = append(c.Params, gin.Param{Key: "device-name", Value: "group1"})
+	c.Params = append(c.Params, gin.Param{Key: deviceNameParamKey, Value: testGroupName})
 	GetDeviceGroupByName(c)
 	resp := w.Result()
 
@@ -208,7 +210,7 @@ func TestGetDeviceGroupByName_DBError(t *testing.T) {
 	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
 		err: fmt.Errorf("mock error"),
 	}
-	c.Params = append(c.Params, gin.Param{Key: "device-name", Value: "group1"})
+	c.Params = append(c.Params, gin.Param{Key: deviceNameParamKey, Value: testGroupName})
 	GetDeviceGroupByName(c)
 	resp := w.Result()
 
@@ -224,7 +226,7 @@ func TestGetDeviceGroupByName_DBError(t *testing.T) {
 		t.Fatalf("failed to unmarshal JSON: %v", err)
 	}
 
-	expected := map[string]string{"error": "failed to retrieve device group"}
+	expected := map[string]string{errorKey: errMsgRetrieveDeviceGroup}
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("expected response body %v, got %v", expected, actual)
 	}
@@ -237,9 +239,9 @@ func TestGetDeviceGroupByName_DeviceGroupExists(t *testing.T) {
 	defer func() { dbadapter.CommonDBClient = originalDBClient }()
 
 	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
-		configuredDeviceGroups: []configmodels.DeviceGroups{deviceGroup("group1")},
+		configuredDeviceGroups: []configmodels.DeviceGroups{deviceGroup(testGroupName)},
 	}
-	c.Params = append(c.Params, gin.Param{Key: "device-name", Value: "group1"})
+	c.Params = append(c.Params, gin.Param{Key: deviceNameParamKey, Value: testGroupName})
 	GetDeviceGroupByName(c)
 	resp := w.Result()
 
@@ -254,7 +256,7 @@ func TestGetDeviceGroupByName_DeviceGroupExists(t *testing.T) {
 	if err := json.Unmarshal(bodyBytes, &actual); err != nil {
 		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
-	expected := deviceGroup("group1")
+	expected := deviceGroup(testGroupName)
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("expected %+v, got %+v", expected, actual)
 	}
@@ -262,7 +264,7 @@ func TestGetDeviceGroupByName_DeviceGroupExists(t *testing.T) {
 
 func Test_handleDeviceGroupPost(t *testing.T) {
 	deviceGroups := []configmodels.DeviceGroups{
-		deviceGroup("group1"),
+		deviceGroup(testGroupName),
 		deviceGroup("group2"),
 		deviceGroup("group_no_imsis"),
 		deviceGroup("group_no_traf_class"),
@@ -296,16 +298,16 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 				t.Fatal("No post operation was recorded")
 			}
 
-			if mockDB.postData[0]["coll"] != devGroupDataColl {
-				t.Errorf("expected collection %v, got %v", devGroupDataColl, mockDB.postData[0]["coll"])
+			if mockDB.postData[0][collKey] != devGroupDataColl {
+				t.Errorf("expected collection %v, got %v", devGroupDataColl, mockDB.postData[0][collKey])
 			}
 
-			expectedFilter := bson.M{"group-name": dg.DeviceGroupName}
-			if !reflect.DeepEqual(mockDB.postData[0]["filter"], expectedFilter) {
-				t.Errorf("expected filter %v, got %v", expectedFilter, mockDB.postData[0]["filter"])
+			expectedFilter := bson.M{groupNameKey: dg.DeviceGroupName}
+			if !reflect.DeepEqual(mockDB.postData[0][filterKey], expectedFilter) {
+				t.Errorf("expected filter %v, got %v", expectedFilter, mockDB.postData[0][filterKey])
 			}
 
-			result := mockDB.postData[0]["data"].(map[string]any)
+			result := mockDB.postData[0][dataKey].(map[string]any)
 			bytes, err := json.Marshal(result)
 			if err != nil {
 				t.Fatalf("could not marshal result data: %v", err)
@@ -323,7 +325,7 @@ func Test_handleDeviceGroupPost(t *testing.T) {
 
 func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 	deviceGroups := []configmodels.DeviceGroups{
-		deviceGroup("group1"),
+		deviceGroup(testGroupName),
 		deviceGroup("group2"),
 		deviceGroup("group_no_imsis"),
 		deviceGroup("group_no_traf_class"),
@@ -357,16 +359,16 @@ func Test_handleDeviceGroupPost_alreadyExists(t *testing.T) {
 				t.Fatal("no post operation was recorded")
 			}
 
-			if mock.postData[0]["coll"] != devGroupDataColl {
-				t.Errorf("expected collection %v, got %v", devGroupDataColl, mock.postData[0]["coll"])
+			if mock.postData[0][collKey] != devGroupDataColl {
+				t.Errorf("expected collection %v, got %v", devGroupDataColl, mock.postData[0][collKey])
 			}
 
-			expectedFilter := bson.M{"group-name": dg.DeviceGroupName}
-			if !reflect.DeepEqual(mock.postData[0]["filter"], expectedFilter) {
-				t.Errorf("expected filter %v, got %v", expectedFilter, mock.postData[0]["filter"])
+			expectedFilter := bson.M{groupNameKey: dg.DeviceGroupName}
+			if !reflect.DeepEqual(mock.postData[0][filterKey], expectedFilter) {
+				t.Errorf("expected filter %v, got %v", expectedFilter, mock.postData[0][filterKey])
 			}
 
-			result := mock.postData[0]["data"].(map[string]any)
+			result := mock.postData[0][dataKey].(map[string]any)
 			bytes, err := json.Marshal(result)
 			if err != nil {
 				t.Fatalf("could not marshal result map: %v", err)
@@ -390,7 +392,7 @@ func Test_handleDeviceGroupDelete(t *testing.T) {
 	dbClientMock := &DeviceGroupMockDBClient{}
 	dbadapter.CommonDBClient = dbClientMock
 
-	err := handleDeviceGroupDelete("group1")
+	err := handleDeviceGroupDelete(testGroupName)
 	if err != nil {
 		t.Fatalf("handleDeviceGroupDelete failed: %v", err)
 	}
@@ -400,13 +402,13 @@ func Test_handleDeviceGroupDelete(t *testing.T) {
 	}
 
 	expectedColl := devGroupDataColl
-	if dbClientMock.deleteData[0]["coll"] != expectedColl {
-		t.Errorf("expected collection %v, got %v", expectedColl, dbClientMock.deleteData[0]["coll"])
+	if dbClientMock.deleteData[0][collKey] != expectedColl {
+		t.Errorf("expected collection %v, got %v", expectedColl, dbClientMock.deleteData[0][collKey])
 	}
 
-	expectedFilter := bson.M{"group-name": "group1"}
-	if !reflect.DeepEqual(dbClientMock.deleteData[0]["filter"], expectedFilter) {
-		t.Errorf("expected filter %v, got %v", expectedFilter, dbClientMock.deleteData[0]["filter"])
+	expectedFilter := bson.M{groupNameKey: testGroupName}
+	if !reflect.DeepEqual(dbClientMock.deleteData[0][filterKey], expectedFilter) {
+		t.Errorf("expected filter %v, got %v", expectedFilter, dbClientMock.deleteData[0][filterKey])
 	}
 }
 

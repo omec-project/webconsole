@@ -28,8 +28,6 @@ type DeviceGroupMockDBClient struct {
 	err                    error
 }
 
-const deviceNameParamKey = groupNameKey
-
 func (db *DeviceGroupMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
 	if db.err != nil {
 		return nil, db.err
@@ -185,7 +183,7 @@ func TestGetDeviceGroupByName_DeviceGroupDoesNotExist(t *testing.T) {
 	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
 		configuredDeviceGroups: []configmodels.DeviceGroups{},
 	}
-	c.Params = append(c.Params, gin.Param{Key: deviceNameParamKey, Value: testGroupName})
+	c.Params = append(c.Params, gin.Param{Key: groupNameKey, Value: testGroupName})
 	GetDeviceGroupByName(c)
 	resp := w.Result()
 
@@ -210,7 +208,7 @@ func TestGetDeviceGroupByName_DBError(t *testing.T) {
 	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
 		err: fmt.Errorf("mock error"),
 	}
-	c.Params = append(c.Params, gin.Param{Key: deviceNameParamKey, Value: testGroupName})
+	c.Params = append(c.Params, gin.Param{Key: groupNameKey, Value: testGroupName})
 	GetDeviceGroupByName(c)
 	resp := w.Result()
 
@@ -241,7 +239,7 @@ func TestGetDeviceGroupByName_DeviceGroupExists(t *testing.T) {
 	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
 		configuredDeviceGroups: []configmodels.DeviceGroups{deviceGroup(testGroupName)},
 	}
-	c.Params = append(c.Params, gin.Param{Key: deviceNameParamKey, Value: testGroupName})
+	c.Params = append(c.Params, gin.Param{Key: groupNameKey, Value: testGroupName})
 	GetDeviceGroupByName(c)
 	resp := w.Result()
 

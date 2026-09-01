@@ -133,7 +133,7 @@ func DeviceGroupGroupNameDelete(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			errorKey:     fmt.Sprintf("Failed to delete device group %s with error: %+v.", groupName, err),
 			requestIDKey: requestID,
-			messageKey:   "Please refer to the log with the provided Request ID for details.",
+			messageKey:   messageRequestIDDetails,
 		})
 		return
 	}
@@ -194,7 +194,7 @@ func DeviceGroupGroupNamePut(c *gin.Context) {
 		c.JSON(statusCode, gin.H{
 			errorKey:     fmt.Sprintf("Failed to update device group %s with error: %+v.", groupName, err),
 			requestIDKey: requestID,
-			messageKey:   "Please refer to the log with the provided Request ID for details.",
+			messageKey:   messageRequestIDDetails,
 		})
 		return
 	}

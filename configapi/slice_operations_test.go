@@ -825,3 +825,34 @@ func TestNormalizeRewritesTheUnitToTheStoredOne(t *testing.T) {
 		t.Errorf("normalising the stored rule again changed it: MBR %d, GBR %d", rule.AppMbrUplink, rule.AppGbrUplink)
 	}
 }
+
+// ConvertToString renders the rate served to the PCF, so what it drops is what the network does
+// not deliver. Integer division chose the largest unit and truncated to it: 1500 bps was served
+// as "1 Kbps", a third of the rate gone, and 2147000000 bps as "2 Gbps" rather than the 2147 Mbps
+// that describes it exactly. A maximum rate served
+// low is a ceiling below the configured one; a guaranteed rate served low is a floor the network
+// never commits to.
+func TestConvertToStringNamesOnlyAUnitThatDescribesTheRateExactly(t *testing.T) {
+	tests := []struct {
+		name string
+		bps  uint64
+		want string
+	}{
+		{"a whole number of Gbps", 2000000000, "2 Gbps"},
+		{"a whole number of Mbps", 10000000, "10 Mbps"},
+		{"a whole number of Kbps", 20000, "20 Kbps"},
+		{"not a whole number of Kbps", 1500, "1500 bps"},
+		{"a whole number of Mbps but not of Gbps", 2147000000, "2147 Mbps"},
+		{"a whole number of no larger unit", 2147000001, "2147000001 bps"},
+		{"below a Kbps", 500, "500 bps"},
+		{"no rate", 0, "0 bps"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ConvertToString(tc.bps); got != tc.want {
+				t.Errorf("ConvertToString(%d) = %q, want %q", tc.bps, got, tc.want)
+			}
+		})
+	}
+}

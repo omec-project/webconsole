@@ -574,23 +574,24 @@ func SnssaiModelsToHex(snssai models.Snssai) string {
 	return sst + snssai.GetSd()
 }
 
+// ConvertToString renders a rate held in bps as the largest unit that describes it exactly.
+//
+// A rate that is not a whole number of the larger unit is rendered in bps rather than truncated to
+// it. The division here used to be integer division on the way out, so 1500 bps was served as
+// "1 Kbps" and 2147000000 bps as "2 Gbps" -- always downwards, and by as much as a whole unit.
+// For a maximum rate that quietly serves a lower ceiling than the operator configured; for a
+// guaranteed rate it is worse, because the network commits to a floor beneath the one asked for.
 func ConvertToString(val uint64) string {
-	var mbVal, gbVal, kbVal uint64
-	kbVal = val / 1000
-	mbVal = val / 1000000
-	gbVal = val / 1000000000
-	var retStr string
-	if gbVal != 0 {
-		retStr = strconv.FormatUint(gbVal, 10) + " Gbps"
-	} else if mbVal != 0 {
-		retStr = strconv.FormatUint(mbVal, 10) + " Mbps"
-	} else if kbVal != 0 {
-		retStr = strconv.FormatUint(kbVal, 10) + " Kbps"
-	} else {
-		retStr = strconv.FormatUint(val, 10) + " bps"
+	switch {
+	case val != 0 && val%1000000000 == 0:
+		return strconv.FormatUint(val/1000000000, 10) + " Gbps"
+	case val != 0 && val%1000000 == 0:
+		return strconv.FormatUint(val/1000000, 10) + " Mbps"
+	case val != 0 && val%1000 == 0:
+		return strconv.FormatUint(val/1000, 10) + " Kbps"
+	default:
+		return strconv.FormatUint(val, 10) + " bps"
 	}
-
-	return retStr
 }
 
 func getSlices() []*configmodels.Slice {

@@ -169,6 +169,25 @@ func normalizeApplicationFilteringRules(slice *configmodels.Slice) {
 	}
 }
 
+// labelStoredRatesAsBps makes a stored rule's unit describe the rates stored beside it.
+//
+// The rates in a rule are normalised to bps when it is written -- since 90de249 in November 2021,
+// and by a fixed factor of a million before that -- so a stored value is bps whatever unit sits
+// beside it, and every consumer of the stored rule, the policy served to the PCF included, reads
+// it that way. Rules written before the unit was stored to match still carry the one the operator
+// posted, so a GET would return a bps value labelled Kbps. That is not just a misleading label:
+// posting the returned document back multiplies the rates again, a thousandfold for a rule
+// configured in Kbps, and the operator has changed nothing.
+//
+// Rewriting the label on the way out rather than the rows in place keeps the read path honest
+// without a migration, and a rule written since the ingest path started storing the unit is
+// already bps, so this leaves it alone.
+func labelStoredRatesAsBps(slice *configmodels.Slice) {
+	for i := range slice.ApplicationFilteringRules {
+		slice.ApplicationFilteringRules[i].BitrateUnit = bitrateUnitBps
+	}
+}
+
 func convertBitrateToInt32(bitrate int64) int32 {
 	if bitrate < 0 {
 		logger.ConfigLog.Warnf("negative bitrate %d bps stored as 0", bitrate)

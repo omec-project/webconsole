@@ -856,3 +856,81 @@ func TestConvertToStringNamesOnlyAUnitThatDescribesTheRateExactly(t *testing.T) 
 		})
 	}
 }
+
+// A rule written before the ingest path started storing the unit holds bps rates under whatever
+// unit the operator posted. The GET has to say bps, or the operator reads a rate labelled a
+// thousand times its own value -- and posting that document back unchanged multiplies it again,
+// which is the way a slice's rates drift without anyone editing them.
+func TestGetNetworkSliceByNameLabelsStoredRatesAsBps(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+
+	// What a rule written before that contract looks like in the database: rates already in bps,
+	// beside the Mbps the operator posted them in.
+	stored := networkSlice(testSliceName)
+	stored.ApplicationFilteringRules = []configmodels.SliceApplicationFilteringRules{
+		filteringRuleWithRates(bitrateUnitMbps, 50000000, 60000000, 10000000, 20000000),
+	}
+	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{slices: []configmodels.Slice{stored}}
+
+	c.Params = append(c.Params, gin.Param{Key: sliceNameKey, Value: testSliceName})
+	GetNetworkSliceByName(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected StatusCode %d, got %d", http.StatusOK, w.Code)
+	}
+	var returned configmodels.Slice
+	if err := json.Unmarshal(w.Body.Bytes(), &returned); err != nil {
+		t.Fatalf("failed to unmarshal the returned slice: %v", err)
+	}
+	if len(returned.ApplicationFilteringRules) != 1 {
+		t.Fatalf("expected 1 filtering rule, got %d", len(returned.ApplicationFilteringRules))
+	}
+	rule := returned.ApplicationFilteringRules[0]
+	if rule.BitrateUnit != bitrateUnitBps {
+		t.Errorf("bitrate-unit = %q, want %q: the stored rates are bps", rule.BitrateUnit, bitrateUnitBps)
+	}
+	if rule.AppMbrUplink != 50000000 || rule.AppGbrUplink != 10000000 {
+		t.Errorf("the returned rates were altered: mbr-ul = %d, gbr-ul = %d", rule.AppMbrUplink, rule.AppGbrUplink)
+	}
+
+	// The property the label exists for, driven through the write path the operator's tool uses
+	// rather than through the normalizer alone: validation reads the unit before anything is
+	// converted, so a test that called normalize directly would keep passing if that order
+	// changed.
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+	postMock := &NetworkSliceMockDBClient{}
+	dbadapter.CommonDBClient = postMock
+
+	jsonBody, err := json.Marshal(returned)
+	if err != nil {
+		t.Fatalf("failed to marshal the returned slice: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	postRecorder := httptest.NewRecorder()
+	router.ServeHTTP(postRecorder, req)
+
+	if postRecorder.Code != http.StatusOK {
+		t.Fatalf("posting back what the GET returned was refused with %d: %s",
+			postRecorder.Code, postRecorder.Body.String())
+	}
+	if len(postMock.postData) == 0 {
+		t.Fatal("expected the slice to be stored")
+	}
+	var storedAgain configmodels.Slice
+	if err := json.Unmarshal(configmodels.MapToByte(postMock.postData[0][dataKey].(map[string]any)), &storedAgain); err != nil {
+		t.Fatalf("failed to unmarshal the stored slice: %v", err)
+	}
+	if !reflect.DeepEqual(storedAgain.ApplicationFilteringRules, returned.ApplicationFilteringRules) {
+		t.Errorf("posting back what a GET returned changed the rule: %+v was stored as %+v",
+			returned.ApplicationFilteringRules, storedAgain.ApplicationFilteringRules)
+	}
+}

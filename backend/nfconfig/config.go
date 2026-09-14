@@ -504,6 +504,12 @@ func buildPccQos(ruleConfig configmodels.SliceApplicationFilteringRules) nfConfi
 	if ruleConfig.AppMbrDownlink != 0 {
 		pccQos.SetMaxBrDl(configapi.ConvertToString(uint64(ruleConfig.AppMbrDownlink)))
 	}
+	if ruleConfig.AppGbrUplink != 0 {
+		pccQos.SetGbrUl(configapi.ConvertToString(uint64(ruleConfig.AppGbrUplink)))
+	}
+	if ruleConfig.AppGbrDownlink != 0 {
+		pccQos.SetGbrDl(configapi.ConvertToString(uint64(ruleConfig.AppGbrDownlink)))
+	}
 	return *pccQos
 }
 

@@ -342,6 +342,7 @@ func GetNetworkSliceByName(c *gin.Context) {
 	if networkSlice.SliceName == "" {
 		c.JSON(http.StatusNotFound, nil)
 	} else {
+		labelStoredRatesAsBps(&networkSlice)
 		c.JSON(http.StatusOK, networkSlice)
 	}
 }

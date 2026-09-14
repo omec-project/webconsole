@@ -109,3 +109,25 @@ func TestValidateGnbTac(t *testing.T) {
 func genLongString(length int) string {
 	return strings.Repeat("a", length)
 }
+
+func TestValidateBitrate(t *testing.T) {
+	testCases := []struct {
+		name     string
+		value    int32
+		unit     string
+		expected bool
+	}{
+		{"unset", 0, bitrateUnitMbps, true},
+		{"within the field", 2000, bitrateUnitMbps, true},
+		{"the largest rate that fits", 2147483, "kbps", true},
+		{"negative", -1, bitrateUnitMbps, false},
+		{"too large for the field", 3, bitrateUnitGbps, false},
+		{"unset unit is read as bps", 2000000, "", true},
+	}
+
+	for _, tc := range testCases {
+		if r := isValidBitrate(tc.value, tc.unit); r != tc.expected {
+			t.Errorf("%s: isValidBitrate(%d, %q) = %v, want %v", tc.name, tc.value, tc.unit, r, tc.expected)
+		}
+	}
+}

@@ -1292,6 +1292,9 @@ const docTemplate = `{
                 "mtu": {
                     "type": "integer"
                 },
+                "pcscf-primary": {
+                    "type": "string"
+                },
                 "ue-dnn-qos": {
                     "$ref": "#/definitions/configmodels.DeviceGroupsIpDomainExpandedUeDnnQos"
                 },
@@ -1417,6 +1420,14 @@ const docTemplate = `{
                 "action": {
                     "description": "action",
                     "type": "string"
+                },
+                "app-gbr-downlink": {
+                    "description": "guaranteed bit rate for downlink, in the unit given by bitrate-unit",
+                    "type": "integer"
+                },
+                "app-gbr-uplink": {
+                    "description": "guaranteed bit rate for uplink, in the unit given by bitrate-unit",
+                    "type": "integer"
                 },
                 "app-mbr-downlink": {
                     "type": "integer"

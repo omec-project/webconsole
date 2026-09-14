@@ -40,6 +40,12 @@ type SliceApplicationFilteringRules struct {
 
 	AppMbrDownlink int32 `json:"app-mbr-downlink,omitempty"`
 
+	// guaranteed bit rate for uplink, in the unit given by bitrate-unit
+	AppGbrUplink int32 `json:"app-gbr-uplink,omitempty"`
+
+	// guaranteed bit rate for downlink, in the unit given by bitrate-unit
+	AppGbrDownlink int32 `json:"app-gbr-downlink,omitempty"`
+
 	// data rate unit for uplink and downlink
 	BitrateUnit string `json:"bitrate-unit,omitempty"`
 

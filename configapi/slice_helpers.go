@@ -88,12 +88,35 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 			logger.ConfigLog.Errorln("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
 			return request, fmt.Errorf("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
 		}
+		if err := validateRuleBitrates(ruleConfig, sliceName); err != nil {
+			return request, err
+		}
 	}
 
 	slices.Sort(request.SiteDeviceGroup)
 	request.SiteDeviceGroup = slices.Compact(request.SiteDeviceGroup)
 
 	return request, nil
+}
+
+// A rate that isValidBitrate rejects is one that cannot be served as configured, so the slice is
+// refused rather than accepted with a rate the operator never asked for.
+func validateRuleBitrates(rule configmodels.SliceApplicationFilteringRules, sliceName string) error {
+	rates := []struct {
+		name  string
+		value int32
+	}{
+		{"app-mbr-uplink", rule.AppMbrUplink},
+		{"app-mbr-downlink", rule.AppMbrDownlink},
+		{"app-gbr-uplink", rule.AppGbrUplink},
+		{"app-gbr-downlink", rule.AppGbrDownlink},
+	}
+	for _, rate := range rates {
+		if !isValidBitrate(rate.value, rule.BitrateUnit) {
+			return fmt.Errorf("invalid %s %d %q for rule %s in Network Slice %s", rate.name, rate.value, rule.BitrateUnit, rule.RuleName, sliceName)
+		}
+	}
+	return nil
 }
 
 func logSliceMetadata(slice configmodels.Slice) {
@@ -123,15 +146,55 @@ func normalizeApplicationFilteringRules(slice *configmodels.Slice) {
 		dl := convertToBps(int64(rule.AppMbrDownlink), rule.BitrateUnit)
 		rule.AppMbrDownlink = convertBitrateToInt32(dl)
 
-		logger.ConfigLog.Infof("Normalized MBR Uplink: %v, Downlink: %v", rule.AppMbrUplink, rule.AppMbrDownlink)
+		// The guaranteed rates are expressed in the same unit and must be normalised the same way.
+		// Left unconverted they would be stored raw, so a rule configured in Mbps would reach the
+		// PCF a million times too small.
+		gbrUl := convertToBps(int64(rule.AppGbrUplink), rule.BitrateUnit)
+		rule.AppGbrUplink = convertBitrateToInt32(gbrUl)
+
+		gbrDl := convertToBps(int64(rule.AppGbrDownlink), rule.BitrateUnit)
+		rule.AppGbrDownlink = convertBitrateToInt32(gbrDl)
+
+		// Every rate on the rule is bps from here on, so the unit has to say so. A GET returns the
+		// stored rule, and returning the operator's original unit beside a normalised value both
+		// contradicts the field description and multiplies the rates again if that document is
+		// posted back.
+		rule.BitrateUnit = bitrateUnitBps
+
+		logger.ConfigLog.Infof("Normalized MBR Uplink: %d, Downlink: %d", rule.AppMbrUplink, rule.AppMbrDownlink)
+		logger.ConfigLog.Infof("Normalized GBR Uplink: %d, Downlink: %d", rule.AppGbrUplink, rule.AppGbrDownlink)
 		if rule.TrafficClass != nil {
 			logger.ConfigLog.Infof("Traffic class: %v", rule.TrafficClass)
 		}
 	}
 }
 
+// labelStoredRatesAsBps makes a stored rule's unit describe the rates stored beside it.
+//
+// The rates in a rule are normalised to bps when it is written -- since 90de249 in November 2021,
+// and by a fixed factor of a million before that -- so a stored value is bps whatever unit sits
+// beside it, and every consumer of the stored rule, the policy served to the PCF included, reads
+// it that way. Rules written before the unit was stored to match still carry the one the operator
+// posted, so a GET would return a bps value labelled Kbps. That is not just a misleading label:
+// posting the returned document back multiplies the rates again, a thousandfold for a rule
+// configured in Kbps, and the operator has changed nothing.
+//
+// Rewriting the label on the way out rather than the rows in place keeps the read path honest
+// without a migration, and a rule written since the ingest path started storing the unit is
+// already bps, so this leaves it alone.
+func labelStoredRatesAsBps(slice *configmodels.Slice) {
+	for i := range slice.ApplicationFilteringRules {
+		slice.ApplicationFilteringRules[i].BitrateUnit = bitrateUnitBps
+	}
+}
+
 func convertBitrateToInt32(bitrate int64) int32 {
-	if bitrate < 0 || bitrate > math.MaxInt32 {
+	if bitrate < 0 {
+		logger.ConfigLog.Warnf("negative bitrate %d bps stored as 0", bitrate)
+		return 0
+	}
+	if bitrate > math.MaxInt32 {
+		logger.ConfigLog.Warnf("bitrate %d bps exceeds the largest rate that can be stored, capped at %d bps", bitrate, int64(math.MaxInt32))
 		return math.MaxInt32
 	}
 	return int32(bitrate)
@@ -530,23 +593,24 @@ func SnssaiModelsToHex(snssai models.Snssai) string {
 	return sst + snssai.GetSd()
 }
 
+// ConvertToString renders a rate held in bps as the largest unit that describes it exactly.
+//
+// A rate that is not a whole number of the larger unit is rendered in bps rather than truncated to
+// it. The division here used to be integer division on the way out, so 1500 bps was served as
+// "1 Kbps" and 2147000000 bps as "2 Gbps" -- always downwards, and by as much as a whole unit.
+// For a maximum rate that quietly serves a lower ceiling than the operator configured; for a
+// guaranteed rate it is worse, because the network commits to a floor beneath the one asked for.
 func ConvertToString(val uint64) string {
-	var mbVal, gbVal, kbVal uint64
-	kbVal = val / 1000
-	mbVal = val / 1000000
-	gbVal = val / 1000000000
-	var retStr string
-	if gbVal != 0 {
-		retStr = strconv.FormatUint(gbVal, 10) + " Gbps"
-	} else if mbVal != 0 {
-		retStr = strconv.FormatUint(mbVal, 10) + " Mbps"
-	} else if kbVal != 0 {
-		retStr = strconv.FormatUint(kbVal, 10) + " Kbps"
-	} else {
-		retStr = strconv.FormatUint(val, 10) + " bps"
+	switch {
+	case val != 0 && val%1000000000 == 0:
+		return strconv.FormatUint(val/1000000000, 10) + " Gbps"
+	case val != 0 && val%1000000 == 0:
+		return strconv.FormatUint(val/1000000, 10) + " Mbps"
+	case val != 0 && val%1000 == 0:
+		return strconv.FormatUint(val/1000, 10) + " Kbps"
+	default:
+		return strconv.FormatUint(val, 10) + " bps"
 	}
-
-	return retStr
 }
 
 func getSlices() []*configmodels.Slice {

@@ -29,6 +29,7 @@ const (
 	MBPS = 1000000
 	GBPS = 1000000000
 
+	bitrateUnitBps  = "bps"
 	bitrateUnitKbps = "kbps"
 )
 
@@ -134,19 +135,28 @@ func updateDG(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.De
 }
 
 func convertToBps(val int64, unit string) int64 {
-	switch strings.ToLower(unit) {
-	case "bps":
-		return val
-	case bitrateUnitKbps:
-		return val * KBPS
-	case "mbps":
-		return val * MBPS
-	case "gbps":
-		return val * GBPS
-	default:
+	multiplier, known := bitrateMultiplier(unit)
+	if !known {
 		logger.ConfigLog.Warnf("unknown bitrate unit: %s, defaulting to bps", unit)
-		return val
 	}
+	return val * multiplier
+}
+
+// bitrateMultiplier is the bps factor for a unit, and whether the unit was recognised. It is
+// separate from convertToBps so that validation, which needs the factor before anything is
+// converted, does not log the unknown-unit warning a second time for the same rule.
+func bitrateMultiplier(unit string) (int64, bool) {
+	switch strings.ToLower(unit) {
+	case bitrateUnitBps:
+		return 1, true
+	case bitrateUnitKbps:
+		return KBPS, true
+	case "mbps":
+		return MBPS, true
+	case "gbps":
+		return GBPS, true
+	}
+	return 1, false
 }
 
 func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -31,6 +32,7 @@ import (
 const (
 	testSliceName   = "slice1"
 	bitrateUnitMbps = "Mbps"
+	bitrateUnitGbps = "Gbps"
 )
 
 var execCommandTimesCalled = 0
@@ -668,5 +670,267 @@ func TestUpdateSmProvisionedData_UsesPutOne(t *testing.T) {
 	}
 	if _, ok = data["dnnconfigurations"]; !ok {
 		t.Fatal("expected dnnconfigurations key in put payload")
+	}
+}
+
+func filteringRuleWithRates(unit string, mbrUl, mbrDl, gbrUl, gbrDl int32) configmodels.SliceApplicationFilteringRules {
+	return configmodels.SliceApplicationFilteringRules{
+		RuleName:       "rate-rule",
+		BitrateUnit:    unit,
+		AppMbrUplink:   mbrUl,
+		AppMbrDownlink: mbrDl,
+		AppGbrUplink:   gbrUl,
+		AppGbrDownlink: gbrDl,
+		TrafficClass:   &configmodels.TrafficClassInfo{Qci: 9, Arp: 1},
+	}
+}
+
+// Guaranteed rates are configured in the rule's bitrate-unit, like the maximum rates, and must be
+// normalised to bps on the same path. Left unconverted, a rule written in Mbps reaches the PCF a
+// million times too small.
+func TestNormalizeConvertsGuaranteedBitRatesToBps(t *testing.T) {
+	slice := &configmodels.Slice{
+		ApplicationFilteringRules: []configmodels.SliceApplicationFilteringRules{
+			filteringRuleWithRates(bitrateUnitMbps, 50, 50, 10, 20),
+		},
+	}
+
+	normalizeApplicationFilteringRules(slice)
+
+	rule := slice.ApplicationFilteringRules[0]
+	if rule.AppGbrUplink != 10_000_000 {
+		t.Errorf("AppGbrUplink = %d, want 10000000 after normalising 10 Mbps", rule.AppGbrUplink)
+	}
+	if rule.AppGbrDownlink != 20_000_000 {
+		t.Errorf("AppGbrDownlink = %d, want 20000000 after normalising 20 Mbps", rule.AppGbrDownlink)
+	}
+	if rule.AppMbrUplink != 50_000_000 {
+		t.Errorf("AppMbrUplink = %d, want the maximum rates still normalised", rule.AppMbrUplink)
+	}
+}
+
+// A negative rate must not become the largest storable one: an operator who configures -1 must not
+// be served a 2.1 Gbps rate.
+func TestConvertBitrateToInt32(t *testing.T) {
+	testCases := []struct {
+		name     string
+		bitrate  int64
+		expected int32
+	}{
+		{"unset", 0, 0},
+		{"within the field", 10_000_000, 10_000_000},
+		{"negative is not a rate", -1, 0},
+		{"beyond the field is capped", math.MaxInt32 + 1, math.MaxInt32},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := convertBitrateToInt32(tc.bitrate); got != tc.expected {
+				t.Errorf("convertBitrateToInt32(%d) = %d, want %d", tc.bitrate, got, tc.expected)
+			}
+		})
+	}
+}
+
+// A rate that is negative, or too large for the field it is stored in, cannot be served as
+// configured, so the slice is rejected rather than accepted with a different rate than was asked
+// for.
+func TestNetworkSlicePostHandler_BitrateValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	testCases := []struct {
+		name          string
+		rule          configmodels.SliceApplicationFilteringRules
+		expectedCode  int
+		expectedError string
+	}{
+		{
+			name:          "negative maximum bit rate",
+			rule:          filteringRuleWithRates(bitrateUnitMbps, -1, 10, 0, 0),
+			expectedCode:  http.StatusBadRequest,
+			expectedError: "invalid app-mbr-uplink",
+		},
+		{
+			name:          "negative guaranteed bit rate",
+			rule:          filteringRuleWithRates(bitrateUnitMbps, 10, 10, 0, -5),
+			expectedCode:  http.StatusBadRequest,
+			expectedError: "invalid app-gbr-downlink",
+		},
+		{
+			name:          "guaranteed bit rate too large to store",
+			rule:          filteringRuleWithRates(bitrateUnitGbps, 2, 2, 3, 0),
+			expectedCode:  http.StatusBadRequest,
+			expectedError: "invalid app-gbr-uplink",
+		},
+		{
+			name:         "rates that fit are accepted",
+			rule:         filteringRuleWithRates(bitrateUnitGbps, 2, 2, 1, 1),
+			expectedCode: http.StatusOK,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			// Installed for every case, not only the accepted one: without it a rejected rate that
+			// slipped through would fail this test with a 500 from the nil client rather than the
+			// 200 that is the defect.
+			dbadapter.CommonDBClient = &NetworkSliceMockDBClient{}
+			slice := networkSlice(testSliceName)
+			slice.ApplicationFilteringRules = []configmodels.SliceApplicationFilteringRules{tc.rule}
+			jsonBody, err := json.Marshal(slice)
+			if err != nil {
+				t.Fatalf("failed to marshal network slice %v", err)
+			}
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+			if tc.expectedCode != w.Code {
+				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
+			}
+			if tc.expectedError != "" && !strings.Contains(w.Body.String(), tc.expectedError) {
+				t.Errorf("expected body to contain error about `%v`, got `%v`", tc.expectedError, w.Body.String())
+			}
+		})
+	}
+}
+
+// A GET returns the stored rule, so the unit has to describe the stored value. The property that
+// matters is idempotence: posting back what a GET returned must not multiply the rates again.
+func TestNormalizeRewritesTheUnitToTheStoredOne(t *testing.T) {
+	slice := &configmodels.Slice{
+		ApplicationFilteringRules: []configmodels.SliceApplicationFilteringRules{
+			filteringRuleWithRates(bitrateUnitMbps, 50, 50, 10, 20),
+		},
+	}
+
+	normalizeApplicationFilteringRules(slice)
+
+	if got := slice.ApplicationFilteringRules[0].BitrateUnit; got != bitrateUnitBps {
+		t.Errorf("BitrateUnit = %q, want %q once the rates are bps", got, bitrateUnitBps)
+	}
+
+	normalizeApplicationFilteringRules(slice)
+
+	rule := slice.ApplicationFilteringRules[0]
+	if rule.AppMbrUplink != 50_000_000 || rule.AppGbrUplink != 10_000_000 {
+		t.Errorf("normalising the stored rule again changed it: MBR %d, GBR %d", rule.AppMbrUplink, rule.AppGbrUplink)
+	}
+}
+
+// ConvertToString renders the rate served to the PCF, so what it drops is what the network does
+// not deliver. Integer division chose the largest unit and truncated to it: 1500 bps was served
+// as "1 Kbps", a third of the rate gone, and 2147000000 bps as "2 Gbps" rather than the 2147 Mbps
+// that describes it exactly. A maximum rate served
+// low is a ceiling below the configured one; a guaranteed rate served low is a floor the network
+// never commits to.
+func TestConvertToStringNamesOnlyAUnitThatDescribesTheRateExactly(t *testing.T) {
+	tests := []struct {
+		name string
+		bps  uint64
+		want string
+	}{
+		{"a whole number of Gbps", 2000000000, "2 Gbps"},
+		{"a whole number of Mbps", 10000000, "10 Mbps"},
+		{"a whole number of Kbps", 20000, "20 Kbps"},
+		{"not a whole number of Kbps", 1500, "1500 bps"},
+		{"a whole number of Mbps but not of Gbps", 2147000000, "2147 Mbps"},
+		{"a whole number of no larger unit", 2147000001, "2147000001 bps"},
+		{"below a Kbps", 500, "500 bps"},
+		{"no rate", 0, "0 bps"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ConvertToString(tc.bps); got != tc.want {
+				t.Errorf("ConvertToString(%d) = %q, want %q", tc.bps, got, tc.want)
+			}
+		})
+	}
+}
+
+// A rule written before the ingest path started storing the unit holds bps rates under whatever
+// unit the operator posted. The GET has to say bps, or the operator reads a rate labelled a
+// thousand times its own value -- and posting that document back unchanged multiplies it again,
+// which is the way a slice's rates drift without anyone editing them.
+func TestGetNetworkSliceByNameLabelsStoredRatesAsBps(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+
+	// What a rule written before that contract looks like in the database: rates already in bps,
+	// beside the Mbps the operator posted them in.
+	stored := networkSlice(testSliceName)
+	stored.ApplicationFilteringRules = []configmodels.SliceApplicationFilteringRules{
+		filteringRuleWithRates(bitrateUnitMbps, 50000000, 60000000, 10000000, 20000000),
+	}
+	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{slices: []configmodels.Slice{stored}}
+
+	c.Params = append(c.Params, gin.Param{Key: sliceNameKey, Value: testSliceName})
+	GetNetworkSliceByName(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected StatusCode %d, got %d", http.StatusOK, w.Code)
+	}
+	var returned configmodels.Slice
+	if err := json.Unmarshal(w.Body.Bytes(), &returned); err != nil {
+		t.Fatalf("failed to unmarshal the returned slice: %v", err)
+	}
+	if len(returned.ApplicationFilteringRules) != 1 {
+		t.Fatalf("expected 1 filtering rule, got %d", len(returned.ApplicationFilteringRules))
+	}
+	rule := returned.ApplicationFilteringRules[0]
+	if rule.BitrateUnit != bitrateUnitBps {
+		t.Errorf("bitrate-unit = %q, want %q: the stored rates are bps", rule.BitrateUnit, bitrateUnitBps)
+	}
+	if rule.AppMbrUplink != 50000000 || rule.AppGbrUplink != 10000000 {
+		t.Errorf("the returned rates were altered: mbr-ul = %d, gbr-ul = %d", rule.AppMbrUplink, rule.AppGbrUplink)
+	}
+
+	// The property the label exists for, driven through the write path the operator's tool uses
+	// rather than through the normalizer alone: validation reads the unit before anything is
+	// converted, so a test that called normalize directly would keep passing if that order
+	// changed.
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+	postMock := &NetworkSliceMockDBClient{}
+	dbadapter.CommonDBClient = postMock
+
+	jsonBody, err := json.Marshal(returned)
+	if err != nil {
+		t.Fatalf("failed to marshal the returned slice: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	postRecorder := httptest.NewRecorder()
+	router.ServeHTTP(postRecorder, req)
+
+	if postRecorder.Code != http.StatusOK {
+		t.Fatalf("posting back what the GET returned was refused with %d: %s",
+			postRecorder.Code, postRecorder.Body.String())
+	}
+	if len(postMock.postData) == 0 {
+		t.Fatal("expected the slice to be stored")
+	}
+	var storedAgain configmodels.Slice
+	if err := json.Unmarshal(configmodels.MapToByte(postMock.postData[0][dataKey].(map[string]any)), &storedAgain); err != nil {
+		t.Fatalf("failed to unmarshal the stored slice: %v", err)
+	}
+	if !reflect.DeepEqual(storedAgain.ApplicationFilteringRules, returned.ApplicationFilteringRules) {
+		t.Errorf("posting back what a GET returned changed the rule: %+v was stored as %+v",
+			returned.ApplicationFilteringRules, storedAgain.ApplicationFilteringRules)
 	}
 }

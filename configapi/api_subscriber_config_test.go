@@ -190,6 +190,7 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 		if amDataData == nil {
 			logger.DbLog.Fatalln("failed to convert amDataData to BsonM")
 		}
+		amDataData[servingPlmnIdKey] = "12345"
 		return amDataData, nil
 
 	case amPolicyDataColl:
@@ -434,7 +435,7 @@ func TestGetSubscriberByID(t *testing.T) {
 						},
 					},
 				},
-				"plmnID": "",
+				"plmnID": "12345",
 				ueIdKey:  sampleImsi,
 			},
 			expectedCommonPostDataDetails: []map[string]any{

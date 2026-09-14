@@ -427,7 +427,15 @@ func GetSubscriberByID(c *gin.Context) {
 		}
 	}
 
+	var servingPlmnId string
+	if amDataDataInterface != nil {
+		if plmnId, plmnIdExists := amDataDataInterface[servingPlmnIdKey]; plmnIdExists {
+			servingPlmnId, _ = plmnId.(string)
+		}
+	}
+
 	subsData = configmodels.SubsData{
+		PlmnID:                            servingPlmnId,
 		UeId:                              ueId,
 		AuthenticationSubscription:        authSubsData,
 		AccessAndMobilitySubscriptionData: amDataData,

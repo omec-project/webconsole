@@ -51,3 +51,18 @@ func isValidBitrate(value int32, unit string) bool {
 	multiplier, _ := bitrateMultiplier(unit)
 	return int64(value)*multiplier <= math.MaxInt32
 }
+
+// A device group rate is normalised to bps and stored in a signed 64-bit field. A negative rate is
+// not a rate, and one above what the served string can express cannot be served as configured, so
+// the group is refused rather than accepted carrying a rate the operator never asked for.
+//
+// The bound is checked by dividing rather than multiplying because the product is what overflows:
+// the field is wide enough that a Gbps rate can wrap it, and a wrapped product lands back inside
+// any range a multiplication would be compared against.
+func isValidDeviceGroupBitrate(value int64, unit string) bool {
+	if value < 0 {
+		return false
+	}
+	multiplier, _ := bitrateMultiplier(unit)
+	return value <= maxDeviceGroupBitrateBps/multiplier
+}

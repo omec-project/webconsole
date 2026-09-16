@@ -99,6 +99,7 @@ func GetDeviceGroupByName(c *gin.Context) {
 	if deviceGroup.DeviceGroupName == "" {
 		c.JSON(http.StatusNotFound, nil)
 	} else {
+		labelStoredDeviceGroupRatesAsBps(&deviceGroup)
 		c.JSON(http.StatusOK, deviceGroup)
 	}
 }

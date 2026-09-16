@@ -723,6 +723,28 @@ func getDeletedDeviceGroupsList(slice, prevSlice configmodels.Slice) []string {
 	return deleted
 }
 
+// addBitrateBps sums two rates in bps without wrapping, and saturates at the largest rate
+// ConvertToString can express, since the aggregate is served the same way a single one is.
+//
+// The aggregate is the sum of every IP domain in a device group, so it can exceed the bound each
+// rate is validated against on its own. It could also reach it from below: a group written before
+// the rates were bounded holds the math.MaxInt64 the old ingest path clamped a negative rate to,
+// and two of those summed plainly give -2, which is served as a rate of 18446744073709551614 bps.
+// Each operand is brought into range before it is added, so the sum cannot wrap.
+func addBitrateBps(a, b int64) int64 {
+	return clampBitrateBps(clampBitrateBps(a) + clampBitrateBps(b))
+}
+
+func clampBitrateBps(val int64) int64 {
+	if val < 0 {
+		return 0
+	}
+	if val > maxDeviceGroupBitrateBps {
+		return maxDeviceGroupBitrateBps
+	}
+	return val
+}
+
 func aggregateQoS(qosList []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos) configmodels.DeviceGroupsIpDomainExpandedUeDnnQos {
 	var aggregated configmodels.DeviceGroupsIpDomainExpandedUeDnnQos
 
@@ -743,8 +765,8 @@ func aggregateQoS(qosList []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos) c
 	unitConsistent := true
 
 	for _, qos := range qosList {
-		aggregated.DnnMbrUplink += qos.DnnMbrUplink
-		aggregated.DnnMbrDownlink += qos.DnnMbrDownlink
+		aggregated.DnnMbrUplink = addBitrateBps(aggregated.DnnMbrUplink, qos.DnnMbrUplink)
+		aggregated.DnnMbrDownlink = addBitrateBps(aggregated.DnnMbrDownlink, qos.DnnMbrDownlink)
 
 		// Warn if units are inconsistent (ignoring empty units)
 		if qos.BitrateUnit != "" && firstNonEmptyUnit != "" && qos.BitrateUnit != firstNonEmptyUnit {

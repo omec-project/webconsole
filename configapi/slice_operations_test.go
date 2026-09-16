@@ -870,10 +870,14 @@ func TestGetNetworkSliceByNameLabelsStoredRatesAsBps(t *testing.T) {
 	defer func() { dbadapter.CommonDBClient = originalDBClient }()
 
 	// What a rule written before that contract looks like in the database: rates already in bps,
-	// beside the Mbps the operator posted them in.
+	// beside the unit the operator posted them in.
+	// A kbps rule, not an Mbps one: 2000000 re-multiplied is 2000000000, which still fits the
+	// stored field. The label is what stops it, and the assertion that catches the drift is the
+	// comparison at the end rather than the status code -- an Mbps rule this size is refused by
+	// the rate validation instead, which is a different failure and would hide this one.
 	stored := networkSlice(testSliceName)
 	stored.ApplicationFilteringRules = []configmodels.SliceApplicationFilteringRules{
-		filteringRuleWithRates(bitrateUnitMbps, 50000000, 60000000, 10000000, 20000000),
+		filteringRuleWithRates("kbps", 2000000, 1000000, 500000, 250000),
 	}
 	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{slices: []configmodels.Slice{stored}}
 
@@ -894,7 +898,7 @@ func TestGetNetworkSliceByNameLabelsStoredRatesAsBps(t *testing.T) {
 	if rule.BitrateUnit != bitrateUnitBps {
 		t.Errorf("bitrate-unit = %q, want %q: the stored rates are bps", rule.BitrateUnit, bitrateUnitBps)
 	}
-	if rule.AppMbrUplink != 50000000 || rule.AppGbrUplink != 10000000 {
+	if rule.AppMbrUplink != 2000000 || rule.AppGbrUplink != 500000 {
 		t.Errorf("the returned rates were altered: mbr-ul = %d, gbr-ul = %d", rule.AppMbrUplink, rule.AppGbrUplink)
 	}
 

@@ -827,24 +827,31 @@ func TestNormalizeRewritesTheUnitToTheStoredOne(t *testing.T) {
 }
 
 // ConvertToString renders the rate served to the PCF, so what it drops is what the network does
-// not deliver. Integer division chose the largest unit and truncated to it: 1500 bps was served
-// as "1 Kbps", a third of the rate gone, and 2147000000 bps as "2 Gbps" rather than the 2147 Mbps
-// that describes it exactly. A maximum rate served
-// low is a ceiling below the configured one; a guaranteed rate served low is a floor the network
-// never commits to.
-func TestConvertToStringNamesOnlyAUnitThatDescribesTheRateExactly(t *testing.T) {
+// not deliver. Integer division chose the largest unit and truncated to it: 2147000000 bps was
+// served as "2 Gbps", 147 Mbps below the rate configured, where "2147 Mbps" describes it exactly.
+//
+// The table has the shape it does because of what the next hop can read, not because of what is
+// true. omec-project/smf's GetBitRate has no case for bps and defaults to Mbps, so an exact
+// "1500 bps" would signal the UE 1500 Mbps; and it reads the numeral into a uint16, so an exact
+// "65536 Mbps" reaches the UE as 0 and a truthful "2147000 Kbps" as 49848. Both halves of that --
+// the unit and the size of the numeral -- are what the cases below pin.
+func TestConvertToStringNamesTheLargestUnitThatIsExactAndReadable(t *testing.T) {
 	tests := []struct {
 		name string
 		bps  uint64
 		want string
 	}{
 		{"a whole number of Gbps", 2000000000, "2 Gbps"},
+		{"a whole number of Mbps but not of Gbps", 2147000000, "2147 Mbps"},
 		{"a whole number of Mbps", 10000000, "10 Mbps"},
 		{"a whole number of Kbps", 20000, "20 Kbps"},
-		{"not a whole number of Kbps", 1500, "1500 bps"},
-		{"a whole number of Mbps but not of Gbps", 2147000000, "2147 Mbps"},
-		{"a whole number of no larger unit", 2147000001, "2147000001 bps"},
-		{"below a Kbps", 500, "500 bps"},
+		{"not a whole number of Kbps, truncated rather than served in bps", 1500, "1 Kbps"},
+		{"no unit is exact, so the smallest that fits the numeral", 2147000001, "2147 Mbps"},
+		{"the largest numeral a consumer can hold", 65535000000, "65535 Mbps"},
+		{"one Mbps past that numeral, so the unit above it", 65536000000, "65 Gbps"},
+		{"a whole number of Kbps whose numeral does not fit", 65536000, "65 Mbps"},
+		{"below a Kbps, which has no smaller unit to fall back to", 500, "500 bps"},
+		{"past what a Gbps numeral holds, which only a device-group rate reaches", 9223372036854775807, "9223372036854775807 bps"},
 		{"no rate", 0, "0 bps"},
 	}
 
@@ -868,10 +875,14 @@ func TestGetNetworkSliceByNameLabelsStoredRatesAsBps(t *testing.T) {
 	defer func() { dbadapter.CommonDBClient = originalDBClient }()
 
 	// What a rule written before that contract looks like in the database: rates already in bps,
-	// beside the Mbps the operator posted them in.
+	// beside the unit the operator posted them in.
+	// A kbps rule, not an Mbps one: 2000000 re-multiplied is 2000000000, which still fits the
+	// stored field. The label is what stops it, and the assertion that catches the drift is the
+	// comparison at the end rather than the status code -- an Mbps rule this size is refused by
+	// the rate validation instead, which is a different failure and would hide this one.
 	stored := networkSlice(testSliceName)
 	stored.ApplicationFilteringRules = []configmodels.SliceApplicationFilteringRules{
-		filteringRuleWithRates(bitrateUnitMbps, 50000000, 60000000, 10000000, 20000000),
+		filteringRuleWithRates("kbps", 2000000, 1000000, 500000, 250000),
 	}
 	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{slices: []configmodels.Slice{stored}}
 
@@ -892,7 +903,7 @@ func TestGetNetworkSliceByNameLabelsStoredRatesAsBps(t *testing.T) {
 	if rule.BitrateUnit != bitrateUnitBps {
 		t.Errorf("bitrate-unit = %q, want %q: the stored rates are bps", rule.BitrateUnit, bitrateUnitBps)
 	}
-	if rule.AppMbrUplink != 50000000 || rule.AppGbrUplink != 10000000 {
+	if rule.AppMbrUplink != 2000000 || rule.AppGbrUplink != 500000 {
 		t.Errorf("the returned rates were altered: mbr-ul = %d, gbr-ul = %d", rule.AppMbrUplink, rule.AppGbrUplink)
 	}
 

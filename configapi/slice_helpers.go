@@ -171,13 +171,16 @@ func normalizeApplicationFilteringRules(slice *configmodels.Slice) {
 
 // labelStoredRatesAsBps makes a stored rule's unit describe the rates stored beside it.
 //
-// The rates in a rule are normalised to bps when it is written -- since 90de249 in November 2021,
-// and by a fixed factor of a million before that -- so a stored value is bps whatever unit sits
-// beside it, and every consumer of the stored rule, the policy served to the PCF included, reads
-// it that way. Rules written before the unit was stored to match still carry the one the operator
-// posted, so a GET would return a bps value labelled Kbps. That is not just a misleading label:
-// posting the returned document back multiplies the rates again, a thousandfold for a rule
-// configured in Kbps, and the operator has changed nothing.
+// The rates in a rule are normalised to bps when it is written, so a stored value is bps whatever
+// unit sits beside it, and every consumer of the stored rule -- the policy served to the PCF
+// included -- reads it that way. That holds for every row that can exist: slices were kept in
+// memory until a21ec74 (October 2023) gave them a collection, and the ingest path has converted by
+// the unit since 90de249, two years earlier.
+//
+// Rules written before the unit was stored to match still carry the one the operator posted, so a
+// GET would return a bps value labelled Kbps. That is not just a misleading label: posting the
+// returned document back multiplies the rates again, a thousandfold for a rule configured in
+// Kbps, and the operator has changed nothing.
 //
 // Rewriting the label on the way out rather than the rows in place keeps the read path honest
 // without a migration, and a rule written since the ingest path started storing the unit is
@@ -593,20 +596,40 @@ func SnssaiModelsToHex(snssai models.Snssai) string {
 	return sst + snssai.GetSd()
 }
 
-// ConvertToString renders a rate held in bps as the largest unit that describes it exactly.
+// ConvertToString renders a rate held in bps for the policy served to the PCF.
 //
-// A rate that is not a whole number of the larger unit is rendered in bps rather than truncated to
-// it. The division here used to be integer division on the way out, so 1500 bps was served as
-// "1 Kbps" and 2147000000 bps as "2 Gbps" -- always downwards, and by as much as a whole unit.
-// For a maximum rate that quietly serves a lower ceiling than the operator configured; for a
-// guaranteed rate it is worse, because the network commits to a floor beneath the one asked for.
+// It names the largest unit that describes the rate exactly, and falls back to a truncated Kbps
+// where none does. The fallback is not what this would do if the choice were free: the exact
+// answer for 1500 bps is "1500 bps", and the 3GPP bit rate format allows it. It is what the
+// consumers can read.
+//
+// omec-project/smf turns these strings into the QoS flow description the UE is signalled, and
+// GetBitRate there switches on the unit with no case for bps -- the default arm is Mbps, so
+// "1500 bps" would tell the UE 1500 Mbps, a million times the rate configured.
+//
+// The same parser is why the fallback truncates to the largest unit at or below the rate rather
+// than always to kbps: it reads the numeral into a uint16, so a numeral of 65536 or more wraps
+// rather than clamps. "2147000 Kbps" -- a truthful rendering of 2147000001 bps -- is read as
+// 49848 Kbps, while "2147 Mbps" is read as it is written. The Session-AMBR converter in
+// omec-project/nas has the same uint16 limit on the numeral.
+//
+// A rate under a kbps has no smaller unit to fall back to and is still rendered in bps, as it
+// always was; that band predates this and is already served to those consumers today.
+//
+// What this does fix is the loss at the larger boundary, where the old integer division discarded
+// whole units: 2147000000 bps was served as "2 Gbps", 147 Mbps below the rate configured, where
+// "2147 Mbps" describes it exactly and every consumer reads it. For a maximum rate the old answer
+// is a ceiling under the one asked for; for a guaranteed rate it is a floor the network never
+// commits to.
 func ConvertToString(val uint64) string {
 	switch {
-	case val != 0 && val%1000000000 == 0:
+	case val >= 1000000000 && val%1000000000 == 0:
 		return strconv.FormatUint(val/1000000000, 10) + " Gbps"
-	case val != 0 && val%1000000 == 0:
+	case val >= 1000000 && val%1000000 == 0:
 		return strconv.FormatUint(val/1000000, 10) + " Mbps"
-	case val != 0 && val%1000 == 0:
+	case val >= 1000000:
+		return strconv.FormatUint(val/1000000, 10) + " Mbps"
+	case val >= 1000:
 		return strconv.FormatUint(val/1000, 10) + " Kbps"
 	default:
 		return strconv.FormatUint(val, 10) + " bps"

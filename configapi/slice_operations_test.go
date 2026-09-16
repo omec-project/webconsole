@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -827,24 +828,28 @@ func TestNormalizeRewritesTheUnitToTheStoredOne(t *testing.T) {
 }
 
 // ConvertToString renders the rate served to the PCF, so what it drops is what the network does
-// not deliver. Integer division chose the largest unit and truncated to it: 1500 bps was served
-// as "1 Kbps", a third of the rate gone, and 2147000000 bps as "2 Gbps" rather than the 2147 Mbps
-// that describes it exactly. A maximum rate served
-// low is a ceiling below the configured one; a guaranteed rate served low is a floor the network
-// never commits to.
-func TestConvertToStringNamesOnlyAUnitThatDescribesTheRateExactly(t *testing.T) {
+// not deliver. Integer division chose the largest unit and truncated to it: 2147000000 bps was
+// served as "2 Gbps", 147 Mbps below the rate configured, where "2147 Mbps" describes it exactly.
+//
+// The inexact cases stay in Kbps rather than becoming exact bps, because the consumers cannot read
+// bps: omec-project/smf's GetBitRate has no case for that unit and defaults to Mbps, so "1500 bps"
+// would signal the UE 1500 Mbps. That is the reason for the shape of this table -- the exactness
+// stops where the next hop stops.
+func TestConvertToStringNamesTheLargestUnitThatIsExactAndReadable(t *testing.T) {
 	tests := []struct {
 		name string
 		bps  uint64
 		want string
 	}{
 		{"a whole number of Gbps", 2000000000, "2 Gbps"},
+		{"a whole number of Mbps but not of Gbps", 2147000000, "2147 Mbps"},
 		{"a whole number of Mbps", 10000000, "10 Mbps"},
 		{"a whole number of Kbps", 20000, "20 Kbps"},
-		{"not a whole number of Kbps", 1500, "1500 bps"},
-		{"a whole number of Mbps but not of Gbps", 2147000000, "2147 Mbps"},
-		{"a whole number of no larger unit", 2147000001, "2147000001 bps"},
-		{"below a Kbps", 500, "500 bps"},
+		{"not a whole number of Kbps, truncated rather than served in bps", 1500, "1 Kbps"},
+		{"a whole number of no larger unit, truncated to the largest below it", 2147000001, "2147 Mbps"},
+		{"inexact just above a Mbps", 70536000, "70 Mbps"},
+		{"inexact below a Mbps", 70536, "70 Kbps"},
+		{"below a Kbps, which has no smaller unit to fall back to", 500, "500 bps"},
 		{"no rate", 0, "0 bps"},
 	}
 
@@ -932,5 +937,33 @@ func TestGetNetworkSliceByNameLabelsStoredRatesAsBps(t *testing.T) {
 	if !reflect.DeepEqual(storedAgain.ApplicationFilteringRules, returned.ApplicationFilteringRules) {
 		t.Errorf("posting back what a GET returned changed the rule: %+v was stored as %+v",
 			returned.ApplicationFilteringRules, storedAgain.ApplicationFilteringRules)
+	}
+}
+
+// The numeral matters as much as the unit. omec-project/smf reads it into a uint16, so a rendering
+// of 65536 or more wraps rather than clamps -- "2147000 Kbps" is read as 49848 Kbps. Every unit
+// this function can name has to keep the numeral inside that, which truncating to the largest unit
+// at or below the rate does and truncating always to kbps does not.
+func TestConvertToStringNeverEmitsANumeralTheConsumersCannotHold(t *testing.T) {
+	const uint16Max = 65535
+	rates := []uint64{
+		999, 1000, 1500, 65535000, 65536000, 70536000, 999999999,
+		1000000000, 2147000000, 2147000001, 4294967295,
+	}
+
+	for _, bps := range rates {
+		rendered := ConvertToString(bps)
+		fields := strings.Fields(rendered)
+		if len(fields) != 2 {
+			t.Fatalf("ConvertToString(%d) = %q, want a numeral and a unit", bps, rendered)
+		}
+		numeral, err := strconv.ParseUint(fields[0], 10, 64)
+		if err != nil {
+			t.Fatalf("ConvertToString(%d) = %q, whose numeral does not parse: %v", bps, rendered, err)
+		}
+		if fields[1] != "bps" && numeral > uint16Max {
+			t.Errorf("ConvertToString(%d) = %q: the numeral exceeds the uint16 the SMF reads it into",
+				bps, rendered)
+		}
 	}
 }

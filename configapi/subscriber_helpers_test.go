@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -375,5 +376,40 @@ func Test_handleSubscriberGet(t *testing.T) {
 	subscriberResult := subscriberAuthenticationDataGet(testSubscriberImsi)
 	if !reflect.DeepEqual(subscriber, subscriberResult) {
 		t.Errorf("expected subscriber %v, got %v", &subscriber, subscriberResult)
+	}
+}
+
+// This write path fetches a device group straight from storage rather than through
+// deviceGroupPostHelper, so it must relabel a rate unit left over from before that helper stored
+// it as bps -- otherwise it persists the stale unit rather than correcting it.
+func TestUpdateSubscriberInDeviceGroups_RelabelsStaleRateUnit(t *testing.T) {
+	origDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = origDBClient }()
+	group := deviceGroup(testGroupName)
+	mock := &DeviceGroupMockDBClient{configuredDeviceGroups: []configmodels.DeviceGroups{group}}
+	dbadapter.CommonDBClient = mock
+
+	statusCode, err := updateSubscriberInDeviceGroups(group.Imsis[0])
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if statusCode != http.StatusOK {
+		t.Fatalf("expected %d, got %d", http.StatusOK, statusCode)
+	}
+	if len(mock.postData) == 0 {
+		t.Fatal("expected the device group to be stored")
+	}
+	var stored configmodels.DeviceGroups
+	if err := json.Unmarshal(configmodels.MapToByte(mock.postData[0][dataKey].(map[string]any)), &stored); err != nil {
+		t.Fatalf("failed to unmarshal the stored device group: %v", err)
+	}
+	qos := stored.IpDomainsExpanded[0].UeDnnQos
+	if qos.BitrateUnit != bitrateUnitBps {
+		t.Errorf("stored bitrate-unit = %q, want %q", qos.BitrateUnit, bitrateUnitBps)
+	}
+	// The rates themselves are untouched: this path does not re-run convertToBps.
+	original := group.IpDomainsExpanded[0].UeDnnQos
+	if qos.DnnMbrUplink != original.DnnMbrUplink || qos.DnnMbrDownlink != original.DnnMbrDownlink {
+		t.Errorf("rates changed: got %d/%d, want %d/%d", qos.DnnMbrUplink, qos.DnnMbrDownlink, original.DnnMbrUplink, original.DnnMbrDownlink)
 	}
 }

@@ -732,10 +732,13 @@ func getDeletedDeviceGroupsList(slice, prevSlice configmodels.Slice) []string {
 // and two of those summed plainly give -2, which is served as a rate of 18446744073709551614 bps.
 // Each operand is brought into range before it is added, so the sum cannot wrap.
 func addBitrateBps(a, b int64) int64 {
-	return clampBitrateBps(clampBitrateBps(a) + clampBitrateBps(b))
+	return ClampDeviceGroupBitrateBps(ClampDeviceGroupBitrateBps(a) + ClampDeviceGroupBitrateBps(b))
 }
 
-func clampBitrateBps(val int64) int64 {
+// ClampDeviceGroupBitrateBps bounds a device group rate to what ConvertToString can render, so a
+// legacy value read straight from storage -- not yet corrected by validateUeDnnQosBitrates because
+// it predates that check -- cannot be served as an unreadable or wrapped rate.
+func ClampDeviceGroupBitrateBps(val int64) int64 {
 	if val < 0 {
 		return 0
 	}

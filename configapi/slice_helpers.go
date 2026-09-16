@@ -595,31 +595,59 @@ func SnssaiModelsToHex(snssai models.Snssai) string {
 
 // ConvertToString renders a rate held in bps for the policy served to the PCF.
 //
-// It names the largest unit that describes the rate exactly -- 2147000000 bps is "2147 Mbps" and
-// not the "2 Gbps" that integer division used to serve, 147 Mbps below the rate configured -- and
-// falls back to a truncated Kbps where no unit describes it exactly.
-//
-// That fallback is not what this would do if the choice were free: the exact answer for 1500 bps
-// is "1500 bps" and the 3GPP bit rate format allows it. It is what the consumers can read.
+// The unit has to be one the consumers can read and the numeral has to be one they can hold.
 // omec-project/smf turns these strings into the QoS flow description the UE is signalled, and
 // GetBitRate there switches on the unit with no case for bps -- the default arm is Mbps, so
-// "1500 bps" tells the UE 1500 Mbps, a million times the rate configured. The Session-AMBR
-// converter in omec-project/nas does know the unit, but maps it to "unit not used" and parses the
-// numeric as a uint16, so a bps rate of 65536 or more is encoded as zero.
+// "1500 bps" would tell the UE 1500 Mbps, a million times the rate configured. It then parses the
+// numeral into a uint16, which "65536 Mbps" reaches the UE as 0 and "2147000 Kbps" as 49848. The
+// Session-AMBR converter in omec-project/nas has the same uint16 limit on the numeral.
 //
-// A rate below a kbps has no smaller unit to fall back to and is still rendered in bps, as it
-// always was.
+// So the unit is the largest one that describes the rate exactly and whose numeral fits, and
+// failing that the smallest one whose numeral fits, which is the one that truncates least. An
+// exact unit is refused when its numeral does not fit: 65536000 bps is a whole number of kbps and
+// is still served as "65 Mbps".
+//
+// Two bands have no unit to fall back to and are rendered in bps as they always were: below a
+// kbps, and above what a Gbps numeral holds. Only the device-group rates reach the second, their
+// int64 field holding either the math.MaxInt64 the ingest path clamps a negative rate to or a
+// product of its own conversion that wrapped. Both are defects of their own.
+//
+// The exactness is what the old integer division lost -- 2147000000 bps was served as "2 Gbps",
+// 147 Mbps below the rate configured, where "2147 Mbps" describes it exactly. For a maximum rate
+// that is a ceiling under the one asked for; for a guaranteed rate it is a floor the network never
+// commits to.
 func ConvertToString(val uint64) string {
 	switch {
-	case val != 0 && val%1000000000 == 0:
-		return strconv.FormatUint(val/1000000000, 10) + " Gbps"
-	case val != 0 && val%1000000 == 0:
-		return strconv.FormatUint(val/1000000, 10) + " Mbps"
-	case val >= 1000:
-		return strconv.FormatUint(val/1000, 10) + " Kbps"
+	case isReadableAndExact(val, GBPS):
+		return strconv.FormatUint(val/GBPS, 10) + " Gbps"
+	case isReadableAndExact(val, MBPS):
+		return strconv.FormatUint(val/MBPS, 10) + " Mbps"
+	case isReadableAndExact(val, KBPS):
+		return strconv.FormatUint(val/KBPS, 10) + " Kbps"
+	case isReadable(val, KBPS):
+		return strconv.FormatUint(val/KBPS, 10) + " Kbps"
+	case isReadable(val, MBPS):
+		return strconv.FormatUint(val/MBPS, 10) + " Mbps"
+	case isReadable(val, GBPS):
+		return strconv.FormatUint(val/GBPS, 10) + " Gbps"
 	default:
 		return strconv.FormatUint(val, 10) + " bps"
 	}
+}
+
+// maxReadableBitRateNumeral is the largest numeral the consumers of these strings can hold: both
+// smf's GetBitRate and nas's Session-AMBR converter read it into a uint16.
+const maxReadableBitRateNumeral = 65535
+
+// isReadable reports whether val is at least one of the given unit and whose numeral in that unit
+// the consumers can hold.
+func isReadable(val, unit uint64) bool {
+	return val >= unit && val/unit <= maxReadableBitRateNumeral
+}
+
+// isReadableAndExact adds that the unit describes the rate with nothing left over.
+func isReadableAndExact(val, unit uint64) bool {
+	return isReadable(val, unit) && val%unit == 0
 }
 
 func getSlices() []*configmodels.Slice {

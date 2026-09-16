@@ -830,10 +830,11 @@ func TestNormalizeRewritesTheUnitToTheStoredOne(t *testing.T) {
 // not deliver. Integer division chose the largest unit and truncated to it: 2147000000 bps was
 // served as "2 Gbps", 147 Mbps below the rate configured, where "2147 Mbps" describes it exactly.
 //
-// The inexact cases stay in Kbps rather than becoming exact bps, because the consumers cannot read
-// bps: omec-project/smf's GetBitRate has no case for that unit and defaults to Mbps, so "1500 bps"
-// would signal the UE 1500 Mbps. That is the reason for the shape of this table -- the exactness
-// stops where the next hop stops.
+// The table has the shape it does because of what the next hop can read, not because of what is
+// true. omec-project/smf's GetBitRate has no case for bps and defaults to Mbps, so an exact
+// "1500 bps" would signal the UE 1500 Mbps; and it reads the numeral into a uint16, so an exact
+// "65536 Mbps" reaches the UE as 0 and a truthful "2147000 Kbps" as 49848. Both halves of that --
+// the unit and the size of the numeral -- are what the cases below pin.
 func TestConvertToStringNamesTheLargestUnitThatIsExactAndReadable(t *testing.T) {
 	tests := []struct {
 		name string
@@ -845,8 +846,12 @@ func TestConvertToStringNamesTheLargestUnitThatIsExactAndReadable(t *testing.T) 
 		{"a whole number of Mbps", 10000000, "10 Mbps"},
 		{"a whole number of Kbps", 20000, "20 Kbps"},
 		{"not a whole number of Kbps, truncated rather than served in bps", 1500, "1 Kbps"},
-		{"not a whole number of any larger unit", 2147000001, "2147000 Kbps"},
+		{"no unit is exact, so the smallest that fits the numeral", 2147000001, "2147 Mbps"},
+		{"the largest numeral a consumer can hold", 65535000000, "65535 Mbps"},
+		{"one Mbps past that numeral, so the unit above it", 65536000000, "65 Gbps"},
+		{"a whole number of Kbps whose numeral does not fit", 65536000, "65 Mbps"},
 		{"below a Kbps, which has no smaller unit to fall back to", 500, "500 bps"},
+		{"past what a Gbps numeral holds, which only a device-group rate reaches", 9223372036854775807, "9223372036854775807 bps"},
 		{"no rate", 0, "0 bps"},
 	}
 

@@ -552,9 +552,12 @@ func extractQosConfigFromIpDomain(ipDomain configmodels.DeviceGroupsIpDomainExpa
 		return nfConfigApi.ImsiQos{}, false
 	}
 
+	// This reads storage directly rather than through configapi's ingest path, so a rate left over
+	// from before that path validated it -- e.g. the math.MaxInt64 the old clamp wrote -- is bounded
+	// here rather than rendered as a string no consumer can parse.
 	qos := nfConfigApi.NewImsiQos(
-		configapi.ConvertToString(uint64(ipDomain.UeDnnQos.DnnMbrUplink)),
-		configapi.ConvertToString(uint64(ipDomain.UeDnnQos.DnnMbrDownlink)),
+		configapi.ConvertToString(uint64(configapi.ClampDeviceGroupBitrateBps(ipDomain.UeDnnQos.DnnMbrUplink))),
+		configapi.ConvertToString(uint64(configapi.ClampDeviceGroupBitrateBps(ipDomain.UeDnnQos.DnnMbrDownlink))),
 		ipDomain.UeDnnQos.TrafficClass.Qci,
 		ipDomain.UeDnnQos.TrafficClass.Arp,
 	)

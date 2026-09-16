@@ -182,6 +182,9 @@ func updateSubscriberInDeviceGroups(imsi string) (int, error) {
 			logger.DbLog.Errorf("error unmarshaling device group: %+v", err)
 			return http.StatusInternalServerError, err
 		}
+		// This write path bypasses deviceGroupPostHelper, so it must relabel the rate unit itself
+		// rather than persist whatever unit a group written before that helper did carry.
+		labelStoredDeviceGroupRatesAsBps(&deviceGroup)
 		filteredImsis := []string{}
 		for _, currImsi := range deviceGroup.Imsis {
 			if currImsi != imsi {

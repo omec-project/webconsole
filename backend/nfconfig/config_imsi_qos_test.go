@@ -4,6 +4,7 @@
 package nfconfig
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -43,6 +44,38 @@ func TestSyncImsiQos(t *testing.T) {
 					dnn:   dnnInternet,
 					qos: []nfConfigApi.ImsiQos{
 						*nfConfigApi.NewImsiQos("20 Mbps", "200 Mbps", 6, 9),
+					},
+				},
+			},
+		},
+		{
+			// This is read straight from storage, bypassing configapi's ingest validation, so a
+			// group written under the old clamp still holds math.MaxInt64 here.
+			name: "DeviceGroup with a legacy math.MaxInt64 rate is clamped rather than served unreadably",
+			deviceGroups: []deviceGroupParams{
+				{
+					name:       deviceGroupNameDG1,
+					dnn:        dnnInternet,
+					imsis:      []string{imsiTest},
+					dnsPrimary: dnsPrimaryTest,
+					ueIpPool:   ueIpPoolTest,
+					mtu:        1500,
+					qos: &configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+						DnnMbrUplink:   math.MaxInt64,
+						DnnMbrDownlink: math.MaxInt64,
+						TrafficClass: &configmodels.TrafficClassInfo{
+							Qci: 6,
+							Arp: 9,
+						},
+					},
+				},
+			},
+			expectedResponse: []imsiQosConfig{
+				{
+					imsis: []string{imsiTest},
+					dnn:   dnnInternet,
+					qos: []nfConfigApi.ImsiQos{
+						*nfConfigApi.NewImsiQos("65535 Gbps", "65535 Gbps", 6, 9),
 					},
 				},
 			},

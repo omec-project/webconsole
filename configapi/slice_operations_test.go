@@ -563,6 +563,46 @@ func TestAggregateQoS_MixedUnits(t *testing.T) {
 	}
 }
 
+// The aggregate is served the same way a single rate is, so it has the same ceiling, and it is the
+// one place a sum can exceed what each rate was validated against on its own. It can also be
+// reached from below: a group written before the rates were bounded holds the math.MaxInt64 the old
+// ingest path clamped a negative rate to, and adding two of those plainly gives -2, which
+// ConvertToString serves as "18446744073709551614 bps".
+func TestAggregateQoS_SaturatesInsteadOfWrapping(t *testing.T) {
+	testCases := []struct {
+		name     string
+		rates    []int64
+		expected int64
+	}{
+		{"two rates that each fit but do not together", []int64{40000 * GBPS, 40000 * GBPS}, maxDeviceGroupBitrateBps},
+		{"two device groups written before the rates were bounded", []int64{math.MaxInt64, math.MaxInt64}, maxDeviceGroupBitrateBps},
+		{"rates that fit are left alone", []int64{10 * GBPS, 20 * GBPS}, 30 * GBPS},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var qosList []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos
+			for _, rate := range tc.rates {
+				qosList = append(qosList, configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+					DnnMbrUplink:   rate,
+					DnnMbrDownlink: rate,
+					BitrateUnit:    bitrateUnitBps,
+				})
+			}
+			result := aggregateQoS(qosList)
+			if result.DnnMbrUplink != tc.expected || result.DnnMbrDownlink != tc.expected {
+				t.Errorf("aggregate = %d/%d, want %d", result.DnnMbrUplink, result.DnnMbrDownlink, tc.expected)
+			}
+			// The point of the bound is the string, so assert on that rather than only the number:
+			// a rate past it is rendered in bps, which nas's Session-AMBR converter reads as "unit
+			// not used" with a numeral that does not parse.
+			if served := ConvertToString(uint64(result.DnnMbrUplink)); strings.HasSuffix(served, " bps") {
+				t.Errorf("the aggregate is served as %q, which no consumer can read", served)
+			}
+		})
+	}
+}
+
 func TestAggregateQoS_EmptyList(t *testing.T) {
 	result := aggregateQoS(nil)
 	if result.DnnMbrUplink != 0 || result.DnnMbrDownlink != 0 || result.BitrateUnit != "" || result.TrafficClass != nil {

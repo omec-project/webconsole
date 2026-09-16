@@ -131,3 +131,28 @@ func TestValidateBitrate(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateDeviceGroupBitrate(t *testing.T) {
+	testCases := []struct {
+		name     string
+		value    int64
+		unit     string
+		expected bool
+	}{
+		{"a rate left unset", 0, bitrateUnitMbps, true},
+		{"an ordinary rate", 100, bitrateUnitMbps, true},
+		{"the largest rate that can be served", 65535, bitrateUnitGbps, true},
+		{"one unit past it", 65536, bitrateUnitGbps, false},
+		{"negative, which the old ingest path turned into the largest rate there is", -1, bitrateUnitMbps, false},
+		// 10^10 Gbps is 10^19 bps, past what int64 holds: multiplying wraps it to a negative
+		// number, so a bound compared against the product would accept it.
+		{"a product that wraps the field", 10000000000, bitrateUnitGbps, false},
+		{"unset unit is read as bps", 65535000000000, "", true},
+	}
+
+	for _, tc := range testCases {
+		if r := isValidDeviceGroupBitrate(tc.value, tc.unit); r != tc.expected {
+			t.Errorf("%s: isValidDeviceGroupBitrate(%d, %q) = %v, want %v", tc.name, tc.value, tc.unit, r, tc.expected)
+		}
+	}
+}

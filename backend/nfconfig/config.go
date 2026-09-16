@@ -553,8 +553,8 @@ func extractQosConfigFromIpDomain(ipDomain configmodels.DeviceGroupsIpDomainExpa
 	}
 
 	qos := nfConfigApi.NewImsiQos(
-		configapi.ConvertToString(uint64(ipDomain.UeDnnQos.DnnMbrUplink)),
-		configapi.ConvertToString(uint64(ipDomain.UeDnnQos.DnnMbrDownlink)),
+		configapi.DeviceGroupBitrateToString(ipDomain.UeDnnQos.DnnMbrUplink),
+		configapi.DeviceGroupBitrateToString(ipDomain.UeDnnQos.DnnMbrDownlink),
 		ipDomain.UeDnnQos.TrafficClass.Qci,
 		ipDomain.UeDnnQos.TrafficClass.Arp,
 	)

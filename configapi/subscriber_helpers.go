@@ -189,6 +189,11 @@ func updateSubscriberInDeviceGroups(imsi string) (int, error) {
 			}
 		}
 		deviceGroup.Imsis = filteredImsis
+		// Deliberately not routed through deviceGroupPostHelper, so the rates are neither converted
+		// nor validated here. This writes back the rates it just read, which is what makes it safe:
+		// converting them a second time would multiply them, and refusing them would make removing
+		// a subscriber fail on a group whose rates were written before they were bounded -- an
+		// operation the operator did not ask about, blocked by a value they cannot reach from here.
 		prevDevGroup := getDeviceGroupByName(deviceGroup.DeviceGroupName)
 		if statusCode, err := handleDeviceGroupPost(&deviceGroup, prevDevGroup); err != nil {
 			logger.ConfigLog.Errorf("error posting device group %+v: %+v", deviceGroup, err)

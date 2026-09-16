@@ -447,7 +447,7 @@ func updateAmProvisionedData(gpsi string, snssai *models.Snssai, aggregatedQoS c
 			DefaultSingleNssais: []models.Snssai{*snssai},
 			SingleNssais:        []models.Snssai{*snssai},
 		}),
-		SubscribedUeAmbr: models.NewAmbr(ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)), ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink))),
+		SubscribedUeAmbr: models.NewAmbr(DeviceGroupBitrateToString(aggregatedQoS.DnnMbrUplink), DeviceGroupBitrateToString(aggregatedQoS.DnnMbrDownlink)),
 	}
 	amDataBsonA := configmodels.ToBsonM(amData)
 	amDataBsonA[ueIdKey] = "imsi-" + imsi
@@ -733,6 +733,28 @@ func getDeletedDeviceGroupsList(slice, prevSlice configmodels.Slice) []string {
 // Each operand is brought into range before it is added, so the sum cannot wrap.
 func addBitrateBps(a, b int64) int64 {
 	return clampBitrateBps(clampBitrateBps(a) + clampBitrateBps(b))
+}
+
+// DeviceGroupBitrateToString renders a stored device group rate, bringing it into range first.
+//
+// A device group rate is int64 and reaches ConvertToString, which takes a uint64: a value outside
+// the range that can be served is not merely rendered badly but cast into a different number
+// altogether. The ingest path refuses such a rate now, but a group written before it did still
+// holds one -- the math.MaxInt64 the old clamp produced from a negative rate -- and that is served
+// as "9223372036854775807 bps", which smf's GetBitRate reads as a Mbps rate through an
+// implementation-defined uint16 conversion and nas's Session-AMBR converter fails to parse at all.
+//
+// Clamping here is the same answer aggregateQoS gives for the same value, and for the same reason:
+// the sum of a group's IP domains and one domain's own rate are served through the identical
+// string, so a bound applied to one and not the other would be an inconsistency rather than a
+// choice. The warning is what keeps it from being silent -- the stored row is still wrong, and
+// this only stops it becoming unreadable downstream.
+func DeviceGroupBitrateToString(val int64) string {
+	if clamped := clampBitrateBps(val); clamped != val {
+		logger.ConfigLog.Warnf("device group rate %d bps cannot be served as configured, serving %d bps", val, clamped)
+		val = clamped
+	}
+	return ConvertToString(uint64(val))
 }
 
 func clampBitrateBps(val int64) int64 {

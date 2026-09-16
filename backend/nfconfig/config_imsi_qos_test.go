@@ -4,6 +4,7 @@
 package nfconfig
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -117,5 +118,42 @@ func TestSyncImsiQos(t *testing.T) {
 				t.Errorf("expected %+v, got %+v", tt.expectedResponse, cfg.imsiQos)
 			}
 		})
+	}
+}
+
+// A device group written before its rates were bounded holds the math.MaxInt64 that the old ingest
+// path produced from a negative rate. Nothing relabels or repairs the stored row on this path --
+// the loader unmarshals it straight from the database and never reads its unit -- so the rate has
+// to be brought into range where it is rendered, or it is served as "9223372036854775807 bps": a
+// numeral nas's Session-AMBR converter cannot parse and smf's GetBitRate reads as Mbps through an
+// implementation-defined uint16 conversion.
+func TestSyncImsiQosBoundsARateWrittenBeforeTheyWereBounded(t *testing.T) {
+	name, group := makeDeviceGroup(deviceGroupParams{
+		name:       deviceGroupNameDG1,
+		dnn:        dnnInternet,
+		imsis:      []string{imsiTest},
+		dnsPrimary: dnsPrimaryTest,
+		ueIpPool:   ueIpPoolTest,
+		mtu:        1500,
+		qos: &configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+			DnnMbrUplink:   math.MaxInt64,
+			DnnMbrDownlink: 20000000,
+			TrafficClass:   &configmodels.TrafficClassInfo{Qci: 6, Arp: 9},
+		},
+	})
+
+	cfg := inMemoryConfig{}
+	cfg.syncImsiQos(map[string]configmodels.DeviceGroups{name: group})
+
+	if len(cfg.imsiQos) != 1 || len(cfg.imsiQos[0].qos) != 1 {
+		t.Fatalf("expected one IMSI QoS entry, got %+v", cfg.imsiQos)
+	}
+	served := cfg.imsiQos[0].qos[0]
+	if served.GetMbrUplink() != "65535 Gbps" {
+		t.Errorf("mbrUplink = %q, want %q", served.GetMbrUplink(), "65535 Gbps")
+	}
+	// The rate that was always in range is untouched, so the bound is not a blanket rewrite.
+	if served.GetMbrDownlink() != "20 Mbps" {
+		t.Errorf("mbrDownlink = %q, want %q", served.GetMbrDownlink(), "20 Mbps")
 	}
 }

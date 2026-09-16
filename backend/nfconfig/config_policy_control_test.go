@@ -24,12 +24,12 @@ const (
 	testDeviceGroupNameDG2       = "dg2"
 	testDnnName                  = "testDnn"
 	// The rates these describe -- 12345, 67890, 45600 and 12300 bps -- are not whole numbers of
-	// Kbps, so they are served in bps. Each used to be truncated to the Kbps below it, losing
-	// between 300 and 890 bps of the rate the operator configured.
-	testMaxBrUl1 = "12345 bps"
-	testMaxBrDl1 = "67890 bps"
-	testMaxBrUl2 = "45600 bps"
-	testMaxBrDl2 = "12300 bps"
+	// Kbps, so they are truncated to the Kbps below. Serving the exact bps instead would be read
+	// as Mbps by the SMF, which is why the truncation stays where no larger unit is exact.
+	testMaxBrUl1 = "12 Kbps"
+	testMaxBrDl1 = "67 Kbps"
+	testMaxBrUl2 = "45 Kbps"
+	testMaxBrDl2 = "12 Kbps"
 )
 
 func makePolicyControlNetworkSlice(mcc, mnc, sst, sd string, dgs []string, filteringRules []configmodels.SliceApplicationFilteringRules) configmodels.Slice {
@@ -293,8 +293,8 @@ func ruleWithGuaranteedRates(gbrUl, gbrDl int32) configmodels.SliceApplicationFi
 	return rule
 }
 
-// Rates reach buildPccQos already normalised to bps, and ConvertToString names the unit that
-// describes the rate exactly — so 10 here really is 10 bps.
+// Rates reach buildPccQos already normalised to bps, and ConvertToString renders them from there —
+// so 10 here really is 10 bps, which is below a Kbps and is rendered as such.
 func TestBuildPccQosCarriesGuaranteedBitRate(t *testing.T) {
 	qos := buildPccQos(ruleWithGuaranteedRates(10, 20))
 

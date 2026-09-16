@@ -593,20 +593,29 @@ func SnssaiModelsToHex(snssai models.Snssai) string {
 	return sst + snssai.GetSd()
 }
 
-// ConvertToString renders a rate held in bps as the largest unit that describes it exactly.
+// ConvertToString renders a rate held in bps for the policy served to the PCF.
 //
-// A rate that is not a whole number of the larger unit is rendered in bps rather than truncated to
-// it. The division here used to be integer division on the way out, so 1500 bps was served as
-// "1 Kbps" and 2147000000 bps as "2 Gbps" -- always downwards, and by as much as a whole unit.
-// For a maximum rate that quietly serves a lower ceiling than the operator configured; for a
-// guaranteed rate it is worse, because the network commits to a floor beneath the one asked for.
+// It names the largest unit that describes the rate exactly -- 2147000000 bps is "2147 Mbps" and
+// not the "2 Gbps" that integer division used to serve, 147 Mbps below the rate configured -- and
+// falls back to a truncated Kbps where no unit describes it exactly.
+//
+// That fallback is not what this would do if the choice were free: the exact answer for 1500 bps
+// is "1500 bps" and the 3GPP bit rate format allows it. It is what the consumers can read.
+// omec-project/smf turns these strings into the QoS flow description the UE is signalled, and
+// GetBitRate there switches on the unit with no case for bps -- the default arm is Mbps, so
+// "1500 bps" tells the UE 1500 Mbps, a million times the rate configured. The Session-AMBR
+// converter in omec-project/nas does know the unit, but maps it to "unit not used" and parses the
+// numeric as a uint16, so a bps rate of 65536 or more is encoded as zero.
+//
+// A rate below a kbps has no smaller unit to fall back to and is still rendered in bps, as it
+// always was.
 func ConvertToString(val uint64) string {
 	switch {
 	case val != 0 && val%1000000000 == 0:
 		return strconv.FormatUint(val/1000000000, 10) + " Gbps"
 	case val != 0 && val%1000000 == 0:
 		return strconv.FormatUint(val/1000000, 10) + " Mbps"
-	case val != 0 && val%1000 == 0:
+	case val >= 1000:
 		return strconv.FormatUint(val/1000, 10) + " Kbps"
 	default:
 		return strconv.FormatUint(val, 10) + " bps"

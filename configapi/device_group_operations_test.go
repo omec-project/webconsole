@@ -580,10 +580,10 @@ func TestDeviceGroupPostHandler_RejectsImsiNotMatchingAssociatedSlicePlmn(t *tes
 	}
 }
 
-// A device group is not guaranteed to be attached to only one slice: syncDeviceGroupSubscriber
-// must provision the subscriber under every associated slice's S-NSSAI, not just whichever one
-// happens to be resolved first.
-func TestDeviceGroupPostHandler_SyncsSubscriberAcrossAllAssociatedSlices(t *testing.T) {
+// A device group can be associated with more than one slice, so a concurrent IMSI must be
+// rejected if it mismatches *any* associated slice's PLMN, not just whichever slice
+// findSlicesByDeviceGroup happens to return first.
+func TestDeviceGroupPostHandler_SyncRejectsImsiMismatchingAnyAssociatedSlice(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	AddConfigV1Service(router)
@@ -595,16 +595,14 @@ func TestDeviceGroupPostHandler_SyncsSubscriberAcrossAllAssociatedSlices(t *test
 	sliceB := networkSlice("sliceB")
 	sliceB.SiteDeviceGroup = []string{testGroupName}
 	sliceB.SliceId = configmodels.SliceSliceId{Sst: "2", Sd: "010203"}
+	sliceB.SiteInfo.Plmn = configmodels.SliceSiteInfoPlmn{Mcc: "111", Mnc: "22"}
 
 	originalDBClient := dbadapter.CommonDBClient
 	defer func() { dbadapter.CommonDBClient = originalDBClient }()
 	mock := &DeviceGroupSliceAwareMockDBClient{slices: []configmodels.Slice{sliceA, sliceB}}
 	dbadapter.CommonDBClient = mock
 
-	originalAuthDBClient := dbadapter.AuthDBClient
-	defer func() { dbadapter.AuthDBClient = originalAuthDBClient }()
-	dbadapter.AuthDBClient = &AuthDBMockDBClient{subscribers: []string{"208930000000001"}}
-
+	// Matches sliceA's PLMN (208/93) but not sliceB's (111/22).
 	newDeviceGroup := deviceGroup(testGroupName)
 	newDeviceGroup.Imsis = []string{"208930000000001"}
 	jsonBody, err := json.Marshal(newDeviceGroup)
@@ -620,18 +618,11 @@ func TestDeviceGroupPostHandler_SyncsSubscriberAcrossAllAssociatedSlices(t *test
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected `%d`, got `%d`: %s", http.StatusOK, w.Code, w.Body.String())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected `%d`, got `%d`: %s", http.StatusBadRequest, w.Code, w.Body.String())
 	}
-
-	var smfSelectionWrites int
-	for _, p := range mock.postData {
-		if p[collKey] == smfSelDataColl {
-			smfSelectionWrites++
-		}
-	}
-	if smfSelectionWrites != 2 {
-		t.Errorf("expected the subscriber to be provisioned under both associated slices (2 smf selection writes), got %d", smfSelectionWrites)
+	if !strings.Contains(w.Body.String(), "208930000000001") {
+		t.Errorf("expected error to mention the mismatched IMSI, got `%s`", w.Body.String())
 	}
 }
 

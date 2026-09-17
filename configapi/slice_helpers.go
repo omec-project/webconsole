@@ -350,9 +350,9 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 			logger.ConfigLog.Warnln("IPDomainExpanded is nil or empty for dgName:", dgName)
 			continue
 		}
-		_, err = processDeviceGroup(devGroupConfig, snssai, mcc, mnc)
+		statusCode, err := processDeviceGroup(devGroupConfig, snssai, mcc, mnc)
 		if err != nil {
-			return http.StatusInternalServerError, err
+			return statusCode, err
 		}
 	}
 	if err := cleanupDeviceGroups(slice, prevSlice); err != nil {

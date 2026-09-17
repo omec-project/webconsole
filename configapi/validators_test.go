@@ -110,6 +110,30 @@ func genLongString(length int) string {
 	return strings.Repeat("a", length)
 }
 
+// A PLMN with only one of MCC/MNC set is not a usable prefix: it is neither a genuinely
+// unassigned PLMN (both empty) nor a complete one, so an IMSI must not be accepted against it.
+func TestValidImsiForPlmn(t *testing.T) {
+	testCases := []struct {
+		name     string
+		imsi     string
+		mcc      string
+		mnc      string
+		expected bool
+	}{
+		{"matching PLMN prefix", "208930000000001", "208", "93", true},
+		{"mismatching PLMN prefix", "111220000000001", "208", "93", false},
+		{"both empty is unassigned and always accepted", "208930000000001", "", "", true},
+		{"mcc set, mnc empty is rejected", "208930000000001", "208", "", false},
+		{"mcc empty, mnc set is rejected", "208930000000001", "", "93", false},
+	}
+
+	for _, tc := range testCases {
+		if r := isValidImsiForPlmn(tc.imsi, tc.mcc, tc.mnc); r != tc.expected {
+			t.Errorf("%s: isValidImsiForPlmn(%q, %q, %q) = %v, want %v", tc.name, tc.imsi, tc.mcc, tc.mnc, r, tc.expected)
+		}
+	}
+}
+
 func TestValidateBitrate(t *testing.T) {
 	testCases := []struct {
 		name     string

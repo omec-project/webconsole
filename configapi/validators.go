@@ -46,10 +46,14 @@ func isValidGnbTac(tac int32) bool {
 // The first digits of an IMSI are its home PLMN (MCC+MNC), so a subscriber whose IMSI does not
 // start with a slice's PLMN does not belong to that network and its records would be filed under
 // the wrong serving PLMN — an empty PLMN means the slice hasn't been assigned one yet and is not
-// something this check can validate against.
+// something this check can validate against. A PLMN with only one of MCC/MNC set is neither
+// unassigned nor complete, so it is rejected rather than treated as a usable prefix.
 func isValidImsiForPlmn(imsi, mcc, mnc string) bool {
 	if mcc == "" && mnc == "" {
 		return true
+	}
+	if mcc == "" || mnc == "" {
+		return false
 	}
 	return strings.HasPrefix(imsi, mcc+mnc)
 }

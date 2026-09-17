@@ -54,6 +54,19 @@ func networkSlicePostHelper(c *gin.Context, sliceName string) (int, error) {
 			return statusCode, err
 		}
 	} else {
+		// getSliceByName returns a zero-value slice, not nil, when no document matches, so an
+		// empty SliceName is how a not-found lookup is distinguished from a genuine previous slice.
+		// A zero-value previous PLMN means none was assigned yet, so assigning one now is not a
+		// change to reject -- only a real PLMN being replaced by a different one is.
+		zeroPlmn := configmodels.SliceSiteInfoPlmn{}
+		if prevSlice.SliceName != "" && prevSlice.SiteInfo.Plmn != zeroPlmn && requestSlice.SiteInfo.Plmn != prevSlice.SiteInfo.Plmn {
+			// The PLMN identifies the subscribers' serving network in every DB record keyed by
+			// (imsi, PLMN). Changing it here would leave the old records in place and write new
+			// ones under the new PLMN, duplicating every subscriber in the slice's device groups.
+			err := fmt.Errorf("changing the PLMN (MCC/MNC) of an existing network slice %s is not allowed; delete and recreate the slice instead", sliceName)
+			logger.ConfigLog.Errorln(err.Error())
+			return http.StatusBadRequest, err
+		}
 		if statusCode, err := updateNS(requestSlice, *prevSlice); err != nil {
 			logger.ConfigLog.Errorf("Error updating slice %s: %+v", sliceName, err)
 			return statusCode, err
@@ -96,7 +109,29 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 	slices.Sort(request.SiteDeviceGroup)
 	request.SiteDeviceGroup = slices.Compact(request.SiteDeviceGroup)
 
+	if err := validateDeviceGroupsBelongToPlmn(request, sliceName); err != nil {
+		return request, err
+	}
+
 	return request, nil
+}
+
+// A slice's device groups must not carry subscribers from a different home network, since their
+// records would then be filed under a serving PLMN they do not belong to.
+func validateDeviceGroupsBelongToPlmn(request configmodels.Slice, sliceName string) error {
+	mcc, mnc := request.SiteInfo.Plmn.Mcc, request.SiteInfo.Plmn.Mnc
+	for _, dgName := range request.SiteDeviceGroup {
+		devGroup := getDeviceGroupByName(dgName)
+		if devGroup == nil {
+			continue
+		}
+		for _, imsi := range devGroup.Imsis {
+			if !isValidImsiForPlmn(imsi, mcc, mnc) {
+				return fmt.Errorf("IMSI %s in device group %s does not belong to PLMN mcc=%s, mnc=%s of Network Slice %s", imsi, dgName, mcc, mnc, sliceName)
+			}
+		}
+	}
+	return nil
 }
 
 // A rate that isValidBitrate rejects is one that cannot be served as configured, so the slice is

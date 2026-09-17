@@ -113,14 +113,29 @@ func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, groupNa
 
 	prevDevGroup := getDeviceGroupByName(groupName)
 	requestDeviceGroup.DeviceGroupName = groupName
+
+	// A device group already tied to a slice inherits that slice's PLMN, so a subscriber whose
+	// IMSI belongs to a different home network must not be added to it here either.
+	slice := findSliceByDeviceGroup(groupName)
+	if slice != nil {
+		mcc, mnc := slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc
+		for _, imsi := range requestDeviceGroup.Imsis {
+			if !isValidImsiForPlmn(imsi, mcc, mnc) {
+				return http.StatusBadRequest, fmt.Errorf("IMSI %s does not belong to PLMN mcc=%s, mnc=%s of Network Slice %s associated with device group %s", imsi, mcc, mnc, slice.SliceName, groupName)
+			}
+		}
+	}
+
+	// slice was already looked up above to validate PLMN, so it is passed along here instead of
+	// having handleDeviceGroupPost's sync step re-scan the whole slice collection for it.
 	if prevDevGroup == nil {
 		logger.ConfigLog.Infof("creating new device group %s", groupName)
-		statusCode, err := createDG(&requestDeviceGroup)
+		statusCode, err := createDG(&requestDeviceGroup, slice)
 		if err != nil {
 			return statusCode, err
 		}
 	} else {
-		statusCode, err := updateDG(&requestDeviceGroup, prevDevGroup)
+		statusCode, err := updateDG(&requestDeviceGroup, prevDevGroup, slice)
 		if err != nil {
 			return statusCode, err
 		}
@@ -129,16 +144,16 @@ func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, groupNa
 	return http.StatusOK, nil
 }
 
-func createDG(devGroup *configmodels.DeviceGroups) (int, error) {
-	if statusCode, err := handleDeviceGroupPost(devGroup, nil); err != nil {
+func createDG(devGroup *configmodels.DeviceGroups, slice *configmodels.Slice) (int, error) {
+	if statusCode, err := handleDeviceGroupPostWithSlice(devGroup, nil, slice); err != nil {
 		logger.ConfigLog.Errorf("error creating device group %+v: %+v", devGroup, err)
 		return statusCode, err
 	}
 	return http.StatusOK, nil
 }
 
-func updateDG(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
-	if statusCode, err := handleDeviceGroupPost(devGroup, prevDevGroup); err != nil {
+func updateDG(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups, slice *configmodels.Slice) (int, error) {
+	if statusCode, err := handleDeviceGroupPostWithSlice(devGroup, prevDevGroup, slice); err != nil {
 		logger.ConfigLog.Errorf("error updating device group %+v: %+v", devGroup, err)
 		return statusCode, err
 	}
@@ -190,7 +205,14 @@ func bitrateMultiplier(unit string) (int64, bool) {
 	return 1, false
 }
 
+// handleDeviceGroupPost looks up the associated slice itself; callers that already have it
+// (e.g. deviceGroupPostHelper, which needs it for PLMN validation first) should call
+// handleDeviceGroupPostWithSlice instead to avoid scanning the slice collection twice.
 func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
+	return handleDeviceGroupPostWithSlice(devGroup, prevDevGroup, findSliceByDeviceGroup(devGroup.DeviceGroupName))
+}
+
+func handleDeviceGroupPostWithSlice(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups, slice *configmodels.Slice) (int, error) {
 	filter := bson.M{groupNameKey: devGroup.DeviceGroupName}
 	devGroupDataBsonA := configmodels.ToBsonM(devGroup)
 	result, err := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
@@ -201,7 +223,7 @@ func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *co
 	logger.DbLog.Infof("DB operation result for device group %s: %v",
 		devGroup.DeviceGroupName, result)
 
-	statusCode, err := syncDeviceGroupSubscriber(devGroup, prevDevGroup)
+	statusCode, err := syncDeviceGroupSubscriber(devGroup, prevDevGroup, slice)
 	if err != nil {
 		logger.WebUILog.Errorln(err.Error())
 		return statusCode, err
@@ -210,10 +232,9 @@ func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *co
 	return http.StatusOK, nil
 }
 
-func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
+func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups, slice *configmodels.Slice) (int, error) {
 	rwLock.Lock()
 	defer rwLock.Unlock()
-	slice := findSliceByDeviceGroup(devGroup.DeviceGroupName)
 	if slice == nil {
 		logger.WebUILog.Infof("Device group %s not associated with any slice — skipping sync", devGroup.DeviceGroupName)
 		return http.StatusOK, nil

@@ -7,6 +7,7 @@ import (
 	"math"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -40,6 +41,17 @@ func isValidUpfPort(port string) bool {
 
 func isValidGnbTac(tac int32) bool {
 	return tac >= 1 && tac <= 16777215
+}
+
+// The first digits of an IMSI are its home PLMN (MCC+MNC), so a subscriber whose IMSI does not
+// start with a slice's PLMN does not belong to that network and its records would be filed under
+// the wrong serving PLMN — an empty PLMN means the slice hasn't been assigned one yet and is not
+// something this check can validate against.
+func isValidImsiForPlmn(imsi, mcc, mnc string) bool {
+	if mcc == "" && mnc == "" {
+		return true
+	}
+	return strings.HasPrefix(imsi, mcc+mnc)
 }
 
 // A rate is normalised to bps and stored in a signed 32-bit field, so a negative rate is not a

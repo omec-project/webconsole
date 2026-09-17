@@ -461,6 +461,115 @@ func TestNetworkSlicePostHandler_NetworkSliceNameValidation(t *testing.T) {
 	}
 }
 
+// SlicePlmnValidationMockDBClient answers slice and device group lookups by collection, unlike
+// NetworkSliceMockDBClient which always returns the same stored slice regardless of collection.
+type SlicePlmnValidationMockDBClient struct {
+	dbadapter.DBInterface
+	deviceGroups map[string]configmodels.DeviceGroups
+	postData     []map[string]any
+}
+
+func (db *SlicePlmnValidationMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	if coll != devGroupDataColl {
+		return nil, nil
+	}
+	name, _ := filter[groupNameKey].(string)
+	dg, ok := db.deviceGroups[name]
+	if !ok {
+		return nil, nil
+	}
+	return configmodels.ToBsonM(dg), nil
+}
+
+func (db *SlicePlmnValidationMockDBClient) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
+	db.postData = append(db.postData, map[string]any{collKey: collName, filterKey: filter, dataKey: postData})
+	return true, nil
+}
+
+// Subscriber DB records are keyed by (imsi, PLMN). Accepting a PLMN change on an existing slice
+// would leave the old records in place and post new ones under the new PLMN, duplicating every
+// subscriber in the slice's device groups instead of moving them
+func TestNetworkSlicePostHandler_RejectsPlmnChangeOnExistingSlice(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	existing := networkSlice(testSliceName)
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	mock := &NetworkSliceMockDBClient{slices: []configmodels.Slice{existing}}
+	dbadapter.CommonDBClient = mock
+
+	updated := networkSlice(testSliceName)
+	updated.SiteInfo.Plmn.Mcc = "123"
+	updated.SiteInfo.Plmn.Mnc = "45"
+	jsonBody, err := json.Marshal(updated)
+	if err != nil {
+		t.Fatalf("failed to marshal network slice: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected `%d`, got `%d`: %s", http.StatusBadRequest, w.Code, w.Body.String())
+	}
+	if len(mock.postData) != 0 {
+		t.Errorf("expected the PLMN change to be rejected before any write, got %d posted documents", len(mock.postData))
+	}
+}
+
+// The first digits of an IMSI are its home PLMN, so a device group carrying a subscriber from a
+// different PLMN must not be attached to a slice - it would file that subscriber's records under
+// a serving PLMN it does not belong to.
+func TestNetworkSlicePostHandler_RejectsDeviceGroupImsiNotMatchingPlmn(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	mock := &SlicePlmnValidationMockDBClient{
+		deviceGroups: map[string]configmodels.DeviceGroups{
+			testGroupName: {
+				DeviceGroupName: testGroupName,
+				Imsis:           []string{"999990000000001"},
+			},
+		},
+	}
+	dbadapter.CommonDBClient = mock
+
+	slice := networkSlice(testSliceName)
+	slice.SiteDeviceGroup = []string{testGroupName}
+	jsonBody, err := json.Marshal(slice)
+	if err != nil {
+		t.Fatalf("failed to marshal network slice: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected `%d`, got `%d`: %s", http.StatusBadRequest, w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "999990000000001") {
+		t.Errorf("expected error to mention the mismatched IMSI, got `%s`", w.Body.String())
+	}
+	if len(mock.postData) != 0 {
+		t.Errorf("expected the mismatch to be rejected before any write, got %d posted documents", len(mock.postData))
+	}
+}
+
 func TestNetworkSlicePostHandler_NetworkSliceGnbTacValidation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()

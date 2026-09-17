@@ -33,7 +33,10 @@ func (db *DeviceGroupMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) 
 	if db.err != nil {
 		return nil, db.err
 	}
-	if len(db.configuredDeviceGroups) == 0 {
+	// Other collections (e.g. sliceDataColl, looked up when syncing a device group's associated
+	// slice) must not be answered with device group documents, which cannot unmarshal as anything
+	// else and would otherwise mask that path failing to see "no data" as it should.
+	if coll != devGroupDataColl || len(db.configuredDeviceGroups) == 0 {
 		return nil, nil
 	}
 	dg := configmodels.ToBsonM(db.configuredDeviceGroups[0])
@@ -46,6 +49,9 @@ func (db *DeviceGroupMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) 
 func (db *DeviceGroupMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
 	if db.err != nil {
 		return nil, db.err
+	}
+	if coll != devGroupDataColl {
+		return nil, nil
 	}
 	var results []map[string]any
 	for _, deviceGroup := range db.configuredDeviceGroups {
@@ -704,7 +710,10 @@ func TestGetDeviceGroupByNameHelperLabelsStoredRatesAsBps(t *testing.T) {
 		configuredDeviceGroups: []configmodels.DeviceGroups{stored},
 	}
 
-	loaded := getDeviceGroupByName(testGroupName)
+	loaded, err := getDeviceGroupByName(testGroupName)
+	if err != nil {
+		t.Fatalf("failed to look up device group: %v", err)
+	}
 	if loaded == nil {
 		t.Fatal("expected the device group to be loaded")
 	}
@@ -722,7 +731,10 @@ func TestGetDeviceGroupByNameHelperLabelsStoredRatesAsBps(t *testing.T) {
 	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
 		configuredDeviceGroups: []configmodels.DeviceGroups{other},
 	}
-	otherLoaded := getDeviceGroupByName("group2")
+	otherLoaded, err := getDeviceGroupByName("group2")
+	if err != nil {
+		t.Fatalf("failed to look up device group: %v", err)
+	}
 	if otherLoaded == nil {
 		t.Fatal("expected the second device group to be loaded")
 	}

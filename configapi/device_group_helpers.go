@@ -116,16 +116,24 @@ func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, groupNa
 		}
 	}
 
-	prevDevGroup := getDeviceGroupByName(groupName)
+	prevDevGroup, err := getDeviceGroupByName(groupName)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to look up existing device group %s: %w", groupName, err)
+	}
 	requestDeviceGroup.DeviceGroupName = groupName
 
 	// A device group already tied to a slice inherits that slice's PLMN, so a subscriber whose
 	// IMSI belongs to a different home network must not be added to it here either. A device group
 	// is not guaranteed to be attached to only one slice, so every associated slice's PLMN must
-	// accept the IMSI, not just whichever slice happens to be found first. The association is
-	// re-resolved under rwLock inside syncDeviceGroupSubscriber before the write actually lands, so
-	// a slice added/removed concurrently with this request cannot make this pre-check stale.
-	for _, slice := range findSlicesByDeviceGroup(groupName) {
+	// accept the IMSI, not just whichever slice happens to be found first. This is a best-effort
+	// pre-check for a fast rejection; syncDeviceGroupSubscriber re-validates under rwLock right
+	// before provisioning, since a slice added/removed concurrently with this request could
+	// otherwise make this pre-check stale.
+	associatedSlices, err := findSlicesByDeviceGroup(groupName)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to look up slices associated with device group %s: %w", groupName, err)
+	}
+	for _, slice := range associatedSlices {
 		mcc, mnc := slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc
 		for _, imsi := range requestDeviceGroup.Imsis {
 			if !isValidImsiForPlmn(imsi, mcc, mnc) {
@@ -233,18 +241,30 @@ func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *co
 
 // syncDeviceGroupSubscriber re-resolves the slice association under rwLock rather than reusing a
 // lookup done before the lock was acquired, so a concurrent slice POST/DELETE that changes the
-// association cannot make this step act on a stale slice.
+// association cannot make this step act on a stale slice. It also re-validates every IMSI against
+// that freshly-resolved slice's PLMN, since deviceGroupPostHelper's own check ran before this lock
+// was held and before the device group document was written, so a concurrent slice update could
+// otherwise attach a mismatched association in between.
 func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
 	rwLock.Lock()
 	defer rwLock.Unlock()
-	slice := findSliceByDeviceGroup(devGroup.DeviceGroupName)
+	slice, err := findSliceByDeviceGroup(devGroup.DeviceGroupName)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to look up slice associated with device group %s: %w", devGroup.DeviceGroupName, err)
+	}
 	if slice == nil {
 		logger.WebUILog.Infof("Device group %s not associated with any slice — skipping sync", devGroup.DeviceGroupName)
 		return http.StatusOK, nil
 	}
 	logger.WebUILog.Infof("Device group %s is part of slice %s", devGroup.DeviceGroupName, slice.SliceName)
+	mcc, mnc := slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc
+	for _, imsi := range devGroup.Imsis {
+		if !isValidImsiForPlmn(imsi, mcc, mnc) {
+			return http.StatusBadRequest, fmt.Errorf("IMSI %s does not belong to PLMN mcc=%s, mnc=%s of Network Slice %s associated with device group %s", imsi, mcc, mnc, slice.SliceName, devGroup.DeviceGroupName)
+		}
+	}
 	if slice.SliceId.Sst == "" {
-		err := fmt.Errorf("missing SST in slice %s", slice.SliceName)
+		err = fmt.Errorf("missing SST in slice %s", slice.SliceName)
 		logger.DbLog.Errorln(err)
 		return http.StatusBadRequest, err
 	}
@@ -324,21 +344,26 @@ func handleDeviceGroupDelete(groupName string) error {
 	return nil
 }
 
-func getDeviceGroupByName(name string) *configmodels.DeviceGroups {
+// getDeviceGroupByName returns (nil, nil) when no device group matches name, and (nil, err) when
+// the lookup or its unmarshal failed -- callers must not treat a failure as "not found", since
+// that silently skips PLMN validation and sync for a group that may well exist.
+func getDeviceGroupByName(name string) (*configmodels.DeviceGroups, error) {
 	filter := bson.M{groupNameKey: name}
 	devGroupDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(devGroupDataColl, filter)
 	if err != nil {
 		logger.DbLog.Warnln(err)
-		return nil
+		return nil, err
+	}
+	if devGroupDataInterface == nil {
+		return nil, nil
 	}
 	var devGroupData configmodels.DeviceGroups
-	err = json.Unmarshal(configmodels.MapToByte(devGroupDataInterface), &devGroupData)
-	if err != nil {
+	if err := json.Unmarshal(configmodels.MapToByte(devGroupDataInterface), &devGroupData); err != nil {
 		logger.DbLog.Errorf("could not unmarshall device group %s", devGroupDataInterface)
-		return nil
+		return nil, err
 	}
 	labelStoredDeviceGroupRatesAsBps(&devGroupData)
-	return &devGroupData
+	return &devGroupData, nil
 }
 
 // labelStoredDeviceGroupRatesAsBps makes a stored group's unit describe the rates stored beside it.
@@ -365,21 +390,31 @@ func labelStoredDeviceGroupRatesAsBps(devGroup *configmodels.DeviceGroups) {
 // ever act on a single association. Callers that must consider every associated slice (e.g. PLMN
 // validation) should use findSlicesByDeviceGroup instead, since a device group is not guaranteed
 // to be attached to only one slice.
-func findSliceByDeviceGroup(DevGroupName string) *configmodels.Slice {
-	associatedSlices := findSlicesByDeviceGroup(DevGroupName)
-	if len(associatedSlices) == 0 {
-		return nil
+func findSliceByDeviceGroup(DevGroupName string) (*configmodels.Slice, error) {
+	associatedSlices, err := findSlicesByDeviceGroup(DevGroupName)
+	if err != nil {
+		return nil, err
 	}
-	return associatedSlices[0]
+	if len(associatedSlices) == 0 {
+		return nil, nil
+	}
+	return associatedSlices[0], nil
 }
 
-func findSlicesByDeviceGroup(devGroupName string) []*configmodels.Slice {
+// findSlicesByDeviceGroup propagates a getSlices failure rather than reporting no associations, so
+// a transient read failure cannot make a PLMN check silently pass for a group that is in fact
+// associated with a slice.
+func findSlicesByDeviceGroup(devGroupName string) ([]*configmodels.Slice, error) {
+	allSlices, err := getSlices()
+	if err != nil {
+		return nil, err
+	}
 	var associatedSlices []*configmodels.Slice
-	for _, slice := range getSlices() {
+	for _, slice := range allSlices {
 		if slices.Contains(slice.SiteDeviceGroup, devGroupName) {
 			logger.WebUILog.Infof("device Group [%s] is part of slice: %s", devGroupName, slice.SliceName)
 			associatedSlices = append(associatedSlices, slice)
 		}
 	}
-	return associatedSlices
+	return associatedSlices, nil
 }

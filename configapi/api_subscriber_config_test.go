@@ -829,6 +829,12 @@ func (db *DeleteSubscriberMockDBClient) RestfulAPIGetMany(coll string, filter bs
 	if db.err != nil {
 		return nil, db.err
 	}
+	// Other collections (e.g. sliceDataColl, looked up when syncing a device group's associated
+	// slice) must not be answered with device group documents, which cannot unmarshal as anything
+	// else.
+	if coll != devGroupDataColl {
+		return nil, nil
+	}
 	var results []map[string]any
 	for _, deviceGroup := range db.deviceGroups {
 		dg := configmodels.ToBsonM(deviceGroup)

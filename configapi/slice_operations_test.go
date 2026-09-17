@@ -84,7 +84,9 @@ func (db *NetworkSliceMockDBClient) RestfulAPIGetOne(coll string, filter bson.M)
 	if db.err != nil {
 		return nil, db.err
 	}
-	if len(db.slices) == 0 {
+	// Other collections (e.g. devGroupDataColl, looked up when syncing a slice's device groups)
+	// must not be answered with slice documents, which cannot unmarshal as anything else.
+	if coll != sliceDataColl || len(db.slices) == 0 {
 		return nil, nil
 	}
 	ns := configmodels.ToBsonM(db.slices[0])
@@ -97,6 +99,9 @@ func (db *NetworkSliceMockDBClient) RestfulAPIGetOne(coll string, filter bson.M)
 func (db *NetworkSliceMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
 	if db.err != nil {
 		return nil, db.err
+	}
+	if coll != sliceDataColl {
+		return nil, nil
 	}
 	var results []map[string]any
 	for _, s := range db.slices {

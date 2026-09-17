@@ -68,6 +68,14 @@ func networkSlicePostHelper(c *gin.Context, sliceName string) (int, error) {
 		// already have subscriber records filed under that empty key -- changing away from it must
 		// be rejected just like any other PLMN change, since the old records would be left in place.
 		zeroPlmn := configmodels.SliceSiteInfoPlmn{}
+		// This still infers exposure from the current device-group list rather than proof that no
+		// record was ever written under the empty PLMN: handleNetworkSlicePost persists a slice
+		// document before subscriber cleanup/sync for it is attempted, so a prior device-group
+		// removal that updated this list but then failed cleanup could leave the list empty while
+		// records remain. Closing that gap fully needs the document write and its subscriber
+		// cleanup to be one transaction, which no write in this package currently is -- this is a
+		// pre-existing, package-wide characteristic (see e.g. cleanupDeviceGroups), not something
+		// specific to this check, and is tracked as a follow-up rather than fixed here.
 		hadNoPriorSubscriberExposure := prevSlice.SiteInfo.Plmn == zeroPlmn && len(prevSlice.SiteDeviceGroup) == 0
 		if requestSlice.SiteInfo.Plmn != prevSlice.SiteInfo.Plmn && !hadNoPriorSubscriberExposure {
 			// The PLMN identifies the subscribers' serving network in every DB record keyed by
@@ -131,7 +139,12 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 func validateDeviceGroupsBelongToPlmn(request configmodels.Slice, sliceName string) error {
 	mcc, mnc := request.SiteInfo.Plmn.Mcc, request.SiteInfo.Plmn.Mnc
 	for _, dgName := range request.SiteDeviceGroup {
-		devGroup := getDeviceGroupByName(dgName)
+		devGroup, err := getDeviceGroupByName(dgName)
+		if err != nil {
+			// A lookup failure is not "no device group to validate": skipping validation on an
+			// inconclusive read could let a mismatched IMSI through undetected.
+			return fmt.Errorf("failed to look up device group %s: %w", dgName, err)
+		}
 		if devGroup == nil {
 			continue
 		}
@@ -323,7 +336,10 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 	mnc := slice.SiteInfo.Plmn.Mnc
 	for _, dgName := range slice.SiteDeviceGroup {
 		logger.ConfigLog.Debugf("dgName: %s", dgName)
-		devGroupConfig := getDeviceGroupByName(dgName)
+		devGroupConfig, err := getDeviceGroupByName(dgName)
+		if err != nil {
+			return http.StatusInternalServerError, fmt.Errorf("failed to look up device group %s: %w", dgName, err)
+		}
 		if devGroupConfig == nil {
 			logger.ConfigLog.Warnf("Device group not found: %s", dgName)
 			continue
@@ -333,7 +349,7 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 			logger.ConfigLog.Warnln("IPDomainExpanded is nil or empty for dgName:", dgName)
 			continue
 		}
-		_, err := processDeviceGroup(devGroupConfig, snssai, mcc, mnc)
+		_, err = processDeviceGroup(devGroupConfig, snssai, mcc, mnc)
 		if err != nil {
 			return http.StatusInternalServerError, err
 		}
@@ -368,6 +384,12 @@ func processDeviceGroup(devGroupConfig *configmodels.DeviceGroups, snssai *model
 	// Calculate aggregate QoS once for the entire group
 	aggregatedQoS := aggregateQoS(allQosProfiles)
 	for i, imsi := range devGroupConfig.Imsis {
+		// This is the authoritative check: parseAndValidateSliceRequest's pre-check ran before the
+		// slice document was written and before rwLock (held by the caller) was acquired, so a
+		// concurrent device-group update could have replaced this group's IMSIs in between.
+		if !isValidImsiForPlmn(imsi, mcc, mnc) {
+			return http.StatusBadRequest, fmt.Errorf("IMSI %s does not belong to PLMN mcc=%s, mnc=%s", imsi, mcc, mnc)
+		}
 		if subscriberAuthenticationDataGet("imsi-"+imsi) != nil {
 			// Process each IP domain for this IMSI
 			var gpsi string
@@ -397,7 +419,10 @@ func processDeviceGroup(devGroupConfig *configmodels.DeviceGroups, snssai *model
 func cleanupDeviceGroups(slice, prevSlice configmodels.Slice) error {
 	dgnames := getDeletedDeviceGroupsList(slice, prevSlice)
 	for _, dgName := range dgnames {
-		devGroupConfig := getDeviceGroupByName(dgName)
+		devGroupConfig, err := getDeviceGroupByName(dgName)
+		if err != nil {
+			return fmt.Errorf("failed to look up device group %s during cleanup: %w", dgName, err)
+		}
 		if devGroupConfig == nil {
 			logger.ConfigLog.Warnf("Device group not found during cleanup: %s", dgName)
 			continue
@@ -695,21 +720,25 @@ func isReadableAndExact(val, unit uint64) bool {
 	return isReadable(val, unit) && val%unit == 0
 }
 
-func getSlices() []*configmodels.Slice {
-	rawSlices, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, nil)
-	if errGetMany != nil {
-		logger.DbLog.Warnln(errGetMany)
+// getSlices returns every slice, and an error if the read or an unmarshal failed -- callers must
+// not treat a failure as "no slices exist", since that would make a PLMN/association check that
+// depends on the full slice collection silently pass instead of failing closed.
+func getSlices() ([]*configmodels.Slice, error) {
+	rawSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, nil)
+	if err != nil {
+		logger.DbLog.Warnln(err)
+		return nil, err
 	}
 	var slices []*configmodels.Slice
 	for _, rawSlice := range rawSlices {
 		var sliceData configmodels.Slice
-		err := json.Unmarshal(configmodels.MapToByte(rawSlice), &sliceData)
-		if err != nil {
+		if err := json.Unmarshal(configmodels.MapToByte(rawSlice), &sliceData); err != nil {
 			logger.DbLog.Errorf("could not unmarshall slice %+v", rawSlice)
+			return nil, err
 		}
 		slices = append(slices, &sliceData)
 	}
-	return slices
+	return slices, nil
 }
 
 // getSliceByName returns (nil, nil) when no slice matches name, and (nil, err) when the lookup or
@@ -736,7 +765,9 @@ func getSliceByName(name string) (*configmodels.Slice, error) {
 func handleNetworkSliceDelete(sliceName string) error {
 	prevSlice, err := getSliceByName(sliceName)
 	if err != nil {
-		logger.DbLog.Errorf("failed to look up slice %s before delete, subscriber cleanup may be incomplete: %+v", sliceName, err)
+		// The previous slice is required for subscriber cleanup below; deleting without it would
+		// leave AM/SM/SMF-selection records orphaned under the slice's old PLMN.
+		return fmt.Errorf("failed to look up slice %s before delete: %w", sliceName, err)
 	}
 	filter := bson.M{sliceNameKey: sliceName}
 	err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)

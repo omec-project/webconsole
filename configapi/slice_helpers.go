@@ -45,7 +45,13 @@ func networkSlicePostHelper(c *gin.Context, sliceName string) (int, error) {
 	logSliceMetadata(requestSlice)
 	normalizeApplicationFilteringRules(&requestSlice)
 	requestSlice.SliceName = sliceName
-	prevSlice := getSliceByName(sliceName)
+	prevSlice, err := getSliceByName(sliceName)
+	if err != nil {
+		// An inconclusive lookup must not be treated as "slice does not exist": that would take the
+		// create path below, which can silently overwrite an existing slice's PLMN and reintroduce
+		// the duplicate-subscriber bug this check exists to prevent.
+		return http.StatusInternalServerError, fmt.Errorf("failed to look up existing network slice %s: %w", sliceName, err)
+	}
 
 	if prevSlice == nil {
 		logger.ConfigLog.Infof("Adding new slice [%s]", sliceName)
@@ -54,12 +60,16 @@ func networkSlicePostHelper(c *gin.Context, sliceName string) (int, error) {
 			return statusCode, err
 		}
 	} else {
-		// getSliceByName returns a zero-value slice, not nil, when no document matches, so an
-		// empty SliceName is how a not-found lookup is distinguished from a genuine previous slice.
-		// A zero-value previous PLMN means none was assigned yet, so assigning one now is not a
-		// change to reject -- only a real PLMN being replaced by a different one is.
+		// A zero-value previous PLMN with no device groups attached could never have had a
+		// subscriber synced under it (syncSubscribersOnSliceCreateOrUpdate only writes records for
+		// a slice's device groups), so assigning a real PLMN in that case is not a change to
+		// reject. Once device groups were ever attached, though, syncSubscribersOnSliceCreateOrUpdate
+		// uses mcc+mnc as the serving PLMN key even when both are empty, so an all-zero PLMN can
+		// already have subscriber records filed under that empty key -- changing away from it must
+		// be rejected just like any other PLMN change, since the old records would be left in place.
 		zeroPlmn := configmodels.SliceSiteInfoPlmn{}
-		if prevSlice.SliceName != "" && prevSlice.SiteInfo.Plmn != zeroPlmn && requestSlice.SiteInfo.Plmn != prevSlice.SiteInfo.Plmn {
+		hadNoPriorSubscriberExposure := prevSlice.SiteInfo.Plmn == zeroPlmn && len(prevSlice.SiteDeviceGroup) == 0
+		if requestSlice.SiteInfo.Plmn != prevSlice.SiteInfo.Plmn && !hadNoPriorSubscriberExposure {
 			// The PLMN identifies the subscribers' serving network in every DB record keyed by
 			// (imsi, PLMN). Changing it here would leave the old records in place and write new
 			// ones under the new PLMN, duplicating every subscriber in the slice's device groups.
@@ -702,26 +712,34 @@ func getSlices() []*configmodels.Slice {
 	return slices
 }
 
-func getSliceByName(name string) *configmodels.Slice {
+// getSliceByName returns (nil, nil) when no slice matches name, and (nil, err) when the lookup or
+// its unmarshal failed -- the two must stay distinguishable so a transient read failure is never
+// mistaken for "slice does not exist yet" by a caller that would otherwise create/overwrite it.
+func getSliceByName(name string) (*configmodels.Slice, error) {
 	filter := bson.M{sliceNameKey: name}
-	sliceDataInterface, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(sliceDataColl, filter)
-	if errGetOne != nil {
-		logger.DbLog.Warnln(errGetOne)
-		return nil
+	sliceDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(sliceDataColl, filter)
+	if err != nil {
+		logger.DbLog.Warnln(err)
+		return nil, err
+	}
+	if sliceDataInterface == nil {
+		return nil, nil
 	}
 	var sliceData configmodels.Slice
-	err := json.Unmarshal(configmodels.MapToByte(sliceDataInterface), &sliceData)
-	if err != nil {
+	if err := json.Unmarshal(configmodels.MapToByte(sliceDataInterface), &sliceData); err != nil {
 		logger.DbLog.Errorf("could not unmarshall slice %+v", sliceDataInterface)
-		return nil
+		return nil, err
 	}
-	return &sliceData
+	return &sliceData, nil
 }
 
 func handleNetworkSliceDelete(sliceName string) error {
-	prevSlice := getSliceByName(sliceName)
+	prevSlice, err := getSliceByName(sliceName)
+	if err != nil {
+		logger.DbLog.Errorf("failed to look up slice %s before delete, subscriber cleanup may be incomplete: %+v", sliceName, err)
+	}
 	filter := bson.M{sliceNameKey: sliceName}
-	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
+	err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorf("failed to delete slice data for %+v: %+v", sliceName, err)
 		return err

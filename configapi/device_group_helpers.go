@@ -66,7 +66,12 @@ func updateDeviceGroupInNetworkSlices(groupName string) error {
 			errorOccurred = true
 			continue
 		}
-		prevSlice := getSliceByName(networkSlice.SliceName)
+		prevSlice, err := getSliceByName(networkSlice.SliceName)
+		if err != nil || prevSlice == nil {
+			logger.ConfigLog.Errorf("failed to look up slice %s while removing device group %s: %+v", networkSlice.SliceName, groupName, err)
+			errorOccurred = true
+			continue
+		}
 		networkSlice.SiteDeviceGroup = slices.DeleteFunc(networkSlice.SiteDeviceGroup, func(existingDG string) bool {
 			return groupName == existingDG
 		})
@@ -115,9 +120,12 @@ func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, groupNa
 	requestDeviceGroup.DeviceGroupName = groupName
 
 	// A device group already tied to a slice inherits that slice's PLMN, so a subscriber whose
-	// IMSI belongs to a different home network must not be added to it here either.
-	slice := findSliceByDeviceGroup(groupName)
-	if slice != nil {
+	// IMSI belongs to a different home network must not be added to it here either. A device group
+	// is not guaranteed to be attached to only one slice, so every associated slice's PLMN must
+	// accept the IMSI, not just whichever slice happens to be found first. The association is
+	// re-resolved under rwLock inside syncDeviceGroupSubscriber before the write actually lands, so
+	// a slice added/removed concurrently with this request cannot make this pre-check stale.
+	for _, slice := range findSlicesByDeviceGroup(groupName) {
 		mcc, mnc := slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc
 		for _, imsi := range requestDeviceGroup.Imsis {
 			if !isValidImsiForPlmn(imsi, mcc, mnc) {
@@ -126,16 +134,14 @@ func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, groupNa
 		}
 	}
 
-	// slice was already looked up above to validate PLMN, so it is passed along here instead of
-	// having handleDeviceGroupPost's sync step re-scan the whole slice collection for it.
 	if prevDevGroup == nil {
 		logger.ConfigLog.Infof("creating new device group %s", groupName)
-		statusCode, err := createDG(&requestDeviceGroup, slice)
+		statusCode, err := createDG(&requestDeviceGroup)
 		if err != nil {
 			return statusCode, err
 		}
 	} else {
-		statusCode, err := updateDG(&requestDeviceGroup, prevDevGroup, slice)
+		statusCode, err := updateDG(&requestDeviceGroup, prevDevGroup)
 		if err != nil {
 			return statusCode, err
 		}
@@ -144,16 +150,16 @@ func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, groupNa
 	return http.StatusOK, nil
 }
 
-func createDG(devGroup *configmodels.DeviceGroups, slice *configmodels.Slice) (int, error) {
-	if statusCode, err := handleDeviceGroupPostWithSlice(devGroup, nil, slice); err != nil {
+func createDG(devGroup *configmodels.DeviceGroups) (int, error) {
+	if statusCode, err := handleDeviceGroupPost(devGroup, nil); err != nil {
 		logger.ConfigLog.Errorf("error creating device group %+v: %+v", devGroup, err)
 		return statusCode, err
 	}
 	return http.StatusOK, nil
 }
 
-func updateDG(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups, slice *configmodels.Slice) (int, error) {
-	if statusCode, err := handleDeviceGroupPostWithSlice(devGroup, prevDevGroup, slice); err != nil {
+func updateDG(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
+	if statusCode, err := handleDeviceGroupPost(devGroup, prevDevGroup); err != nil {
 		logger.ConfigLog.Errorf("error updating device group %+v: %+v", devGroup, err)
 		return statusCode, err
 	}
@@ -205,14 +211,7 @@ func bitrateMultiplier(unit string) (int64, bool) {
 	return 1, false
 }
 
-// handleDeviceGroupPost looks up the associated slice itself; callers that already have it
-// (e.g. deviceGroupPostHelper, which needs it for PLMN validation first) should call
-// handleDeviceGroupPostWithSlice instead to avoid scanning the slice collection twice.
 func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
-	return handleDeviceGroupPostWithSlice(devGroup, prevDevGroup, findSliceByDeviceGroup(devGroup.DeviceGroupName))
-}
-
-func handleDeviceGroupPostWithSlice(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups, slice *configmodels.Slice) (int, error) {
 	filter := bson.M{groupNameKey: devGroup.DeviceGroupName}
 	devGroupDataBsonA := configmodels.ToBsonM(devGroup)
 	result, err := dbadapter.CommonDBClient.RestfulAPIPost(devGroupDataColl, filter, devGroupDataBsonA)
@@ -223,7 +222,7 @@ func handleDeviceGroupPostWithSlice(devGroup *configmodels.DeviceGroups, prevDev
 	logger.DbLog.Infof("DB operation result for device group %s: %v",
 		devGroup.DeviceGroupName, result)
 
-	statusCode, err := syncDeviceGroupSubscriber(devGroup, prevDevGroup, slice)
+	statusCode, err := syncDeviceGroupSubscriber(devGroup, prevDevGroup)
 	if err != nil {
 		logger.WebUILog.Errorln(err.Error())
 		return statusCode, err
@@ -232,9 +231,13 @@ func handleDeviceGroupPostWithSlice(devGroup *configmodels.DeviceGroups, prevDev
 	return http.StatusOK, nil
 }
 
-func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups, slice *configmodels.Slice) (int, error) {
+// syncDeviceGroupSubscriber re-resolves the slice association under rwLock rather than reusing a
+// lookup done before the lock was acquired, so a concurrent slice POST/DELETE that changes the
+// association cannot make this step act on a stale slice.
+func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
 	rwLock.Lock()
 	defer rwLock.Unlock()
+	slice := findSliceByDeviceGroup(devGroup.DeviceGroupName)
 	if slice == nil {
 		logger.WebUILog.Infof("Device group %s not associated with any slice — skipping sync", devGroup.DeviceGroupName)
 		return http.StatusOK, nil
@@ -358,14 +361,25 @@ func labelStoredDeviceGroupRatesAsBps(devGroup *configmodels.DeviceGroups) {
 	}
 }
 
+// findSliceByDeviceGroup returns one slice associated with DevGroupName, for callers that only
+// ever act on a single association. Callers that must consider every associated slice (e.g. PLMN
+// validation) should use findSlicesByDeviceGroup instead, since a device group is not guaranteed
+// to be attached to only one slice.
 func findSliceByDeviceGroup(DevGroupName string) *configmodels.Slice {
+	associatedSlices := findSlicesByDeviceGroup(DevGroupName)
+	if len(associatedSlices) == 0 {
+		return nil
+	}
+	return associatedSlices[0]
+}
+
+func findSlicesByDeviceGroup(devGroupName string) []*configmodels.Slice {
+	var associatedSlices []*configmodels.Slice
 	for _, slice := range getSlices() {
-		for _, dgName := range slice.SiteDeviceGroup {
-			if dgName == DevGroupName {
-				logger.WebUILog.Infof("device Group [%s] is part of slice: %s", dgName, slice.SliceName)
-				return slice
-			}
+		if slices.Contains(slice.SiteDeviceGroup, devGroupName) {
+			logger.WebUILog.Infof("device Group [%s] is part of slice: %s", devGroupName, slice.SliceName)
+			associatedSlices = append(associatedSlices, slice)
 		}
 	}
-	return nil
+	return associatedSlices
 }

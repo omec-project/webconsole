@@ -524,6 +524,81 @@ func TestNetworkSlicePostHandler_RejectsPlmnChangeOnExistingSlice(t *testing.T) 
 	}
 }
 
+// A slice that never had device groups attached could not have synced a subscriber under its
+// zero-value PLMN, since syncSubscribersOnSliceCreateOrUpdate only ever provisions device groups
+// attached to the slice, so assigning a real PLMN in that case is safe.
+func TestNetworkSlicePostHandler_AllowsPlmnAssignmentWhenSliceHadNoDeviceGroups(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	existing := networkSlice(testSliceName)
+	existing.SiteInfo.Plmn = configmodels.SliceSiteInfoPlmn{}
+	existing.SiteDeviceGroup = nil
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	mock := &NetworkSliceMockDBClient{slices: []configmodels.Slice{existing}}
+	dbadapter.CommonDBClient = mock
+
+	updated := networkSlice(testSliceName)
+	updated.SiteDeviceGroup = nil
+	jsonBody, err := json.Marshal(updated)
+	if err != nil {
+		t.Fatalf("failed to marshal network slice: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected `%d`, got `%d`: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+}
+
+// A zero-value PLMN does not mean no subscriber was ever synced under it:
+// syncSubscribersOnSliceCreateOrUpdate uses mcc+mnc as the serving PLMN key even when both are
+// empty, so a slice that already had device groups attached can already have subscriber records
+// filed under that empty key. Assigning a real PLMN must still be rejected in that case, same as
+// any other PLMN change, to avoid duplicating those records under the new PLMN.
+func TestNetworkSlicePostHandler_RejectsPlmnAssignmentWhenSliceHadDeviceGroups(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	existing := networkSlice(testSliceName)
+	existing.SiteInfo.Plmn = configmodels.SliceSiteInfoPlmn{}
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	mock := &NetworkSliceMockDBClient{slices: []configmodels.Slice{existing}}
+	dbadapter.CommonDBClient = mock
+
+	updated := networkSlice(testSliceName)
+	jsonBody, err := json.Marshal(updated)
+	if err != nil {
+		t.Fatalf("failed to marshal network slice: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected `%d`, got `%d`: %s", http.StatusBadRequest, w.Code, w.Body.String())
+	}
+	if len(mock.postData) != 0 {
+		t.Errorf("expected the PLMN assignment to be rejected before any write, got %d posted documents", len(mock.postData))
+	}
+}
+
 // The first digits of an IMSI are its home PLMN, so a device group carrying a subscriber from a
 // different PLMN must not be attached to a slice - it would file that subscriber's records under
 // a serving PLMN it does not belong to.

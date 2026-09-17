@@ -534,6 +534,11 @@ func (db *DeviceGroupSliceAwareMockDBClient) RestfulAPIPost(collName string, fil
 	return true, nil
 }
 
+func (db *DeviceGroupSliceAwareMockDBClient) RestfulAPIPutOne(collName string, filter bson.M, putData map[string]any) (bool, error) {
+	db.postData = append(db.postData, map[string]any{collKey: collName, filterKey: filter, dataKey: putData})
+	return true, nil
+}
+
 // The first digits of an IMSI are its home PLMN, so a device group already attached to a slice
 // must not accept a subscriber whose IMSI belongs to a different PLMN.
 func TestDeviceGroupPostHandler_RejectsImsiNotMatchingAssociatedSlicePlmn(t *testing.T) {
@@ -572,6 +577,61 @@ func TestDeviceGroupPostHandler_RejectsImsiNotMatchingAssociatedSlicePlmn(t *tes
 	}
 	if len(mock.postData) != 0 {
 		t.Errorf("expected the mismatch to be rejected before any write, got %d posted documents", len(mock.postData))
+	}
+}
+
+// A device group is not guaranteed to be attached to only one slice: syncDeviceGroupSubscriber
+// must provision the subscriber under every associated slice's S-NSSAI, not just whichever one
+// happens to be resolved first.
+func TestDeviceGroupPostHandler_SyncsSubscriberAcrossAllAssociatedSlices(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	sliceA := networkSlice("sliceA")
+	sliceA.SiteDeviceGroup = []string{testGroupName}
+	sliceA.SliceId = configmodels.SliceSliceId{Sst: "1", Sd: "010203"}
+
+	sliceB := networkSlice("sliceB")
+	sliceB.SiteDeviceGroup = []string{testGroupName}
+	sliceB.SliceId = configmodels.SliceSliceId{Sst: "2", Sd: "010203"}
+
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	mock := &DeviceGroupSliceAwareMockDBClient{slices: []configmodels.Slice{sliceA, sliceB}}
+	dbadapter.CommonDBClient = mock
+
+	originalAuthDBClient := dbadapter.AuthDBClient
+	defer func() { dbadapter.AuthDBClient = originalAuthDBClient }()
+	dbadapter.AuthDBClient = &AuthDBMockDBClient{subscribers: []string{"208930000000001"}}
+
+	newDeviceGroup := deviceGroup(testGroupName)
+	newDeviceGroup.Imsis = []string{"208930000000001"}
+	jsonBody, err := json.Marshal(newDeviceGroup)
+	if err != nil {
+		t.Fatalf("failed to marshal device group: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/device-group/"+testGroupName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected `%d`, got `%d`: %s", http.StatusOK, w.Code, w.Body.String())
+	}
+
+	var smfSelectionWrites int
+	for _, p := range mock.postData {
+		if p[collKey] == smfSelDataColl {
+			smfSelectionWrites++
+		}
+	}
+	if smfSelectionWrites != 2 {
+		t.Errorf("expected the subscriber to be provisioned under both associated slices (2 smf selection writes), got %d", smfSelectionWrites)
 	}
 }
 

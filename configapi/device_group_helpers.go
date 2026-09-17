@@ -239,45 +239,26 @@ func handleDeviceGroupPost(devGroup *configmodels.DeviceGroups, prevDevGroup *co
 	return http.StatusOK, nil
 }
 
-// syncDeviceGroupSubscriber re-resolves the slice association under rwLock rather than reusing a
-// lookup done before the lock was acquired, so a concurrent slice POST/DELETE that changes the
+// syncDeviceGroupSubscriber re-resolves the slice associations under rwLock rather than reusing a
+// lookup done before the lock was acquired, so a concurrent slice POST/DELETE that changes an
 // association cannot make this step act on a stale slice. It also re-validates every IMSI against
-// that freshly-resolved slice's PLMN, since deviceGroupPostHelper's own check ran before this lock
-// was held and before the device group document was written, so a concurrent slice update could
-// otherwise attach a mismatched association in between.
+// every freshly-resolved associated slice's PLMN, since deviceGroupPostHelper's own check ran
+// before this lock was held and before the device group document was written, so a concurrent
+// slice update could otherwise attach a mismatched association in between. A device group is not
+// guaranteed to be attached to only one slice, so provisioning must happen for every associated
+// slice, not just the first one found.
 func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.DeviceGroups) (int, error) {
 	rwLock.Lock()
 	defer rwLock.Unlock()
-	slice, err := findSliceByDeviceGroup(devGroup.DeviceGroupName)
+	associatedSlices, err := findSlicesByDeviceGroup(devGroup.DeviceGroupName)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to look up slice associated with device group %s: %w", devGroup.DeviceGroupName, err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to look up slices associated with device group %s: %w", devGroup.DeviceGroupName, err)
 	}
-	if slice == nil {
+	if len(associatedSlices) == 0 {
 		logger.WebUILog.Infof("Device group %s not associated with any slice — skipping sync", devGroup.DeviceGroupName)
 		return http.StatusOK, nil
 	}
-	logger.WebUILog.Infof("Device group %s is part of slice %s", devGroup.DeviceGroupName, slice.SliceName)
-	mcc, mnc := slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc
-	for _, imsi := range devGroup.Imsis {
-		if !isValidImsiForPlmn(imsi, mcc, mnc) {
-			return http.StatusBadRequest, fmt.Errorf("IMSI %s does not belong to PLMN mcc=%s, mnc=%s of Network Slice %s associated with device group %s", imsi, mcc, mnc, slice.SliceName, devGroup.DeviceGroupName)
-		}
-	}
-	if slice.SliceId.Sst == "" {
-		err = fmt.Errorf("missing SST in slice %s", slice.SliceName)
-		logger.DbLog.Errorln(err)
-		return http.StatusBadRequest, err
-	}
-	sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
-	if err != nil {
-		logger.DbLog.Errorf("could not parse SST %s", slice.SliceId.Sst)
-		return http.StatusBadRequest, err
-	}
-	snssai := &models.Snssai{
-		Sd:  openapi.PtrString(slice.SliceId.Sd),
-		Sst: int32(sVal),
-	}
-	var errorOccured bool
+
 	dnnMap := make(map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos)
 	for _, ipDomain := range devGroup.IpDomainsExpanded {
 		if ipDomain.UeDnnQos != nil {
@@ -285,50 +266,74 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 		}
 	}
 
-	// Calculate the aggregatedQoS
+	// Calculate the aggregatedQoS. This depends only on the device group's own IP domains, so it
+	// is the same for every associated slice and only needs to be computed once.
 	var allQosProfiles []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos
 	for _, qosList := range dnnMap {
 		allQosProfiles = append(allQosProfiles, qosList...)
 	}
-
 	aggregatedQoS := aggregateQoS(allQosProfiles)
-	for i, imsi := range devGroup.Imsis {
-		/* update all current IMSIs */
-		if subscriberAuthenticationDataGet("imsi-"+imsi) != nil {
-			var gpsi string
-			if devGroup.Msisdns != nil && i < len(devGroup.Msisdns) {
-				gpsi = devGroup.Msisdns[i]
-			}
-			err = updatePolicyAndProvisionedData(
-				imsi,
-				gpsi,
-				snssai,
-				dnnMap,
-				slice.SiteInfo.Plmn.Mcc,
-				slice.SiteInfo.Plmn.Mnc,
-				aggregatedQoS,
-			)
-			if err != nil {
-				logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %+v", imsi, err)
-				errorOccured = true
-			}
-		}
-	}
+
 	// delete IMSI's that are removed
 	dimsis := getDeletedImsisList(devGroup, prevDevGroup)
-	for _, imsi := range dimsis {
-		err = removeSubscriberEntriesRelatedToDeviceGroups(slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc, imsi)
+
+	var errorOccured bool
+	for _, slice := range associatedSlices {
+		logger.WebUILog.Infof("Device group %s is part of slice %s", devGroup.DeviceGroupName, slice.SliceName)
+		mcc, mnc := slice.SiteInfo.Plmn.Mcc, slice.SiteInfo.Plmn.Mnc
+		for _, imsi := range devGroup.Imsis {
+			if !isValidImsiForPlmn(imsi, mcc, mnc) {
+				return http.StatusBadRequest, fmt.Errorf("IMSI %s does not belong to PLMN mcc=%s, mnc=%s of Network Slice %s associated with device group %s", imsi, mcc, mnc, slice.SliceName, devGroup.DeviceGroupName)
+			}
+		}
+		if slice.SliceId.Sst == "" {
+			err := fmt.Errorf("missing SST in slice %s", slice.SliceName)
+			logger.DbLog.Errorln(err)
+			return http.StatusBadRequest, err
+		}
+		sVal, err := strconv.ParseUint(slice.SliceId.Sst, 10, 32)
 		if err != nil {
-			logger.ConfigLog.Errorln(err)
-			errorOccured = true
+			logger.DbLog.Errorf("could not parse SST %s", slice.SliceId.Sst)
+			return http.StatusBadRequest, err
+		}
+		snssai := &models.Snssai{
+			Sd:  openapi.PtrString(slice.SliceId.Sd),
+			Sst: int32(sVal),
+		}
+
+		for i, imsi := range devGroup.Imsis {
+			/* update all current IMSIs */
+			if subscriberAuthenticationDataGet("imsi-"+imsi) != nil {
+				var gpsi string
+				if devGroup.Msisdns != nil && i < len(devGroup.Msisdns) {
+					gpsi = devGroup.Msisdns[i]
+				}
+				if err := updatePolicyAndProvisionedData(
+					imsi,
+					gpsi,
+					snssai,
+					dnnMap,
+					mcc,
+					mnc,
+					aggregatedQoS,
+				); err != nil {
+					logger.DbLog.Errorf("updatePolicyAndProvisionedData failed for IMSI %s: %+v", imsi, err)
+					errorOccured = true
+				}
+			}
+		}
+		for _, imsi := range dimsis {
+			if err := removeSubscriberEntriesRelatedToDeviceGroups(mcc, mnc, imsi); err != nil {
+				logger.ConfigLog.Errorln(err)
+				errorOccured = true
+			}
 		}
 	}
 
 	if errorOccured {
 		return http.StatusInternalServerError, fmt.Errorf("syncDeviceGroupSubscriber failed, please check logs")
-	} else {
-		return http.StatusOK, nil
 	}
+	return http.StatusOK, nil
 }
 
 func handleDeviceGroupDelete(groupName string) error {
@@ -384,21 +389,6 @@ func labelStoredDeviceGroupRatesAsBps(devGroup *configmodels.DeviceGroups) {
 			devGroup.IpDomainsExpanded[i].UeDnnQos.BitrateUnit = bitrateUnitBps
 		}
 	}
-}
-
-// findSliceByDeviceGroup returns one slice associated with DevGroupName, for callers that only
-// ever act on a single association. Callers that must consider every associated slice (e.g. PLMN
-// validation) should use findSlicesByDeviceGroup instead, since a device group is not guaranteed
-// to be attached to only one slice.
-func findSliceByDeviceGroup(DevGroupName string) (*configmodels.Slice, error) {
-	associatedSlices, err := findSlicesByDeviceGroup(DevGroupName)
-	if err != nil {
-		return nil, err
-	}
-	if len(associatedSlices) == 0 {
-		return nil, nil
-	}
-	return associatedSlices[0], nil
 }
 
 // findSlicesByDeviceGroup propagates a getSlices failure rather than reporting no associations, so

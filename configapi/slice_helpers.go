@@ -37,9 +37,9 @@ func networkSliceDeleteHelper(sliceName string) error {
 
 func networkSlicePostHelper(c *gin.Context, sliceName string) (int, error) {
 	logger.ConfigLog.Infof("received slice: %s", sliceName)
-	requestSlice, err := parseAndValidateSliceRequest(c, sliceName)
+	requestSlice, statusCode, err := parseAndValidateSliceRequest(c, sliceName)
 	if err != nil {
-		return http.StatusBadRequest, err
+		return statusCode, err
 	}
 
 	logSliceMetadata(requestSlice)
@@ -93,68 +93,69 @@ func networkSlicePostHelper(c *gin.Context, sliceName string) (int, error) {
 	return http.StatusOK, nil
 }
 
-func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodels.Slice, error) {
+func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodels.Slice, int, error) {
 	var request configmodels.Slice
 
 	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
 	if ct != jsonContentType {
-		return request, fmt.Errorf("unsupported content-type: %s", ct)
+		return request, http.StatusBadRequest, fmt.Errorf("unsupported content-type: %s", ct)
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		return request, fmt.Errorf("JSON bind error: %w", err)
+		return request, http.StatusBadRequest, fmt.Errorf("JSON bind error: %w", err)
 	}
 
 	for _, gnb := range request.SiteInfo.GNodeBs {
 		if !isValidName(gnb.Name) {
-			return request, fmt.Errorf("invalid gNB name `%s` in Network Slice %s", gnb.Name, sliceName)
+			return request, http.StatusBadRequest, fmt.Errorf("invalid gNB name `%s` in Network Slice %s", gnb.Name, sliceName)
 		}
 		if !isValidGnbTac(gnb.Tac) {
-			return request, fmt.Errorf("invalid TAC %d for gNB %s in Network Slice %s", gnb.Tac, gnb.Name, sliceName)
+			return request, http.StatusBadRequest, fmt.Errorf("invalid TAC %d for gNB %s in Network Slice %s", gnb.Tac, gnb.Name, sliceName)
 		}
 	}
 
 	for _, ruleConfig := range request.ApplicationFilteringRules {
 		if ruleConfig.TrafficClass == nil {
 			logger.ConfigLog.Errorln("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
-			return request, fmt.Errorf("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
+			return request, http.StatusBadRequest, fmt.Errorf("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
 		}
 		if err := validateRuleBitrates(ruleConfig, sliceName); err != nil {
-			return request, err
+			return request, http.StatusBadRequest, err
 		}
 	}
 
 	slices.Sort(request.SiteDeviceGroup)
 	request.SiteDeviceGroup = slices.Compact(request.SiteDeviceGroup)
 
-	if err := validateDeviceGroupsBelongToPlmn(request, sliceName); err != nil {
-		return request, err
+	if statusCode, err := validateDeviceGroupsBelongToPlmn(request, sliceName); err != nil {
+		return request, statusCode, err
 	}
 
-	return request, nil
+	return request, http.StatusOK, nil
 }
 
 // A slice's device groups must not carry subscribers from a different home network, since their
 // records would then be filed under a serving PLMN they do not belong to.
-func validateDeviceGroupsBelongToPlmn(request configmodels.Slice, sliceName string) error {
+func validateDeviceGroupsBelongToPlmn(request configmodels.Slice, sliceName string) (int, error) {
 	mcc, mnc := request.SiteInfo.Plmn.Mcc, request.SiteInfo.Plmn.Mnc
 	for _, dgName := range request.SiteDeviceGroup {
 		devGroup, err := getDeviceGroupByName(dgName)
 		if err != nil {
 			// A lookup failure is not "no device group to validate": skipping validation on an
-			// inconclusive read could let a mismatched IMSI through undetected.
-			return fmt.Errorf("failed to look up device group %s: %w", dgName, err)
+			// inconclusive read could let a mismatched IMSI through undetected. It is also not a
+			// client error: the request itself may be perfectly valid.
+			return http.StatusInternalServerError, fmt.Errorf("failed to look up device group %s: %w", dgName, err)
 		}
 		if devGroup == nil {
 			continue
 		}
 		for _, imsi := range devGroup.Imsis {
 			if !isValidImsiForPlmn(imsi, mcc, mnc) {
-				return fmt.Errorf("IMSI %s in device group %s does not belong to PLMN mcc=%s, mnc=%s of Network Slice %s", imsi, dgName, mcc, mnc, sliceName)
+				return http.StatusBadRequest, fmt.Errorf("IMSI %s in device group %s does not belong to PLMN mcc=%s, mnc=%s of Network Slice %s", imsi, dgName, mcc, mnc, sliceName)
 			}
 		}
 	}
-	return nil
+	return http.StatusOK, nil
 }
 
 // A rate that isValidBitrate rejects is one that cannot be served as configured, so the slice is

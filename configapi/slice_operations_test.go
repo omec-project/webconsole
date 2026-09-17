@@ -472,9 +472,13 @@ type SlicePlmnValidationMockDBClient struct {
 	dbadapter.DBInterface
 	deviceGroups map[string]configmodels.DeviceGroups
 	postData     []map[string]any
+	err          error
 }
 
 func (db *SlicePlmnValidationMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	if db.err != nil {
+		return nil, db.err
+	}
 	if coll != devGroupDataColl {
 		return nil, nil
 	}
@@ -647,6 +651,40 @@ func TestNetworkSlicePostHandler_RejectsDeviceGroupImsiNotMatchingPlmn(t *testin
 	}
 	if len(mock.postData) != 0 {
 		t.Errorf("expected the mismatch to be rejected before any write, got %d posted documents", len(mock.postData))
+	}
+}
+
+// A transient database failure while validating a slice's device groups is not the client's
+// fault and must not be reported as one: the request may be perfectly valid, and mapping it to
+// 400 would prevent a caller from distinguishing a bad request from a server-side outage.
+func TestNetworkSlicePostHandler_ReturnsServerErrorOnDeviceGroupLookupFailure(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	dbadapter.CommonDBClient = &SlicePlmnValidationMockDBClient{
+		err: fmt.Errorf("db unavailable"),
+	}
+
+	slice := networkSlice(testSliceName)
+	slice.SiteDeviceGroup = []string{testGroupName}
+	jsonBody, err := json.Marshal(slice)
+	if err != nil {
+		t.Fatalf("failed to marshal network slice: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected `%d`, got `%d`: %s", http.StatusInternalServerError, w.Code, w.Body.String())
 	}
 }
 

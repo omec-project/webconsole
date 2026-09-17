@@ -358,6 +358,31 @@ func Test_sendPebbleNotification_off_when_handleNetworkSlicePost(t *testing.T) {
 	}
 }
 
+// The authoritative PLMN recheck must run for every device group attached to the slice, not only
+// ones with IP domain config: IMSIs are independent of IpDomainsExpanded, so skipping a group with
+// no IP domains configured would let a mismatched IMSI slip past this race-condition recheck.
+func TestSyncSubscribersOnSliceCreateOrUpdate_RejectsImsiMismatchOnGroupWithNoIpDomains(t *testing.T) {
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+
+	mismatchedGroup := configmodels.DeviceGroups{
+		DeviceGroupName: testGroupName,
+		Imsis:           []string{"999990000000001"}, // does not match the slice's PLMN (208/93)
+	}
+	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{configuredDeviceGroups: []configmodels.DeviceGroups{mismatchedGroup}}
+
+	slice := networkSlice(testSliceName)
+	slice.SiteDeviceGroup = []string{testGroupName}
+
+	statusCode, err := syncSubscribersOnSliceCreateOrUpdate(slice, configmodels.Slice{})
+	if err == nil {
+		t.Fatal("expected an error for the mismatched IMSI, got nil")
+	}
+	if statusCode != http.StatusBadRequest {
+		t.Errorf("expected %d, got %d: %v", http.StatusBadRequest, statusCode, err)
+	}
+}
+
 func Test_handleNetworkSlicePost(t *testing.T) {
 	networkSlices := []configmodels.Slice{
 		networkSlice(testSliceName),
@@ -463,6 +488,44 @@ func TestNetworkSlicePostHandler_NetworkSliceNameValidation(t *testing.T) {
 				t.Errorf("expected `%v`, got `%v`", tc.expectedCode, w.Code)
 			}
 		})
+	}
+}
+
+// A slice with no device groups never reaches the PLMN check inside
+// validateDeviceGroupsBelongToPlmn, so an incomplete PLMN must be rejected independently of
+// whether the slice has any device groups to iterate.
+func TestNetworkSlicePostHandler_RejectsIncompletePlmnWithNoDeviceGroups(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	slice := networkSlice(testSliceName)
+	slice.SiteDeviceGroup = nil
+	slice.SiteInfo.Plmn = configmodels.SliceSiteInfoPlmn{Mcc: "208", Mnc: ""}
+
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	mock := &NetworkSliceMockDBClient{}
+	dbadapter.CommonDBClient = mock
+
+	jsonBody, err := json.Marshal(slice)
+	if err != nil {
+		t.Fatalf("failed to marshal network slice: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected `%d`, got `%d`: %s", http.StatusBadRequest, w.Code, w.Body.String())
+	}
+	if len(mock.postData) != 0 {
+		t.Errorf("expected the incomplete PLMN to be rejected before any write, got %d posted documents", len(mock.postData))
 	}
 }
 

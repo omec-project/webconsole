@@ -134,6 +134,28 @@ func TestValidImsiForPlmn(t *testing.T) {
 	}
 }
 
+// A PLMN must be either fully unassigned or fully specified; one field set without the other
+// cannot be completed later since a non-zero PLMN is treated as immutable once stored.
+func TestIsCompletePlmn(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mcc      string
+		mnc      string
+		expected bool
+	}{
+		{"both set", "208", "93", true},
+		{"both empty", "", "", true},
+		{"mcc only", "208", "", false},
+		{"mnc only", "", "93", false},
+	}
+
+	for _, tc := range testCases {
+		if r := isCompletePlmn(tc.mcc, tc.mnc); r != tc.expected {
+			t.Errorf("%s: isCompletePlmn(%q, %q) = %v, want %v", tc.name, tc.mcc, tc.mnc, r, tc.expected)
+		}
+	}
+}
+
 func TestValidateBitrate(t *testing.T) {
 	testCases := []struct {
 		name     string

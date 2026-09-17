@@ -127,6 +127,11 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 	slices.Sort(request.SiteDeviceGroup)
 	request.SiteDeviceGroup = slices.Compact(request.SiteDeviceGroup)
 
+	mcc, mnc := request.SiteInfo.Plmn.Mcc, request.SiteInfo.Plmn.Mnc
+	if !isCompletePlmn(mcc, mnc) {
+		return request, http.StatusBadRequest, fmt.Errorf("incomplete PLMN (mcc=%q, mnc=%q) for Network Slice %s: both MCC and MNC must be set, or both left empty", mcc, mnc, sliceName)
+	}
+
 	if statusCode, err := validateDeviceGroupsBelongToPlmn(request, sliceName); err != nil {
 		return request, statusCode, err
 	}
@@ -346,6 +351,17 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 			continue
 		}
 
+		// This is the authoritative check: parseAndValidateSliceRequest's pre-check ran before the
+		// slice document was written and before rwLock (held by this function) was acquired, so a
+		// concurrent device-group update could have replaced this group's IMSIs in between. It must
+		// run for every device group regardless of IP domain config, since IMSIs don't depend on it
+		// and the skip below used to let such a group bypass this recheck entirely.
+		for _, imsi := range devGroupConfig.Imsis {
+			if !isValidImsiForPlmn(imsi, mcc, mnc) {
+				return http.StatusBadRequest, fmt.Errorf("IMSI %s does not belong to PLMN mcc=%s, mnc=%s", imsi, mcc, mnc)
+			}
+		}
+
 		if len(devGroupConfig.IpDomainsExpanded) == 0 {
 			logger.ConfigLog.Warnln("IPDomainExpanded is nil or empty for dgName:", dgName)
 			continue
@@ -385,12 +401,6 @@ func processDeviceGroup(devGroupConfig *configmodels.DeviceGroups, snssai *model
 	// Calculate aggregate QoS once for the entire group
 	aggregatedQoS := aggregateQoS(allQosProfiles)
 	for i, imsi := range devGroupConfig.Imsis {
-		// This is the authoritative check: parseAndValidateSliceRequest's pre-check ran before the
-		// slice document was written and before rwLock (held by the caller) was acquired, so a
-		// concurrent device-group update could have replaced this group's IMSIs in between.
-		if !isValidImsiForPlmn(imsi, mcc, mnc) {
-			return http.StatusBadRequest, fmt.Errorf("IMSI %s does not belong to PLMN mcc=%s, mnc=%s", imsi, mcc, mnc)
-		}
 		if subscriberAuthenticationDataGet("imsi-"+imsi) != nil {
 			// Process each IP domain for this IMSI
 			var gpsi string

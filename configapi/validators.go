@@ -58,6 +58,14 @@ func isValidImsiForPlmn(imsi, mcc, mnc string) bool {
 	return strings.HasPrefix(imsi, mcc+mnc)
 }
 
+// A PLMN is either fully unassigned (both MCC and MNC empty) or fully specified -- one set
+// without the other cannot identify a home network and must not be stored, since a slice's PLMN
+// is treated as immutable once non-zero and the operator would then have no way to complete it
+// short of deleting and recreating the slice.
+func isCompletePlmn(mcc, mnc string) bool {
+	return (mcc == "") == (mnc == "")
+}
+
 // A rate is normalised to bps and stored in a signed 32-bit field, so a negative rate is not a
 // rate at all and one that does not fit the field cannot be served as configured.
 func isValidBitrate(value int32, unit string) bool {

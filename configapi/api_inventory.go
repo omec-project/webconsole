@@ -562,7 +562,13 @@ func updateInventoryInNetworkSlices(filter bson.M, updateFunc func(*configmodels
 		if err = json.Unmarshal(configmodels.MapToByte(rawNetworkSlice), &networkSlice); err != nil {
 			return http.StatusInternalServerError, fmt.Errorf("error unmarshaling network slice: %w", err)
 		}
-		prevSlice := getSliceByName(networkSlice.SliceName)
+		prevSlice, err := getSliceByName(networkSlice.SliceName)
+		if err != nil {
+			return http.StatusInternalServerError, fmt.Errorf("failed to look up slice %s: %w", networkSlice.SliceName, err)
+		}
+		if prevSlice == nil {
+			return http.StatusInternalServerError, fmt.Errorf("slice %s not found", networkSlice.SliceName)
+		}
 		updateFunc(&networkSlice)
 		if statusCode, err := updateNS(networkSlice, *prevSlice); err != nil {
 			logger.ConfigLog.Errorf("error updating slice %s: %+v", networkSlice.SliceName, err)

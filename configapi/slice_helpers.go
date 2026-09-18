@@ -37,15 +37,21 @@ func networkSliceDeleteHelper(sliceName string) error {
 
 func networkSlicePostHelper(c *gin.Context, sliceName string) (int, error) {
 	logger.ConfigLog.Infof("received slice: %s", sliceName)
-	requestSlice, err := parseAndValidateSliceRequest(c, sliceName)
+	requestSlice, statusCode, err := parseAndValidateSliceRequest(c, sliceName)
 	if err != nil {
-		return http.StatusBadRequest, err
+		return statusCode, err
 	}
 
 	logSliceMetadata(requestSlice)
 	normalizeApplicationFilteringRules(&requestSlice)
 	requestSlice.SliceName = sliceName
-	prevSlice := getSliceByName(sliceName)
+	prevSlice, err := getSliceByName(sliceName)
+	if err != nil {
+		// An inconclusive lookup must not be treated as "slice does not exist": that would take the
+		// create path below, which can silently overwrite an existing slice's PLMN and reintroduce
+		// the duplicate-subscriber bug this check exists to prevent.
+		return http.StatusInternalServerError, fmt.Errorf("failed to look up existing network slice %s: %w", sliceName, err)
+	}
 
 	if prevSlice == nil {
 		logger.ConfigLog.Infof("Adding new slice [%s]", sliceName)
@@ -54,6 +60,31 @@ func networkSlicePostHelper(c *gin.Context, sliceName string) (int, error) {
 			return statusCode, err
 		}
 	} else {
+		// A zero-value previous PLMN with no device groups attached could never have had a
+		// subscriber synced under it (syncSubscribersOnSliceCreateOrUpdate only writes records for
+		// a slice's device groups), so assigning a real PLMN in that case is not a change to
+		// reject. Once device groups were ever attached, though, syncSubscribersOnSliceCreateOrUpdate
+		// uses mcc+mnc as the serving PLMN key even when both are empty, so an all-zero PLMN can
+		// already have subscriber records filed under that empty key -- changing away from it must
+		// be rejected just like any other PLMN change, since the old records would be left in place.
+		zeroPlmn := configmodels.SliceSiteInfoPlmn{}
+		// This still infers exposure from the current device-group list rather than proof that no
+		// record was ever written under the empty PLMN: handleNetworkSlicePost persists a slice
+		// document before subscriber cleanup/sync for it is attempted, so a prior device-group
+		// removal that updated this list but then failed cleanup could leave the list empty while
+		// records remain. Closing that gap fully needs the document write and its subscriber
+		// cleanup to be one transaction, which no write in this package currently is -- this is a
+		// pre-existing, package-wide characteristic (see e.g. cleanupDeviceGroups), not something
+		// specific to this check, and is tracked as a follow-up rather than fixed here.
+		hadNoPriorSubscriberExposure := prevSlice.SiteInfo.Plmn == zeroPlmn && len(prevSlice.SiteDeviceGroup) == 0
+		if requestSlice.SiteInfo.Plmn != prevSlice.SiteInfo.Plmn && !hadNoPriorSubscriberExposure {
+			// The PLMN identifies the subscribers' serving network in every DB record keyed by
+			// (imsi, PLMN). Changing it here would leave the old records in place and write new
+			// ones under the new PLMN, duplicating every subscriber in the slice's device groups.
+			err := fmt.Errorf("changing the PLMN (MCC/MNC) of an existing network slice %s is not allowed; delete and recreate the slice instead", sliceName)
+			logger.ConfigLog.Errorln(err.Error())
+			return http.StatusBadRequest, err
+		}
 		if statusCode, err := updateNS(requestSlice, *prevSlice); err != nil {
 			logger.ConfigLog.Errorf("Error updating slice %s: %+v", sliceName, err)
 			return statusCode, err
@@ -62,41 +93,74 @@ func networkSlicePostHelper(c *gin.Context, sliceName string) (int, error) {
 	return http.StatusOK, nil
 }
 
-func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodels.Slice, error) {
+func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodels.Slice, int, error) {
 	var request configmodels.Slice
 
 	ct := strings.Split(c.GetHeader("Content-Type"), ";")[0]
 	if ct != jsonContentType {
-		return request, fmt.Errorf("unsupported content-type: %s", ct)
+		return request, http.StatusBadRequest, fmt.Errorf("unsupported content-type: %s", ct)
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		return request, fmt.Errorf("JSON bind error: %w", err)
+		return request, http.StatusBadRequest, fmt.Errorf("JSON bind error: %w", err)
 	}
 
 	for _, gnb := range request.SiteInfo.GNodeBs {
 		if !isValidName(gnb.Name) {
-			return request, fmt.Errorf("invalid gNB name `%s` in Network Slice %s", gnb.Name, sliceName)
+			return request, http.StatusBadRequest, fmt.Errorf("invalid gNB name `%s` in Network Slice %s", gnb.Name, sliceName)
 		}
 		if !isValidGnbTac(gnb.Tac) {
-			return request, fmt.Errorf("invalid TAC %d for gNB %s in Network Slice %s", gnb.Tac, gnb.Name, sliceName)
+			return request, http.StatusBadRequest, fmt.Errorf("invalid TAC %d for gNB %s in Network Slice %s", gnb.Tac, gnb.Name, sliceName)
 		}
 	}
 
 	for _, ruleConfig := range request.ApplicationFilteringRules {
 		if ruleConfig.TrafficClass == nil {
 			logger.ConfigLog.Errorln("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
-			return request, fmt.Errorf("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
+			return request, http.StatusBadRequest, fmt.Errorf("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
 		}
 		if err := validateRuleBitrates(ruleConfig, sliceName); err != nil {
-			return request, err
+			return request, http.StatusBadRequest, err
 		}
 	}
 
 	slices.Sort(request.SiteDeviceGroup)
 	request.SiteDeviceGroup = slices.Compact(request.SiteDeviceGroup)
 
-	return request, nil
+	mcc, mnc := request.SiteInfo.Plmn.Mcc, request.SiteInfo.Plmn.Mnc
+	if !isCompletePlmn(mcc, mnc) {
+		return request, http.StatusBadRequest, fmt.Errorf("incomplete PLMN (mcc=%q, mnc=%q) for Network Slice %s: both MCC and MNC must be set, or both left empty", mcc, mnc, sliceName)
+	}
+
+	if statusCode, err := validateDeviceGroupsBelongToPlmn(request, sliceName); err != nil {
+		return request, statusCode, err
+	}
+
+	return request, http.StatusOK, nil
+}
+
+// A slice's device groups must not carry subscribers from a different home network, since their
+// records would then be filed under a serving PLMN they do not belong to.
+func validateDeviceGroupsBelongToPlmn(request configmodels.Slice, sliceName string) (int, error) {
+	mcc, mnc := request.SiteInfo.Plmn.Mcc, request.SiteInfo.Plmn.Mnc
+	for _, dgName := range request.SiteDeviceGroup {
+		devGroup, err := getDeviceGroupByName(dgName)
+		if err != nil {
+			// A lookup failure is not "no device group to validate": skipping validation on an
+			// inconclusive read could let a mismatched IMSI through undetected. It is also not a
+			// client error: the request itself may be perfectly valid.
+			return http.StatusInternalServerError, fmt.Errorf("failed to look up device group %s: %w", dgName, err)
+		}
+		if devGroup == nil {
+			continue
+		}
+		for _, imsi := range devGroup.Imsis {
+			if !isValidImsiForPlmn(imsi, mcc, mnc) {
+				return http.StatusBadRequest, fmt.Errorf("IMSI %s in device group %s does not belong to PLMN mcc=%s, mnc=%s of Network Slice %s", imsi, dgName, mcc, mnc, sliceName)
+			}
+		}
+	}
+	return http.StatusOK, nil
 }
 
 // A rate that isValidBitrate rejects is one that cannot be served as configured, so the slice is
@@ -278,19 +342,33 @@ var syncSubscribersOnSliceCreateOrUpdate = func(slice configmodels.Slice, prevSl
 	mnc := slice.SiteInfo.Plmn.Mnc
 	for _, dgName := range slice.SiteDeviceGroup {
 		logger.ConfigLog.Debugf("dgName: %s", dgName)
-		devGroupConfig := getDeviceGroupByName(dgName)
+		devGroupConfig, err := getDeviceGroupByName(dgName)
+		if err != nil {
+			return http.StatusInternalServerError, fmt.Errorf("failed to look up device group %s: %w", dgName, err)
+		}
 		if devGroupConfig == nil {
 			logger.ConfigLog.Warnf("Device group not found: %s", dgName)
 			continue
+		}
+
+		// This is the authoritative check: parseAndValidateSliceRequest's pre-check ran before the
+		// slice document was written and before rwLock (held by this function) was acquired, so a
+		// concurrent device-group update could have replaced this group's IMSIs in between. It must
+		// run for every device group regardless of IP domain config, since IMSIs don't depend on it
+		// and the skip below used to let such a group bypass this recheck entirely.
+		for _, imsi := range devGroupConfig.Imsis {
+			if !isValidImsiForPlmn(imsi, mcc, mnc) {
+				return http.StatusBadRequest, fmt.Errorf("IMSI %s does not belong to PLMN mcc=%s, mnc=%s", imsi, mcc, mnc)
+			}
 		}
 
 		if len(devGroupConfig.IpDomainsExpanded) == 0 {
 			logger.ConfigLog.Warnln("IPDomainExpanded is nil or empty for dgName:", dgName)
 			continue
 		}
-		_, err := processDeviceGroup(devGroupConfig, snssai, mcc, mnc)
+		statusCode, err := processDeviceGroup(devGroupConfig, snssai, mcc, mnc)
 		if err != nil {
-			return http.StatusInternalServerError, err
+			return statusCode, err
 		}
 	}
 	if err := cleanupDeviceGroups(slice, prevSlice); err != nil {
@@ -352,7 +430,10 @@ func processDeviceGroup(devGroupConfig *configmodels.DeviceGroups, snssai *model
 func cleanupDeviceGroups(slice, prevSlice configmodels.Slice) error {
 	dgnames := getDeletedDeviceGroupsList(slice, prevSlice)
 	for _, dgName := range dgnames {
-		devGroupConfig := getDeviceGroupByName(dgName)
+		devGroupConfig, err := getDeviceGroupByName(dgName)
+		if err != nil {
+			return fmt.Errorf("failed to look up device group %s during cleanup: %w", dgName, err)
+		}
 		if devGroupConfig == nil {
 			logger.ConfigLog.Warnf("Device group not found during cleanup: %s", dgName)
 			continue
@@ -650,43 +731,57 @@ func isReadableAndExact(val, unit uint64) bool {
 	return isReadable(val, unit) && val%unit == 0
 }
 
-func getSlices() []*configmodels.Slice {
-	rawSlices, errGetMany := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, nil)
-	if errGetMany != nil {
-		logger.DbLog.Warnln(errGetMany)
+// getSlices returns every slice, and an error if the read or an unmarshal failed -- callers must
+// not treat a failure as "no slices exist", since that would make a PLMN/association check that
+// depends on the full slice collection silently pass instead of failing closed.
+func getSlices() ([]*configmodels.Slice, error) {
+	rawSlices, err := dbadapter.CommonDBClient.RestfulAPIGetMany(sliceDataColl, nil)
+	if err != nil {
+		logger.DbLog.Warnln(err)
+		return nil, err
 	}
 	var slices []*configmodels.Slice
 	for _, rawSlice := range rawSlices {
 		var sliceData configmodels.Slice
-		err := json.Unmarshal(configmodels.MapToByte(rawSlice), &sliceData)
-		if err != nil {
+		if err := json.Unmarshal(configmodels.MapToByte(rawSlice), &sliceData); err != nil {
 			logger.DbLog.Errorf("could not unmarshall slice %+v", rawSlice)
+			return nil, err
 		}
 		slices = append(slices, &sliceData)
 	}
-	return slices
+	return slices, nil
 }
 
-func getSliceByName(name string) *configmodels.Slice {
+// getSliceByName returns (nil, nil) when no slice matches name, and (nil, err) when the lookup or
+// its unmarshal failed -- the two must stay distinguishable so a transient read failure is never
+// mistaken for "slice does not exist yet" by a caller that would otherwise create/overwrite it.
+func getSliceByName(name string) (*configmodels.Slice, error) {
 	filter := bson.M{sliceNameKey: name}
-	sliceDataInterface, errGetOne := dbadapter.CommonDBClient.RestfulAPIGetOne(sliceDataColl, filter)
-	if errGetOne != nil {
-		logger.DbLog.Warnln(errGetOne)
-		return nil
+	sliceDataInterface, err := dbadapter.CommonDBClient.RestfulAPIGetOne(sliceDataColl, filter)
+	if err != nil {
+		logger.DbLog.Warnln(err)
+		return nil, err
+	}
+	if sliceDataInterface == nil {
+		return nil, nil
 	}
 	var sliceData configmodels.Slice
-	err := json.Unmarshal(configmodels.MapToByte(sliceDataInterface), &sliceData)
-	if err != nil {
+	if err := json.Unmarshal(configmodels.MapToByte(sliceDataInterface), &sliceData); err != nil {
 		logger.DbLog.Errorf("could not unmarshall slice %+v", sliceDataInterface)
-		return nil
+		return nil, err
 	}
-	return &sliceData
+	return &sliceData, nil
 }
 
 func handleNetworkSliceDelete(sliceName string) error {
-	prevSlice := getSliceByName(sliceName)
+	prevSlice, err := getSliceByName(sliceName)
+	if err != nil {
+		// The previous slice is required for subscriber cleanup below; deleting without it would
+		// leave AM/SM/SMF-selection records orphaned under the slice's old PLMN.
+		return fmt.Errorf("failed to look up slice %s before delete: %w", sliceName, err)
+	}
 	filter := bson.M{sliceNameKey: sliceName}
-	err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
+	err = dbadapter.CommonDBClient.RestfulAPIDeleteOne(sliceDataColl, filter)
 	if err != nil {
 		logger.DbLog.Errorf("failed to delete slice data for %+v: %+v", sliceName, err)
 		return err

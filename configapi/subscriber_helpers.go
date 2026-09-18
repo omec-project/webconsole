@@ -6,6 +6,7 @@ package configapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/omec-project/openapi/v2/models"
@@ -192,7 +193,10 @@ func updateSubscriberInDeviceGroups(imsi string) (int, error) {
 			}
 		}
 		deviceGroup.Imsis = filteredImsis
-		prevDevGroup := getDeviceGroupByName(deviceGroup.DeviceGroupName)
+		prevDevGroup, err := getDeviceGroupByName(deviceGroup.DeviceGroupName)
+		if err != nil {
+			return http.StatusInternalServerError, fmt.Errorf("failed to look up device group %s: %w", deviceGroup.DeviceGroupName, err)
+		}
 		if statusCode, err := handleDeviceGroupPost(&deviceGroup, prevDevGroup); err != nil {
 			logger.ConfigLog.Errorf("error posting device group %+v: %+v", deviceGroup, err)
 			return statusCode, err

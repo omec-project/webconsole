@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -32,7 +33,10 @@ func (db *DeviceGroupMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) 
 	if db.err != nil {
 		return nil, db.err
 	}
-	if len(db.configuredDeviceGroups) == 0 {
+	// Other collections (e.g. sliceDataColl, looked up when syncing a device group's associated
+	// slice) must not be answered with device group documents, which cannot unmarshal as anything
+	// else and would otherwise mask that path failing to see "no data" as it should.
+	if coll != devGroupDataColl || len(db.configuredDeviceGroups) == 0 {
 		return nil, nil
 	}
 	dg := configmodels.ToBsonM(db.configuredDeviceGroups[0])
@@ -45,6 +49,9 @@ func (db *DeviceGroupMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) 
 func (db *DeviceGroupMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
 	if db.err != nil {
 		return nil, db.err
+	}
+	if coll != devGroupDataColl {
+		return nil, nil
 	}
 	var results []map[string]any
 	for _, deviceGroup := range db.configuredDeviceGroups {
@@ -498,6 +505,127 @@ func postDeviceGroup(t *testing.T, dg configmodels.DeviceGroups) *httptest.Respo
 	return w
 }
 
+// DeviceGroupSliceAwareMockDBClient answers slice lookups by collection, unlike
+// DeviceGroupMockDBClient which always returns the same stored device group regardless of
+// collection.
+type DeviceGroupSliceAwareMockDBClient struct {
+	dbadapter.DBInterface
+	slices   []configmodels.Slice
+	postData []map[string]any
+}
+
+func (db *DeviceGroupSliceAwareMockDBClient) RestfulAPIGetOne(coll string, filter bson.M) (map[string]any, error) {
+	return nil, nil
+}
+
+func (db *DeviceGroupSliceAwareMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	if coll != sliceDataColl {
+		return nil, nil
+	}
+	var results []map[string]any
+	for _, s := range db.slices {
+		results = append(results, configmodels.ToBsonM(s))
+	}
+	return results, nil
+}
+
+func (db *DeviceGroupSliceAwareMockDBClient) RestfulAPIPost(collName string, filter bson.M, postData map[string]any) (bool, error) {
+	db.postData = append(db.postData, map[string]any{collKey: collName, filterKey: filter, dataKey: postData})
+	return true, nil
+}
+
+func (db *DeviceGroupSliceAwareMockDBClient) RestfulAPIPutOne(collName string, filter bson.M, putData map[string]any) (bool, error) {
+	db.postData = append(db.postData, map[string]any{collKey: collName, filterKey: filter, dataKey: putData})
+	return true, nil
+}
+
+// The first digits of an IMSI are its home PLMN, so a device group already attached to a slice
+// must not accept a subscriber whose IMSI belongs to a different PLMN.
+func TestDeviceGroupPostHandler_RejectsImsiNotMatchingAssociatedSlicePlmn(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	associatedSlice := networkSlice(testSliceName)
+	associatedSlice.SiteDeviceGroup = []string{testGroupName}
+
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	mock := &DeviceGroupSliceAwareMockDBClient{slices: []configmodels.Slice{associatedSlice}}
+	dbadapter.CommonDBClient = mock
+
+	newDeviceGroup := deviceGroup(testGroupName)
+	newDeviceGroup.Imsis = []string{"999990000000001"}
+	jsonBody, err := json.Marshal(newDeviceGroup)
+	if err != nil {
+		t.Fatalf("failed to marshal device group: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/device-group/"+testGroupName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected `%d`, got `%d`: %s", http.StatusBadRequest, w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "999990000000001") {
+		t.Errorf("expected error to mention the mismatched IMSI, got `%s`", w.Body.String())
+	}
+	if len(mock.postData) != 0 {
+		t.Errorf("expected the mismatch to be rejected before any write, got %d posted documents", len(mock.postData))
+	}
+}
+
+// A device group can be associated with more than one slice, so a concurrent IMSI must be
+// rejected if it mismatches *any* associated slice's PLMN, not just whichever slice
+// findSlicesByDeviceGroup happens to return first.
+func TestDeviceGroupPostHandler_SyncRejectsImsiMismatchingAnyAssociatedSlice(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	sliceA := networkSlice("sliceA")
+	sliceA.SiteDeviceGroup = []string{testGroupName}
+	sliceA.SliceId = configmodels.SliceSliceId{Sst: "1", Sd: "010203"}
+
+	sliceB := networkSlice("sliceB")
+	sliceB.SiteDeviceGroup = []string{testGroupName}
+	sliceB.SliceId = configmodels.SliceSliceId{Sst: "2", Sd: "010203"}
+	sliceB.SiteInfo.Plmn = configmodels.SliceSiteInfoPlmn{Mcc: "111", Mnc: "22"}
+
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	mock := &DeviceGroupSliceAwareMockDBClient{slices: []configmodels.Slice{sliceA, sliceB}}
+	dbadapter.CommonDBClient = mock
+
+	// Matches sliceA's PLMN (208/93) but not sliceB's (111/22).
+	newDeviceGroup := deviceGroup(testGroupName)
+	newDeviceGroup.Imsis = []string{"208930000000001"}
+	jsonBody, err := json.Marshal(newDeviceGroup)
+	if err != nil {
+		t.Fatalf("failed to marshal device group: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/device-group/"+testGroupName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected `%d`, got `%d`: %s", http.StatusBadRequest, w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "208930000000001") {
+		t.Errorf("expected error to mention the mismatched IMSI, got `%s`", w.Body.String())
+	}
+}
+
 // A rate that cannot be served as configured is refused, where it used to be accepted and stored as
 // something else entirely: a negative rate became math.MaxInt64, the largest rate the element can
 // carry, and a Gbps rate large enough to wrap the field was clamped to the same value by the sign
@@ -633,7 +761,10 @@ func TestGetDeviceGroupByNameHelperLabelsStoredRatesAsBps(t *testing.T) {
 		configuredDeviceGroups: []configmodels.DeviceGroups{stored},
 	}
 
-	loaded := getDeviceGroupByName(testGroupName)
+	loaded, err := getDeviceGroupByName(testGroupName)
+	if err != nil {
+		t.Fatalf("failed to look up device group: %v", err)
+	}
 	if loaded == nil {
 		t.Fatal("expected the device group to be loaded")
 	}
@@ -651,7 +782,10 @@ func TestGetDeviceGroupByNameHelperLabelsStoredRatesAsBps(t *testing.T) {
 	dbadapter.CommonDBClient = &DeviceGroupMockDBClient{
 		configuredDeviceGroups: []configmodels.DeviceGroups{other},
 	}
-	otherLoaded := getDeviceGroupByName("group2")
+	otherLoaded, err := getDeviceGroupByName("group2")
+	if err != nil {
+		t.Fatalf("failed to look up device group: %v", err)
+	}
 	if otherLoaded == nil {
 		t.Fatal("expected the second device group to be loaded")
 	}

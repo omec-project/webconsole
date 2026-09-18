@@ -7,6 +7,7 @@ import (
 	"math"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -40,6 +41,29 @@ func isValidUpfPort(port string) bool {
 
 func isValidGnbTac(tac int32) bool {
 	return tac >= 1 && tac <= 16777215
+}
+
+// The first digits of an IMSI are its home PLMN (MCC+MNC), so a subscriber whose IMSI does not
+// start with a slice's PLMN does not belong to that network and its records would be filed under
+// the wrong serving PLMN — an empty PLMN means the slice hasn't been assigned one yet and is not
+// something this check can validate against. A PLMN with only one of MCC/MNC set is neither
+// unassigned nor complete, so it is rejected rather than treated as a usable prefix.
+func isValidImsiForPlmn(imsi, mcc, mnc string) bool {
+	if mcc == "" && mnc == "" {
+		return true
+	}
+	if mcc == "" || mnc == "" {
+		return false
+	}
+	return strings.HasPrefix(imsi, mcc+mnc)
+}
+
+// A PLMN is either fully unassigned (both MCC and MNC empty) or fully specified -- one set
+// without the other cannot identify a home network and must not be stored, since a slice's PLMN
+// is treated as immutable once non-zero and the operator would then have no way to complete it
+// short of deleting and recreating the slice.
+func isCompletePlmn(mcc, mnc string) bool {
+	return (mcc == "") == (mnc == "")
 }
 
 // A rate is normalised to bps and stored in a signed 32-bit field, so a negative rate is not a

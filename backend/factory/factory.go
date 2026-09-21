@@ -65,12 +65,6 @@ func InitConfigFactory(f string) error {
 		}
 	}
 
-	if WebUIConfig.Configuration.RocEnd != nil {
-		if WebUIConfig.Configuration.RocEnd.Enabled && WebUIConfig.Configuration.RocEnd.SyncUrl == "" {
-			return fmt.Errorf("[Configuration] if RocEnd enabled, SyncUrl must be set")
-		}
-	}
-
 	return nil
 }
 

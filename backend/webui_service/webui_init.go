@@ -13,7 +13,6 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
-	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -113,46 +112,8 @@ func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 	self := webui_context.WEBUI_Self()
 	self.UpdateNfProfiles()
 
-	// fetch one time configuration from the simapp/roc on startup
-	// this is to fetch existing config
-	if factory.WebUIConfig.Configuration.RocEnd != nil {
-		if factory.WebUIConfig.Configuration.RocEnd.Enabled && factory.WebUIConfig.Configuration.RocEnd.SyncUrl != "" {
-			go fetchConfigAdapater()
-		}
-	} else {
-		logger.AppLog.Infoln("simapp/roc configuration not fetched")
-	}
-
 	<-ctx.Done()
 	logger.AppLog.Infoln("WebUI shutting down due to context cancel")
-}
-
-func fetchConfigAdapater() {
-	for {
-		client := &http.Client{}
-		httpend := factory.WebUIConfig.Configuration.RocEnd.SyncUrl
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, httpend, nil)
-		// Handle Error
-		if err != nil {
-			logger.InitLog.Errorf("an error occurred %v", err)
-			time.Sleep(1 * time.Second)
-			continue
-		}
-		// set the request header Content-Type for json
-		req.Header.Set("Content-Type", "application/json; charset=utf-8")
-		resp, err := client.Do(req)
-		if err != nil {
-			logger.InitLog.Errorf("an error occurred %v", err)
-			time.Sleep(1 * time.Second)
-			continue
-		}
-		err = resp.Body.Close()
-		if err != nil {
-			logger.InitLog.Errorf("an error occurred %v", err)
-		}
-		logger.InitLog.Infof("fetching config from simapp/roc. Response code = %d", resp.StatusCode)
-		break
-	}
 }
 
 func triggerNFConfigSyncMiddleware(syncChan chan<- struct{}) gin.HandlerFunc {

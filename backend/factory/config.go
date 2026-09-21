@@ -31,14 +31,13 @@ type Info struct {
 }
 
 type Configuration struct {
-	Mongodb                 *Mongodb  `yaml:"mongodb"`
-	WebuiTLS                *TLS      `yaml:"webui-tls"`
-	NfConfigTLS             *TLS      `yaml:"nfconfig-tls"`
-	RocEnd                  *RocEndpt `yaml:"managedByConfigPod,omitempty"` // fetch config during bootup
-	SdfComp                 bool      `yaml:"spec-compliant-sdf"`
-	EnableAuthentication    bool      `yaml:"enableAuthentication,omitempty"`
-	SendPebbleNotifications bool      `yaml:"send-pebble-notifications,omitempty"`
-	CfgPort                 int       `yaml:"cfgport,omitempty"`
+	Mongodb                 *Mongodb `yaml:"mongodb"`
+	WebuiTLS                *TLS     `yaml:"webui-tls"`
+	NfConfigTLS             *TLS     `yaml:"nfconfig-tls"`
+	SdfComp                 bool     `yaml:"spec-compliant-sdf"`
+	EnableAuthentication    bool     `yaml:"enableAuthentication,omitempty"`
+	SendPebbleNotifications bool     `yaml:"send-pebble-notifications,omitempty"`
+	CfgPort                 int      `yaml:"cfgport,omitempty"`
 }
 
 type TLS struct {
@@ -53,9 +52,4 @@ type Mongodb struct {
 	AuthUrl        string `yaml:"authUrl"`
 	WebuiDBName    string `yaml:"webuiDbName,omitempty"`
 	WebuiDBUrl     string `yaml:"webuiDbUrl,omitempty"`
-}
-
-type RocEndpt struct {
-	SyncUrl string `yaml:"syncUrl,omitempty"`
-	Enabled bool   `yaml:"enabled,omitempty"`
 }

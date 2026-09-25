@@ -152,13 +152,16 @@ func TestMainValidateCLIFlags(t *testing.T) {
 
 func TestStartApplication(t *testing.T) {
 	originalInit := initMongoDB
+	originalEnsure := ensureSubscriberIndexes
 	originalNewNF := newNFConfigServer
 	originalRun := runServer
 	defer func() {
 		initMongoDB = originalInit
+		ensureSubscriberIndexes = originalEnsure
 		newNFConfigServer = originalNewNF
 		runServer = originalRun
 	}()
+	ensureSubscriberIndexes = func() error { return nil }
 
 	t.Run("nil config", func(t *testing.T) {
 		err := startApplication(nil)
@@ -174,6 +177,20 @@ func TestStartApplication(t *testing.T) {
 		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
 		if err == nil || !strings.Contains(err.Error(), "mongo failed") {
 			t.Errorf("expected mongo init error, got: %v", err)
+		}
+	})
+
+	t.Run("index ensure failure", func(t *testing.T) {
+		initMongoDB = func() error { return nil }
+		ensureSubscriberIndexes = func() error { return fmt.Errorf("index failed") }
+		defer func() { ensureSubscriberIndexes = func() error { return nil } }()
+		newNFConfigServer = func(config *factory.Config) (nfconfig.NFConfigInterface, error) {
+			t.Error("NF config server created although the indexes failed")
+			return nil, fmt.Errorf("unreachable")
+		}
+		err := startApplication(&factory.Config{Configuration: &factory.Configuration{}})
+		if err == nil || !strings.Contains(err.Error(), "index failed") {
+			t.Errorf("expected index ensure error, got: %v", err)
 		}
 	})
 

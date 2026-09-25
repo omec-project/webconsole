@@ -92,6 +92,18 @@ type indexCreator interface {
 	CreateIndex(collName string, keyField string) (bool, error)
 }
 
+// indexEnsurer is kept out of DBInterface because only startup calls it, and
+// widening DBInterface would make every test double implement it.
+// *MongoDBClient satisfies it through the embedded mongoapi.MongoClient.
+type indexEnsurer interface {
+	EnsureIndex(ctx context.Context, collName string, spec mongoapi.IndexSpec) error
+}
+
+// indexEnsureAttemptTimeout bounds one EnsureIndex call, which builds the index
+// and then reads the collection's indexes back to confirm it. Without it a hung
+// call would spend the whole retry budget on one attempt instead of being retried.
+const indexEnsureAttemptTimeout = 30 * time.Second
+
 var (
 	CommonDBClient DBInterface
 	AuthDBClient   DBInterface
@@ -101,6 +113,9 @@ var (
 type MongoDBClient struct {
 	mongoapi.MongoClient
 }
+
+var _ indexEnsurer = (*MongoDBClient)(nil)
+
 type SessionRunner func(ctx context.Context, fn func(sc context.Context) error) error
 
 func GetSessionRunner(client DBInterface) SessionRunner {
@@ -264,6 +279,56 @@ func createIndexWithRetry(client indexCreator, collName string, keyField string,
 			continue
 		case <-timer.C:
 			return fmt.Errorf("timed out creating index for %s.%s: %w", collName, keyField, err)
+		}
+	}
+}
+
+// EnsureIndex makes the collection collName, reached through client, carry the
+// index spec describes. It fails if client is not connected or cannot ensure
+// indexes, rather than skipping the index.
+func EnsureIndex(client DBInterface, collName string, spec mongoapi.IndexSpec) error {
+	if client == nil {
+		return fmt.Errorf("mongoDB client has not been initialized")
+	}
+	ensurer, ok := client.(indexEnsurer)
+	if !ok {
+		return fmt.Errorf("mongoDB client %T cannot ensure index %q on %s", client, spec.Name, collName)
+	}
+	return ensureIndexWithRetry(ensurer, collName, spec, 180*time.Second, 2*time.Second, indexEnsureAttemptTimeout)
+}
+
+// ensureIndexWithRetry retries every error until timeout, not only those
+// isRetryableIndexError accepts: EnsureIndex reports an index created
+// concurrently by another process as an error to retry, and that predicate
+// does not recognise it.
+func ensureIndexWithRetry(client indexEnsurer, collName string, spec mongoapi.IndexSpec, timeout, retryInterval, attemptTimeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(retryInterval)
+	defer ticker.Stop()
+
+	for {
+		attemptCtx, cancelAttempt := context.WithTimeout(ctx, attemptTimeout)
+		err := client.EnsureIndex(attemptCtx, collName, spec)
+		cancelAttempt()
+		if err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return fmt.Errorf("timed out ensuring index %q on %s: %w", spec.Name, collName, err)
+		}
+
+		logger.InitLog.Warnw("retrying MongoDB index ensure",
+			"collection", collName,
+			"index", spec.Name,
+			"error", err)
+
+		select {
+		case <-ticker.C:
+			continue
+		case <-ctx.Done():
+			return fmt.Errorf("timed out ensuring index %q on %s: %w", spec.Name, collName, err)
 		}
 	}
 }

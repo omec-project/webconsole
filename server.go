@@ -16,14 +16,16 @@ import (
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/nfconfig"
 	"github.com/omec-project/webconsole/backend/webui_service"
+	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/dbadapter"
 	"github.com/urfave/cli/v3"
 )
 
 var (
-	initMongoDB       = dbadapter.InitMongoDB
-	newNFConfigServer = nfconfig.NewNFConfigServer
-	runServer         = runWebUIAndNFConfig
+	initMongoDB             = dbadapter.InitMongoDB
+	ensureSubscriberIndexes = configapi.EnsureSubscriberIndexes
+	newNFConfigServer       = nfconfig.NewNFConfigServer
+	runServer               = runWebUIAndNFConfig
 )
 
 func main() {
@@ -70,6 +72,10 @@ func startApplication(config *factory.Config) error {
 	}
 	if err := initMongoDB(); err != nil {
 		logger.InitLog.Errorf("failed to initialize MongoDB: %v", err)
+		return err
+	}
+	if err := ensureSubscriberIndexes(); err != nil {
+		logger.InitLog.Errorf("failed to ensure subscriber indexes: %v", err)
 		return err
 	}
 	webui := &webui_service.WEBUI{}

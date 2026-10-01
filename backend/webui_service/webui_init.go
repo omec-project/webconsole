@@ -10,9 +10,11 @@ package webui_service
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -71,7 +73,11 @@ func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 		MaxAge:           86400,
 	}))
 
+	// The goroutine sends the configured server, or closes the channel without
+	// sending when configuration fails, so the shutdown below knows which.
+	serverCh := make(chan *http.Server, 1)
 	go func() {
+		defer close(serverCh)
 		httpAddr := ":" + strconv.Itoa(factory.WebUIConfig.Configuration.CfgPort)
 		logger.InitLog.Infoln("Webui HTTP addr", httpAddr)
 		tlsConfig := factory.WebUIConfig.Configuration.WebuiTLS
@@ -97,6 +103,7 @@ func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 			}
 		}
 
+		serverCh <- server
 		if tlsConfig != nil {
 			logger.InitLog.Infoln("Starting HTTPS server with TLS on", httpAddr)
 			err = server.ListenAndServeTLS(tlsConfig.PEM, tlsConfig.Key)
@@ -104,7 +111,7 @@ func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 			logger.InitLog.Infoln("Starting HTTP server on", httpAddr)
 			err = server.ListenAndServe()
 		}
-		if err != nil {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.InitLog.Fatalln("HTTP server setup failed:", err)
 		}
 	}()
@@ -114,6 +121,19 @@ func (webui *WEBUI) Start(ctx context.Context, syncChan chan<- struct{}) {
 
 	<-ctx.Done()
 	logger.AppLog.Infoln("WebUI shutting down due to context cancel")
+	// Wait for configuration to end either way: a server that is still being
+	// configured would otherwise start listening after Start has returned.
+	// Shutdown also works before ListenAndServe, which then returns at once.
+	server, ok := <-serverCh
+	if !ok {
+		// Configuration failed; there is no server to shut down.
+		return
+	}
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.AppLog.Warnln("WebUI server shutdown:", err)
+	}
 }
 
 func triggerNFConfigSyncMiddleware(syncChan chan<- struct{}) gin.HandlerFunc {

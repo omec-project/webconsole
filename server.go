@@ -10,7 +10,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -88,17 +90,26 @@ func startApplication(config *factory.Config) error {
 }
 
 func runWebUIAndNFConfig(webui webui_service.WebUIInterface, nfConf nfconfig.NFConfigInterface) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// SIGTERM (a pod delete or a rollout) and Ctrl-C cancel the context, which
+	// shuts both servers down; the process then exits 0.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	syncChan := make(chan struct{}, 1)
-	go webui.Start(ctx, syncChan)
+	webuiDone := make(chan struct{})
+	go func() {
+		defer close(webuiDone)
+		webui.Start(ctx, syncChan)
+	}()
 	logger.InitLog.Infoln("WebUI started")
 
 	err := nfConf.Start(ctx, syncChan)
+	// Stop the WebUI as well when NFConfig returns for any other reason, and
+	// wait for its server to shut down.
+	stop()
+	<-webuiDone
 	if err != nil {
-		cancel()
 		return fmt.Errorf("NFConfig failed: %w", err)
 	}
-
+	logger.InitLog.Infoln("WebUI and NFConfig stopped")
 	return nil
 }

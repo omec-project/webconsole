@@ -7,9 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -88,6 +90,53 @@ func TestRunWebUIAndNFConfig_GivenFailureInNfConfigServiceExpectError(t *testing
 	err := runWebUIAndNFConfig(webui, nf)
 	if err == nil || !strings.Contains(err.Error(), "NFConfig start failed") {
 		t.Errorf("expected NFConfig failure, got %v", err)
+	}
+}
+
+// mockBlockingWebUI and mockBlockingNFConfig run until the context is
+// cancelled, as the real servers do.
+type mockBlockingWebUI struct {
+	startedCh chan struct{}
+	stopped   atomic.Bool
+}
+
+func (m *mockBlockingWebUI) Start(ctx context.Context, syncChan chan<- struct{}) {
+	close(m.startedCh)
+	<-ctx.Done()
+	m.stopped.Store(true)
+}
+
+type mockBlockingNFConfig struct{}
+
+func (m *mockBlockingNFConfig) Start(ctx context.Context, syncChan <-chan struct{}) error {
+	<-ctx.Done()
+	return nil
+}
+
+func TestRunWebUIAndNFConfig_GivenSIGTERM_ExpectBothStoppedAndNoError(t *testing.T) {
+	webui := &mockBlockingWebUI{startedCh: make(chan struct{})}
+	errCh := make(chan error, 1)
+	go func() { errCh <- runWebUIAndNFConfig(webui, &mockBlockingNFConfig{}) }()
+
+	select {
+	case <-webui.startedCh:
+	case <-time.After(time.Second):
+		t.Fatal("webui.Start was not called in time")
+	}
+	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+		t.Fatalf("sending SIGTERM: %v", err)
+	}
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Errorf("expected no error after SIGTERM, got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("runWebUIAndNFConfig did not return after SIGTERM")
+	}
+	if !webui.stopped.Load() {
+		t.Error("expected the WebUI to have stopped before runWebUIAndNFConfig returned")
 	}
 }
 

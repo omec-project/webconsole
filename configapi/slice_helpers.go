@@ -250,7 +250,13 @@ func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (ruleShape, b
 		if err != nil {
 			return ruleShape{}, true
 		}
-		shape.prefixLen, _ = ipNet.Mask.Size()
+		ones, bits := ipNet.Mask.Size()
+		// The UPF keeps only the low 32 bits of an IPv6 mask, so an IPv6 prefix reaches the
+		// datapath as the part of it that falls in those bits.
+		if bits == 8*net.IPv6len {
+			ones = max(0, ones-(8*net.IPv6len-32))
+		}
+		shape.prefixLen = ones
 	}
 	if rule.Protocol == protocolTCP || rule.Protocol == protocolUDP {
 		if rule.StartPort < 0 || rule.EndPort > math.MaxUint16 || rule.StartPort > rule.EndPort {

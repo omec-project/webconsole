@@ -1133,6 +1133,75 @@ func TestNetworkSlicePostHandler_BitrateValidation(t *testing.T) {
 	}
 }
 
+func filteringRuleWithPorts(protocol, start, end int32) configmodels.SliceApplicationFilteringRules {
+	return configmodels.SliceApplicationFilteringRules{
+		RuleName:     "port-rule",
+		Endpoint:     "10.0.0.0/8",
+		Protocol:     protocol,
+		StartPort:    start,
+		EndPort:      end,
+		TrafficClass: &configmodels.TrafficClassInfo{Qci: 9, Arp: 1},
+	}
+}
+
+// The UPF refuses a port range it cannot install, and with it every session the rule applies to.
+func TestNetworkSlicePostHandler_PortRangeValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	testCases := []struct {
+		name          string
+		rule          configmodels.SliceApplicationFilteringRules
+		expectedCode  int
+		expectedError string
+	}{
+		{"range of 101 ports", filteringRuleWithPorts(protocolUDP, 1000, 1100), http.StatusBadRequest, "covers more than 100 ports"},
+		{"every port but zero", filteringRuleWithPorts(protocolTCP, 1, 65535), http.StatusBadRequest, "covers more than 100 ports"},
+		{"start above end", filteringRuleWithPorts(protocolTCP, 81, 80), http.StatusBadRequest, "invalid port range 81-80"},
+		{"start without end", filteringRuleWithPorts(protocolTCP, 80, 0), http.StatusBadRequest, "invalid port range 80-0"},
+		{"negative start", filteringRuleWithPorts(protocolTCP, -1, 80), http.StatusBadRequest, "invalid port range -1-80"},
+		{"end above the largest port", filteringRuleWithPorts(protocolUDP, 65500, 65536), http.StatusBadRequest, "invalid port range 65500-65536"},
+		{"range of 100 ports", filteringRuleWithPorts(protocolUDP, 1000, 1099), http.StatusOK, ""},
+		{"range from port zero", filteringRuleWithPorts(protocolUDP, 0, 99), http.StatusOK, ""},
+		{"single port", filteringRuleWithPorts(protocolTCP, 443, 443), http.StatusOK, ""},
+		{"no port", filteringRuleWithPorts(protocolTCP, 0, 0), http.StatusOK, ""},
+		{"every port", filteringRuleWithPorts(protocolTCP, 0, 65535), http.StatusOK, ""},
+		// No SDF filter carries ports for any other protocol, so they never reach the UPF.
+		{"ports on a rule for any protocol", filteringRuleWithPorts(0, 1, 65535), http.StatusOK, ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			// Installed for every case, so that a range that slipped through answers 200, not a 500
+			// from the nil client.
+			dbadapter.CommonDBClient = &NetworkSliceMockDBClient{}
+			slice := networkSlice(testSliceName)
+			slice.ApplicationFilteringRules = []configmodels.SliceApplicationFilteringRules{tc.rule}
+			jsonBody, err := json.Marshal(slice)
+			if err != nil {
+				t.Fatalf("failed to marshal network slice %v", err)
+			}
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+			if tc.expectedCode != w.Code {
+				t.Errorf("expected `%v`, got `%v`: %s", tc.expectedCode, w.Code, w.Body.String())
+			}
+			if tc.expectedError != "" && !strings.Contains(w.Body.String(), tc.expectedError) {
+				t.Errorf("expected body to contain error about `%v`, got `%v`", tc.expectedError, w.Body.String())
+			}
+		})
+	}
+}
+
 // A GET returns the stored rule, so the unit has to describe the stored value. The property that
 // matters is idempotence: posting back what a GET returned must not multiply the rates again.
 func TestNormalizeRewritesTheUnitToTheStoredOne(t *testing.T) {

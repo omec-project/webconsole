@@ -122,6 +122,9 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 		if err := validateRuleBitrates(ruleConfig, sliceName); err != nil {
 			return request, http.StatusBadRequest, err
 		}
+		if err := validateRulePorts(ruleConfig, sliceName); err != nil {
+			return request, http.StatusBadRequest, err
+		}
 	}
 
 	slices.Sort(request.SiteDeviceGroup)
@@ -179,6 +182,36 @@ func validateRuleBitrates(rule configmodels.SliceApplicationFilteringRules, slic
 		if !isValidBitrate(rate.value, rule.BitrateUnit) {
 			return fmt.Errorf("invalid %s %d %q for rule %s in Network Slice %s", rate.name, rate.value, rule.BitrateUnit, rule.RuleName, sliceName)
 		}
+	}
+	return nil
+}
+
+const (
+	protocolTCP int32 = 6
+	protocolUDP int32 = 17
+	// The UPF installs a port range as one rule per port, and refuses a range of more than this
+	// many ports. It refuses the whole session that carries the rule, not only the rule.
+	maxRulePortRangeWidth = 100
+)
+
+// A rule's ports reach the UPF only for TCP and UDP, as a range in its SDF filter. The UPF refuses a
+// range wider than it can install, and with it every session the rule applies to. A range it cannot
+// parse, it drops with the rest of the filter, installing the rule as matching any traffic. Both are
+// refused here. Both ports zero writes no port into the filter, and the UPF reads the full range as
+// any port.
+func validateRulePorts(rule configmodels.SliceApplicationFilteringRules, sliceName string) error {
+	if rule.Protocol != protocolTCP && rule.Protocol != protocolUDP {
+		return nil
+	}
+	start, end := rule.StartPort, rule.EndPort
+	if start == 0 && end == 0 || start == 0 && end == math.MaxUint16 {
+		return nil
+	}
+	if start < 0 || end > math.MaxUint16 || start > end {
+		return fmt.Errorf("invalid port range %d-%d for rule %s in Network Slice %s", start, end, rule.RuleName, sliceName)
+	}
+	if end-start+1 > maxRulePortRangeWidth {
+		return fmt.Errorf("port range %d-%d for rule %s in Network Slice %s covers more than %d ports", start, end, rule.RuleName, sliceName, maxRulePortRangeWidth)
 	}
 	return nil
 }

@@ -1325,6 +1325,13 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 			expectedCode: http.StatusOK,
 		},
 		{
+			// The UPF refuses a range it cannot install before writing anything, so it takes no mask.
+			name:         "a stored port range too wide to install takes no shape",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", ruleTo("10.0.0.0/8", protocolTCP, 1000, 1100))},
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules()[:6], ruleTo("0.0.0.0/0", protocolTCP, 0, 0), ruleTo("0.0.0.0/0", protocolUDP, 53, 53))...),
+			expectedCode: http.StatusOK,
+		},
+		{
 			name:         "a slice naming no UPF is not counted",
 			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", sevenPrefixRules()...)},
 			posted:       sliceOnUpf("a", "", append(sevenPrefixRules(), allowAll, ruleTo("0.0.0.0/0", protocolTCP, 0, 0))...),

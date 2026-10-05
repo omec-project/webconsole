@@ -237,8 +237,10 @@ type ruleShape struct {
 // The shape of the PDR the UPF installs for this rule, as buildFlowDescription writes its SDF
 // filter. The UPF installs a PDR whose filter it cannot parse without the filter, matching any
 // traffic, so an endpoint or a port range it cannot parse has the shape of a rule permitting any
-// traffic. validateRulePorts refuses such a range, but a slice stored before it may hold one.
-func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) ruleShape {
+// traffic. A range it parses but cannot install, it refuses before writing anything, so that rule
+// takes no mask and reports false. validateRulePorts refuses both kinds of range, but a slice stored
+// before it may hold one.
+func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (ruleShape, bool) {
 	var shape ruleShape
 	if endpoint := rule.Endpoint; !strings.HasPrefix(endpoint, "0.0.0.0") {
 		if !strings.Contains(endpoint, "/") {
@@ -246,19 +248,22 @@ func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) ruleShape {
 		}
 		_, ipNet, err := net.ParseCIDR(endpoint)
 		if err != nil {
-			return ruleShape{}
+			return ruleShape{}, true
 		}
 		shape.prefixLen, _ = ipNet.Mask.Size()
 	}
 	if rule.Protocol == protocolTCP || rule.Protocol == protocolUDP {
 		if rule.StartPort < 0 || rule.EndPort > math.MaxUint16 || rule.StartPort > rule.EndPort {
-			return ruleShape{}
+			return ruleShape{}, true
 		}
 		shape.protocol = true
 		anyPort := rule.StartPort == 0 && (rule.EndPort == 0 || rule.EndPort == math.MaxUint16)
+		if !anyPort && rule.EndPort-rule.StartPort+1 > maxRulePortRangeWidth {
+			return ruleShape{}, false
+		}
 		shape.port = !anyPort
 	}
-	return shape
+	return shape, true
 }
 
 func upfNameOf(slice configmodels.Slice) string {
@@ -286,7 +291,9 @@ func validateUpfRuleShapes(request configmodels.Slice, sliceName string) (int, e
 			return
 		}
 		for _, rule := range slice.ApplicationFilteringRules {
-			shapes[ruleShapeOf(rule)] = struct{}{}
+			if shape, ok := ruleShapeOf(rule); ok {
+				shapes[shape] = struct{}{}
+			}
 		}
 	}
 	add(request)

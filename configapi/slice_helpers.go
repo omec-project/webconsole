@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	"os/exec"
 	"slices"
@@ -139,6 +140,10 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 		return request, statusCode, err
 	}
 
+	if statusCode, err := validateUpfRuleShapes(request, sliceName); err != nil {
+		return request, statusCode, err
+	}
+
 	return request, http.StatusOK, nil
 }
 
@@ -214,6 +219,87 @@ func validateRulePorts(rule configmodels.SliceApplicationFilteringRules, sliceNa
 		return fmt.Errorf("port range %d-%d for rule %s in Network Slice %s covers more than %d ports", start, end, rule.RuleName, sliceName, maxRulePortRangeWidth)
 	}
 	return nil
+}
+
+// The BESS UPF matches packets to PDRs in one table shared by every session on the UPF, and that
+// table has room for 16 distinct masks (MAX_TUPLES in bess/core/modules/wildcard_match.h). A rule's
+// mask depends only on its endpoint's prefix length, whether it names a protocol and whether it
+// names a port; each such shape takes two masks, one per direction. Once the table is full, the
+// UPF refuses every session that needs a shape it does not hold.
+const maxUpfRuleShapes = 8
+
+type ruleShape struct {
+	prefixLen int
+	protocol  bool
+	port      bool
+}
+
+// The shape of the PDR the UPF installs for this rule, as buildFlowDescription writes its SDF
+// filter. The UPF installs a PDR whose filter it cannot parse without the filter, matching any
+// traffic, so an endpoint or a port range it cannot parse has the shape of a rule permitting any
+// traffic. validateRulePorts refuses such a range, but a slice stored before it may hold one.
+func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) ruleShape {
+	var shape ruleShape
+	if endpoint := rule.Endpoint; !strings.HasPrefix(endpoint, "0.0.0.0") {
+		if !strings.Contains(endpoint, "/") {
+			endpoint += "/32"
+		}
+		_, ipNet, err := net.ParseCIDR(endpoint)
+		if err != nil {
+			return ruleShape{}
+		}
+		shape.prefixLen, _ = ipNet.Mask.Size()
+	}
+	if rule.Protocol == protocolTCP || rule.Protocol == protocolUDP {
+		if rule.StartPort < 0 || rule.EndPort > math.MaxUint16 || rule.StartPort > rule.EndPort {
+			return ruleShape{}
+		}
+		shape.protocol = true
+		anyPort := rule.StartPort == 0 && (rule.EndPort == 0 || rule.EndPort == math.MaxUint16)
+		shape.port = !anyPort
+	}
+	return shape
+}
+
+func upfNameOf(slice configmodels.Slice) string {
+	name, _ := slice.SiteInfo.Upf["upf-name"].(string)
+	return name
+}
+
+// Refuses a slice that would take the rules on its UPF past the shapes the UPF can hold, counting
+// the slice as posted together with every other slice on the same UPF. A slice without rules is
+// given a default rule that permits any traffic (backend/nfconfig), which has a shape of its own.
+// A slice that names no UPF is not counted: nothing here says which UPF serves it.
+func validateUpfRuleShapes(request configmodels.Slice, sliceName string) (int, error) {
+	upf := upfNameOf(request)
+	if upf == "" {
+		return http.StatusOK, nil
+	}
+	stored, err := getSlices()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to look up network slices: %w", err)
+	}
+	shapes := map[ruleShape]struct{}{}
+	add := func(slice configmodels.Slice) {
+		if len(slice.ApplicationFilteringRules) == 0 {
+			shapes[ruleShape{}] = struct{}{}
+			return
+		}
+		for _, rule := range slice.ApplicationFilteringRules {
+			shapes[ruleShapeOf(rule)] = struct{}{}
+		}
+	}
+	add(request)
+	for _, slice := range stored {
+		if slice.SliceName != sliceName && upfNameOf(*slice) == upf {
+			add(*slice)
+		}
+	}
+	if len(shapes) > maxUpfRuleShapes {
+		return http.StatusBadRequest, fmt.Errorf("network slice %s would bring the filtering rules on UPF %s to %d distinct shapes, more than the %d the UPF can hold; "+
+			"a shape is the endpoint's prefix length, whether a protocol is given and whether a port is given", sliceName, upf, len(shapes), maxUpfRuleShapes)
+	}
+	return http.StatusOK, nil
 }
 
 func logSliceMetadata(slice configmodels.Slice) {

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -1199,6 +1200,194 @@ func TestNetworkSlicePostHandler_PortRangeValidation(t *testing.T) {
 				t.Errorf("expected body to contain error about `%v`, got `%v`", tc.expectedError, w.Body.String())
 			}
 		})
+	}
+}
+
+func sliceOnUpf(name, upf string, rules ...configmodels.SliceApplicationFilteringRules) configmodels.Slice {
+	slice := networkSlice(name)
+	slice.SliceName = name
+	slice.SiteInfo.Upf = map[string]any{"upf-name": upf}
+	slice.ApplicationFilteringRules = rules
+	return slice
+}
+
+func ruleTo(endpoint string, protocol, start, end int32) configmodels.SliceApplicationFilteringRules {
+	rule := filteringRuleWithPorts(protocol, start, end)
+	rule.Endpoint = endpoint
+	return rule
+}
+
+// Seven shapes besides any traffic, one per prefix length.
+func sevenPrefixRules() []configmodels.SliceApplicationFilteringRules {
+	return []configmodels.SliceApplicationFilteringRules{
+		ruleTo("10.0.0.0/8", 0, 0, 0),
+		ruleTo("172.16.0.0/12", 0, 0, 0),
+		ruleTo("192.168.0.0/16", 0, 0, 0),
+		ruleTo("100.64.0.0/20", 0, 0, 0),
+		ruleTo("192.0.2.0/24", 0, 0, 0),
+		ruleTo("198.51.100.0/28", 0, 0, 0),
+		ruleTo("203.0.113.9", 0, 0, 0),
+	}
+}
+
+// The UPF's table is shared by every slice it serves, so the shapes are counted across them.
+func TestValidateUpfRuleShapes(t *testing.T) {
+	allowAll := ruleTo("0.0.0.0/0", 0, 0, 0)
+	testCases := []struct {
+		name         string
+		stored       []configmodels.Slice
+		posted       configmodels.Slice
+		expectedCode int
+	}{
+		{
+			name:         "eight shapes in one slice",
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules(), allowAll)...),
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "nine shapes in one slice",
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules(), allowAll, ruleTo("0.0.0.0/0", protocolTCP, 0, 0))...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "nine shapes across two slices on the same UPF",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", sevenPrefixRules()...)},
+			posted:       sliceOnUpf("a", "upf1", allowAll, ruleTo("10.0.0.0/8", protocolUDP, 5060, 5060)),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			// It is given a default rule permitting any traffic, which is a shape of its own.
+			name:         "a slice without rules on a UPF already holding eight other shapes",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", append(sevenPrefixRules(), ruleTo("0.0.0.0/0", protocolTCP, 0, 0))...)},
+			posted:       sliceOnUpf("a", "upf1"),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "the same slices on different UPFs",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf2", sevenPrefixRules()...)},
+			posted:       sliceOnUpf("a", "upf1", allowAll, ruleTo("10.0.0.0/8", protocolUDP, 5060, 5060)),
+			expectedCode: http.StatusOK,
+		},
+		{
+			// The stored version is the one being replaced, so its shapes do not count.
+			name:         "replacing a slice's own rules",
+			stored:       []configmodels.Slice{sliceOnUpf("a", "upf1", sevenPrefixRules()...)},
+			posted:       sliceOnUpf("a", "upf1", allowAll, ruleTo("10.0.0.0/8", protocolUDP, 5060, 5060)),
+			expectedCode: http.StatusOK,
+		},
+		{
+			// The address, TCP or UDP, a single port or a range, and the full range as any port:
+			// none of them changes a mask. Twelve rules, eight shapes.
+			name: "rules that differ only in what does not change a mask",
+			posted: sliceOnUpf("a", "upf1", append(sevenPrefixRules()[:5],
+				allowAll,
+				ruleTo("0.0.0.0/30", 0, 0, 0),
+				ruleTo("11.0.0.0/8", 0, 0, 0),
+				ruleTo("0.0.0.0/0", protocolTCP, 443, 443),
+				ruleTo("0.0.0.0/0", protocolUDP, 5060, 5070),
+				ruleTo("0.0.0.0/0", protocolTCP, 0, 0),
+				ruleTo("0.0.0.0/0", protocolUDP, 0, 65535),
+			)...),
+			expectedCode: http.StatusOK,
+		},
+		{
+			// The full range is any port, so it shares the shape of a rule with no port. Nine
+			// shapes only if it does.
+			name: "nine shapes, one of them written as the full port range",
+			posted: sliceOnUpf("a", "upf1", append(sevenPrefixRules()[:6],
+				allowAll,
+				ruleTo("0.0.0.0/0", protocolTCP, 443, 443),
+				ruleTo("0.0.0.0/0", protocolUDP, 0, 65535),
+			)...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			// The UPF drops a filter it cannot parse and matches any traffic instead.
+			name: "an endpoint the UPF cannot parse has the shape of any traffic",
+			posted: sliceOnUpf("a", "upf1", append(sevenPrefixRules(),
+				ruleTo("0.0.0.0/0", protocolTCP, 0, 0),
+				ruleTo("not-an-address", protocolTCP, 80, 80),
+			)...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name: "an endpoint the UPF cannot parse shares the shape of any traffic",
+			posted: sliceOnUpf("a", "upf1", append(sevenPrefixRules(),
+				allowAll,
+				ruleTo("not-an-address", protocolTCP, 80, 80),
+			)...),
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "a stored port range the UPF cannot parse shares the shape of any traffic",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", ruleTo("10.0.0.0/8", protocolTCP, 81, 80))},
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules(), allowAll)...),
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "a slice naming no UPF is not counted",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", sevenPrefixRules()...)},
+			posted:       sliceOnUpf("a", "", append(sevenPrefixRules(), allowAll, ruleTo("0.0.0.0/0", protocolTCP, 0, 0))...),
+			expectedCode: http.StatusOK,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			dbadapter.CommonDBClient = &NetworkSliceMockDBClient{slices: tc.stored}
+
+			code, err := validateUpfRuleShapes(tc.posted, tc.posted.SliceName)
+			if code != tc.expectedCode {
+				t.Errorf("expected `%v`, got `%v` (%v)", tc.expectedCode, code, err)
+			}
+			if (err != nil) != (tc.expectedCode != http.StatusOK) {
+				t.Errorf("unexpected error %v for status %v", err, code)
+			}
+		})
+	}
+}
+
+// The count needs every slice on the UPF; without them it cannot say the slice fits.
+func TestValidateUpfRuleShapesReportsAFailedLookup(t *testing.T) {
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{err: errors.New("db unavailable")}
+
+	code, err := validateUpfRuleShapes(sliceOnUpf("a", "upf1"), "a")
+	if code != http.StatusInternalServerError || err == nil {
+		t.Errorf("expected `%v` and an error, got `%v` (%v)", http.StatusInternalServerError, code, err)
+	}
+}
+
+func TestNetworkSlicePostHandler_RefusesTooManyRuleShapes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{}
+
+	slice := networkSlice(testSliceName)
+	slice.ApplicationFilteringRules = append(sevenPrefixRules(), ruleTo("0.0.0.0/0", 0, 0, 0), ruleTo("0.0.0.0/0", protocolTCP, 0, 0))
+	jsonBody, err := json.Marshal(slice)
+	if err != nil {
+		t.Fatalf("failed to marshal network slice %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected `%v`, got `%v`: %s", http.StatusBadRequest, w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "9 distinct shapes") {
+		t.Errorf("expected body to name the shape count, got `%v`", w.Body.String())
 	}
 }
 

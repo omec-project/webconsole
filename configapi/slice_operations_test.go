@@ -1443,6 +1443,38 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 			expectedCode: http.StatusOK,
 		},
 		{
+			// The UPF splits the filter on whitespace, so a stored endpoint padded with it is still
+			// one field. Nine shapes.
+			name:         "a stored endpoint padded with whitespace counts by its prefix",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", ruleTo(" 192.0.2.0/30 ", 0, 0, 0))},
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules(), allowAll)...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "a stored any padded with whitespace counts by its protocol and port",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", ruleTo(" any ", protocolTCP, 80, 80))},
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules(), allowAll)...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			// buildFlowDescription writes only an endpoint beginning 0.0.0.0 as "any"; with a
+			// space before it, the UPF reads the prefix as written. Nine shapes.
+			name:         "a stored 0.0.0.0 prefix after whitespace counts by its prefix",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", ruleTo(" 0.0.0.0/8", 0, 0, 0))},
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules()[1:], allowAll, ruleTo("0.0.0.0/0", protocolTCP, 0, 0))...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			// Neither carries its ports or protocol into the filter: both write "ip". Eight shapes.
+			name: "stored endpoints of several fields on rules for any protocol share the filter they write",
+			stored: []configmodels.Slice{sliceOnUpf("b", "upf1",
+				ruleTo("10.0.0.0/8 80", 1, 0, 0),
+				ruleTo("10.0.0.0/8 80", 0, 5, 9),
+			)},
+			posted:       sliceOnUpf("a", "upf1", sevenPrefixRules()...),
+			expectedCode: http.StatusOK,
+		},
+		{
 			name:         "a slice naming no UPF is not counted",
 			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", sevenPrefixRules()...)},
 			posted:       sliceOnUpf("a", "", append(sevenPrefixRules(), allowAll, ruleTo("0.0.0.0/0", protocolTCP, 0, 0))...),

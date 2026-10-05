@@ -1361,6 +1361,88 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
+			// A stored endpoint of several fields may parse at the UPF into any shape, so each
+			// counts as one of its own. Nine shapes.
+			name:         "a stored endpoint of several fields counts as a shape of its own",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", ruleTo("10.0.0.0/8 80", 0, 0, 0))},
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules(), allowAll)...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			// The same text parses differently with a different protocol and ports. Nine shapes.
+			name: "a stored endpoint of several fields counts once per protocol and port",
+			stored: []configmodels.Slice{sliceOnUpf("b", "upf1",
+				ruleTo("10.0.0.0/8 80", protocolTCP, 80, 80),
+				ruleTo("10.0.0.0/8 80", protocolUDP, 0, 0),
+			)},
+			posted:       sliceOnUpf("a", "upf1", sevenPrefixRules()...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			// "any" is any address, but its protocol and ports still set the mask. Nine shapes.
+			name: "an any endpoint counts by its protocol and port",
+			posted: sliceOnUpf("a", "upf1", append(sevenPrefixRules(),
+				ruleTo("any", protocolTCP, 80, 80),
+				ruleTo("any", protocolUDP, 0, 0),
+			)...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name: "an any endpoint shares the shape of 0.0.0.0/0",
+			posted: sliceOnUpf("a", "upf1", append(sevenPrefixRules(),
+				ruleTo("any", protocolTCP, 80, 80),
+				ruleTo("0.0.0.0/0", protocolUDP, 53, 53),
+			)...),
+			expectedCode: http.StatusOK,
+		},
+		{
+			// Where the ports are written before "to assigned", a stored endpoint of several
+			// fields moves them out of place, so a range that would be refused may still parse
+			// into a shape. Counted conservatively. Nine shapes.
+			name:         "a stored endpoint of several fields counts even with a range too wide to install",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", ruleTo("10.0.0.0/8 80", protocolTCP, 1024, 65535))},
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules(), allowAll)...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "a stored endpoint of several fields counts even with a range the UPF cannot parse",
+			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", ruleTo("10.0.0.0/8 80", protocolTCP, 100, 50))},
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules(), allowAll)...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			// Both mean any port for an endpoint of one field, but only 0-0 leaves the ports out of
+			// the filter, and around an endpoint of several fields that can change what parses.
+			name: "a stored endpoint of several fields counts once per filter it writes",
+			stored: []configmodels.Slice{sliceOnUpf("b", "upf1",
+				ruleTo("10.0.0.0/8 to assigned", protocolTCP, 0, 0),
+				ruleTo("10.0.0.0/8 to assigned", protocolTCP, 0, 65535),
+			)},
+			posted:       sliceOnUpf("a", "upf1", sevenPrefixRules()...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			// One component of the filter differs in each. Nine shapes.
+			name: "a stored endpoint of several fields counts once per protocol and per start and end port",
+			stored: []configmodels.Slice{sliceOnUpf("b", "upf1",
+				ruleTo("10.0.0.0/8 80", protocolTCP, 80, 80),
+				ruleTo("10.0.0.0/8 80", protocolUDP, 80, 80),
+				ruleTo("10.0.0.0/8 80", protocolTCP, 70, 80),
+				ruleTo("10.0.0.0/8 80", protocolTCP, 80, 90),
+			)},
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules()[:4], allowAll)...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name: "stored rules writing the same filter share a shape",
+			stored: []configmodels.Slice{sliceOnUpf("b", "upf1",
+				ruleTo("10.0.0.0/8 80", protocolTCP, 80, 80),
+				ruleTo("10.0.0.0/8 80", protocolTCP, 80, 80),
+			)},
+			posted:       sliceOnUpf("a", "upf1", sevenPrefixRules()...),
+			expectedCode: http.StatusOK,
+		},
+		{
 			name:         "a slice naming no UPF is not counted",
 			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", sevenPrefixRules()...)},
 			posted:       sliceOnUpf("a", "", append(sevenPrefixRules(), allowAll, ruleTo("0.0.0.0/0", protocolTCP, 0, 0))...),
@@ -1424,6 +1506,58 @@ func TestNetworkSlicePostHandler_RefusesTooManyRuleShapes(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "9 distinct shapes") {
 		t.Errorf("expected body to name the shape count, got `%v`", w.Body.String())
+	}
+}
+
+// The endpoint is written into the SDF filter as it is, so only a single address, prefix or "any"
+// reaches the UPF as one.
+func TestNetworkSlicePostHandler_EndpointValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	testCases := []struct {
+		endpoint     string
+		expectedCode int
+	}{
+		{"10.0.0.0/8 80", http.StatusBadRequest},
+		{"10.0.0.0/8 to assigned", http.StatusBadRequest},
+		{"not-an-address", http.StatusBadRequest},
+		{"10.0.0.0/33", http.StatusBadRequest},
+		{"10.0.0.1", http.StatusOK},
+		{"10.0.0.0/8", http.StatusOK},
+		{"0.0.0.0/0", http.StatusOK},
+		{"any", http.StatusOK},
+		{"2001:db8::/64", http.StatusOK},
+		{"", http.StatusOK},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.endpoint, func(t *testing.T) {
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			dbadapter.CommonDBClient = &NetworkSliceMockDBClient{}
+			slice := networkSlice(testSliceName)
+			slice.ApplicationFilteringRules = []configmodels.SliceApplicationFilteringRules{ruleTo(tc.endpoint, protocolTCP, 80, 80)}
+			jsonBody, err := json.Marshal(slice)
+			if err != nil {
+				t.Fatalf("failed to marshal network slice %v", err)
+			}
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+			if err != nil {
+				t.Fatalf("failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+			if tc.expectedCode != w.Code {
+				t.Errorf("expected `%v`, got `%v`: %s", tc.expectedCode, w.Code, w.Body.String())
+			}
+			if tc.expectedCode != http.StatusOK && !strings.Contains(w.Body.String(), "invalid endpoint") {
+				t.Errorf("expected body to name the endpoint, got `%v`", w.Body.String())
+			}
+		})
 	}
 }
 

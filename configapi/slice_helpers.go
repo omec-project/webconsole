@@ -126,6 +126,9 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 		if err := validateRulePorts(ruleConfig, sliceName); err != nil {
 			return request, http.StatusBadRequest, err
 		}
+		if err := validateRuleEndpoint(ruleConfig, sliceName); err != nil {
+			return request, http.StatusBadRequest, err
+		}
 	}
 
 	slices.Sort(request.SiteDeviceGroup)
@@ -228,10 +231,29 @@ func validateRulePorts(rule configmodels.SliceApplicationFilteringRules, sliceNa
 // UPF refuses every session that needs a shape it does not hold.
 const maxUpfRuleShapes = 8
 
+// A rule's endpoint is written into its SDF filter as it is, and the UPF splits the filter into
+// fields, so anything but a single address, prefix or "any" changes what it parses: extra fields
+// can add a port, or turn the filter into one it cannot parse and installs as matching any traffic.
+// No endpoint at all is accepted as it was before: the UPF cannot parse the filter it gives, and
+// installs the rule matching any traffic.
+func validateRuleEndpoint(rule configmodels.SliceApplicationFilteringRules, sliceName string) error {
+	endpoint := rule.Endpoint
+	if endpoint == "" || endpoint == "any" || net.ParseIP(endpoint) != nil {
+		return nil
+	}
+	if _, _, err := net.ParseCIDR(endpoint); err == nil {
+		return nil
+	}
+	return fmt.Errorf("invalid endpoint %q for rule %s in Network Slice %s: expected an IP address, a prefix or \"any\"", endpoint, rule.RuleName, sliceName)
+}
+
 type ruleShape struct {
 	prefixLen int
 	protocol  bool
 	port      bool
+	// Set only for a stored endpoint of several fields, whose mask cannot be known here: every
+	// input of its SDF filter, so that only rules with the same filter share a shape.
+	unknown string
 }
 
 // The shape of the PDR the UPF installs for this rule, as buildFlowDescription writes its SDF
@@ -242,21 +264,32 @@ type ruleShape struct {
 // before it may hold one.
 func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (ruleShape, bool) {
 	var shape ruleShape
-	if endpoint := rule.Endpoint; !strings.HasPrefix(endpoint, "0.0.0.0") {
+	// buildFlowDescription writes an endpoint beginning 0.0.0.0 as "any", which the UPF parses as
+	// any address, as it does "any" itself.
+	if endpoint := rule.Endpoint; endpoint != "any" && !strings.HasPrefix(endpoint, "0.0.0.0") {
 		if !strings.Contains(endpoint, "/") {
 			endpoint += "/32"
 		}
 		_, ipNet, err := net.ParseCIDR(endpoint)
-		if err != nil {
+		switch {
+		case err == nil:
+			ones, bits := ipNet.Mask.Size()
+			// The UPF keeps only the low 32 bits of an IPv6 mask, so an IPv6 prefix reaches the
+			// datapath as the part of it that falls in those bits.
+			if bits == 8*net.IPv6len {
+				ones = max(0, ones-(8*net.IPv6len-32))
+			}
+			shape.prefixLen = ones
+		case len(strings.Fields(rule.Endpoint)) > 1:
+			// validateRuleEndpoint refuses such an endpoint, but a slice stored before it may
+			// hold one. The UPF may parse its fields, together with the protocol and ports
+			// written around them, into any shape, so it is not modelled: a rule counts as a
+			// shape of its own unless another writes exactly the same filter.
+			return ruleShape{unknown: fmt.Sprintf("%s|%d|%d|%d", rule.Endpoint, rule.Protocol, rule.StartPort, rule.EndPort)}, true
+		default:
+			// A single field the UPF cannot parse makes it drop the filter.
 			return ruleShape{}, true
 		}
-		ones, bits := ipNet.Mask.Size()
-		// The UPF keeps only the low 32 bits of an IPv6 mask, so an IPv6 prefix reaches the
-		// datapath as the part of it that falls in those bits.
-		if bits == 8*net.IPv6len {
-			ones = max(0, ones-(8*net.IPv6len-32))
-		}
-		shape.prefixLen = ones
 	}
 	if rule.Protocol == protocolTCP || rule.Protocol == protocolUDP {
 		if rule.StartPort < 0 || rule.EndPort > math.MaxUint16 || rule.StartPort > rule.EndPort {

@@ -30,7 +30,7 @@ const (
 	testSubscriberImsi = "imsi-208930100007487"
 )
 
-func (m *MockSession) WithTransaction(ctx context.Context, fn func(ctx context.Context) (interface{}, error), opts ...options.Lister[options.TransactionOptions]) (interface{}, error) {
+func (m *MockSession) WithTransaction(ctx context.Context, fn func(ctx context.Context) (any, error), opts ...options.Lister[options.TransactionOptions]) (any, error) {
 	return fn(ctx)
 }
 

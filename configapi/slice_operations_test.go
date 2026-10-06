@@ -924,7 +924,7 @@ func TestBuildSmProvisionedDataDocument(t *testing.T) {
 		t.Fatalf("unexpected ueId: %v", got)
 	}
 
-	singleNssai, ok := doc["singlenssai"].(map[string]interface{})
+	singleNssai, ok := doc["singlenssai"].(map[string]any)
 	if !ok {
 		t.Fatalf("singlenssai has unexpected type: %T", doc["singlenssai"])
 	}
@@ -932,20 +932,20 @@ func TestBuildSmProvisionedDataDocument(t *testing.T) {
 		t.Fatalf("unexpected sd: %v", singleNssai["sd"])
 	}
 
-	dnnConfigurations, ok := doc["dnnconfigurations"].(map[string]interface{})
+	dnnConfigurations, ok := doc["dnnconfigurations"].(map[string]any)
 	if !ok {
 		t.Fatalf("dnnconfigurations has unexpected type: %T", doc["dnnconfigurations"])
 	}
-	internet, ok := dnnConfigurations[dnnInternet].(map[string]interface{})
+	internet, ok := dnnConfigurations[dnnInternet].(map[string]any)
 	if !ok {
 		t.Fatalf("internet dnn config has unexpected type: %T", dnnConfigurations[dnnInternet])
 	}
 
-	qos, ok := internet["5gQosProfile"].(map[string]interface{})
+	qos, ok := internet["5gQosProfile"].(map[string]any)
 	if !ok {
 		t.Fatalf("5gQosProfile has unexpected type: %T", internet["5gQosProfile"])
 	}
-	arp, ok := qos["arp"].(map[string]interface{})
+	arp, ok := qos["arp"].(map[string]any)
 	if !ok {
 		t.Fatalf("arp has unexpected type: %T", qos["arp"])
 	}

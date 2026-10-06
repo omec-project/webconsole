@@ -24,5 +24,5 @@ type SliceSiteInfo struct {
 	GNodeBs []SliceSiteInfoGNodeBs `json:"gNodeBs"`
 
 	// UPF which belong to this slice
-	Upf map[string]interface{} `json:"upf,omitempty"`
+	Upf map[string]any `json:"upf,omitempty"`
 }

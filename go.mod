@@ -9,13 +9,13 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/omec-project/openapi/v2 v2.2.5
-	github.com/omec-project/util v1.8.13
+	github.com/omec-project/util v1.9.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.1
 	github.com/swaggo/swag v1.16.6
-	github.com/urfave/cli/v3 v3.13.0
-	go.mongodb.org/mongo-driver/v2 v2.9.1
+	github.com/urfave/cli/v3 v3.14.0
+	go.mongodb.org/mongo-driver/v2 v2.9.2
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/crypto v0.57.0
@@ -75,6 +75,6 @@ require (
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
-	golang.org/x/tools v0.50.0 // indirect
+	golang.org/x/tools v0.51.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )

@@ -764,8 +764,8 @@ func updateSmProvisionedData(snssai *models.Snssai, dnnMap map[string][]configmo
 	return nil
 }
 
-func buildSmProvisionedDataDocument(snssai *models.Snssai, dnnMap map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string) (map[string]interface{}, error) {
-	dnnConfigurations := make(map[string]interface{}, len(dnnMap))
+func buildSmProvisionedDataDocument(snssai *models.Snssai, dnnMap map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, mcc, mnc, imsi string) (map[string]any, error) {
+	dnnConfigurations := make(map[string]any, len(dnnMap))
 
 	for dnn, ueDnnQosList := range dnnMap {
 		aggregatedQoS := aggregateQoS(ueDnnQosList)
@@ -774,22 +774,22 @@ func buildSmProvisionedDataDocument(snssai *models.Snssai, dnnMap map[string][]c
 			return nil, fmt.Errorf("traffic class missing for DNN %s", dnn)
 		}
 
-		dnnConfigurations[dnn] = map[string]interface{}{
-			"pduSessionTypes": map[string]interface{}{
+		dnnConfigurations[dnn] = map[string]any{
+			"pduSessionTypes": map[string]any{
 				"defaultSessionType":  models.PDUSESSIONTYPE_IPV4,
 				"allowedSessionTypes": []models.PduSessionType{models.PDUSESSIONTYPE_IPV4},
 			},
-			"sscModes": map[string]interface{}{
+			"sscModes": map[string]any{
 				"defaultSscMode":  models.SSCMODE_SSC_MODE_1,
 				"allowedSscModes": []models.SscMode{models.SSCMODE_SSC_MODE_2, models.SSCMODE_SSC_MODE_3},
 			},
-			"sessionAmbr": map[string]interface{}{
+			"sessionAmbr": map[string]any{
 				downlinkKey: ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink)),
 				uplinkKey:   ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)),
 			},
-			"5gQosProfile": map[string]interface{}{
+			"5gQosProfile": map[string]any{
 				"5qi": aggregatedQoS.TrafficClass.Qci,
-				"arp": map[string]interface{}{
+				"arp": map[string]any{
 					priorityLevelKey: int32(8),
 					"preemptCap":     models.PREEMPTIONCAPABILITY_NOT_PREEMPT,
 					"preemptVuln":    models.PREEMPTIONVULNERABILITY_NOT_PREEMPTABLE,
@@ -799,14 +799,14 @@ func buildSmProvisionedDataDocument(snssai *models.Snssai, dnnMap map[string][]c
 		}
 	}
 
-	singleNssai := map[string]interface{}{
+	singleNssai := map[string]any{
 		"sst": snssai.Sst,
 	}
 	if snssai.Sd != nil {
 		singleNssai["sd"] = *snssai.Sd
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		ueIdKey:             "imsi-" + imsi,
 		servingPlmnIdKey:    mcc + mnc,
 		"singlenssai":       singleNssai,

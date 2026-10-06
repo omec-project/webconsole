@@ -138,9 +138,9 @@ func GetSessionRunner(client DBInterface) SessionRunner {
 }
 
 type PatchOperation struct {
-	Value any `json:"value,omitempty"`
-	Op    string      `json:"op"`
-	Path  string      `json:"path"`
+	Value any    `json:"value,omitempty"`
+	Op    string `json:"op"`
+	Path  string `json:"path"`
 }
 
 func setDBClient(url, dbname string) (DBInterface, error) {

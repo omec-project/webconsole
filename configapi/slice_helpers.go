@@ -280,7 +280,14 @@ func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (ruleShape, b
 	default:
 		endpoint := strings.Join(fields, "")
 		if !strings.Contains(endpoint, "/") {
-			endpoint += "/32"
+			// A bare address is a full host: /32 for IPv4, /128 for IPv6. Appending /32 to an IPv6
+			// address would make it a 32-bit prefix, which the low-32-bits fold below then turns
+			// into a match on any address -- the opposite of the single host the UPF installs.
+			if ip := net.ParseIP(endpoint); ip != nil && ip.To4() == nil {
+				endpoint += "/128"
+			} else {
+				endpoint += "/32"
+			}
 		}
 		_, ipNet, err := net.ParseCIDR(endpoint)
 		if err != nil {

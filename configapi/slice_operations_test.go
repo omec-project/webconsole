@@ -1332,8 +1332,8 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 			expectedCode: http.StatusOK,
 		},
 		{
-			// The UPF keeps the low 32 bits of an IPv6 mask: a /64, a /32 and a bare address match
-			// any address, a /120 is a /24 and a /128 a /32. Eight shapes.
+			// The UPF keeps the low 32 bits of an IPv6 mask: a /64 and a /32 match any address, a
+			// /120 is a /24, and a bare host and a /128 are a /32. Eight shapes.
 			name: "an IPv6 endpoint has the shape of its low 32 bits",
 			posted: sliceOnUpf("a", "upf1", append(sevenPrefixRules(),
 				allowAll,
@@ -1344,6 +1344,25 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 				ruleTo("2001:db8::/128", 0, 0, 0),
 			)...),
 			expectedCode: http.StatusOK,
+		},
+		{
+			// A bare IPv6 host is a full address, so it reaches the datapath as the low 32 bits of a
+			// /128 -- a /32 there -- not as the match-any a 32-bit prefix would give. The eight rules
+			// before it hold a match-any (0.0.0.0/0) but no /32, so a bare host read as match-any
+			// would fold into the eighth and fit; read as a /32 it is the ninth and does not.
+			name: "a bare IPv6 host counts as a /32, not as any address",
+			posted: sliceOnUpf("a", "upf1",
+				ruleTo("10.0.0.0/8", 0, 0, 0),
+				ruleTo("172.16.0.0/12", 0, 0, 0),
+				ruleTo("192.168.0.0/16", 0, 0, 0),
+				ruleTo("100.64.0.0/20", 0, 0, 0),
+				ruleTo("192.0.2.0/24", 0, 0, 0),
+				ruleTo("198.51.100.0/28", 0, 0, 0),
+				ruleTo("203.0.113.0/30", 0, 0, 0),
+				allowAll,
+				ruleTo("2001:db8::1", 0, 0, 0),
+			),
+			expectedCode: http.StatusBadRequest,
 		},
 		{
 			name: "an IPv6 /120 counts as a /24",

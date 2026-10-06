@@ -1365,6 +1365,27 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
+			// An IPv4-mapped IPv6 literal is written with colons, so the UPF reads it as a full
+			// 128-bit host just like any other IPv6 address, reaching the datapath as a /32 -- not
+			// as the match-any a 32-bit prefix would give, which is what its IPv4 form (To4) would
+			// wrongly suggest. The eight rules before it hold a match-any (0.0.0.0/0) but no /32, so
+			// a mapped host read as match-any would fold into the eighth and fit; read as a /32 it
+			// is the ninth and does not.
+			name: "an IPv4-mapped IPv6 host counts as a /32, not as any address",
+			posted: sliceOnUpf("a", "upf1",
+				ruleTo("10.0.0.0/8", 0, 0, 0),
+				ruleTo("172.16.0.0/12", 0, 0, 0),
+				ruleTo("192.168.0.0/16", 0, 0, 0),
+				ruleTo("100.64.0.0/20", 0, 0, 0),
+				ruleTo("192.0.2.0/24", 0, 0, 0),
+				ruleTo("198.51.100.0/28", 0, 0, 0),
+				ruleTo("203.0.113.0/30", 0, 0, 0),
+				allowAll,
+				ruleTo("::ffff:192.0.2.1", 0, 0, 0),
+			),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
 			name: "an IPv6 /120 counts as a /24",
 			posted: sliceOnUpf("a", "upf1",
 				ruleTo("10.0.0.0/8", 0, 0, 0),

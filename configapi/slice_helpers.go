@@ -280,10 +280,14 @@ func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (ruleShape, b
 	default:
 		endpoint := strings.Join(fields, "")
 		if !strings.Contains(endpoint, "/") {
-			// A bare address is a full host: /32 for IPv4, /128 for IPv6. Appending /32 to an IPv6
-			// address would make it a 32-bit prefix, which the low-32-bits fold below then turns
-			// into a match on any address -- the opposite of the single host the UPF installs.
-			if ip := net.ParseIP(endpoint); ip != nil && ip.To4() == nil {
+			// A bare address is a full host: /32 for IPv4, /128 for IPv6. The suffix has to match
+			// how ParseCIDR reads the address, which it decides from the address's own syntax: any
+			// address written with a colon gets a 128-bit mask. So the choice turns on the colon,
+			// not on To4(), which is non-nil for an IPv4-mapped IPv6 literal such as
+			// ::ffff:192.0.2.1: appending /32 to that would make it a 32-bit prefix, which the
+			// low-32-bits fold below then turns into a match on any address -- the opposite of the
+			// single host the UPF installs.
+			if strings.Contains(endpoint, ":") {
 				endpoint += "/128"
 			} else {
 				endpoint += "/32"

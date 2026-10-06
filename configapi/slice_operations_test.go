@@ -1587,6 +1587,50 @@ func TestValidateUpfRuleShapesFoldsLegacyEndpointWritingTheSameFilter(t *testing
 	}
 }
 
+// A modelable rule the UPF refuses before installing anything -- a port range too wide -- takes no
+// mask, and a legacy endpoint writing the same filter is refused the same way, so it must take no
+// shape either. With spec-compliant-SDF the ports sit right after the endpoint, so a legacy
+// "10.0.0.0/8 1000-1100" carrying no ports of its own writes exactly what a clean "10.0.0.0/8" with
+// the oversized range 1000-1100 does; the legacy copy folds into the refused rule and adds nothing.
+// Without it the filters differ, so the legacy copy still counts as a shape of its own.
+func TestValidateUpfRuleShapesFoldsLegacyEndpointOntoARefusedFilter(t *testing.T) {
+	origConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = origConfig }()
+
+	// The range is wider than maxRulePortRangeWidth, so the UPF refuses the rule before installing a
+	// mask and it takes no shape of its own.
+	refused := ruleTo("10.0.0.0/8", protocolTCP, 1000, 1100)
+	legacy := ruleTo("10.0.0.0/8 1000-1100", protocolTCP, 0, 0)
+	// Seven prefix shapes and any traffic make eight; the legacy rule either folds onto the refused
+	// filter and adds nothing or becomes a ninth.
+	posted := sliceOnUpf("a", "upf1", append(sevenPrefixRules(), ruleTo("0.0.0.0/0", 0, 0, 0), refused, legacy)...)
+
+	testCases := []struct {
+		name          string
+		specCompliant bool
+		expectedCode  int
+	}{
+		{"spec-compliant SDF writes the refused filter for both", true, http.StatusOK},
+		{"legacy SDF writes a different filter for each", false, http.StatusBadRequest},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			factory.WebUIConfig = &factory.Config{Configuration: &factory.Configuration{SdfComp: tc.specCompliant}}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			dbadapter.CommonDBClient = &NetworkSliceMockDBClient{}
+
+			code, err := validateUpfRuleShapes(posted, posted.SliceName)
+			if code != tc.expectedCode {
+				t.Errorf("expected `%v`, got `%v` (%v)", tc.expectedCode, code, err)
+			}
+			if (err != nil) != (tc.expectedCode != http.StatusOK) {
+				t.Errorf("unexpected error %v for status %v", err, code)
+			}
+		})
+	}
+}
+
 // The count needs every slice on the UPF; without them it cannot say the slice fits.
 func TestValidateUpfRuleShapesReportsAFailedLookup(t *testing.T) {
 	originalDBClient := dbadapter.CommonDBClient

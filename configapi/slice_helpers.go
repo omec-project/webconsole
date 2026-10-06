@@ -381,10 +381,10 @@ func validateUpfRuleShapes(request configmodels.Slice, sliceName string) (int, e
 		return http.StatusInternalServerError, fmt.Errorf("failed to look up network slices: %w", err)
 	}
 	shapes := map[ruleShape]struct{}{}
-	// The filters written by rules whose mask is known. An endpoint of several fields is deferred
-	// until these are all collected, so it can share a modelled rule's shape when it writes the
-	// same filter -- the UPF installs one mask for the two -- rather than always counting as one of
-	// its own.
+	// The filters written by the modelable rules. An endpoint of several fields is deferred until
+	// these are all collected, so it takes no shape of its own when it writes the same filter as one
+	// of them: the UPF reads one filter for the two and either installs a single mask for both or
+	// refuses both alike, rather than the deferred copy counting as a shape it never installs.
 	modeledFlows := map[string]struct{}{}
 	var deferredFlows []string
 	add := func(slice configmodels.Slice) {
@@ -398,11 +398,11 @@ func validateUpfRuleShapes(request configmodels.Slice, sliceName string) (int, e
 				deferredFlows = append(deferredFlows, canonicalFlow(rule))
 				continue
 			}
+			modeledFlows[canonicalFlow(rule)] = struct{}{}
 			if !counts {
 				continue
 			}
 			shapes[shape] = struct{}{}
-			modeledFlows[canonicalFlow(rule)] = struct{}{}
 		}
 	}
 	add(request)

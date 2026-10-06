@@ -231,6 +231,10 @@ func validateRulePorts(rule configmodels.SliceApplicationFilteringRules, sliceNa
 // UPF refuses every session that needs a shape it does not hold.
 const maxUpfRuleShapes = 8
 
+// anyEndpoint is the SDF keyword for any address: the endpoint an operator may give, and the one
+// BuildSDFFilter writes for an endpoint beginning 0.0.0.0.
+const anyEndpoint = "any"
+
 // A rule's endpoint is written into its SDF filter as it is, and the UPF splits the filter into
 // fields, so anything but a single address, prefix or "any" changes what it parses: extra fields
 // can add a port, or turn the filter into one it cannot parse and installs as matching any traffic.
@@ -238,7 +242,7 @@ const maxUpfRuleShapes = 8
 // installs the rule matching any traffic.
 func validateRuleEndpoint(rule configmodels.SliceApplicationFilteringRules, sliceName string) error {
 	endpoint := rule.Endpoint
-	if endpoint == "" || endpoint == "any" || net.ParseIP(endpoint) != nil {
+	if endpoint == "" || endpoint == anyEndpoint || net.ParseIP(endpoint) != nil {
 		return nil
 	}
 	if _, _, err := net.ParseCIDR(endpoint); err == nil {
@@ -251,32 +255,35 @@ type ruleShape struct {
 	prefixLen int
 	protocol  bool
 	port      bool
-	// Set only for a stored endpoint of several fields, whose mask cannot be known here: every
-	// input of its SDF filter, so that only rules with the same filter share a shape.
+	// Set only for a stored endpoint of several fields, whose mask cannot be known here: the SDF
+	// filter BuildSDFFilter writes for it, as the UPF reads it, so that only rules writing the same
+	// filter share a shape -- including a modelled rule that happens to write the same one (see
+	// validateUpfRuleShapes).
 	unknown string
 }
 
-// The shape of the PDR the UPF installs for this rule, as buildFlowDescription writes its SDF
-// filter. The UPF installs a PDR whose filter it cannot parse without the filter, matching any
-// traffic, so an endpoint or a port range it cannot parse has the shape of a rule permitting any
-// traffic. A range it parses but cannot install, it refuses before writing anything, so that rule
-// takes no mask and reports false. validateRulePorts refuses both kinds of range, but a slice stored
+// The shape of the PDR the UPF installs for this rule, as BuildSDFFilter writes its SDF filter.
+//
+// modelable is false for an endpoint of several fields, whose mask cannot be known here: the UPF may
+// parse its fields, together with the protocol and ports written around them, into any shape. Such a
+// rule is keyed by the filter it writes instead (see validateUpfRuleShapes).
+//
+// counts is false for a modelable rule the UPF refuses before installing anything -- a port range
+// too wide -- so that rule takes no mask. An endpoint or port range the UPF cannot parse it drops
+// with the rest of the filter, installing the rule as matching any traffic, so that reports the
+// any-traffic shape and counts. validateRulePorts refuses a range of either kind, but a slice stored
 // before it may hold one.
-func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (ruleShape, bool) {
-	var shape ruleShape
+func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (shape ruleShape, modelable, counts bool) {
 	// The UPF splits the filter with strings.Fields, so it reads the endpoint as these fields.
 	fields := strings.Fields(rule.Endpoint)
 	switch {
 	case strings.HasPrefix(rule.Endpoint, "0.0.0.0"):
-		// buildFlowDescription writes such an endpoint as "any", which the UPF parses as any
+		// BuildSDFFilter writes such an endpoint as "any", which the UPF parses as any
 		// address.
 	case len(fields) > 1:
-		// validateRuleEndpoint refuses such an endpoint, but a slice stored before it may hold
-		// one. The UPF may parse its fields, together with the protocol and ports written around
-		// them, into any shape, so it is not modelled: a rule counts as a shape of its own unless
-		// another writes exactly the same filter.
-		return ruleShape{unknown: filterInputs(fields, rule)}, true
-	case len(fields) == 1 && fields[0] == "any":
+		// validateRuleEndpoint refuses such an endpoint, but a slice stored before it may hold one.
+		return ruleShape{}, false, false
+	case len(fields) == 1 && fields[0] == anyEndpoint:
 	default:
 		endpoint := strings.Join(fields, "")
 		if !strings.Contains(endpoint, "/") {
@@ -296,7 +303,7 @@ func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (ruleShape, b
 		_, ipNet, err := net.ParseCIDR(endpoint)
 		if err != nil {
 			// A filter the UPF cannot parse, including one with no endpoint, it drops.
-			return ruleShape{}, true
+			return ruleShape{}, true, true
 		}
 		ones, bits := ipNet.Mask.Size()
 		// The UPF keeps only the low 32 bits of an IPv6 mask, so an IPv6 prefix reaches the
@@ -308,30 +315,51 @@ func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (ruleShape, b
 	}
 	if rule.Protocol == protocolTCP || rule.Protocol == protocolUDP {
 		if rule.StartPort < 0 || rule.EndPort > math.MaxUint16 || rule.StartPort > rule.EndPort {
-			return ruleShape{}, true
+			return ruleShape{}, true, true
 		}
 		shape.protocol = true
 		anyPort := rule.StartPort == 0 && (rule.EndPort == 0 || rule.EndPort == math.MaxUint16)
 		if !anyPort && rule.EndPort-rule.StartPort+1 > maxRulePortRangeWidth {
-			return ruleShape{}, false
+			return ruleShape{}, true, false
 		}
 		shape.port = !anyPort
 	}
-	return shape, true
+	return shape, true, true
 }
 
-// What buildFlowDescription writes into the filter around an endpoint of several fields: the
-// fields as the UPF reads them, the protocol, and the ports, which only TCP and UDP rules carry and
-// which are left out when both are zero.
-func filterInputs(fields []string, rule configmodels.SliceApplicationFilteringRules) string {
-	protocol, ports := "ip", ""
-	if rule.Protocol == protocolTCP || rule.Protocol == protocolUDP {
-		protocol = strconv.Itoa(int(rule.Protocol))
-		if rule.StartPort != 0 || rule.EndPort != 0 {
-			ports = fmt.Sprintf("%d-%d", rule.StartPort, rule.EndPort)
-		}
+// BuildSDFFilter renders the SDF filter installed for a rule: the flow description the UPF receives
+// and splits into the fields it matches on. backend/nfconfig sends this to the datapath, and
+// validateUpfRuleShapes keys a rule's PDR mask on it (through canonicalFlow). Rendering it in one
+// place keeps the shape count from drifting away from the filter actually installed.
+func BuildSDFFilter(rule configmodels.SliceApplicationFilteringRules) string {
+	endpoint := rule.Endpoint
+	if strings.HasPrefix(endpoint, "0.0.0.0") {
+		endpoint = anyEndpoint
 	}
-	return strings.Join(fields, " ") + "|" + protocol + "|" + ports
+	var protocol string
+	switch rule.Protocol {
+	case protocolTCP:
+		protocol = "tcp"
+	case protocolUDP:
+		protocol = "udp"
+	default:
+		// Only TCP and UDP carry ports into the filter.
+		return fmt.Sprintf("permit out ip from %s to assigned", endpoint)
+	}
+	switch {
+	case rule.StartPort == 0 && rule.EndPort == 0:
+		return fmt.Sprintf("permit out %s from %s to assigned", protocol, endpoint)
+	case factory.WebUIConfig.Configuration.SdfComp:
+		return fmt.Sprintf("permit out %s from %s %d-%d to assigned", protocol, endpoint, rule.StartPort, rule.EndPort)
+	default:
+		return fmt.Sprintf("permit out %s from %s to assigned %d-%d", protocol, endpoint, rule.StartPort, rule.EndPort)
+	}
+}
+
+// canonicalFlow is a rule's SDF filter tokenised the way the UPF reads it with strings.Fields, so
+// two rules the UPF installs as the same filter compare equal despite incidental whitespace.
+func canonicalFlow(rule configmodels.SliceApplicationFilteringRules) string {
+	return strings.Join(strings.Fields(BuildSDFFilter(rule)), " ")
 }
 
 func upfNameOf(slice configmodels.Slice) string {
@@ -353,21 +381,39 @@ func validateUpfRuleShapes(request configmodels.Slice, sliceName string) (int, e
 		return http.StatusInternalServerError, fmt.Errorf("failed to look up network slices: %w", err)
 	}
 	shapes := map[ruleShape]struct{}{}
+	// The filters written by rules whose mask is known. An endpoint of several fields is deferred
+	// until these are all collected, so it can share a modelled rule's shape when it writes the
+	// same filter -- the UPF installs one mask for the two -- rather than always counting as one of
+	// its own.
+	modeledFlows := map[string]struct{}{}
+	var deferredFlows []string
 	add := func(slice configmodels.Slice) {
 		if len(slice.ApplicationFilteringRules) == 0 {
 			shapes[ruleShape{}] = struct{}{}
 			return
 		}
 		for _, rule := range slice.ApplicationFilteringRules {
-			if shape, ok := ruleShapeOf(rule); ok {
-				shapes[shape] = struct{}{}
+			shape, modelable, counts := ruleShapeOf(rule)
+			if !modelable {
+				deferredFlows = append(deferredFlows, canonicalFlow(rule))
+				continue
 			}
+			if !counts {
+				continue
+			}
+			shapes[shape] = struct{}{}
+			modeledFlows[canonicalFlow(rule)] = struct{}{}
 		}
 	}
 	add(request)
 	for _, slice := range stored {
 		if slice.SliceName != sliceName && upfNameOf(*slice) == upf {
 			add(*slice)
+		}
+	}
+	for _, flow := range deferredFlows {
+		if _, ok := modeledFlows[flow]; !ok {
+			shapes[ruleShape{unknown: flow}] = struct{}{}
 		}
 	}
 	if len(shapes) > maxUpfRuleShapes {

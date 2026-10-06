@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	"os/exec"
 	"slices"
@@ -125,6 +126,9 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 		if err := validateRulePorts(ruleConfig, sliceName); err != nil {
 			return request, http.StatusBadRequest, err
 		}
+		if err := validateRuleEndpoint(ruleConfig, sliceName); err != nil {
+			return request, http.StatusBadRequest, err
+		}
 	}
 
 	slices.Sort(request.SiteDeviceGroup)
@@ -136,6 +140,10 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 	}
 
 	if statusCode, err := validateDeviceGroupsBelongToPlmn(request, sliceName); err != nil {
+		return request, statusCode, err
+	}
+
+	if statusCode, err := validateUpfRuleShapes(request, sliceName); err != nil {
 		return request, statusCode, err
 	}
 
@@ -214,6 +222,148 @@ func validateRulePorts(rule configmodels.SliceApplicationFilteringRules, sliceNa
 		return fmt.Errorf("port range %d-%d for rule %s in Network Slice %s covers more than %d ports", start, end, rule.RuleName, sliceName, maxRulePortRangeWidth)
 	}
 	return nil
+}
+
+// The BESS UPF matches packets to PDRs in one table shared by every session on the UPF, and that
+// table has room for 16 distinct masks (MAX_TUPLES in bess/core/modules/wildcard_match.h). A rule's
+// mask depends only on its endpoint's prefix length, whether it names a protocol and whether it
+// names a port; each such shape takes two masks, one per direction. Once the table is full, the
+// UPF refuses every session that needs a shape it does not hold.
+const maxUpfRuleShapes = 8
+
+// A rule's endpoint is written into its SDF filter as it is, and the UPF splits the filter into
+// fields, so anything but a single address, prefix or "any" changes what it parses: extra fields
+// can add a port, or turn the filter into one it cannot parse and installs as matching any traffic.
+// No endpoint at all is accepted as it was before: the UPF cannot parse the filter it gives, and
+// installs the rule matching any traffic.
+func validateRuleEndpoint(rule configmodels.SliceApplicationFilteringRules, sliceName string) error {
+	endpoint := rule.Endpoint
+	if endpoint == "" || endpoint == "any" || net.ParseIP(endpoint) != nil {
+		return nil
+	}
+	if _, _, err := net.ParseCIDR(endpoint); err == nil {
+		return nil
+	}
+	return fmt.Errorf("invalid endpoint %q for rule %s in Network Slice %s: expected an IP address, a prefix or \"any\"", endpoint, rule.RuleName, sliceName)
+}
+
+type ruleShape struct {
+	prefixLen int
+	protocol  bool
+	port      bool
+	// Set only for a stored endpoint of several fields, whose mask cannot be known here: every
+	// input of its SDF filter, so that only rules with the same filter share a shape.
+	unknown string
+}
+
+// The shape of the PDR the UPF installs for this rule, as buildFlowDescription writes its SDF
+// filter. The UPF installs a PDR whose filter it cannot parse without the filter, matching any
+// traffic, so an endpoint or a port range it cannot parse has the shape of a rule permitting any
+// traffic. A range it parses but cannot install, it refuses before writing anything, so that rule
+// takes no mask and reports false. validateRulePorts refuses both kinds of range, but a slice stored
+// before it may hold one.
+func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (ruleShape, bool) {
+	var shape ruleShape
+	// The UPF splits the filter with strings.Fields, so it reads the endpoint as these fields.
+	fields := strings.Fields(rule.Endpoint)
+	switch {
+	case strings.HasPrefix(rule.Endpoint, "0.0.0.0"):
+		// buildFlowDescription writes such an endpoint as "any", which the UPF parses as any
+		// address.
+	case len(fields) > 1:
+		// validateRuleEndpoint refuses such an endpoint, but a slice stored before it may hold
+		// one. The UPF may parse its fields, together with the protocol and ports written around
+		// them, into any shape, so it is not modelled: a rule counts as a shape of its own unless
+		// another writes exactly the same filter.
+		return ruleShape{unknown: filterInputs(fields, rule)}, true
+	case len(fields) == 1 && fields[0] == "any":
+	default:
+		endpoint := strings.Join(fields, "")
+		if !strings.Contains(endpoint, "/") {
+			endpoint += "/32"
+		}
+		_, ipNet, err := net.ParseCIDR(endpoint)
+		if err != nil {
+			// A filter the UPF cannot parse, including one with no endpoint, it drops.
+			return ruleShape{}, true
+		}
+		ones, bits := ipNet.Mask.Size()
+		// The UPF keeps only the low 32 bits of an IPv6 mask, so an IPv6 prefix reaches the
+		// datapath as the part of it that falls in those bits.
+		if bits == 8*net.IPv6len {
+			ones = max(0, ones-(8*net.IPv6len-32))
+		}
+		shape.prefixLen = ones
+	}
+	if rule.Protocol == protocolTCP || rule.Protocol == protocolUDP {
+		if rule.StartPort < 0 || rule.EndPort > math.MaxUint16 || rule.StartPort > rule.EndPort {
+			return ruleShape{}, true
+		}
+		shape.protocol = true
+		anyPort := rule.StartPort == 0 && (rule.EndPort == 0 || rule.EndPort == math.MaxUint16)
+		if !anyPort && rule.EndPort-rule.StartPort+1 > maxRulePortRangeWidth {
+			return ruleShape{}, false
+		}
+		shape.port = !anyPort
+	}
+	return shape, true
+}
+
+// What buildFlowDescription writes into the filter around an endpoint of several fields: the
+// fields as the UPF reads them, the protocol, and the ports, which only TCP and UDP rules carry and
+// which are left out when both are zero.
+func filterInputs(fields []string, rule configmodels.SliceApplicationFilteringRules) string {
+	protocol, ports := "ip", ""
+	if rule.Protocol == protocolTCP || rule.Protocol == protocolUDP {
+		protocol = strconv.Itoa(int(rule.Protocol))
+		if rule.StartPort != 0 || rule.EndPort != 0 {
+			ports = fmt.Sprintf("%d-%d", rule.StartPort, rule.EndPort)
+		}
+	}
+	return strings.Join(fields, " ") + "|" + protocol + "|" + ports
+}
+
+func upfNameOf(slice configmodels.Slice) string {
+	name, _ := slice.SiteInfo.Upf["upf-name"].(string)
+	return name
+}
+
+// Refuses a slice that would take the rules on its UPF past the shapes the UPF can hold, counting
+// the slice as posted together with every other slice on the same UPF. A slice without rules is
+// given a default rule that permits any traffic (backend/nfconfig), which has a shape of its own.
+// A slice that names no UPF is not counted: nothing here says which UPF serves it.
+func validateUpfRuleShapes(request configmodels.Slice, sliceName string) (int, error) {
+	upf := upfNameOf(request)
+	if upf == "" {
+		return http.StatusOK, nil
+	}
+	stored, err := getSlices()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to look up network slices: %w", err)
+	}
+	shapes := map[ruleShape]struct{}{}
+	add := func(slice configmodels.Slice) {
+		if len(slice.ApplicationFilteringRules) == 0 {
+			shapes[ruleShape{}] = struct{}{}
+			return
+		}
+		for _, rule := range slice.ApplicationFilteringRules {
+			if shape, ok := ruleShapeOf(rule); ok {
+				shapes[shape] = struct{}{}
+			}
+		}
+	}
+	add(request)
+	for _, slice := range stored {
+		if slice.SliceName != sliceName && upfNameOf(*slice) == upf {
+			add(*slice)
+		}
+	}
+	if len(shapes) > maxUpfRuleShapes {
+		return http.StatusBadRequest, fmt.Errorf("network slice %s would bring the filtering rules on UPF %s to %d distinct shapes, more than the %d the UPF can hold; "+
+			"a shape is the endpoint's prefix length, whether a protocol is given and whether a port is given", sliceName, upf, len(shapes), maxUpfRuleShapes)
+	}
+	return http.StatusOK, nil
 }
 
 func logSliceMetadata(slice configmodels.Slice) {

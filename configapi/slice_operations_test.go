@@ -1232,6 +1232,12 @@ func sevenPrefixRules() []configmodels.SliceApplicationFilteringRules {
 
 // The UPF's table is shared by every slice it serves, so the shapes are counted across them.
 func TestValidateUpfRuleShapes(t *testing.T) {
+	// canonicalFlow reads the spec-compliant-SDF flag to place a rule's ports as the UPF receives
+	// them; pin it so the shapes do not depend on whatever a prior test left in the global config.
+	origConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = origConfig }()
+	factory.WebUIConfig = &factory.Config{Configuration: &factory.Configuration{}}
+
 	allowAll := ruleTo("0.0.0.0/0", 0, 0, 0)
 	testCases := []struct {
 		name         string
@@ -1497,7 +1503,7 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			// buildFlowDescription writes only an endpoint beginning 0.0.0.0 as "any"; with a
+			// BuildSDFFilter writes only an endpoint beginning 0.0.0.0 as "any"; with a
 			// space before it, the UPF reads the prefix as written. Nine shapes.
 			name:         "a stored 0.0.0.0 prefix after whitespace counts by its prefix",
 			stored:       []configmodels.Slice{sliceOnUpf("b", "upf1", ruleTo(" 0.0.0.0/8", 0, 0, 0))},
@@ -1529,6 +1535,92 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 			dbadapter.CommonDBClient = &NetworkSliceMockDBClient{slices: tc.stored}
 
 			code, err := validateUpfRuleShapes(tc.posted, tc.posted.SliceName)
+			if code != tc.expectedCode {
+				t.Errorf("expected `%v`, got `%v` (%v)", tc.expectedCode, code, err)
+			}
+			if (err != nil) != (tc.expectedCode != http.StatusOK) {
+				t.Errorf("unexpected error %v for status %v", err, code)
+			}
+		})
+	}
+}
+
+// A stored endpoint of several fields shares a modelled rule's shape when it writes the same SDF
+// filter: the UPF installs one mask for the two, so counting them apart would reject a slice that
+// fits. With spec-compliant-SDF the ports sit right after the endpoint, so a legacy
+// "10.0.0.0/8 80-80" carrying no ports of its own writes exactly what a clean "10.0.0.0/8" with
+// ports 80-80 does. Without it the ports sit after "to assigned", so the two filters differ and the
+// rules do count apart.
+func TestValidateUpfRuleShapesFoldsLegacyEndpointWritingTheSameFilter(t *testing.T) {
+	origConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = origConfig }()
+
+	modeled := ruleTo("10.0.0.0/8", protocolTCP, 80, 80)
+	legacy := ruleTo("10.0.0.0/8 80-80", protocolTCP, 0, 0)
+	// Seven prefix shapes, then an eighth from the modelled rule's port; the legacy rule is the one
+	// that either folds into the eighth or becomes a ninth.
+	posted := sliceOnUpf("a", "upf1", append(sevenPrefixRules(), modeled, legacy)...)
+
+	testCases := []struct {
+		name          string
+		specCompliant bool
+		expectedCode  int
+	}{
+		{"spec-compliant SDF writes the same filter for both", true, http.StatusOK},
+		{"legacy SDF writes a different filter for each", false, http.StatusBadRequest},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			factory.WebUIConfig = &factory.Config{Configuration: &factory.Configuration{SdfComp: tc.specCompliant}}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			dbadapter.CommonDBClient = &NetworkSliceMockDBClient{}
+
+			code, err := validateUpfRuleShapes(posted, posted.SliceName)
+			if code != tc.expectedCode {
+				t.Errorf("expected `%v`, got `%v` (%v)", tc.expectedCode, code, err)
+			}
+			if (err != nil) != (tc.expectedCode != http.StatusOK) {
+				t.Errorf("unexpected error %v for status %v", err, code)
+			}
+		})
+	}
+}
+
+// A modelable rule the UPF refuses before installing anything -- a port range too wide -- takes no
+// mask, and a legacy endpoint writing the same filter is refused the same way, so it must take no
+// shape either. With spec-compliant-SDF the ports sit right after the endpoint, so a legacy
+// "10.0.0.0/8 1000-1100" carrying no ports of its own writes exactly what a clean "10.0.0.0/8" with
+// the oversized range 1000-1100 does; the legacy copy folds into the refused rule and adds nothing.
+// Without it the filters differ, so the legacy copy still counts as a shape of its own.
+func TestValidateUpfRuleShapesFoldsLegacyEndpointOntoARefusedFilter(t *testing.T) {
+	origConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = origConfig }()
+
+	// The range is wider than maxRulePortRangeWidth, so the UPF refuses the rule before installing a
+	// mask and it takes no shape of its own.
+	refused := ruleTo("10.0.0.0/8", protocolTCP, 1000, 1100)
+	legacy := ruleTo("10.0.0.0/8 1000-1100", protocolTCP, 0, 0)
+	// Seven prefix shapes and any traffic make eight; the legacy rule either folds onto the refused
+	// filter and adds nothing or becomes a ninth.
+	posted := sliceOnUpf("a", "upf1", append(sevenPrefixRules(), ruleTo("0.0.0.0/0", 0, 0, 0), refused, legacy)...)
+
+	testCases := []struct {
+		name          string
+		specCompliant bool
+		expectedCode  int
+	}{
+		{"spec-compliant SDF writes the refused filter for both", true, http.StatusOK},
+		{"legacy SDF writes a different filter for each", false, http.StatusBadRequest},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			factory.WebUIConfig = &factory.Config{Configuration: &factory.Configuration{SdfComp: tc.specCompliant}}
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			dbadapter.CommonDBClient = &NetworkSliceMockDBClient{}
+
+			code, err := validateUpfRuleShapes(posted, posted.SliceName)
 			if code != tc.expectedCode {
 				t.Errorf("expected `%v`, got `%v` (%v)", tc.expectedCode, code, err)
 			}

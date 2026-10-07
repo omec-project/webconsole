@@ -6,22 +6,14 @@
 package nfconfig
 
 import (
-	"fmt"
 	"slices"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/omec-project/openapi/v2/nfConfigApi"
-	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configapi"
 	"github.com/omec-project/webconsole/configmodels"
-)
-
-const (
-	tcp int32 = 6
-	udp int32 = 17
 )
 
 type accessAndMobilityKey struct {
@@ -427,7 +419,7 @@ func buildSlicePccRules(slice configmodels.Slice) []nfConfigApi.PccRule {
 func buildPccFlows(ruleConfig configmodels.SliceApplicationFilteringRules) []nfConfigApi.PccFlow {
 	pccFlows := []nfConfigApi.PccFlow{}
 
-	description := buildFlowDescription(ruleConfig)
+	description := configapi.BuildSDFFilter(ruleConfig)
 	var status nfConfigApi.Status
 	if ruleConfig.Action == "deny" {
 		status = nfConfigApi.STATUS_DISABLED
@@ -443,32 +435,6 @@ func buildPccFlows(ruleConfig configmodels.SliceApplicationFilteringRules) []nfC
 
 	pccFlows = append(pccFlows, *flowInfo)
 	return pccFlows
-}
-
-func buildFlowDescription(ruleConfig configmodels.SliceApplicationFilteringRules) string {
-	endp := ruleConfig.Endpoint
-	if strings.HasPrefix(endp, "0.0.0.0") {
-		endp = "any"
-	}
-
-	switch ruleConfig.Protocol {
-	case tcp:
-		return buildDescription("tcp", endp, ruleConfig.StartPort, ruleConfig.EndPort)
-	case udp:
-		return buildDescription("udp", endp, ruleConfig.StartPort, ruleConfig.EndPort)
-	default:
-		return fmt.Sprintf("permit out ip from %s to assigned", endp)
-	}
-}
-
-func buildDescription(protocol, endpoint string, startPort, endPort int32) string {
-	if startPort == 0 && endPort == 0 {
-		return fmt.Sprintf("permit out %s from %s to assigned", protocol, endpoint)
-	} else if factory.WebUIConfig.Configuration.SdfComp {
-		return fmt.Sprintf("permit out %s from %s %s-%s to assigned", protocol, endpoint, strconv.FormatInt(int64(startPort), 10), strconv.FormatInt(int64(endPort), 10))
-	} else {
-		return fmt.Sprintf("permit out %s from %s to assigned %s-%s", protocol, endpoint, strconv.FormatInt(int64(startPort), 10), strconv.FormatInt(int64(endPort), 10))
-	}
 }
 
 func getSupportedDnns(slice configmodels.Slice, deviceGroups map[string]configmodels.DeviceGroups) []string {

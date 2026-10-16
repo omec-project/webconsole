@@ -491,4 +491,3 @@ func (db *MongoDBClient) StartSession() (DBSession, error) {
 func (db *MongoDBClient) SupportsTransactions() (bool, error) {
 	return db.MongoClient.SupportsTransactions()
 }
-

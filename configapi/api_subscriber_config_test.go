@@ -12,7 +12,9 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omec-project/openapi/v2/models"
@@ -107,7 +109,7 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 		filterKey: filter,
 	})
 	sqn := models.NewSequenceNumber()
-	sqn.SetSqn("16f3b3f70fc2")
+	sqn.SetSqn(testSequenceNumber)
 	var authenticationSubscription models.AuthenticationSubscription
 	authenticationSubscription.SetAuthenticationManagementField("8000")
 	authenticationSubscription.SetAuthenticationMethod(models.AUTHMETHOD__5_G_AKA)
@@ -345,7 +347,7 @@ func TestGetSubscriberByID(t *testing.T) {
 					"authenticationMethod":          models.AUTHMETHOD__5_G_AKA,
 					"encOpcKey":                     "981d464c7c52eb6e5036234984ad0bcf",
 					"encPermanentKey":               "5122250214c33e723a5dd523fc145fc0",
-					"sequenceNumber":                map[string]any{"sqn": "16f3b3f70fc2"},
+					sequenceNumberKey:               map[string]any{"sqn": testSequenceNumber},
 				},
 				"FlowRules": nil,
 				"SessionManagementSubscriptionData": []any{
@@ -636,6 +638,7 @@ func TestSubscriberPost(t *testing.T) {
 	tests := []struct {
 		name             string
 		commonDbAdapter  PostSubscriberMockDBClient
+		authSubscribers  []string
 		expectedCode     int
 		expectedBody     string
 		expectedGetData  []map[string]any
@@ -646,8 +649,9 @@ func TestSubscriberPost(t *testing.T) {
 			commonDbAdapter: PostSubscriberMockDBClient{
 				subscribers: []string{testSubscriberImsi},
 			},
-			expectedCode: http.StatusConflict,
-			expectedBody: "subscriber imsi-208930100007487 already exists",
+			authSubscribers: []string{testSubscriberImsi},
+			expectedCode:    http.StatusConflict,
+			expectedBody:    "subscriber imsi-208930100007487 already exists",
 			expectedGetData: []map[string]any{
 				{collKey: amDataColl, filterKey: map[string]any{ueIdKey: testSubscriberImsi}},
 			},
@@ -667,6 +671,22 @@ func TestSubscriberPost(t *testing.T) {
 				{collKey: amDataColl, filterKey: bson.M{ueIdKey: testSubscriberImsi}},
 			},
 		},
+		{
+			// amData left behind by a delayed, ambiguous create (e.g. a timed-out upsert landing
+			// after its own credential was rolled back) must not permanently block recreation.
+			name: "Orphaned amData without a matching credential is self-healed",
+			commonDbAdapter: PostSubscriberMockDBClient{
+				subscribers: []string{testSubscriberImsi},
+			},
+			expectedCode: http.StatusCreated,
+			expectedBody: `{}`,
+			expectedGetData: []map[string]any{
+				{collKey: amDataColl, filterKey: map[string]any{ueIdKey: testSubscriberImsi}},
+			},
+			expectedPostData: []map[string]any{
+				{collKey: amDataColl, filterKey: bson.M{ueIdKey: testSubscriberImsi}},
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -676,10 +696,10 @@ func TestSubscriberPost(t *testing.T) {
 
 			route := subscriberByImsiPath
 			inputData := map[string]string{
-				"plmnID":         "12345",
-				"opc":            "8e27b6af0e692e750f32667a3b14605d",
-				"key":            "8baf473f2f8fd09487cccbd7097c6862",
-				"sequenceNumber": "16f3b3f70fc2",
+				"plmnID":          "12345",
+				"opc":             "8e27b6af0e692e750f32667a3b14605d",
+				"key":             "8baf473f2f8fd09487cccbd7097c6862",
+				sequenceNumberKey: testSequenceNumber,
 			}
 			jsonData, err := json.Marshal(inputData)
 			if err != nil {
@@ -692,7 +712,7 @@ func TestSubscriberPost(t *testing.T) {
 				dbadapter.CommonDBClient = origDBClient
 				dbadapter.AuthDBClient = origAuthDBClient
 			}()
-			authMock := &AuthDBMockDBClient{}
+			authMock := &AuthDBMockDBClient{subscribers: tc.authSubscribers}
 			dbadapter.AuthDBClient = authMock
 			dbadapter.CommonDBClient = &tc.commonDbAdapter
 
@@ -747,11 +767,152 @@ func TestSubscriberPost(t *testing.T) {
 	}
 }
 
+// A second POST for the same IMSI must block on the per-IMSI subscriber lock until the first
+// finishes, so the two requests can never interleave their auth/amData writes and publish
+// mismatched tokens.
+func TestSubscriberAuthLock_SerializesPostSubscriberByID(t *testing.T) {
+	cleanupFactory := setupTestFactory()
+	defer cleanupFactory()
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddApiService(router)
+
+	origDBClient := dbadapter.CommonDBClient
+	origAuthDBClient := dbadapter.AuthDBClient
+	defer func() {
+		dbadapter.CommonDBClient = origDBClient
+		dbadapter.AuthDBClient = origAuthDBClient
+	}()
+	dbadapter.CommonDBClient = &PostSubscriberMockDBClient{}
+	dbadapter.AuthDBClient = &AuthDBMockDBClient{}
+
+	inputData := map[string]string{
+		"opc":             "8e27b6af0e692e750f32667a3b14605d",
+		"key":             "8baf473f2f8fd09487cccbd7097c6862",
+		sequenceNumberKey: testSequenceNumber,
+	}
+	jsonData, err := json.Marshal(inputData)
+	if err != nil {
+		t.Fatalf("failed to marshal input data to JSON: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, subscriberByImsiPath, bytes.NewBuffer(jsonData))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Released via an idempotent deferred unlock: if an assertion below calls t.Fatalf before the
+	// explicit unlock() is reached, the shard would otherwise stay locked forever and hang later
+	// tests that share it.
+	release := lockSubscriber(testSubscriberImsi)
+	var released atomic.Bool
+	unlock := func() {
+		if released.CompareAndSwap(false, true) {
+			release()
+		}
+	}
+	defer unlock()
+	done := make(chan int, 1)
+	go func() {
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		done <- w.Code
+	}()
+
+	select {
+	case code := <-done:
+		t.Fatalf("expected PostSubscriberByID to block while the subscriber lock is held, got code %d", code)
+	case <-time.After(50 * time.Millisecond):
+		// Still blocked, as expected.
+	}
+
+	unlock()
+
+	select {
+	case code := <-done:
+		if code != http.StatusCreated {
+			t.Errorf("expected %d once unblocked, got %d", http.StatusCreated, code)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected PostSubscriberByID to complete after the lock was released")
+	}
+}
+
+// DeleteSubscriberByID must acquire the per-IMSI lock before updateSubscriberInDeviceGroups runs,
+// not just before the final auth/amData delete: that cleanup can itself remove this subscriber's
+// amData, so a concurrent POST slipping into the gap could create a new generation that this
+// delete would otherwise wipe out.
+func TestSubscriberAuthLock_SerializesDeleteSubscriberByIDBeforeDeviceGroupCleanup(t *testing.T) {
+	cleanupFactory := setupTestFactory()
+	defer cleanupFactory()
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddApiService(router)
+
+	origDBClient := dbadapter.CommonDBClient
+	origAuthDBClient := dbadapter.AuthDBClient
+	defer func() {
+		dbadapter.CommonDBClient = origDBClient
+		dbadapter.AuthDBClient = origAuthDBClient
+	}()
+	mockDB := &DeleteSubscriberMockDBClient{deviceGroups: []configmodels.DeviceGroups{}}
+	dbadapter.CommonDBClient = mockDB
+	dbadapter.AuthDBClient = &AuthDBMockDBClient{}
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, subscriberByImsiPath, nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	// Released via an idempotent deferred unlock: if an assertion below calls t.Fatalf before the
+	// explicit unlock() is reached, the shard would otherwise stay locked forever and hang later
+	// tests that share it.
+	release := lockSubscriber(testSubscriberImsi)
+	var released atomic.Bool
+	unlock := func() {
+		if released.CompareAndSwap(false, true) {
+			release()
+		}
+	}
+	defer unlock()
+	done := make(chan int, 1)
+	go func() {
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		done <- w.Code
+	}()
+
+	select {
+	case code := <-done:
+		t.Fatalf("expected DeleteSubscriberByID to block while the subscriber lock is held, got code %d", code)
+	case <-time.After(50 * time.Millisecond):
+		// Still blocked, as expected.
+	}
+	if calls := mockDB.getManyCalls.Load(); calls != 0 {
+		t.Fatalf("expected the device-group lookup to wait for the lock too, but it ran %d time(s) first", calls)
+	}
+
+	unlock()
+
+	select {
+	case code := <-done:
+		if code != http.StatusNoContent {
+			t.Errorf("expected %d once unblocked, got %d", http.StatusNoContent, code)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected DeleteSubscriberByID to complete after the lock was released")
+	}
+	if calls := mockDB.getManyCalls.Load(); calls == 0 {
+		t.Error("expected the device-group lookup to have run once unblocked")
+	}
+}
+
 type DeleteSubscriberMockDBClient struct {
 	dbadapter.DBInterface
 	deviceGroups      []configmodels.DeviceGroups
 	deleteData        []map[string]any
 	deleteWithCtxData []map[string]any
+	getManyCalls      atomic.Int32
 	err               error
 }
 
@@ -767,6 +928,7 @@ func (db *DeleteSubscriberMockDBClient) RestfulAPIGetOne(coll string, filter bso
 }
 
 func (db *DeleteSubscriberMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	db.getManyCalls.Add(1)
 	if db.err != nil {
 		return nil, db.err
 	}

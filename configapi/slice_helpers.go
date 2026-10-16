@@ -764,7 +764,7 @@ func updateAmProvisionedData(gpsi string, snssai *models.Snssai, aggregatedQoS c
 	var nssai models.Nssai
 	nssai.SetDefaultSingleNssais([]models.Snssai{*snssai})
 	nssai.SetSingleNssais([]models.Snssai{*snssai})
-	amData := models.NewAccessAndMobilitySubscriptionData()
+	amData := new(models.AccessAndMobilitySubscriptionData)
 	amData.SetGpsis(gpsiSlice)
 	amData.SetNssai(nssai)
 	amData.SetSubscribedUeAmbr(*models.NewAmbr(ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)), ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink))))

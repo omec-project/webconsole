@@ -50,6 +50,7 @@ const (
 	ueIdKey                    = "ueId"
 	usernameKey                = "username"
 	servingPlmnIdKey           = "servingPlmnId"
+	provisioningTokenKey       = "provisioningToken"
 	dnnInternet                = "internet"
 	errMsgRetrieveDeviceGroup  = "failed to retrieve device group"
 	errMsgRetrieveNetworkSlice = "failed to retrieve network slice"

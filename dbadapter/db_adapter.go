@@ -65,6 +65,17 @@ type DBInterface interface {
 	RestfulAPIPutOne(collName string, filter bson.M, putData map[string]any) (bool, error)
 	RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]any) (bool, error)
 	RestfulAPIPutOneNotUpdate(collName string, filter bson.M, putData map[string]any) (bool, error)
+	// RestfulAPIReplaceOneNoUpsert replaces the whole document matching filter with replacement
+	// (unlike RestfulAPIPutOne, which $set-merges and always upserts): absent fields are actually
+	// removed, and a filter that matches nothing is a no-op rather than an insert. Returns whether
+	// a document was matched and replaced.
+	RestfulAPIReplaceOneNoUpsert(collName string, filter bson.M, replacement map[string]any) (bool, error)
+	// RestfulAPIUpdateOneNoUpsert $set-merges updateData into the document matching filter, with
+	// upsert disabled: unlike RestfulAPIPutOne (always upserts), a filter built from a previously
+	// observed document that no longer matches -- because it changed since that read -- is a safe
+	// no-op instead of either overwriting the change or inserting a duplicate document. Returns
+	// whether a document was matched and updated.
+	RestfulAPIUpdateOneNoUpsert(collName string, filter bson.M, updateData map[string]any) (bool, error)
 	RestfulAPIPutMany(collName string, filterArray []bson.M, putDataArray []map[string]any) error
 	RestfulAPIDeleteOne(collName string, filter bson.M) error
 	RestfulAPIDeleteOneWithContext(context context.Context, collName string, filter bson.M) error
@@ -414,6 +425,33 @@ func (db *MongoDBClient) RestfulAPIPutOneWithContext(context context.Context, co
 
 func (db *MongoDBClient) RestfulAPIPutOneNotUpdate(collName string, filter bson.M, putData map[string]any) (bool, error) {
 	return db.MongoClient.RestfulAPIPutOneNotUpdate(collName, filter, putData)
+}
+
+// RestfulAPIReplaceOneNoUpsert performs a true document replace (not a $set merge) with upsert
+// disabled, since the embedded util MongoClient has no such primitive: RestfulAPIPutOne/Post
+// always $set-merge and upsert, which cannot restore a snapshot's absent fields or safely treat a
+// non-matching filter as a no-op.
+func (db *MongoDBClient) RestfulAPIReplaceOneNoUpsert(collName string, filter bson.M, replacement map[string]any) (bool, error) {
+	collection := db.GetCollection(collName)
+	opts := options.Replace().SetUpsert(false)
+	result, err := collection.ReplaceOne(context.TODO(), filter, replacement, opts)
+	if err != nil {
+		return false, fmt.Errorf("RestfulAPIReplaceOneNoUpsert ReplaceOne err: %w", err)
+	}
+	return result.MatchedCount > 0, nil
+}
+
+// RestfulAPIUpdateOneNoUpsert performs a $set update (not a full replace) with upsert disabled:
+// a filter built from a previously observed document that no longer matches it is a safe no-op
+// instead of either overwriting a change made since that read or inserting a duplicate document.
+func (db *MongoDBClient) RestfulAPIUpdateOneNoUpsert(collName string, filter bson.M, updateData map[string]any) (bool, error) {
+	collection := db.GetCollection(collName)
+	opts := options.UpdateOne().SetUpsert(false)
+	result, err := collection.UpdateOne(context.TODO(), filter, bson.M{"$set": updateData}, opts)
+	if err != nil {
+		return false, fmt.Errorf("RestfulAPIUpdateOneNoUpsert UpdateOne err: %w", err)
+	}
+	return result.MatchedCount > 0, nil
 }
 
 func (db *MongoDBClient) RestfulAPIPutMany(collName string, filterArray []bson.M, putDataArray []map[string]any) error {

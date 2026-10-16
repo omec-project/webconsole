@@ -27,6 +27,10 @@ const (
 	subscriberPath     = "/api/subscriber"
 	testGroupName      = "group1"
 	testSubscriberImsi = "imsi-208930100007487"
+	testSequenceNumber = "16f3b3f70fc2"
+	sequenceNumberKey  = "sequenceNumber"
+	testGenerationOne  = "generation-1"
+	testCommonDBErrMsg = "common db failure"
 )
 
 func (m *MockSession) WithTransaction(ctx context.Context, fn func(ctx context.Context) (any, error), opts ...options.Lister[options.TransactionOptions]) (any, error) {

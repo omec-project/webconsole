@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omec-project/openapi/v2"
 	"github.com/omec-project/openapi/v2/models"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -902,7 +901,8 @@ func TestAggregateQoS_EmptyList(t *testing.T) {
 }
 
 func TestBuildSmProvisionedDataDocument(t *testing.T) {
-	snssai := &models.Snssai{Sst: 1, Sd: openapi.PtrString("010203")}
+	snssai := models.NewSnssai(1)
+	snssai.SetSd("010203")
 	dnnMap := map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
 		dnnInternet: {
 			{
@@ -972,7 +972,8 @@ func TestUpdateSmProvisionedData_UsesPutOne(t *testing.T) {
 	mock := &NetworkSliceMockDBClient{}
 	dbadapter.CommonDBClient = mock
 
-	snssai := &models.Snssai{Sst: 1, Sd: openapi.PtrString("010203")}
+	snssai := models.NewSnssai(1)
+	snssai.SetSd("010203")
 	dnnMap := map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
 		dnnInternet: {
 			{

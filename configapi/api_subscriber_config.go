@@ -16,7 +16,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/omec-project/openapi/v2"
 	"github.com/omec-project/openapi/v2/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
@@ -75,32 +74,31 @@ func GetSampleJSON(c *gin.Context) {
 
 	var subsData configmodels.SubsData
 
-	authSubsData := models.AuthenticationSubscription{
-		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          authMethod5GAKA,                                       // "5G_AKA", "EAP_AKA_PRIME"
-		EncOpcKey:                     openapi.PtrString("981d464c7c52eb6e5036234984ad0bcf"), // Required
-		EncPermanentKey:               openapi.PtrString("5122250214c33e723a5dd523fc145fc0"), // Required
-	}
+	var authSubsData models.AuthenticationSubscription
+	authSubsData.SetAuthenticationManagementField("8000")
+	authSubsData.SetAuthenticationMethod(models.AUTHMETHOD__5_G_AKA)    // "5G_AKA", "EAP_AKA_PRIME"
+	authSubsData.SetEncOpcKey("981d464c7c52eb6e5036234984ad0bcf")       // Required
+	authSubsData.SetEncPermanentKey("5122250214c33e723a5dd523fc145fc0") // Required
 
 	nssais := models.NewNssaiWithDefaults()
 	nssais.SetDefaultSingleNssais([]models.Snssai{
 		{
 			Sst: 1,
-			Sd:  openapi.PtrString("010203"),
+			Sd:  new("010203"),
 		},
 		{
 			Sst: 1,
-			Sd:  openapi.PtrString("112233"),
+			Sd:  new("112233"),
 		},
 	})
 	nssais.SetSingleNssais([]models.Snssai{
 		{
 			Sst: 1,
-			Sd:  openapi.PtrString("010203"),
+			Sd:  new("010203"),
 		},
 		{
 			Sst: 1,
-			Sd:  openapi.PtrString("112233"),
+			Sd:  new("112233"),
 		},
 	})
 	nullableNssai := models.NewNullableNssai(nssais)
@@ -113,13 +111,17 @@ func GetSampleJSON(c *gin.Context) {
 		SubscribedUeAmbr: models.NewAmbr(ambr1000Kbps, ambr1000Kbps),
 	}
 
-	val := int32(8)
-	nullableInt32 := openapi.NewNullableInt32(&val)
+	arp := models.NewArpWithDefaults()
+	arp.SetPriorityLevel(8)
+	arp.SetPreemptCap(models.PREEMPTIONCAPABILITY_MAY_PREEMPT)
+	arp.SetPreemptVuln(models.PREEMPTIONVULNERABILITY_PREEMPTABLE)
+	subscribeDefaultQos := models.NewSubscribedDefaultQos(9, *arp)
+	subscribeDefaultQos.SetPriorityLevel(8)
 	smDataData := []models.SessionManagementSubscriptionData{
 		{
 			SingleNssai: models.Snssai{
 				Sst: 1,
-				Sd:  openapi.PtrString("010203"),
+				Sd:  new("010203"),
 			},
 			DnnConfigurations: &map[string]models.DnnConfiguration{
 				dnnInternet: {
@@ -131,26 +133,15 @@ func GetSampleJSON(c *gin.Context) {
 						DefaultSscMode:  models.SSCMODE_SSC_MODE_1,
 						AllowedSscModes: []models.SscMode{models.SSCMODE_SSC_MODE_1},
 					},
-					SessionAmbr: &models.Ambr{
-						Downlink: ambr1000Kbps,
-						Uplink:   ambr1000Kbps,
-					},
-					Var5gQosProfile: &models.SubscribedDefaultQos{
-						Var5qi: 9,
-						Arp: models.Arp{
-							PriorityLevel: *nullableInt32,
-							PreemptCap:    models.PREEMPTIONCAPABILITY_MAY_PREEMPT,
-							PreemptVuln:   models.PREEMPTIONVULNERABILITY_PREEMPTABLE,
-						},
-						PriorityLevel: openapi.PtrInt32(8),
-					},
+					SessionAmbr:     models.NewAmbr(ambr1000Kbps, ambr1000Kbps),
+					Var5gQosProfile: subscribeDefaultQos,
 				},
 			},
 		},
 		{
 			SingleNssai: models.Snssai{
 				Sst: 1,
-				Sd:  openapi.PtrString("112233"),
+				Sd:  new("112233"),
 			},
 			DnnConfigurations: &map[string]models.DnnConfiguration{
 				dnnInternet: {
@@ -162,19 +153,8 @@ func GetSampleJSON(c *gin.Context) {
 						DefaultSscMode:  models.SSCMODE_SSC_MODE_1,
 						AllowedSscModes: []models.SscMode{models.SSCMODE_SSC_MODE_1},
 					},
-					SessionAmbr: &models.Ambr{
-						Downlink: ambr1000Kbps,
-						Uplink:   ambr1000Kbps,
-					},
-					Var5gQosProfile: &models.SubscribedDefaultQos{
-						Var5qi: 9,
-						Arp: models.Arp{
-							PriorityLevel: *nullableInt32,
-							PreemptCap:    models.PREEMPTIONCAPABILITY_MAY_PREEMPT,
-							PreemptVuln:   models.PREEMPTIONVULNERABILITY_PREEMPTABLE,
-						},
-						PriorityLevel: openapi.PtrInt32(8),
-					},
+					SessionAmbr:     models.NewAmbr(ambr1000Kbps, ambr1000Kbps),
+					Var5gQosProfile: subscribeDefaultQos,
 				},
 			},
 		},
@@ -186,7 +166,7 @@ func GetSampleJSON(c *gin.Context) {
 				DnnInfos: []models.DnnInfo{
 					{
 						Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
-							String: openapi.PtrString(dnnInternet),
+							String: new(dnnInternet),
 						},
 					},
 				},
@@ -195,7 +175,7 @@ func GetSampleJSON(c *gin.Context) {
 				DnnInfos: []models.DnnInfo{
 					{
 						Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
-							String: openapi.PtrString(dnnInternet),
+							String: new(dnnInternet),
 						},
 					},
 				},
@@ -213,7 +193,7 @@ func GetSampleJSON(c *gin.Context) {
 		SmPolicySnssaiData: map[string]models.SmPolicySnssaiData{
 			"01010203": {
 				Snssai: models.Snssai{
-					Sd:  openapi.PtrString("010203"),
+					Sd:  new("010203"),
 					Sst: 1,
 				},
 				SmPolicyDnnData: &map[string]models.SmPolicyDnnData{
@@ -224,7 +204,7 @@ func GetSampleJSON(c *gin.Context) {
 			},
 			"01112233": {
 				Snssai: models.Snssai{
-					Sd:  openapi.PtrString("112233"),
+					Sd:  new("112233"),
 					Sst: 1,
 				},
 				SmPolicyDnnData: &map[string]models.SmPolicyDnnData{
@@ -482,6 +462,12 @@ func PostSubscriberByID(c *gin.Context) {
 	logger.WebUILog.Infoln("Received Post Subscriber Data from Roc/Simapp:", ueId)
 	logger.WebUILog.Debugf("Override Data: %+v", subsOverrideData)
 
+	// Serializes the existence check and credential writes below against concurrent
+	// POST/PUT/DELETE for the same IMSI so two requests can never interleave and publish
+	// mismatched auth/amData records or race a delete.
+	unlock := lockSubscriber(ueId)
+	defer unlock()
+
 	// Check if the IMSI already exists in the database
 	filter := bson.M{ueIdKey: ueId}
 	subscriber, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filter)
@@ -490,29 +476,43 @@ func PostSubscriberByID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{errorKey: fmt.Sprintf("failed to check subscriber: %s existence", ueId), requestIDKey: requestID})
 		return
 	} else if subscriber != nil {
-		logger.WebUILog.Errorf("subscriber %s already exists", ueId)
-		c.JSON(http.StatusConflict, gin.H{errorKey: fmt.Sprintf("subscriber %s already exists", ueId), requestIDKey: requestID})
-		return
+		// amData alone isn't proof of a usable subscriber: an earlier create's amData write can
+		// still land after its own credential was already rolled back or deleted (e.g. a delayed,
+		// ambiguous write racing a DELETE for the same IMSI), leaving amData orphaned with no
+		// matching authentication subscription. Only treat that as a conflict when a credential
+		// actually backs it; otherwise self-heal by letting creation proceed and overwrite the
+		// orphan, the same way every other partial-failure state in this file recovers.
+		existingAuth, authCheckErr := dbadapter.AuthDBClient.RestfulAPIGetOne(authSubsDataColl, filter)
+		if authCheckErr != nil {
+			logger.DbLog.Errorf("failed querying authentication subscription existence for IMSI: %s; Error: %+v", ueId, authCheckErr)
+			c.JSON(http.StatusInternalServerError, gin.H{errorKey: fmt.Sprintf("failed to check subscriber: %s existence", ueId), requestIDKey: requestID})
+			return
+		}
+		if existingAuth != nil {
+			logger.WebUILog.Errorf("subscriber %s already exists", ueId)
+			c.JSON(http.StatusConflict, gin.H{errorKey: fmt.Sprintf("subscriber %s already exists", ueId), requestIDKey: requestID})
+			return
+		}
+		logger.WebUILog.Warnf("amData for %s exists without a matching authentication subscription; treating as orphaned and proceeding with creation", ueId)
 	}
 	if subsOverrideData.OPc == "" || subsOverrideData.Key == "" || subsOverrideData.SequenceNumber == "" {
 		c.JSON(http.StatusBadRequest, gin.H{errorKey: "Missing required authentication data: OPc and Key must be provided", requestIDKey: requestID})
 		return
 	}
 
-	authSubsData := models.AuthenticationSubscription{
-		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          authMethod5GAKA, // "5G_AKA", "EAP_AKA_PRIME"
-		EncOpcKey:                     openapi.PtrString(subsOverrideData.OPc),
-		EncPermanentKey:               openapi.PtrString(subsOverrideData.Key),
-		SequenceNumber: &models.SequenceNumber{
-			Sqn: openapi.PtrString(subsOverrideData.SequenceNumber),
-		},
-	}
+	sqn := models.NewSequenceNumber()
+	sqn.SetSqn(subsOverrideData.SequenceNumber)
+	authSubsData := new(models.AuthenticationSubscription)
+	authSubsData.SetAuthenticationMethod(models.AUTHMETHOD__5_G_AKA) // "5G_AKA", "EAP_AKA_PRIME"
+	authSubsData.SetAuthenticationManagementField("8000")
+	authSubsData.SetEncOpcKey(subsOverrideData.OPc)
+	authSubsData.SetEncPermanentKey(subsOverrideData.Key)
+	authSubsData.SetSequenceNumber(*sqn)
 
 	logger.WebUILog.Infof("%+v", authSubsData)
 	logger.WebUILog.Infof("Using OPc: %s, Key: %s, SeqNo: %s", subsOverrideData.OPc, subsOverrideData.Key, subsOverrideData.SequenceNumber)
 
-	err = subscriberAuthenticationDataCreate(ueId, &authSubsData)
+	err = subscriberAuthenticationDataCreate(ueId, authSubsData)
 	if err != nil {
 		logger.WebUILog.Errorf("Failed to create subscriber %s: %+v request ID: %s", ueId, err, requestID)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -556,6 +556,10 @@ func PutSubscriberByID(c *gin.Context) {
 	ueId := c.Param(ueIdKey)
 	logger.WebUILog.Infoln("Received Put Subscriber Data from Roc/Simapp:", ueId)
 
+	// See PostSubscriberByID: serializes against concurrent POST/PUT/DELETE for the same IMSI.
+	unlock := lockSubscriber(ueId)
+	defer unlock()
+
 	filter := bson.M{ueIdKey: ueId}
 	subscriber, err := dbadapter.CommonDBClient.RestfulAPIGetOne(amDataColl, filter)
 	if err != nil {
@@ -572,17 +576,16 @@ func PutSubscriberByID(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{errorKey: "Missing required authentication data: OPc, Key and Sequence number must be provided", requestIDKey: requestID})
 		return
 	}
-	authSubsData := models.AuthenticationSubscription{
-		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          authMethod5GAKA,
-		EncOpcKey:                     openapi.PtrString(subsOverrideData.OPc),
-		EncPermanentKey:               openapi.PtrString(subsOverrideData.Key),
-		SequenceNumber: &models.SequenceNumber{
-			Sqn: openapi.PtrString(subsOverrideData.SequenceNumber),
-		},
-	}
+	sqn := models.NewSequenceNumber()
+	sqn.SetSqn(subsOverrideData.SequenceNumber)
+	authSubsData := new(models.AuthenticationSubscription)
+	authSubsData.SetAuthenticationMethod(models.AUTHMETHOD__5_G_AKA)
+	authSubsData.SetAuthenticationManagementField("8000")
+	authSubsData.SetEncOpcKey(subsOverrideData.OPc)
+	authSubsData.SetEncPermanentKey(subsOverrideData.Key)
+	authSubsData.SetSequenceNumber(*sqn)
 
-	err = subscriberAuthenticationDataUpdate(ueId, &authSubsData)
+	err = subscriberAuthenticationDataUpdate(ueId, authSubsData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			errorKey:     fmt.Sprintf("Failed to update subscriber %s", ueId),
@@ -618,6 +621,13 @@ func DeleteSubscriberByID(c *gin.Context) {
 	requestID := uuid.New().String()
 
 	ueId := c.Param(ueIdKey)
+
+	// See PostSubscriberByID: serializes against concurrent POST/PUT/DELETE for the same IMSI.
+	// Must be acquired before updateSubscriberInDeviceGroups below, since that can already remove
+	// this subscriber's amData; otherwise a concurrent POST could create a new generation in the
+	// gap and have it wiped out by this delete.
+	unlock := lockSubscriber(ueId)
+	defer unlock()
 
 	imsi := strings.TrimPrefix(ueId, "imsi-")
 	statusCode, err := updateSubscriberInDeviceGroups(imsi)

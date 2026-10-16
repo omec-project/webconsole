@@ -12,10 +12,11 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omec-project/openapi/v2"
 	"github.com/omec-project/openapi/v2/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -107,16 +108,15 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 		collKey:   coll,
 		filterKey: filter,
 	})
-
-	authSubscription := configmodels.ToBsonM(models.AuthenticationSubscription{
-		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          authMethod5GAKA,                                       // authMethod5GAKA, "EAP_AKA_PRIME"
-		EncOpcKey:                     openapi.PtrString("981d464c7c52eb6e5036234984ad0bcf"), // Required
-		EncPermanentKey:               openapi.PtrString("5122250214c33e723a5dd523fc145fc0"), // Required
-		SequenceNumber: &models.SequenceNumber{
-			Sqn: openapi.PtrString("16f3b3f70fc2"),
-		},
-	})
+	sqn := models.NewSequenceNumber()
+	sqn.SetSqn(testSequenceNumber)
+	var authenticationSubscription models.AuthenticationSubscription
+	authenticationSubscription.SetAuthenticationManagementField("8000")
+	authenticationSubscription.SetAuthenticationMethod(models.AUTHMETHOD__5_G_AKA)
+	authenticationSubscription.SetEncOpcKey("981d464c7c52eb6e5036234984ad0bcf")
+	authenticationSubscription.SetEncPermanentKey("5122250214c33e723a5dd523fc145fc0")
+	authenticationSubscription.SetSequenceNumber(*sqn)
+	authSubscription := configmodels.ToBsonM(authenticationSubscription)
 	if authSubscription == nil {
 		logger.DbLog.Fatalln("failed to convert subscriber to BsonM")
 	}
@@ -166,27 +166,17 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 	switch coll {
 	case amDataColl:
 		nssais := models.NewNssaiWithDefaults()
-		nssais.SetDefaultSingleNssais([]models.Snssai{
-			{
-				Sd:  openapi.PtrString("010203"),
-				Sst: 1,
-			},
-		})
-		nssais.SetSingleNssais([]models.Snssai{
-			{
-				Sd:  openapi.PtrString("010203"),
-				Sst: 1,
-			},
-		})
-		nullableNssai := models.NewNullableNssai(nssais)
+		var snssai models.Snssai
+		snssai.SetSst(1)
+		snssai.SetSd("010203")
+		nssais.SetDefaultSingleNssais([]models.Snssai{snssai})
+		nssais.SetSingleNssais([]models.Snssai{snssai})
 
-		amDataData := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{
-			Gpsis: []string{
-				sampleMsisdn,
-			},
-			Nssai:            *nullableNssai,
-			SubscribedUeAmbr: models.NewAmbr(ambr1000Kbps, ambr1000Kbps),
-		})
+		var amData models.AccessAndMobilitySubscriptionData
+		amData.SetGpsis([]string{sampleMsisdn})
+		amData.SetNssai(*nssais)
+		amData.SetSubscribedUeAmbr(*models.NewAmbr(ambr1000Kbps, ambr1000Kbps))
+		amDataData := configmodels.ToBsonM(amData)
 		if amDataData == nil {
 			logger.DbLog.Fatalln("failed to convert amDataData to BsonM")
 		}
@@ -194,51 +184,42 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 		return amDataData, nil
 
 	case amPolicyDataColl:
-		amPolicyData := configmodels.ToBsonM(models.AmPolicyData{
-			SubscCats: []string{
-				subscCatAether,
-			},
-		})
+		var amPolData models.AmPolicyData
+		amPolData.SetSubscCats([]string{subscCatAether})
+		amPolicyData := configmodels.ToBsonM(amPolData)
 		if amPolicyData == nil {
 			logger.DbLog.Fatalln("failed to convert amPolicyData to BsonM")
 		}
 		return amPolicyData, nil
 
 	case smPolicyDataColl:
-		smPolicyData := configmodels.ToBsonM(models.SmPolicyData{
-			SmPolicySnssaiData: map[string]models.SmPolicySnssaiData{
-				"01010203": {
-					Snssai: models.Snssai{
-						Sd:  openapi.PtrString("010203"),
-						Sst: 1,
-					},
-					SmPolicyDnnData: &map[string]models.SmPolicyDnnData{
-						dnnInternet: {
-							Dnn: dnnInternet,
-						},
-					},
-				},
-			},
-		})
+		var snssai models.Snssai
+		snssai.SetSst(1)
+		snssai.SetSd("010203")
+		var smPolDnnData models.SmPolicyDnnData
+		smPolDnnData.SetDnn(dnnInternet)
+		var smPolSnssaiData models.SmPolicySnssaiData
+		smPolSnssaiData.SetSnssai(snssai)
+		smPolSnssaiData.SetSmPolicyDnnData(map[string]models.SmPolicyDnnData{dnnInternet: smPolDnnData})
+		var smPolData models.SmPolicyData
+		smPolData.SetSmPolicySnssaiData(map[string]models.SmPolicySnssaiData{"01010203": smPolSnssaiData})
+
+		smPolicyData := configmodels.ToBsonM(smPolData)
 		if smPolicyData == nil {
 			logger.DbLog.Fatalln("failed to convert smPolicyData to BsonM")
 		}
 		return smPolicyData, nil
 
 	case smfSelDataColl:
-		smfSelData := configmodels.ToBsonM(models.SmfSelectionSubscriptionData{
-			SubscribedSnssaiInfos: &map[string]models.SnssaiInfo{
-				"01010203": {
-					DnnInfos: []models.DnnInfo{
-						{
-							Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
-								String: openapi.PtrString(dnnInternet),
-							},
-						},
-					},
-				},
-			},
-		})
+		var dnnInfo models.DnnInfo
+		dnnInfo.SetDnn(models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{String: new(dnnInternet)})
+		var snssaiInfo models.SnssaiInfo
+		snssaiInfo.SetDnnInfos([]models.DnnInfo{dnnInfo})
+
+		var smfSelSubsData models.SmfSelectionSubscriptionData
+		smfSelSubsData.SetSubscribedSnssaiInfos(map[string]models.SnssaiInfo{"01010203": snssaiInfo})
+
+		smfSelData := configmodels.ToBsonM(smfSelSubsData)
 		if smfSelData == nil {
 			logger.DbLog.Fatalln("failed to convert smfSelData to BsonM")
 		}
@@ -255,13 +236,17 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.
 		filterKey: filter,
 	})
 
-	val := int32(8)
-	nullableInt32 := openapi.NewNullableInt32(&val)
+	arp := models.NewArpWithDefaults()
+	arp.SetPriorityLevel(8)
+	arp.SetPreemptCap(models.PREEMPTIONCAPABILITY_MAY_PREEMPT)
+	arp.SetPreemptVuln(models.PREEMPTIONVULNERABILITY_PREEMPTABLE)
+	var5gQosProfile := models.NewSubscribedDefaultQos(9, *arp)
+	var5gQosProfile.SetPriorityLevel(8)
 	smDataData := []models.SessionManagementSubscriptionData{
 		{
 			SingleNssai: models.Snssai{
 				Sst: 1,
-				Sd:  openapi.PtrString("010203"),
+				Sd:  new("010203"),
 			},
 			DnnConfigurations: &map[string]models.DnnConfiguration{
 				dnnInternet: {
@@ -273,19 +258,8 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.
 						DefaultSscMode:  models.SSCMODE_SSC_MODE_1,
 						AllowedSscModes: []models.SscMode{models.SSCMODE_SSC_MODE_1},
 					},
-					SessionAmbr: &models.Ambr{
-						Downlink: ambr1000Kbps,
-						Uplink:   ambr1000Kbps,
-					},
-					Var5gQosProfile: &models.SubscribedDefaultQos{
-						Var5qi: 9,
-						Arp: models.Arp{
-							PriorityLevel: *nullableInt32,
-							PreemptCap:    models.PREEMPTIONCAPABILITY_MAY_PREEMPT,
-							PreemptVuln:   models.PREEMPTIONVULNERABILITY_PREEMPTABLE,
-						},
-						PriorityLevel: openapi.PtrInt32(8),
-					},
+					SessionAmbr:     models.NewAmbr(ambr1000Kbps, ambr1000Kbps),
+					Var5gQosProfile: var5gQosProfile,
 				},
 			},
 		},
@@ -370,10 +344,10 @@ func TestGetSubscriberByID(t *testing.T) {
 				},
 				"AuthenticationSubscription": map[string]any{
 					"authenticationManagementField": "8000",
-					"authenticationMethod":          authMethod5GAKA,
+					"authenticationMethod":          models.AUTHMETHOD__5_G_AKA,
 					"encOpcKey":                     "981d464c7c52eb6e5036234984ad0bcf",
 					"encPermanentKey":               "5122250214c33e723a5dd523fc145fc0",
-					"sequenceNumber":                map[string]any{"sqn": "16f3b3f70fc2"},
+					sequenceNumberKey:               map[string]any{"sqn": testSequenceNumber},
 				},
 				"FlowRules": nil,
 				"SessionManagementSubscriptionData": []any{
@@ -590,17 +564,7 @@ func (db *AuthDBMockDBClient) RestfulAPIGetOne(collName string, filter bson.M) (
 	if len(db.subscribers) == 0 {
 		return nil, nil
 	}
-	s := models.AuthenticationSubscription{
-		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          authMethod5GAKA,
-		EncOpcKey:                     openapi.PtrString("8e27b6af0e692e750f32667a3b14605d"),
-		EncPermanentKey:               openapi.PtrString("8baf473f2f8fd09487cccbd7097c6862"),
-		SequenceNumber: &models.SequenceNumber{
-			Sqn: openapi.PtrString("16f3b3f70fc2"),
-		},
-	}
-
-	subscriber := configmodels.ToBsonM(s)
+	subscriber := configmodels.ToBsonM(authenticationSubscription())
 	subscriber[ueIdKey] = db.subscribers[0]
 	subscriber[servingPlmnIdKey] = "12345"
 	return subscriber, nil
@@ -629,12 +593,10 @@ func (db *AuthDBMockDBClient) RestfulAPIDeleteOne(collName string, filter bson.M
 
 type PostSubscriberMockDBClient struct {
 	dbadapter.DBInterface
-	subscribers         []string
-	receivedGetData     []map[string]any
-	receivedPostData    []map[string]any
-	receivedPostOnDB    []map[string]any
-	receivedPostWithCtx []map[string]any
-	err                 error
+	subscribers      []string
+	receivedGetData  []map[string]any
+	receivedPostData []map[string]any
+	err              error
 }
 
 func (db *PostSubscriberMockDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
@@ -669,25 +631,6 @@ func (db *PostSubscriberMockDBClient) StartSession() (dbadapter.DBSession, error
 	return &MockSession{}, nil
 }
 
-func (db *PostSubscriberMockDBClient) RestfulAPIPostOnDB(ctx context.Context, dbName string, collName string, filter bson.M, postData map[string]any) (bool, error) {
-	db.receivedPostOnDB = append(db.receivedPostOnDB, map[string]any{
-		dbNameKey: dbName,
-		collKey:   collName,
-		filterKey: filter,
-		dataKey:   postData,
-	})
-	return true, nil
-}
-
-func (db *PostSubscriberMockDBClient) RestfulAPIPostWithContext(ctx context.Context, collName string, filter bson.M, postData map[string]any) (bool, error) {
-	db.receivedPostWithCtx = append(db.receivedPostWithCtx, map[string]any{
-		collKey:   collName,
-		filterKey: filter,
-		dataKey:   postData,
-	})
-	return true, nil
-}
-
 func TestSubscriberPost(t *testing.T) {
 	cleanupFactory := setupTestFactory()
 	defer cleanupFactory()
@@ -695,6 +638,7 @@ func TestSubscriberPost(t *testing.T) {
 	tests := []struct {
 		name             string
 		commonDbAdapter  PostSubscriberMockDBClient
+		authSubscribers  []string
 		expectedCode     int
 		expectedBody     string
 		expectedGetData  []map[string]any
@@ -705,8 +649,9 @@ func TestSubscriberPost(t *testing.T) {
 			commonDbAdapter: PostSubscriberMockDBClient{
 				subscribers: []string{testSubscriberImsi},
 			},
-			expectedCode: http.StatusConflict,
-			expectedBody: "subscriber imsi-208930100007487 already exists",
+			authSubscribers: []string{testSubscriberImsi},
+			expectedCode:    http.StatusConflict,
+			expectedBody:    "subscriber imsi-208930100007487 already exists",
 			expectedGetData: []map[string]any{
 				{collKey: amDataColl, filterKey: map[string]any{ueIdKey: testSubscriberImsi}},
 			},
@@ -726,6 +671,22 @@ func TestSubscriberPost(t *testing.T) {
 				{collKey: amDataColl, filterKey: bson.M{ueIdKey: testSubscriberImsi}},
 			},
 		},
+		{
+			// amData left behind by a delayed, ambiguous create (e.g. a timed-out upsert landing
+			// after its own credential was rolled back) must not permanently block recreation.
+			name: "Orphaned amData without a matching credential is self-healed",
+			commonDbAdapter: PostSubscriberMockDBClient{
+				subscribers: []string{testSubscriberImsi},
+			},
+			expectedCode: http.StatusCreated,
+			expectedBody: `{}`,
+			expectedGetData: []map[string]any{
+				{collKey: amDataColl, filterKey: map[string]any{ueIdKey: testSubscriberImsi}},
+			},
+			expectedPostData: []map[string]any{
+				{collKey: amDataColl, filterKey: bson.M{ueIdKey: testSubscriberImsi}},
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -735,10 +696,10 @@ func TestSubscriberPost(t *testing.T) {
 
 			route := subscriberByImsiPath
 			inputData := map[string]string{
-				"plmnID":         "12345",
-				"opc":            "8e27b6af0e692e750f32667a3b14605d",
-				"key":            "8baf473f2f8fd09487cccbd7097c6862",
-				"sequenceNumber": "16f3b3f70fc2",
+				"plmnID":          "12345",
+				"opc":             "8e27b6af0e692e750f32667a3b14605d",
+				"key":             "8baf473f2f8fd09487cccbd7097c6862",
+				sequenceNumberKey: testSequenceNumber,
 			}
 			jsonData, err := json.Marshal(inputData)
 			if err != nil {
@@ -751,7 +712,8 @@ func TestSubscriberPost(t *testing.T) {
 				dbadapter.CommonDBClient = origDBClient
 				dbadapter.AuthDBClient = origAuthDBClient
 			}()
-			dbadapter.AuthDBClient = &AuthDBMockDBClient{}
+			authMock := &AuthDBMockDBClient{subscribers: tc.authSubscribers}
+			dbadapter.AuthDBClient = authMock
 			dbadapter.CommonDBClient = &tc.commonDbAdapter
 
 			expectedGetData, err := json.Marshal(tc.expectedGetData)
@@ -783,25 +745,165 @@ func TestSubscriberPost(t *testing.T) {
 			}
 
 			if tc.expectedPostData != nil {
-				if len(tc.commonDbAdapter.receivedPostOnDB) != 1 {
-					t.Fatalf("expected 1 PostOnDB call, got %d", len(tc.commonDbAdapter.receivedPostOnDB))
+				if len(authMock.receivedPostData) != 1 {
+					t.Fatalf("expected 1 auth DB post call, got %d", len(authMock.receivedPostData))
 				}
-				if tc.commonDbAdapter.receivedPostOnDB[0][collKey] != authSubsDataColl {
-					t.Errorf("expected auth collection %v, got %v", authSubsDataColl, tc.commonDbAdapter.receivedPostOnDB[0][collKey])
+				if authMock.receivedPostData[0][collKey] != authSubsDataColl {
+					t.Errorf("expected auth collection %v, got %v", authSubsDataColl, authMock.receivedPostData[0][collKey])
 				}
 				expectedAmDataCollection := amDataColl
-				if len(tc.commonDbAdapter.receivedPostWithCtx) != 1 {
-					t.Fatalf("expected 1 PostWithContext call, got %d", len(tc.commonDbAdapter.receivedPostWithCtx))
+				if len(tc.commonDbAdapter.receivedPostData) != 1 {
+					t.Fatalf("expected 1 amData post call, got %d", len(tc.commonDbAdapter.receivedPostData))
 				}
-				if tc.commonDbAdapter.receivedPostWithCtx[0][collKey] != expectedAmDataCollection {
-					t.Errorf("expected collection %v, got %v", expectedAmDataCollection, tc.commonDbAdapter.receivedPostWithCtx[0][collKey])
+				if tc.commonDbAdapter.receivedPostData[0][collKey] != expectedAmDataCollection {
+					t.Errorf("expected collection %v, got %v", expectedAmDataCollection, tc.commonDbAdapter.receivedPostData[0][collKey])
 				}
 				expectedFilter := bson.M{ueIdKey: testSubscriberImsi}
-				if !reflect.DeepEqual(tc.commonDbAdapter.receivedPostWithCtx[0][filterKey], expectedFilter) {
-					t.Errorf("expected filter %v, got %v", expectedFilter, tc.commonDbAdapter.receivedPostWithCtx[0][filterKey])
+				if !reflect.DeepEqual(tc.commonDbAdapter.receivedPostData[0][filterKey], expectedFilter) {
+					t.Errorf("expected filter %v, got %v", expectedFilter, tc.commonDbAdapter.receivedPostData[0][filterKey])
 				}
 			}
 		})
+	}
+}
+
+// A second POST for the same IMSI must block on the per-IMSI subscriber lock until the first
+// finishes, so the two requests can never interleave their auth/amData writes and publish
+// mismatched tokens.
+func TestSubscriberAuthLock_SerializesPostSubscriberByID(t *testing.T) {
+	cleanupFactory := setupTestFactory()
+	defer cleanupFactory()
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddApiService(router)
+
+	origDBClient := dbadapter.CommonDBClient
+	origAuthDBClient := dbadapter.AuthDBClient
+	defer func() {
+		dbadapter.CommonDBClient = origDBClient
+		dbadapter.AuthDBClient = origAuthDBClient
+	}()
+	dbadapter.CommonDBClient = &PostSubscriberMockDBClient{}
+	dbadapter.AuthDBClient = &AuthDBMockDBClient{}
+
+	inputData := map[string]string{
+		"opc":             "8e27b6af0e692e750f32667a3b14605d",
+		"key":             "8baf473f2f8fd09487cccbd7097c6862",
+		sequenceNumberKey: testSequenceNumber,
+	}
+	jsonData, err := json.Marshal(inputData)
+	if err != nil {
+		t.Fatalf("failed to marshal input data to JSON: %v", err)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, subscriberByImsiPath, bytes.NewBuffer(jsonData))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Released via an idempotent deferred unlock: if an assertion below calls t.Fatalf before the
+	// explicit unlock() is reached, the shard would otherwise stay locked forever and hang later
+	// tests that share it.
+	release := lockSubscriber(testSubscriberImsi)
+	var released atomic.Bool
+	unlock := func() {
+		if released.CompareAndSwap(false, true) {
+			release()
+		}
+	}
+	defer unlock()
+	done := make(chan int, 1)
+	go func() {
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		done <- w.Code
+	}()
+
+	select {
+	case code := <-done:
+		t.Fatalf("expected PostSubscriberByID to block while the subscriber lock is held, got code %d", code)
+	case <-time.After(50 * time.Millisecond):
+		// Still blocked, as expected.
+	}
+
+	unlock()
+
+	select {
+	case code := <-done:
+		if code != http.StatusCreated {
+			t.Errorf("expected %d once unblocked, got %d", http.StatusCreated, code)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected PostSubscriberByID to complete after the lock was released")
+	}
+}
+
+// DeleteSubscriberByID must acquire the per-IMSI lock before updateSubscriberInDeviceGroups runs,
+// not just before the final auth/amData delete: that cleanup can itself remove this subscriber's
+// amData, so a concurrent POST slipping into the gap could create a new generation that this
+// delete would otherwise wipe out.
+func TestSubscriberAuthLock_SerializesDeleteSubscriberByIDBeforeDeviceGroupCleanup(t *testing.T) {
+	cleanupFactory := setupTestFactory()
+	defer cleanupFactory()
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddApiService(router)
+
+	origDBClient := dbadapter.CommonDBClient
+	origAuthDBClient := dbadapter.AuthDBClient
+	defer func() {
+		dbadapter.CommonDBClient = origDBClient
+		dbadapter.AuthDBClient = origAuthDBClient
+	}()
+	mockDB := &DeleteSubscriberMockDBClient{deviceGroups: []configmodels.DeviceGroups{}}
+	dbadapter.CommonDBClient = mockDB
+	dbadapter.AuthDBClient = &AuthDBMockDBClient{}
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, subscriberByImsiPath, nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	// Released via an idempotent deferred unlock: if an assertion below calls t.Fatalf before the
+	// explicit unlock() is reached, the shard would otherwise stay locked forever and hang later
+	// tests that share it.
+	release := lockSubscriber(testSubscriberImsi)
+	var released atomic.Bool
+	unlock := func() {
+		if released.CompareAndSwap(false, true) {
+			release()
+		}
+	}
+	defer unlock()
+	done := make(chan int, 1)
+	go func() {
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		done <- w.Code
+	}()
+
+	select {
+	case code := <-done:
+		t.Fatalf("expected DeleteSubscriberByID to block while the subscriber lock is held, got code %d", code)
+	case <-time.After(50 * time.Millisecond):
+		// Still blocked, as expected.
+	}
+	if calls := mockDB.getManyCalls.Load(); calls != 0 {
+		t.Fatalf("expected the device-group lookup to wait for the lock too, but it ran %d time(s) first", calls)
+	}
+
+	unlock()
+
+	select {
+	case code := <-done:
+		if code != http.StatusNoContent {
+			t.Errorf("expected %d once unblocked, got %d", http.StatusNoContent, code)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected DeleteSubscriberByID to complete after the lock was released")
+	}
+	if calls := mockDB.getManyCalls.Load(); calls == 0 {
+		t.Error("expected the device-group lookup to have run once unblocked")
 	}
 }
 
@@ -809,8 +911,8 @@ type DeleteSubscriberMockDBClient struct {
 	dbadapter.DBInterface
 	deviceGroups      []configmodels.DeviceGroups
 	deleteData        []map[string]any
-	deleteOnDBData    []map[string]any
 	deleteWithCtxData []map[string]any
+	getManyCalls      atomic.Int32
 	err               error
 }
 
@@ -826,6 +928,7 @@ func (db *DeleteSubscriberMockDBClient) RestfulAPIGetOne(coll string, filter bso
 }
 
 func (db *DeleteSubscriberMockDBClient) RestfulAPIGetMany(coll string, filter bson.M) ([]map[string]any, error) {
+	db.getManyCalls.Add(1)
 	if db.err != nil {
 		return nil, db.err
 	}
@@ -867,18 +970,6 @@ func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOne(coll string, filter 
 
 func (db *DeleteSubscriberMockDBClient) StartSession() (dbadapter.DBSession, error) {
 	return &MockSession{}, nil
-}
-
-func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M) error {
-	if db.err != nil {
-		return db.err
-	}
-	db.deleteOnDBData = append(db.deleteOnDBData, map[string]any{
-		dbNameKey: dbName,
-		collKey:   collName,
-		filterKey: filter,
-	})
-	return nil
 }
 
 func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOneWithContext(ctx context.Context, collName string, filter bson.M) error {

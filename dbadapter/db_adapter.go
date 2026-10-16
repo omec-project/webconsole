@@ -65,6 +65,17 @@ type DBInterface interface {
 	RestfulAPIPutOne(collName string, filter bson.M, putData map[string]any) (bool, error)
 	RestfulAPIPutOneWithContext(context context.Context, collName string, filter bson.M, putData map[string]any) (bool, error)
 	RestfulAPIPutOneNotUpdate(collName string, filter bson.M, putData map[string]any) (bool, error)
+	// RestfulAPIReplaceOneNoUpsert replaces the whole document matching filter with replacement
+	// (unlike RestfulAPIPutOne, which $set-merges and always upserts): absent fields are actually
+	// removed, and a filter that matches nothing is a no-op rather than an insert. Returns whether
+	// a document was matched and replaced.
+	RestfulAPIReplaceOneNoUpsert(collName string, filter bson.M, replacement map[string]any) (bool, error)
+	// RestfulAPIUpdateOneNoUpsert $set-merges updateData into the document matching filter, with
+	// upsert disabled: unlike RestfulAPIPutOne (always upserts), a filter built from a previously
+	// observed document that no longer matches -- because it changed since that read -- is a safe
+	// no-op instead of either overwriting the change or inserting a duplicate document. Returns
+	// whether a document was matched and updated.
+	RestfulAPIUpdateOneNoUpsert(collName string, filter bson.M, updateData map[string]any) (bool, error)
 	RestfulAPIPutMany(collName string, filterArray []bson.M, putDataArray []map[string]any) error
 	RestfulAPIDeleteOne(collName string, filter bson.M) error
 	RestfulAPIDeleteOneWithContext(context context.Context, collName string, filter bson.M) error
@@ -83,9 +94,6 @@ type DBInterface interface {
 	CreateIndex(collName string, keyField string) (bool, error)
 	StartSession() (DBSession, error)
 	SupportsTransactions() (bool, error)
-	RestfulAPIPostOnDB(ctx context.Context, dbName string, collName string, filter bson.M, postData map[string]any) (bool, error)
-	RestfulAPIPutOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M, putData map[string]any) (bool, error)
-	RestfulAPIDeleteOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M) error
 }
 
 type indexCreator interface {
@@ -419,6 +427,33 @@ func (db *MongoDBClient) RestfulAPIPutOneNotUpdate(collName string, filter bson.
 	return db.MongoClient.RestfulAPIPutOneNotUpdate(collName, filter, putData)
 }
 
+// RestfulAPIReplaceOneNoUpsert performs a true document replace (not a $set merge) with upsert
+// disabled, since the embedded util MongoClient has no such primitive: RestfulAPIPutOne/Post
+// always $set-merge and upsert, which cannot restore a snapshot's absent fields or safely treat a
+// non-matching filter as a no-op.
+func (db *MongoDBClient) RestfulAPIReplaceOneNoUpsert(collName string, filter bson.M, replacement map[string]any) (bool, error) {
+	collection := db.GetCollection(collName)
+	opts := options.Replace().SetUpsert(false)
+	result, err := collection.ReplaceOne(context.TODO(), filter, replacement, opts)
+	if err != nil {
+		return false, fmt.Errorf("RestfulAPIReplaceOneNoUpsert ReplaceOne err: %w", err)
+	}
+	return result.MatchedCount > 0, nil
+}
+
+// RestfulAPIUpdateOneNoUpsert performs a $set update (not a full replace) with upsert disabled:
+// a filter built from a previously observed document that no longer matches it is a safe no-op
+// instead of either overwriting a change made since that read or inserting a duplicate document.
+func (db *MongoDBClient) RestfulAPIUpdateOneNoUpsert(collName string, filter bson.M, updateData map[string]any) (bool, error) {
+	collection := db.GetCollection(collName)
+	opts := options.UpdateOne().SetUpsert(false)
+	result, err := collection.UpdateOne(context.TODO(), filter, bson.M{"$set": updateData}, opts)
+	if err != nil {
+		return false, fmt.Errorf("RestfulAPIUpdateOneNoUpsert UpdateOne err: %w", err)
+	}
+	return result.MatchedCount > 0, nil
+}
+
 func (db *MongoDBClient) RestfulAPIPutMany(collName string, filterArray []bson.M, putDataArray []map[string]any) error {
 	return db.MongoClient.RestfulAPIPutMany(collName, filterArray, putDataArray)
 }
@@ -493,50 +528,4 @@ func (db *MongoDBClient) StartSession() (DBSession, error) {
 
 func (db *MongoDBClient) SupportsTransactions() (bool, error) {
 	return db.MongoClient.SupportsTransactions()
-}
-
-func (db *MongoDBClient) RestfulAPIPostOnDB(ctx context.Context, dbName string, collName string, filter bson.M, postData map[string]any) (bool, error) {
-	collection := db.Client.Database(dbName).Collection(collName)
-	var existing bson.M
-	err := collection.FindOne(ctx, filter).Decode(&existing)
-	if err != nil && err != mongo.ErrNoDocuments {
-		return false, fmt.Errorf("RestfulAPIPostOnDB FindOne err: %w", err)
-	}
-	if existing != nil {
-		if _, err := collection.UpdateOne(ctx, filter, bson.M{"$set": postData}); err != nil {
-			return false, fmt.Errorf("RestfulAPIPostOnDB UpdateOne err: %w", err)
-		}
-		return true, nil
-	}
-	if _, err := collection.InsertOne(ctx, postData); err != nil {
-		return false, fmt.Errorf("RestfulAPIPostOnDB InsertOne err: %w", err)
-	}
-	return false, nil
-}
-
-func (db *MongoDBClient) RestfulAPIPutOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M, putData map[string]any) (bool, error) {
-	collection := db.Client.Database(dbName).Collection(collName)
-	var existing bson.M
-	err := collection.FindOne(ctx, filter).Decode(&existing)
-	if err != nil && err != mongo.ErrNoDocuments {
-		return false, fmt.Errorf("RestfulAPIPutOneOnDB FindOne err: %w", err)
-	}
-	if existing != nil {
-		if _, err := collection.UpdateOne(ctx, filter, bson.M{"$set": putData}); err != nil {
-			return false, fmt.Errorf("RestfulAPIPutOneOnDB UpdateOne err: %w", err)
-		}
-		return true, nil
-	}
-	if _, err := collection.InsertOne(ctx, putData); err != nil {
-		return false, fmt.Errorf("RestfulAPIPutOneOnDB InsertOne err: %w", err)
-	}
-	return false, nil
-}
-
-func (db *MongoDBClient) RestfulAPIDeleteOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M) error {
-	collection := db.Client.Database(dbName).Collection(collName)
-	if _, err := collection.DeleteOne(ctx, filter); err != nil {
-		return fmt.Errorf("RestfulAPIDeleteOneOnDB err: %w", err)
-	}
-	return nil
 }

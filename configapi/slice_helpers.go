@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omec-project/openapi/v2"
 	"github.com/omec-project/openapi/v2/models"
 	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
@@ -762,14 +761,13 @@ func updateAmProvisionedData(gpsi string, snssai *models.Snssai, aggregatedQoS c
 	if gpsi != "" {        // Only add if gpsi is not empty
 		gpsiSlice = []string{gpsi}
 	}
-	amData := models.AccessAndMobilitySubscriptionData{
-		Gpsis: gpsiSlice,
-		Nssai: *models.NewNullableNssai(&models.Nssai{
-			DefaultSingleNssais: []models.Snssai{*snssai},
-			SingleNssais:        []models.Snssai{*snssai},
-		}),
-		SubscribedUeAmbr: models.NewAmbr(ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)), ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink))),
-	}
+	var nssai models.Nssai
+	nssai.SetDefaultSingleNssais([]models.Snssai{*snssai})
+	nssai.SetSingleNssais([]models.Snssai{*snssai})
+	amData := new(models.AccessAndMobilitySubscriptionData)
+	amData.SetGpsis(gpsiSlice)
+	amData.SetNssai(nssai)
+	amData.SetSubscribedUeAmbr(*models.NewAmbr(ConvertToString(uint64(aggregatedQoS.DnnMbrUplink)), ConvertToString(uint64(aggregatedQoS.DnnMbrDownlink))))
 	amDataBsonA := configmodels.ToBsonM(amData)
 	amDataBsonA[ueIdKey] = "imsi-" + imsi
 	amDataBsonA[servingPlmnIdKey] = mcc + mnc
@@ -881,7 +879,7 @@ func updateSmfSelectionProvisionedData(snssai *models.Snssai, mcc, mnc string, d
 	for _, dnn := range dnns {
 		snssaiInfo.DnnInfos = append(snssaiInfo.DnnInfos, models.DnnInfo{
 			Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
-				String: openapi.PtrString(dnn),
+				String: new(dnn),
 			},
 		})
 	}

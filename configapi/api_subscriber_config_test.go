@@ -15,7 +15,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omec-project/openapi/v2"
 	"github.com/omec-project/openapi/v2/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -107,16 +106,15 @@ func (m *MockAuthDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M) 
 		collKey:   coll,
 		filterKey: filter,
 	})
-
-	authSubscription := configmodels.ToBsonM(models.AuthenticationSubscription{
-		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          authMethod5GAKA,                                       // authMethod5GAKA, "EAP_AKA_PRIME"
-		EncOpcKey:                     openapi.PtrString("981d464c7c52eb6e5036234984ad0bcf"), // Required
-		EncPermanentKey:               openapi.PtrString("5122250214c33e723a5dd523fc145fc0"), // Required
-		SequenceNumber: &models.SequenceNumber{
-			Sqn: openapi.PtrString("16f3b3f70fc2"),
-		},
-	})
+	sqn := models.NewSequenceNumber()
+	sqn.SetSqn("16f3b3f70fc2")
+	var authenticationSubscription models.AuthenticationSubscription
+	authenticationSubscription.SetAuthenticationManagementField("8000")
+	authenticationSubscription.SetAuthenticationMethod(models.AUTHMETHOD__5_G_AKA)
+	authenticationSubscription.SetEncOpcKey("981d464c7c52eb6e5036234984ad0bcf")
+	authenticationSubscription.SetEncPermanentKey("5122250214c33e723a5dd523fc145fc0")
+	authenticationSubscription.SetSequenceNumber(*sqn)
+	authSubscription := configmodels.ToBsonM(authenticationSubscription)
 	if authSubscription == nil {
 		logger.DbLog.Fatalln("failed to convert subscriber to BsonM")
 	}
@@ -166,27 +164,17 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 	switch coll {
 	case amDataColl:
 		nssais := models.NewNssaiWithDefaults()
-		nssais.SetDefaultSingleNssais([]models.Snssai{
-			{
-				Sd:  openapi.PtrString("010203"),
-				Sst: 1,
-			},
-		})
-		nssais.SetSingleNssais([]models.Snssai{
-			{
-				Sd:  openapi.PtrString("010203"),
-				Sst: 1,
-			},
-		})
-		nullableNssai := models.NewNullableNssai(nssais)
+		var snssai models.Snssai
+		snssai.SetSst(1)
+		snssai.SetSd("010203")
+		nssais.SetDefaultSingleNssais([]models.Snssai{snssai})
+		nssais.SetSingleNssais([]models.Snssai{snssai})
 
-		amDataData := configmodels.ToBsonM(models.AccessAndMobilitySubscriptionData{
-			Gpsis: []string{
-				sampleMsisdn,
-			},
-			Nssai:            *nullableNssai,
-			SubscribedUeAmbr: models.NewAmbr(ambr1000Kbps, ambr1000Kbps),
-		})
+		var amData models.AccessAndMobilitySubscriptionData
+		amData.SetGpsis([]string{sampleMsisdn})
+		amData.SetNssai(*nssais)
+		amData.SetSubscribedUeAmbr(*models.NewAmbr(ambr1000Kbps, ambr1000Kbps))
+		amDataData := configmodels.ToBsonM(amData)
 		if amDataData == nil {
 			logger.DbLog.Fatalln("failed to convert amDataData to BsonM")
 		}
@@ -194,51 +182,42 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetOne(coll string, filter bson.M
 		return amDataData, nil
 
 	case amPolicyDataColl:
-		amPolicyData := configmodels.ToBsonM(models.AmPolicyData{
-			SubscCats: []string{
-				subscCatAether,
-			},
-		})
+		var amPolData models.AmPolicyData
+		amPolData.SetSubscCats([]string{subscCatAether})
+		amPolicyData := configmodels.ToBsonM(amPolData)
 		if amPolicyData == nil {
 			logger.DbLog.Fatalln("failed to convert amPolicyData to BsonM")
 		}
 		return amPolicyData, nil
 
 	case smPolicyDataColl:
-		smPolicyData := configmodels.ToBsonM(models.SmPolicyData{
-			SmPolicySnssaiData: map[string]models.SmPolicySnssaiData{
-				"01010203": {
-					Snssai: models.Snssai{
-						Sd:  openapi.PtrString("010203"),
-						Sst: 1,
-					},
-					SmPolicyDnnData: &map[string]models.SmPolicyDnnData{
-						dnnInternet: {
-							Dnn: dnnInternet,
-						},
-					},
-				},
-			},
-		})
+		var snssai models.Snssai
+		snssai.SetSst(1)
+		snssai.SetSd("010203")
+		var smPolDnnData models.SmPolicyDnnData
+		smPolDnnData.SetDnn(dnnInternet)
+		var smPolSnssaiData models.SmPolicySnssaiData
+		smPolSnssaiData.SetSnssai(snssai)
+		smPolSnssaiData.SetSmPolicyDnnData(map[string]models.SmPolicyDnnData{dnnInternet: smPolDnnData})
+		var smPolData models.SmPolicyData
+		smPolData.SetSmPolicySnssaiData(map[string]models.SmPolicySnssaiData{"01010203": smPolSnssaiData})
+
+		smPolicyData := configmodels.ToBsonM(smPolData)
 		if smPolicyData == nil {
 			logger.DbLog.Fatalln("failed to convert smPolicyData to BsonM")
 		}
 		return smPolicyData, nil
 
 	case smfSelDataColl:
-		smfSelData := configmodels.ToBsonM(models.SmfSelectionSubscriptionData{
-			SubscribedSnssaiInfos: &map[string]models.SnssaiInfo{
-				"01010203": {
-					DnnInfos: []models.DnnInfo{
-						{
-							Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
-								String: openapi.PtrString(dnnInternet),
-							},
-						},
-					},
-				},
-			},
-		})
+		var dnnInfo models.DnnInfo
+		dnnInfo.SetDnn(models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{String: new(dnnInternet)})
+		var snssaiInfo models.SnssaiInfo
+		snssaiInfo.SetDnnInfos([]models.DnnInfo{dnnInfo})
+
+		var smfSelSubsData models.SmfSelectionSubscriptionData
+		smfSelSubsData.SetSubscribedSnssaiInfos(map[string]models.SnssaiInfo{"01010203": snssaiInfo})
+
+		smfSelData := configmodels.ToBsonM(smfSelSubsData)
 		if smfSelData == nil {
 			logger.DbLog.Fatalln("failed to convert smfSelData to BsonM")
 		}
@@ -255,13 +234,17 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.
 		filterKey: filter,
 	})
 
-	val := int32(8)
-	nullableInt32 := openapi.NewNullableInt32(&val)
+	arp := models.NewArpWithDefaults()
+	arp.SetPriorityLevel(8)
+	arp.SetPreemptCap(models.PREEMPTIONCAPABILITY_MAY_PREEMPT)
+	arp.SetPreemptVuln(models.PREEMPTIONVULNERABILITY_PREEMPTABLE)
+	var5gQosProfile := models.NewSubscribedDefaultQos(9, *arp)
+	var5gQosProfile.SetPriorityLevel(8)
 	smDataData := []models.SessionManagementSubscriptionData{
 		{
 			SingleNssai: models.Snssai{
 				Sst: 1,
-				Sd:  openapi.PtrString("010203"),
+				Sd:  new("010203"),
 			},
 			DnnConfigurations: &map[string]models.DnnConfiguration{
 				dnnInternet: {
@@ -273,19 +256,8 @@ func (m *MockCommonDBClientWithData) RestfulAPIGetMany(coll string, filter bson.
 						DefaultSscMode:  models.SSCMODE_SSC_MODE_1,
 						AllowedSscModes: []models.SscMode{models.SSCMODE_SSC_MODE_1},
 					},
-					SessionAmbr: &models.Ambr{
-						Downlink: ambr1000Kbps,
-						Uplink:   ambr1000Kbps,
-					},
-					Var5gQosProfile: &models.SubscribedDefaultQos{
-						Var5qi: 9,
-						Arp: models.Arp{
-							PriorityLevel: *nullableInt32,
-							PreemptCap:    models.PREEMPTIONCAPABILITY_MAY_PREEMPT,
-							PreemptVuln:   models.PREEMPTIONVULNERABILITY_PREEMPTABLE,
-						},
-						PriorityLevel: openapi.PtrInt32(8),
-					},
+					SessionAmbr:     models.NewAmbr(ambr1000Kbps, ambr1000Kbps),
+					Var5gQosProfile: var5gQosProfile,
 				},
 			},
 		},
@@ -370,7 +342,7 @@ func TestGetSubscriberByID(t *testing.T) {
 				},
 				"AuthenticationSubscription": map[string]any{
 					"authenticationManagementField": "8000",
-					"authenticationMethod":          authMethod5GAKA,
+					"authenticationMethod":          models.AUTHMETHOD__5_G_AKA,
 					"encOpcKey":                     "981d464c7c52eb6e5036234984ad0bcf",
 					"encPermanentKey":               "5122250214c33e723a5dd523fc145fc0",
 					"sequenceNumber":                map[string]any{"sqn": "16f3b3f70fc2"},
@@ -590,17 +562,7 @@ func (db *AuthDBMockDBClient) RestfulAPIGetOne(collName string, filter bson.M) (
 	if len(db.subscribers) == 0 {
 		return nil, nil
 	}
-	s := models.AuthenticationSubscription{
-		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          authMethod5GAKA,
-		EncOpcKey:                     openapi.PtrString("8e27b6af0e692e750f32667a3b14605d"),
-		EncPermanentKey:               openapi.PtrString("8baf473f2f8fd09487cccbd7097c6862"),
-		SequenceNumber: &models.SequenceNumber{
-			Sqn: openapi.PtrString("16f3b3f70fc2"),
-		},
-	}
-
-	subscriber := configmodels.ToBsonM(s)
+	subscriber := configmodels.ToBsonM(authenticationSubscription())
 	subscriber[ueIdKey] = db.subscribers[0]
 	subscriber[servingPlmnIdKey] = "12345"
 	return subscriber, nil
@@ -629,12 +591,10 @@ func (db *AuthDBMockDBClient) RestfulAPIDeleteOne(collName string, filter bson.M
 
 type PostSubscriberMockDBClient struct {
 	dbadapter.DBInterface
-	subscribers         []string
-	receivedGetData     []map[string]any
-	receivedPostData    []map[string]any
-	receivedPostOnDB    []map[string]any
-	receivedPostWithCtx []map[string]any
-	err                 error
+	subscribers      []string
+	receivedGetData  []map[string]any
+	receivedPostData []map[string]any
+	err              error
 }
 
 func (db *PostSubscriberMockDBClient) RestfulAPIGetOne(collName string, filter bson.M) (map[string]any, error) {
@@ -667,25 +627,6 @@ func (db *PostSubscriberMockDBClient) RestfulAPIPost(collName string, filter bso
 
 func (db *PostSubscriberMockDBClient) StartSession() (dbadapter.DBSession, error) {
 	return &MockSession{}, nil
-}
-
-func (db *PostSubscriberMockDBClient) RestfulAPIPostOnDB(ctx context.Context, dbName string, collName string, filter bson.M, postData map[string]any) (bool, error) {
-	db.receivedPostOnDB = append(db.receivedPostOnDB, map[string]any{
-		dbNameKey: dbName,
-		collKey:   collName,
-		filterKey: filter,
-		dataKey:   postData,
-	})
-	return true, nil
-}
-
-func (db *PostSubscriberMockDBClient) RestfulAPIPostWithContext(ctx context.Context, collName string, filter bson.M, postData map[string]any) (bool, error) {
-	db.receivedPostWithCtx = append(db.receivedPostWithCtx, map[string]any{
-		collKey:   collName,
-		filterKey: filter,
-		dataKey:   postData,
-	})
-	return true, nil
 }
 
 func TestSubscriberPost(t *testing.T) {
@@ -751,7 +692,8 @@ func TestSubscriberPost(t *testing.T) {
 				dbadapter.CommonDBClient = origDBClient
 				dbadapter.AuthDBClient = origAuthDBClient
 			}()
-			dbadapter.AuthDBClient = &AuthDBMockDBClient{}
+			authMock := &AuthDBMockDBClient{}
+			dbadapter.AuthDBClient = authMock
 			dbadapter.CommonDBClient = &tc.commonDbAdapter
 
 			expectedGetData, err := json.Marshal(tc.expectedGetData)
@@ -783,22 +725,22 @@ func TestSubscriberPost(t *testing.T) {
 			}
 
 			if tc.expectedPostData != nil {
-				if len(tc.commonDbAdapter.receivedPostOnDB) != 1 {
-					t.Fatalf("expected 1 PostOnDB call, got %d", len(tc.commonDbAdapter.receivedPostOnDB))
+				if len(authMock.receivedPostData) != 1 {
+					t.Fatalf("expected 1 auth DB post call, got %d", len(authMock.receivedPostData))
 				}
-				if tc.commonDbAdapter.receivedPostOnDB[0][collKey] != authSubsDataColl {
-					t.Errorf("expected auth collection %v, got %v", authSubsDataColl, tc.commonDbAdapter.receivedPostOnDB[0][collKey])
+				if authMock.receivedPostData[0][collKey] != authSubsDataColl {
+					t.Errorf("expected auth collection %v, got %v", authSubsDataColl, authMock.receivedPostData[0][collKey])
 				}
 				expectedAmDataCollection := amDataColl
-				if len(tc.commonDbAdapter.receivedPostWithCtx) != 1 {
-					t.Fatalf("expected 1 PostWithContext call, got %d", len(tc.commonDbAdapter.receivedPostWithCtx))
+				if len(tc.commonDbAdapter.receivedPostData) != 1 {
+					t.Fatalf("expected 1 amData post call, got %d", len(tc.commonDbAdapter.receivedPostData))
 				}
-				if tc.commonDbAdapter.receivedPostWithCtx[0][collKey] != expectedAmDataCollection {
-					t.Errorf("expected collection %v, got %v", expectedAmDataCollection, tc.commonDbAdapter.receivedPostWithCtx[0][collKey])
+				if tc.commonDbAdapter.receivedPostData[0][collKey] != expectedAmDataCollection {
+					t.Errorf("expected collection %v, got %v", expectedAmDataCollection, tc.commonDbAdapter.receivedPostData[0][collKey])
 				}
 				expectedFilter := bson.M{ueIdKey: testSubscriberImsi}
-				if !reflect.DeepEqual(tc.commonDbAdapter.receivedPostWithCtx[0][filterKey], expectedFilter) {
-					t.Errorf("expected filter %v, got %v", expectedFilter, tc.commonDbAdapter.receivedPostWithCtx[0][filterKey])
+				if !reflect.DeepEqual(tc.commonDbAdapter.receivedPostData[0][filterKey], expectedFilter) {
+					t.Errorf("expected filter %v, got %v", expectedFilter, tc.commonDbAdapter.receivedPostData[0][filterKey])
 				}
 			}
 		})
@@ -809,7 +751,6 @@ type DeleteSubscriberMockDBClient struct {
 	dbadapter.DBInterface
 	deviceGroups      []configmodels.DeviceGroups
 	deleteData        []map[string]any
-	deleteOnDBData    []map[string]any
 	deleteWithCtxData []map[string]any
 	err               error
 }
@@ -867,18 +808,6 @@ func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOne(coll string, filter 
 
 func (db *DeleteSubscriberMockDBClient) StartSession() (dbadapter.DBSession, error) {
 	return &MockSession{}, nil
-}
-
-func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOneOnDB(ctx context.Context, dbName string, collName string, filter bson.M) error {
-	if db.err != nil {
-		return db.err
-	}
-	db.deleteOnDBData = append(db.deleteOnDBData, map[string]any{
-		dbNameKey: dbName,
-		collKey:   collName,
-		filterKey: filter,
-	})
-	return nil
 }
 
 func (db *DeleteSubscriberMockDBClient) RestfulAPIDeleteOneWithContext(ctx context.Context, collName string, filter bson.M) error {

@@ -474,6 +474,9 @@ func TestSyncWithRetry_Success_CallsSyncInMemoryConfig(t *testing.T) {
 
 func TestSyncWithRetry_RetryInCaseOfFailure(t *testing.T) {
 	n := &NFConfigServer{}
+	originalRetryInterval := syncRetryInterval
+	syncRetryInterval = 10 * time.Millisecond
+	defer func() { syncRetryInterval = originalRetryInterval }()
 
 	callCount := 0
 	originalSyncInMemoryFunc := syncInMemoryConfigFunc
@@ -488,7 +491,6 @@ func TestSyncWithRetry_RetryInCaseOfFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	n.syncWithRetry(ctx)
 
-	time.Sleep(10 * time.Second)
 	if callCount != 3 {
 		t.Fatalf("expected 3 calls to syncInMemoryConfigFunc, got %d", callCount)
 	}

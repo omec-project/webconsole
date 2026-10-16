@@ -48,8 +48,9 @@ type MockMongoClientRegularUser struct {
 	dbadapter.DBInterface
 }
 
+// MinCost keeps these test fixtures fast: DefaultCost is deliberately expensive and only matters for production hashing.
 func hashPassword(password string) string {
-	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 	if err != nil {
 		return ""
 	}

@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/omec-project/openapi/v2"
 	"github.com/omec-project/openapi/v2/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
@@ -286,10 +285,8 @@ func syncDeviceGroupSubscriber(devGroup *configmodels.DeviceGroups, prevDevGroup
 		logger.DbLog.Errorf("could not parse SST %s", slice.SliceId.Sst)
 		return http.StatusBadRequest, err
 	}
-	snssai := &models.Snssai{
-		Sd:  openapi.PtrString(slice.SliceId.Sd),
-		Sst: int32(sVal),
-	}
+	snssai := models.NewSnssai(int32(sVal))
+	snssai.SetSd(slice.SliceId.Sd)
 	var errorOccured bool
 	dnnMap := make(map[string][]configmodels.DeviceGroupsIpDomainExpandedUeDnnQos)
 	for _, ipDomain := range devGroup.IpDomainsExpanded {

@@ -16,7 +16,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/omec-project/openapi/v2"
 	"github.com/omec-project/openapi/v2/models"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/backend/webui_context"
@@ -75,32 +74,31 @@ func GetSampleJSON(c *gin.Context) {
 
 	var subsData configmodels.SubsData
 
-	authSubsData := models.AuthenticationSubscription{
-		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          authMethod5GAKA,                                       // "5G_AKA", "EAP_AKA_PRIME"
-		EncOpcKey:                     openapi.PtrString("981d464c7c52eb6e5036234984ad0bcf"), // Required
-		EncPermanentKey:               openapi.PtrString("5122250214c33e723a5dd523fc145fc0"), // Required
-	}
+	var authSubsData models.AuthenticationSubscription
+	authSubsData.SetAuthenticationManagementField("8000")
+	authSubsData.SetAuthenticationMethod(models.AUTHMETHOD__5_G_AKA)    // "5G_AKA", "EAP_AKA_PRIME"
+	authSubsData.SetEncOpcKey("981d464c7c52eb6e5036234984ad0bcf")       // Required
+	authSubsData.SetEncPermanentKey("5122250214c33e723a5dd523fc145fc0") // Required
 
 	nssais := models.NewNssaiWithDefaults()
 	nssais.SetDefaultSingleNssais([]models.Snssai{
 		{
 			Sst: 1,
-			Sd:  openapi.PtrString("010203"),
+			Sd:  new("010203"),
 		},
 		{
 			Sst: 1,
-			Sd:  openapi.PtrString("112233"),
+			Sd:  new("112233"),
 		},
 	})
 	nssais.SetSingleNssais([]models.Snssai{
 		{
 			Sst: 1,
-			Sd:  openapi.PtrString("010203"),
+			Sd:  new("010203"),
 		},
 		{
 			Sst: 1,
-			Sd:  openapi.PtrString("112233"),
+			Sd:  new("112233"),
 		},
 	})
 	nullableNssai := models.NewNullableNssai(nssais)
@@ -113,13 +111,17 @@ func GetSampleJSON(c *gin.Context) {
 		SubscribedUeAmbr: models.NewAmbr(ambr1000Kbps, ambr1000Kbps),
 	}
 
-	val := int32(8)
-	nullableInt32 := openapi.NewNullableInt32(&val)
+	arp := models.NewArpWithDefaults()
+	arp.SetPriorityLevel(8)
+	arp.SetPreemptCap(models.PREEMPTIONCAPABILITY_MAY_PREEMPT)
+	arp.SetPreemptVuln(models.PREEMPTIONVULNERABILITY_PREEMPTABLE)
+	subscribeDefaultQos := models.NewSubscribedDefaultQos(9, *arp)
+	subscribeDefaultQos.SetPriorityLevel(8)
 	smDataData := []models.SessionManagementSubscriptionData{
 		{
 			SingleNssai: models.Snssai{
 				Sst: 1,
-				Sd:  openapi.PtrString("010203"),
+				Sd:  new("010203"),
 			},
 			DnnConfigurations: &map[string]models.DnnConfiguration{
 				dnnInternet: {
@@ -131,26 +133,15 @@ func GetSampleJSON(c *gin.Context) {
 						DefaultSscMode:  models.SSCMODE_SSC_MODE_1,
 						AllowedSscModes: []models.SscMode{models.SSCMODE_SSC_MODE_1},
 					},
-					SessionAmbr: &models.Ambr{
-						Downlink: ambr1000Kbps,
-						Uplink:   ambr1000Kbps,
-					},
-					Var5gQosProfile: &models.SubscribedDefaultQos{
-						Var5qi: 9,
-						Arp: models.Arp{
-							PriorityLevel: *nullableInt32,
-							PreemptCap:    models.PREEMPTIONCAPABILITY_MAY_PREEMPT,
-							PreemptVuln:   models.PREEMPTIONVULNERABILITY_PREEMPTABLE,
-						},
-						PriorityLevel: openapi.PtrInt32(8),
-					},
+					SessionAmbr:     models.NewAmbr(ambr1000Kbps, ambr1000Kbps),
+					Var5gQosProfile: subscribeDefaultQos,
 				},
 			},
 		},
 		{
 			SingleNssai: models.Snssai{
 				Sst: 1,
-				Sd:  openapi.PtrString("112233"),
+				Sd:  new("112233"),
 			},
 			DnnConfigurations: &map[string]models.DnnConfiguration{
 				dnnInternet: {
@@ -162,19 +153,8 @@ func GetSampleJSON(c *gin.Context) {
 						DefaultSscMode:  models.SSCMODE_SSC_MODE_1,
 						AllowedSscModes: []models.SscMode{models.SSCMODE_SSC_MODE_1},
 					},
-					SessionAmbr: &models.Ambr{
-						Downlink: ambr1000Kbps,
-						Uplink:   ambr1000Kbps,
-					},
-					Var5gQosProfile: &models.SubscribedDefaultQos{
-						Var5qi: 9,
-						Arp: models.Arp{
-							PriorityLevel: *nullableInt32,
-							PreemptCap:    models.PREEMPTIONCAPABILITY_MAY_PREEMPT,
-							PreemptVuln:   models.PREEMPTIONVULNERABILITY_PREEMPTABLE,
-						},
-						PriorityLevel: openapi.PtrInt32(8),
-					},
+					SessionAmbr:     models.NewAmbr(ambr1000Kbps, ambr1000Kbps),
+					Var5gQosProfile: subscribeDefaultQos,
 				},
 			},
 		},
@@ -186,7 +166,7 @@ func GetSampleJSON(c *gin.Context) {
 				DnnInfos: []models.DnnInfo{
 					{
 						Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
-							String: openapi.PtrString(dnnInternet),
+							String: new(dnnInternet),
 						},
 					},
 				},
@@ -195,7 +175,7 @@ func GetSampleJSON(c *gin.Context) {
 				DnnInfos: []models.DnnInfo{
 					{
 						Dnn: models.AccessAndMobilitySubscriptionDataSubscribedDnnListInner{
-							String: openapi.PtrString(dnnInternet),
+							String: new(dnnInternet),
 						},
 					},
 				},
@@ -213,7 +193,7 @@ func GetSampleJSON(c *gin.Context) {
 		SmPolicySnssaiData: map[string]models.SmPolicySnssaiData{
 			"01010203": {
 				Snssai: models.Snssai{
-					Sd:  openapi.PtrString("010203"),
+					Sd:  new("010203"),
 					Sst: 1,
 				},
 				SmPolicyDnnData: &map[string]models.SmPolicyDnnData{
@@ -224,7 +204,7 @@ func GetSampleJSON(c *gin.Context) {
 			},
 			"01112233": {
 				Snssai: models.Snssai{
-					Sd:  openapi.PtrString("112233"),
+					Sd:  new("112233"),
 					Sst: 1,
 				},
 				SmPolicyDnnData: &map[string]models.SmPolicyDnnData{
@@ -499,20 +479,18 @@ func PostSubscriberByID(c *gin.Context) {
 		return
 	}
 
-	authSubsData := models.AuthenticationSubscription{
-		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          authMethod5GAKA, // "5G_AKA", "EAP_AKA_PRIME"
-		EncOpcKey:                     openapi.PtrString(subsOverrideData.OPc),
-		EncPermanentKey:               openapi.PtrString(subsOverrideData.Key),
-		SequenceNumber: &models.SequenceNumber{
-			Sqn: openapi.PtrString(subsOverrideData.SequenceNumber),
-		},
-	}
+	sqn := models.NewSequenceNumber()
+	sqn.SetSqn(subsOverrideData.SequenceNumber)
+	authSubsData := models.NewAuthenticationSubscription(models.AUTHMETHOD__5_G_AKA) // "5G_AKA", "EAP_AKA_PRIME"
+	authSubsData.SetAuthenticationManagementField("8000")
+	authSubsData.SetEncOpcKey(subsOverrideData.OPc)
+	authSubsData.SetEncPermanentKey(subsOverrideData.Key)
+	authSubsData.SetSequenceNumber(*sqn)
 
 	logger.WebUILog.Infof("%+v", authSubsData)
 	logger.WebUILog.Infof("Using OPc: %s, Key: %s, SeqNo: %s", subsOverrideData.OPc, subsOverrideData.Key, subsOverrideData.SequenceNumber)
 
-	err = subscriberAuthenticationDataCreate(ueId, &authSubsData)
+	err = subscriberAuthenticationDataCreate(ueId, authSubsData)
 	if err != nil {
 		logger.WebUILog.Errorf("Failed to create subscriber %s: %+v request ID: %s", ueId, err, requestID)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -572,17 +550,15 @@ func PutSubscriberByID(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{errorKey: "Missing required authentication data: OPc, Key and Sequence number must be provided", requestIDKey: requestID})
 		return
 	}
-	authSubsData := models.AuthenticationSubscription{
-		AuthenticationManagementField: openapi.PtrString("8000"),
-		AuthenticationMethod:          authMethod5GAKA,
-		EncOpcKey:                     openapi.PtrString(subsOverrideData.OPc),
-		EncPermanentKey:               openapi.PtrString(subsOverrideData.Key),
-		SequenceNumber: &models.SequenceNumber{
-			Sqn: openapi.PtrString(subsOverrideData.SequenceNumber),
-		},
-	}
+	sqn := models.NewSequenceNumber()
+	sqn.SetSqn(subsOverrideData.SequenceNumber)
+	authSubsData := models.NewAuthenticationSubscription(models.AUTHMETHOD__5_G_AKA)
+	authSubsData.SetAuthenticationManagementField("8000")
+	authSubsData.SetEncOpcKey(subsOverrideData.OPc)
+	authSubsData.SetEncPermanentKey(subsOverrideData.Key)
+	authSubsData.SetSequenceNumber(*sqn)
 
-	err = subscriberAuthenticationDataUpdate(ueId, &authSubsData)
+	err = subscriberAuthenticationDataUpdate(ueId, authSubsData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			errorKey:     fmt.Sprintf("Failed to update subscriber %s", ueId),

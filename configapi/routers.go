@@ -39,7 +39,6 @@ const (
 	deviceGroupByNamePath      = "/device-group/:group-name"
 	networkSliceByNamePath     = "/network-slice/:slice-name"
 	jsonContentType            = "application/json"
-	authMethod5GAKA            = "5G_AKA"
 	errorKey                   = "error"
 	messageRequestIDDetails    = "Please refer to the log with the provided Request ID for details"
 	groupNameKey               = "group-name"

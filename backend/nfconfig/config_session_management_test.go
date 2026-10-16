@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/omec-project/openapi/v2"
 	"github.com/omec-project/openapi/v2/nfConfigApi"
 	"github.com/omec-project/webconsole/configmodels"
 )
@@ -134,14 +133,14 @@ func TestSyncSessionManagement(t *testing.T) {
 						{
 							DnnName:   dnnInternet,
 							DnsIpv4:   dnsPrimaryTest,
-							PcscfIpv4: openapi.PtrString("10.10.10.10"),
+							PcscfIpv4: new("10.10.10.10"),
 							UeSubnet:  ueIpPoolTest,
 							Mtu:       1500,
 						},
 					},
 					Upf: &nfConfigApi.Upf{
 						Hostname: upfHostnameLocal,
-						Port:     ptr(int32(8805)),
+						Port:     new(int32(8805)),
 					},
 					GnbNames: []string{gnbNameGnb1},
 				},

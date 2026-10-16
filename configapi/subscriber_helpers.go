@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	"github.com/omec-project/openapi/v2/models"
-	"github.com/omec-project/webconsole/backend/factory"
 	"github.com/omec-project/webconsole/backend/logger"
 	"github.com/omec-project/webconsole/configmodels"
 	"github.com/omec-project/webconsole/dbadapter"
@@ -32,6 +31,9 @@ func subscriberAuthenticationDataGet(imsi string) (authSubData *models.Authentic
 	return authSubData
 }
 
+// authSubsDataColl lives on AuthDBClient's server (mongodb.authUrl), which can differ from
+// CommonDBClient's (mongodb.url). A mongo transaction can't span two different clients/servers,
+// so each collection is written through its own client as a separate, non-transactional call.
 func subscriberAuthenticationDataCreate(imsi string, authSubData *models.AuthenticationSubscription) error {
 	filter := bson.M{ueIdKey: imsi}
 	logger.WebUILog.Infof("%+v", authSubData)
@@ -39,21 +41,17 @@ func subscriberAuthenticationDataCreate(imsi string, authSubData *models.Authent
 	authDataBsonA[ueIdKey] = imsi
 	basicAmData := map[string]any{ueIdKey: imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
-	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
-	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
-	return sessionRunner(context.TODO(), func(sc context.Context) error {
-		if _, err := dbadapter.CommonDBClient.RestfulAPIPostOnDB(sc, authDbName, authSubsDataColl, filter, authDataBsonA); err != nil {
-			logger.DbLog.Errorf("failed to create authentication subscription error: %+v", err)
-			return err
-		}
-		logger.WebUILog.Infof("created authentication subscription in authenticationSubscription collection: %s", imsi)
-		if _, err := dbadapter.CommonDBClient.RestfulAPIPostWithContext(sc, amDataColl, filter, basicDataBson); err != nil {
-			logger.DbLog.Errorf("failed to create amData error: %+v", err)
-			return err
-		}
-		logger.WebUILog.Infof("successfully created authentication subscription in amData collection: %s", imsi)
-		return nil
-	})
+	if _, err := dbadapter.AuthDBClient.RestfulAPIPost(authSubsDataColl, filter, authDataBsonA); err != nil {
+		logger.DbLog.Errorf("failed to create authentication subscription error: %+v", err)
+		return err
+	}
+	logger.WebUILog.Infof("created authentication subscription in authenticationSubscription collection: %s", imsi)
+	if _, err := dbadapter.CommonDBClient.RestfulAPIPost(amDataColl, filter, basicDataBson); err != nil {
+		logger.DbLog.Errorf("failed to create amData error: %+v", err)
+		return err
+	}
+	logger.WebUILog.Infof("successfully created authentication subscription in amData collection: %s", imsi)
+	return nil
 }
 
 func subscriberAuthenticationDataUpdate(imsi string, authSubData *models.AuthenticationSubscription) error {
@@ -62,41 +60,33 @@ func subscriberAuthenticationDataUpdate(imsi string, authSubData *models.Authent
 	authDataBsonA[ueIdKey] = imsi
 	basicAmData := map[string]any{ueIdKey: imsi}
 	basicDataBson := configmodels.ToBsonM(basicAmData)
-	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
-	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
-	return sessionRunner(context.TODO(), func(sc context.Context) error {
-		if _, err := dbadapter.CommonDBClient.RestfulAPIPutOneOnDB(sc, authDbName, authSubsDataColl, filter, authDataBsonA); err != nil {
-			logger.DbLog.Errorf("failed to update authentication subscription error: %+v", err)
-			return err
-		}
-		logger.WebUILog.Debugf("updated authentication subscription in authenticationSubscription collection: %s", imsi)
-		if _, err := dbadapter.CommonDBClient.RestfulAPIPutOneWithContext(sc, amDataColl, filter, basicDataBson); err != nil {
-			logger.DbLog.Errorf("failed to update amData error: %+v", err)
-			return err
-		}
-		logger.WebUILog.Debugf("successfully updated authentication subscription in amData collection: %s", imsi)
-		return nil
-	})
+	if _, err := dbadapter.AuthDBClient.RestfulAPIPutOne(authSubsDataColl, filter, authDataBsonA); err != nil {
+		logger.DbLog.Errorf("failed to update authentication subscription error: %+v", err)
+		return err
+	}
+	logger.WebUILog.Debugf("updated authentication subscription in authenticationSubscription collection: %s", imsi)
+	if _, err := dbadapter.CommonDBClient.RestfulAPIPutOne(amDataColl, filter, basicDataBson); err != nil {
+		logger.DbLog.Errorf("failed to update amData error: %+v", err)
+		return err
+	}
+	logger.WebUILog.Debugf("successfully updated authentication subscription in amData collection: %s", imsi)
+	return nil
 }
 
 func subscriberAuthenticationDataDelete(imsi string) error {
 	logger.WebUILog.Debugf("delete authentication subscription from authenticationSubscription collection: %s", imsi)
 	filter := bson.M{ueIdKey: imsi}
-	authDbName := factory.WebUIConfig.Configuration.Mongodb.AuthKeysDbName
-	sessionRunner := dbadapter.GetSessionRunner(dbadapter.CommonDBClient)
-	return sessionRunner(context.TODO(), func(sc context.Context) error {
-		if err := dbadapter.CommonDBClient.RestfulAPIDeleteOneOnDB(sc, authDbName, authSubsDataColl, filter); err != nil {
-			logger.DbLog.Errorf("failed to delete authentication subscription: %+v", err)
-			return err
-		}
-		logger.WebUILog.Debugf("successfully deleted authentication subscription from authenticationSubscription collection: %v", imsi)
-		if err := dbadapter.CommonDBClient.RestfulAPIDeleteOneWithContext(sc, amDataColl, filter); err != nil {
-			logger.DbLog.Errorf("failed to delete amData: %+v", err)
-			return err
-		}
-		logger.WebUILog.Debugf("successfully deleted authentication subscription from amData collection: %s", imsi)
-		return nil
-	})
+	if err := dbadapter.AuthDBClient.RestfulAPIDeleteOne(authSubsDataColl, filter); err != nil {
+		logger.DbLog.Errorf("failed to delete authentication subscription: %+v", err)
+		return err
+	}
+	logger.WebUILog.Debugf("successfully deleted authentication subscription from authenticationSubscription collection: %v", imsi)
+	if err := dbadapter.CommonDBClient.RestfulAPIDeleteOne(amDataColl, filter); err != nil {
+		logger.DbLog.Errorf("failed to delete amData: %+v", err)
+		return err
+	}
+	logger.WebUILog.Debugf("successfully deleted authentication subscription from amData collection: %s", imsi)
+	return nil
 }
 
 func getDeletedImsisList(group, prevGroup *configmodels.DeviceGroups) (dimsis []string) {

@@ -129,6 +129,9 @@ func (n *NFConfigServer) startSyncWorker(ctx context.Context, syncChan <-chan st
 	}()
 }
 
+// syncRetryInterval is a var, not a const, so tests can shrink it instead of sleeping through real backoffs.
+var syncRetryInterval = 3 * time.Second
+
 func (n *NFConfigServer) syncWithRetry(ctx context.Context) {
 	n.syncMutex.Lock()
 	defer n.syncMutex.Unlock()
@@ -145,7 +148,7 @@ func (n *NFConfigServer) syncWithRetry(ctx context.Context) {
 				return
 			}
 			logger.NfConfigLog.Warnf("Sync in-memory configuration failed, retrying: %v", err)
-			interval = 3 * time.Second
+			interval = syncRetryInterval
 		}
 	}
 }

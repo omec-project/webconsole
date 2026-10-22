@@ -38,6 +38,9 @@ type Configuration struct {
 	EnableAuthentication    bool     `yaml:"enableAuthentication,omitempty"`
 	SendPebbleNotifications bool     `yaml:"send-pebble-notifications,omitempty"`
 	CfgPort                 int      `yaml:"cfgport,omitempty"`
+	// Distinct filtering-rule shapes one UPF may carry (see configapi.validateUpfRuleShapes).
+	// 0 keeps the default.
+	UpfRuleShapeLimit int `yaml:"upf-rule-shape-limit,omitempty"`
 }
 
 type TLS struct {

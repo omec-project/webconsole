@@ -1755,6 +1755,112 @@ func TestNetworkSlicePostHandler_EndpointValidation(t *testing.T) {
 	}
 }
 
+// A rule stored before its values were refused is accepted again unchanged, so the slice it is in
+// can still be edited by reading it, changing something else and posting it back; a changed or new
+// rule is validated in full.
+func TestNetworkSlicePostHandler_AcceptsAStoredRuleUnchanged(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	AddConfigV1Service(router)
+
+	// A port range wider than the UPF installs, refused since it was stored. Rules stored before
+	// the unit was normalised keep the operator's unit; a GET labels them bps.
+	legacy := func(unit string) configmodels.SliceApplicationFilteringRules {
+		rule := ruleTo("10.0.0.0/8", protocolTCP, 1000, 2000)
+		rule.BitrateUnit = unit
+		rule.AppMbrUplink = 5000000
+		rule.AppMbrDownlink = 5000000
+		return rule
+	}
+	storedWith := func(rule configmodels.SliceApplicationFilteringRules) *NetworkSliceMockDBClient {
+		stored := networkSlice(testSliceName)
+		stored.ApplicationFilteringRules = []configmodels.SliceApplicationFilteringRules{rule}
+		return &NetworkSliceMockDBClient{slices: []configmodels.Slice{stored}}
+	}
+	post := func(t *testing.T, slice configmodels.Slice) *httptest.ResponseRecorder {
+		jsonBody, err := json.Marshal(slice)
+		if err != nil {
+			t.Fatalf("failed to marshal network slice %v", err)
+		}
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "/config/v1/network-slice/"+testSliceName, bytes.NewReader(jsonBody))
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w
+	}
+	// What a client posts back: the slice as a GET returns it, with its gNB changed.
+	readBack := func(t *testing.T) configmodels.Slice {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/config/v1/network-slice/"+testSliceName, nil)
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET answered %v: %s", w.Code, w.Body.String())
+		}
+		var slice configmodels.Slice
+		if err := json.Unmarshal(w.Body.Bytes(), &slice); err != nil {
+			t.Fatalf("failed to decode the GET response: %v", err)
+		}
+		slice.SiteInfo.GNodeBs = []configmodels.SliceSiteInfoGNodeBs{{Name: "demo-gnb2", Tac: 2}}
+		return slice
+	}
+
+	testCases := []struct {
+		name         string
+		db           *NetworkSliceMockDBClient
+		edit         func(*configmodels.Slice)
+		expectedCode int
+	}{
+		{"stored in Mbps, read back unchanged", storedWith(legacy(bitrateUnitMbps)), func(*configmodels.Slice) {}, http.StatusOK},
+		{"stored without a unit, read back unchanged", storedWith(legacy("")), func(*configmodels.Slice) {}, http.StatusOK},
+		{"stored in bps, read back unchanged", storedWith(legacy(bitrateUnitBps)), func(*configmodels.Slice) {}, http.StatusOK},
+		{"the stored rule changed", storedWith(legacy(bitrateUnitMbps)), func(s *configmodels.Slice) {
+			s.ApplicationFilteringRules[0].EndPort = 1500
+		}, http.StatusBadRequest},
+		{"the stored rule beside a new refused rule", storedWith(legacy(bitrateUnitMbps)), func(s *configmodels.Slice) {
+			s.ApplicationFilteringRules = append(s.ApplicationFilteringRules, ruleTo("10.0.0.0/8 80", 0, 0, 0))
+		}, http.StatusBadRequest},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			dbadapter.CommonDBClient = tc.db
+			slice := readBack(t)
+			tc.edit(&slice)
+			if w := post(t, slice); tc.expectedCode != w.Code {
+				t.Errorf("expected `%v`, got `%v`: %s", tc.expectedCode, w.Code, w.Body.String())
+			}
+		})
+	}
+
+	t.Run("the same rule in a slice that is not stored", func(t *testing.T) {
+		originalDBClient := dbadapter.CommonDBClient
+		defer func() { dbadapter.CommonDBClient = originalDBClient }()
+		dbadapter.CommonDBClient = &NetworkSliceMockDBClient{}
+		slice := networkSlice(testSliceName)
+		slice.ApplicationFilteringRules = []configmodels.SliceApplicationFilteringRules{legacy(bitrateUnitBps)}
+		if w := post(t, slice); w.Code != http.StatusBadRequest {
+			t.Errorf("expected `%v`, got `%v`: %s", http.StatusBadRequest, w.Code, w.Body.String())
+		}
+	})
+	t.Run("the stored slice cannot be read", func(t *testing.T) {
+		originalDBClient := dbadapter.CommonDBClient
+		defer func() { dbadapter.CommonDBClient = originalDBClient }()
+		dbadapter.CommonDBClient = &NetworkSliceMockDBClient{err: errors.New("db down")}
+		slice := networkSlice(testSliceName)
+		slice.ApplicationFilteringRules = []configmodels.SliceApplicationFilteringRules{legacy(bitrateUnitBps)}
+		if w := post(t, slice); w.Code != http.StatusInternalServerError {
+			t.Errorf("expected `%v`, got `%v`: %s", http.StatusInternalServerError, w.Code, w.Body.String())
+		}
+	})
+}
+
 // A GET returns the stored rule, so the unit has to describe the stored value. The property that
 // matters is idempotence: posting back what a GET returned must not multiply the rates again.
 func TestNormalizeRewritesTheUnitToTheStoredOne(t *testing.T) {

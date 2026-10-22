@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os/exec"
+	"reflect"
 	"slices"
 	"sort"
 	"strconv"
@@ -114,20 +115,40 @@ func parseAndValidateSliceRequest(c *gin.Context, sliceName string) (configmodel
 		}
 	}
 
+	// A slice stored with a rule whose values are now refused could not otherwise be posted back
+	// with an unrelated edit. A rule identical to one the slice already stores is accepted again
+	// unchanged, with a warning; a new or changed rule is validated in full. A GET labels the stored
+	// rates bps (labelStoredRatesAsBps), so the stored rules are compared under that same label. The
+	// stored slice is read only once a rule is refused.
+	var storedRules []configmodels.SliceApplicationFilteringRules
+	storedRead := false
 	for _, ruleConfig := range request.ApplicationFilteringRules {
 		if ruleConfig.TrafficClass == nil {
 			logger.ConfigLog.Errorln("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
 			return request, http.StatusBadRequest, fmt.Errorf("TrafficClass (QCI, ARP) required but not provided, network slice NOT configured in the network")
 		}
-		if err := validateRuleBitrates(ruleConfig, sliceName); err != nil {
-			return request, http.StatusBadRequest, err
+		err := validateRuleValues(ruleConfig, sliceName)
+		if err == nil {
+			continue
 		}
-		if err := validateRulePorts(ruleConfig, sliceName); err != nil {
-			return request, http.StatusBadRequest, err
+		if !storedRead {
+			prevSlice, lookupErr := getSliceByName(sliceName)
+			if lookupErr != nil {
+				return request, http.StatusInternalServerError, fmt.Errorf("failed to look up existing network slice %s: %w", sliceName, lookupErr)
+			}
+			if prevSlice != nil {
+				labelStoredRatesAsBps(prevSlice)
+				storedRules = prevSlice.ApplicationFilteringRules
+			}
+			storedRead = true
 		}
-		if err := validateRuleEndpoint(ruleConfig, sliceName); err != nil {
-			return request, http.StatusBadRequest, err
+		if slices.ContainsFunc(storedRules, func(stored configmodels.SliceApplicationFilteringRules) bool {
+			return reflect.DeepEqual(stored, ruleConfig)
+		}) {
+			logger.ConfigLog.Warnf("rule %s is stored unchanged with a value that is now refused: %v", ruleConfig.RuleName, err)
+			continue
 		}
+		return request, http.StatusBadRequest, err
 	}
 
 	slices.Sort(request.SiteDeviceGroup)
@@ -171,6 +192,17 @@ func validateDeviceGroupsBelongToPlmn(request configmodels.Slice, sliceName stri
 		}
 	}
 	return http.StatusOK, nil
+}
+
+// validateRuleValues refuses a rule whose rates, ports or endpoint the network cannot serve as given.
+func validateRuleValues(rule configmodels.SliceApplicationFilteringRules, sliceName string) error {
+	if err := validateRuleBitrates(rule, sliceName); err != nil {
+		return err
+	}
+	if err := validateRulePorts(rule, sliceName); err != nil {
+		return err
+	}
+	return validateRuleEndpoint(rule, sliceName)
 }
 
 // A rate that isValidBitrate rejects is one that cannot be served as configured, so the slice is

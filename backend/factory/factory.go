@@ -25,6 +25,11 @@ import (
 
 var WebUIConfig *Config
 
+// MaxUpfRuleShapeLimit is the most upf-rule-shape-limit may be: a UPF holds at most 256 masks
+// (pdr_lookup_max_masks), and a shape takes two. A UPF that looks rules up by UE address (upf 1359)
+// takes no mask for the rules written here, so there the bound is only a guard against a typo.
+const MaxUpfRuleShapeLimit = 128
+
 func init() {
 	WebUIConfig = &Config{Configuration: &Configuration{CfgPort: 5000}}
 }
@@ -49,6 +54,9 @@ func InitConfigFactory(f string) error {
 			WebUIConfig.Configuration.NfConfigTLS.PEM == "" {
 			return fmt.Errorf("[NFConfig Configuration] TLS Key and PEM must be set")
 		}
+	}
+	if limit := WebUIConfig.Configuration.UpfRuleShapeLimit; limit < 0 || limit > MaxUpfRuleShapeLimit {
+		return fmt.Errorf("[Configuration] upf-rule-shape-limit must be 0 (the default) to %d, got %d", MaxUpfRuleShapeLimit, limit)
 	}
 	if WebUIConfig.Configuration.Mongodb.AuthUrl == "" {
 		authUrl := WebUIConfig.Configuration.Mongodb.Url

@@ -203,9 +203,9 @@ const (
 
 // A rule's ports reach the UPF only for TCP and UDP, as a range in its SDF filter. The UPF refuses a
 // range wider than it can install, and with it every session the rule applies to. A range it cannot
-// parse, it drops with the rest of the filter, installing the rule as matching any traffic. Both are
-// refused here. Both ports zero writes no port into the filter, and the UPF reads the full range as
-// any port.
+// parse, it drops with the rest of the filter, installing the rule as matching all of the UE's
+// traffic. Both are refused here. Both ports zero writes no port into the filter, and the UPF reads
+// the full range as any port.
 func validateRulePorts(rule configmodels.SliceApplicationFilteringRules, sliceName string) error {
 	if rule.Protocol != protocolTCP && rule.Protocol != protocolUDP {
 		return nil
@@ -224,11 +224,23 @@ func validateRulePorts(rule configmodels.SliceApplicationFilteringRules, sliceNa
 }
 
 // The BESS UPF matches packets to PDRs in one table shared by every session on the UPF, and that
-// table has room for 16 distinct masks (MAX_TUPLES in bess/core/modules/wildcard_match.h). A rule's
-// mask depends only on its endpoint's prefix length, whether it names a protocol and whether it
-// names a port; each such shape takes two masks, one per direction. Once the table is full, the
-// UPF refuses every session that needs a shape it does not hold.
-const maxUpfRuleShapes = 8
+// table has room for 16 distinct masks by default (pdr_lookup_max_masks in the UPF's upf.jsonc, at
+// most 256). A rule's mask depends only on its endpoint's prefix length, whether it names a protocol
+// and whether it names a port; each such shape takes two masks, one per direction. Once the table is
+// full, the UPF refuses every session that needs a shape it does not hold.
+//
+// A UPF that looks pdrLookup rules up by UE address first (upf 1359) takes no mask for a rule exact
+// on the UE address, which every filter written here is ("to assigned"), so on such a UPF the limit
+// can be raised to factory.MaxUpfRuleShapeLimit.
+const defaultUpfRuleShapeLimit = 8
+
+// upfRuleShapeLimit is the configured upf-rule-shape-limit, or the default when it is unset.
+func upfRuleShapeLimit() int {
+	if limit := factory.WebUIConfig.Configuration.UpfRuleShapeLimit; limit > 0 {
+		return limit
+	}
+	return defaultUpfRuleShapeLimit
+}
 
 // anyEndpoint is the SDF keyword for any address: the endpoint an operator may give, and the one
 // BuildSDFFilter writes for an endpoint beginning 0.0.0.0.
@@ -236,9 +248,9 @@ const anyEndpoint = "any"
 
 // A rule's endpoint is written into its SDF filter as it is, and the UPF splits the filter into
 // fields, so anything but a single address, prefix or "any" changes what it parses: extra fields
-// can add a port, or turn the filter into one it cannot parse and installs as matching any traffic.
-// No endpoint at all is accepted as it was before: the UPF cannot parse the filter it gives, and
-// installs the rule matching any traffic.
+// can add a port, or turn the filter into one it cannot parse and installs as matching all of the
+// UE's traffic. No endpoint at all is accepted as it was before: the UPF cannot parse the filter it
+// gives, and installs the rule matching all of the UE's traffic.
 func validateRuleEndpoint(rule configmodels.SliceApplicationFilteringRules, sliceName string) error {
 	endpoint := rule.Endpoint
 	if endpoint == "" || endpoint == anyEndpoint || net.ParseIP(endpoint) != nil {
@@ -269,8 +281,8 @@ type ruleShape struct {
 //
 // counts is false for a modelable rule the UPF refuses before installing anything -- a port range
 // too wide -- so that rule takes no mask. An endpoint or port range the UPF cannot parse it drops
-// with the rest of the filter, installing the rule as matching any traffic, so that reports the
-// any-traffic shape and counts. validateRulePorts refuses a range of either kind, but a slice stored
+// with the rest of the filter, installing the rule as matching all of the UE's traffic, so that
+// reports the any-endpoint shape and counts. validateRulePorts refuses a range of either kind, but a slice stored
 // before it may hold one.
 func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (shape ruleShape, modelable, counts bool) {
 	// The UPF splits the filter with strings.Fields, so it reads the endpoint as these fields.
@@ -415,9 +427,9 @@ func validateUpfRuleShapes(request configmodels.Slice, sliceName string) (int, e
 			shapes[ruleShape{unknown: flow}] = struct{}{}
 		}
 	}
-	if len(shapes) > maxUpfRuleShapes {
-		return http.StatusBadRequest, fmt.Errorf("network slice %s would bring the filtering rules on UPF %s to %d distinct shapes, more than the %d the UPF can hold; "+
-			"a shape is the endpoint's prefix length, whether a protocol is given and whether a port is given", sliceName, upf, len(shapes), maxUpfRuleShapes)
+	if limit := upfRuleShapeLimit(); len(shapes) > limit {
+		return http.StatusBadRequest, fmt.Errorf("network slice %s would bring the filtering rules on UPF %s to %d distinct shapes, more than the %d allowed by upf-rule-shape-limit; "+
+			"a shape is the endpoint's prefix length, whether a protocol is given and whether a port is given", sliceName, upf, len(shapes), limit)
 	}
 	return http.StatusOK, nil
 }

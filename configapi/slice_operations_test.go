@@ -1309,7 +1309,7 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			// The UPF drops a filter it cannot parse and matches any traffic instead.
+			// The UPF drops a filter it cannot parse and matches all of the UE's traffic instead.
 			name: "an endpoint the UPF cannot parse has the shape of any traffic",
 			posted: sliceOnUpf("a", "upf1", append(sevenPrefixRules(),
 				ruleTo("0.0.0.0/0", protocolTCP, 0, 0),
@@ -1541,6 +1541,35 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 			}
 			if (err != nil) != (tc.expectedCode != http.StatusOK) {
 				t.Errorf("unexpected error %v for status %v", err, code)
+			}
+		})
+	}
+}
+
+// upf-rule-shape-limit replaces the default of eight; 0 keeps it.
+func TestValidateUpfRuleShapesReadsTheConfiguredLimit(t *testing.T) {
+	origConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = origConfig }()
+	originalDBClient := dbadapter.CommonDBClient
+	defer func() { dbadapter.CommonDBClient = originalDBClient }()
+	dbadapter.CommonDBClient = &NetworkSliceMockDBClient{}
+
+	nineShapes := sliceOnUpf("a", "upf1", append(sevenPrefixRules(), ruleTo("0.0.0.0/0", 0, 0, 0), ruleTo("0.0.0.0/0", protocolTCP, 0, 0))...)
+	testCases := []struct {
+		limit        int
+		expectedCode int
+	}{
+		{0, http.StatusBadRequest},
+		{8, http.StatusBadRequest},
+		{9, http.StatusOK},
+		{factory.MaxUpfRuleShapeLimit, http.StatusOK},
+	}
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("limit %d", tc.limit), func(t *testing.T) {
+			factory.WebUIConfig = &factory.Config{Configuration: &factory.Configuration{UpfRuleShapeLimit: tc.limit}}
+			code, err := validateUpfRuleShapes(nineShapes, nineShapes.SliceName)
+			if code != tc.expectedCode {
+				t.Errorf("expected `%v`, got `%v` (%v)", tc.expectedCode, code, err)
 			}
 		})
 	}

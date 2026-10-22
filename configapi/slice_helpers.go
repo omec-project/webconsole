@@ -275,8 +275,26 @@ func upfRuleShapeLimit() int {
 }
 
 // anyEndpoint is the SDF keyword for any address: the endpoint an operator may give, and the one
-// BuildSDFFilter writes for an endpoint beginning 0.0.0.0.
+// BuildSDFFilter writes for an endpoint writtenAsAny.
 const anyEndpoint = "any"
+
+// writtenAsAny reports whether BuildSDFFilter writes the endpoint as "any": a prefix of length 0
+// such as 0.0.0.0/0, or anything else beginning 0.0.0.0 that does not parse as one prefix -- a
+// bare 0.0.0.0, or an endpoint of several fields such as "0.0.0.0/1 80", which validateRuleEndpoint
+// refuses but a slice stored before it may hold. Those are written as they always were. The SMF
+// reads only "any" as a match-all filter (smf qos.IsMatchAllIPFilter), and the PCF only a filter
+// ending "any to assigned" as the default QoS flow. A narrower prefix of 0.0.0.0, such as
+// 0.0.0.0/1, is written as given.
+func writtenAsAny(endpoint string) bool {
+	if !strings.HasPrefix(endpoint, "0.0.0.0") {
+		return false
+	}
+	if _, ipNet, err := net.ParseCIDR(endpoint); err == nil {
+		ones, _ := ipNet.Mask.Size()
+		return ones == 0
+	}
+	return true
+}
 
 // A rule's endpoint is written into its SDF filter as it is, and the UPF splits the filter into
 // fields, so anything but a single address, prefix or "any" changes what it parses: extra fields
@@ -320,7 +338,7 @@ func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (shape ruleSh
 	// The UPF splits the filter with strings.Fields, so it reads the endpoint as these fields.
 	fields := strings.Fields(rule.Endpoint)
 	switch {
-	case strings.HasPrefix(rule.Endpoint, "0.0.0.0"):
+	case writtenAsAny(rule.Endpoint):
 		// BuildSDFFilter writes such an endpoint as "any", which the UPF parses as any
 		// address.
 	case len(fields) > 1:
@@ -376,7 +394,7 @@ func ruleShapeOf(rule configmodels.SliceApplicationFilteringRules) (shape ruleSh
 // place keeps the shape count from drifting away from the filter actually installed.
 func BuildSDFFilter(rule configmodels.SliceApplicationFilteringRules) string {
 	endpoint := rule.Endpoint
-	if strings.HasPrefix(endpoint, "0.0.0.0") {
+	if writtenAsAny(endpoint) {
 		endpoint = anyEndpoint
 	}
 	var protocol string

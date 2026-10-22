@@ -1288,7 +1288,7 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 			name: "rules that differ only in what does not change a mask",
 			posted: sliceOnUpf("a", "upf1", append(sevenPrefixRules()[:5],
 				allowAll,
-				ruleTo("0.0.0.0/30", 0, 0, 0),
+				ruleTo("198.18.0.0/24", 0, 0, 0),
 				ruleTo("11.0.0.0/8", 0, 0, 0),
 				ruleTo("0.0.0.0/0", protocolTCP, 443, 443),
 				ruleTo("0.0.0.0/0", protocolUDP, 5060, 5070),
@@ -1435,6 +1435,13 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
+			// BuildSDFFilter writes it as given, not as "any", so it is a prefix length of its own.
+			// Nine shapes.
+			name:         "a narrower prefix of 0.0.0.0 has a shape of its own",
+			posted:       sliceOnUpf("a", "upf1", append(sevenPrefixRules(), allowAll, ruleTo("0.0.0.0/1", 0, 0, 0))...),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
 			name: "an any endpoint shares the shape of 0.0.0.0/0",
 			posted: sliceOnUpf("a", "upf1", append(sevenPrefixRules(),
 				ruleTo("any", protocolTCP, 80, 80),
@@ -1543,6 +1550,35 @@ func TestValidateUpfRuleShapes(t *testing.T) {
 				t.Errorf("unexpected error %v for status %v", err, code)
 			}
 		})
+	}
+}
+
+// Only a prefix of length 0, or a legacy endpoint beginning 0.0.0.0 that is not a prefix, is
+// widened to "any"; a narrower prefix of 0.0.0.0 reaches the filter as given.
+func TestBuildSDFFilterWritesOnlyAZeroPrefixAsAny(t *testing.T) {
+	origConfig := factory.WebUIConfig
+	defer func() { factory.WebUIConfig = origConfig }()
+	factory.WebUIConfig = &factory.Config{Configuration: &factory.Configuration{}}
+
+	const fromAny = "permit out ip from any to assigned"
+	testCases := []struct {
+		endpoint string
+		want     string
+	}{
+		{"0.0.0.0/0", fromAny},
+		{"0.0.0.0", fromAny},
+		{"0.0.0.0/0 80", fromAny},
+		{"0.0.0.0/1 80", fromAny},
+		{"0.0.0.0/1", "permit out ip from 0.0.0.0/1 to assigned"},
+		{"0.0.0.0/30", "permit out ip from 0.0.0.0/30 to assigned"},
+		{"0.0.0.0/32", "permit out ip from 0.0.0.0/32 to assigned"},
+		{"198.18.0.0/15", "permit out ip from 198.18.0.0/15 to assigned"},
+		{"any", fromAny},
+	}
+	for _, tc := range testCases {
+		if got := BuildSDFFilter(ruleTo(tc.endpoint, 0, 0, 0)); got != tc.want {
+			t.Errorf("endpoint %q: got %q, want %q", tc.endpoint, got, tc.want)
+		}
 	}
 }
 

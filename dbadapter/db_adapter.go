@@ -208,6 +208,40 @@ func CheckTransactionsSupport(client *DBInterface) error {
 	return nil
 }
 
+// urlNotLogged stands in for a MongoDB URL whose credentials cannot be located
+// safely.
+const urlNotLogged = "(URL not logged)"
+
+// redactURL returns a MongoDB URL as it may be logged: with the password
+// replaced by "xxxxx", hosts and options kept. net/url cannot do it here: it
+// rejects the several hosts of a replica-set URL (mongodb://h1:27017,h2:27017).
+// The user info is everything before the last "@", so an unescaped "?", "/"
+// or "@" in the password cannot move its end. When that part holds a "/" or
+// "?", where the credentials end is ambiguous, and the URL is not logged.
+// So is anything with an "@" that does not start with a MongoDB scheme.
+func redactURL(rawURL string) string {
+	scheme, rest, ok := strings.Cut(rawURL, "://")
+	if !ok || (scheme != "mongodb" && scheme != "mongodb+srv") {
+		if strings.Contains(rawURL, "@") {
+			return urlNotLogged
+		}
+		return rawURL
+	}
+	at := strings.LastIndex(rest, "@")
+	if at < 0 {
+		return rawURL
+	}
+	userInfo := rest[:at]
+	if strings.ContainsAny(userInfo, "/?") {
+		return urlNotLogged
+	}
+	user, _, hasPassword := strings.Cut(userInfo, ":")
+	if !hasPassword {
+		return rawURL
+	}
+	return scheme + "://" + user + ":xxxxx@" + rest[at+1:]
+}
+
 func InitMongoDB() error {
 	if factory.WebUIConfig.Configuration == nil {
 		return fmt.Errorf("configuration is nil")
@@ -219,7 +253,7 @@ func InitMongoDB() error {
 
 	ConnectMongo(mongodb.Url, mongodb.Name, &CommonDBClient)
 	logger.InitLog.Infow("Connected to common database",
-		"url", mongodb.Url,
+		"url", redactURL(mongodb.Url),
 		"dbName", mongodb.Name)
 
 	if err := CheckTransactionsSupport(&CommonDBClient); err != nil {
@@ -229,7 +263,7 @@ func InitMongoDB() error {
 
 	ConnectMongo(mongodb.AuthUrl, mongodb.AuthKeysDbName, &AuthDBClient)
 	logger.InitLog.Infow("Connected to auth database",
-		"url", mongodb.AuthUrl,
+		"url", redactURL(mongodb.AuthUrl),
 		"dbName", mongodb.AuthKeysDbName)
 
 	if err := createIndexWithRetry(CommonDBClient, configmodels.UpfDataColl, "hostname", 180*time.Second, 2*time.Second); err != nil {

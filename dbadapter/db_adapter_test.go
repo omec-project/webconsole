@@ -99,3 +99,98 @@ func TestCreateIndexWithRetry(t *testing.T) {
 		}
 	})
 }
+
+// redactedSingleHost is how redactURL logs a one-host URL with credentials.
+const redactedSingleHost = "mongodb://aether:xxxxx@mongodb-svc:27017/"
+
+func TestRedactURL(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "password replaced",
+			in:   "mongodb://aether:s3cret@mongodb-svc:27017/?replicaSet=mongodb&authSource=admin",
+			want: "mongodb://aether:xxxxx@mongodb-svc:27017/?replicaSet=mongodb&authSource=admin",
+		},
+		{
+			name: "percent-encoded password replaced",
+			in:   "mongodb://aether:s3cr%20et%2Bx@mongodb-svc:27017/",
+			want: redactedSingleHost,
+		},
+		{
+			name: "several hosts kept",
+			in:   "mongodb://aether:s3cret@mongodb-0:27017,mongodb-1:27017/?replicaSet=rs0",
+			want: "mongodb://aether:xxxxx@mongodb-0:27017,mongodb-1:27017/?replicaSet=rs0",
+		},
+		{
+			name: "no credentials unchanged",
+			in:   "mongodb://mongodb-headless:27017/?replicaSet=rs0",
+			want: "mongodb://mongodb-headless:27017/?replicaSet=rs0",
+		},
+		{
+			name: "SRV URL",
+			in:   "mongodb+srv://aether:s3cret@cluster.example.com/aether?retryWrites=true",
+			want: "mongodb+srv://aether:xxxxx@cluster.example.com/aether?retryWrites=true",
+		},
+		{
+			name: "user without password unchanged",
+			in:   "mongodb://aether@mongodb-svc:27017/",
+			want: "mongodb://aether@mongodb-svc:27017/",
+		},
+		{
+			name: "invalid escape in the password still replaced",
+			in:   "mongodb://aether:s3%zzret@mongodb-svc:27017/",
+			want: redactedSingleHost,
+		},
+		{
+			name: "unescaped @ in the password replaced",
+			in:   "mongodb://aether:s3@cret@mongodb-svc:27017/",
+			want: redactedSingleHost,
+		},
+		{
+			name: "unescaped ? in the password, not logged",
+			in:   "mongodb://aether:s3?cret@mongodb-svc:27017/",
+			want: urlNotLogged,
+		},
+		{
+			name: "unescaped / in the password, not logged",
+			in:   "mongodb://aether:s3/cret@mongodb-svc:27017/",
+			want: urlNotLogged,
+		},
+		{
+			name: "@ in the options, not logged",
+			in:   "mongodb://mongodb-svc:27017/?appName=webui@site",
+			want: urlNotLogged,
+		},
+		{
+			name: "no scheme with credentials, not logged",
+			in:   "aether:s3cret@mongodb-svc:27017",
+			want: urlNotLogged,
+		},
+		{
+			name: "password where the scheme should be, not logged",
+			in:   "aether:s3cret://tail@mongodb-svc:27017/",
+			want: urlNotLogged,
+		},
+		{
+			name: "other scheme without credentials unchanged",
+			in:   "http://mongodb-svc:27017/",
+			want: "http://mongodb-svc:27017/",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := redactURL(tc.in)
+			if got != tc.want {
+				t.Errorf("redactURL(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+			for _, secret := range []string{"s3cret", "s3cr%20et", "s3%zzret", "s3@cret", "s3?cret", "s3/cret", "cret@"} {
+				if strings.Contains(got, secret) {
+					t.Errorf("redactURL(%q) = %q still contains the password", tc.in, got)
+				}
+			}
+		})
+	}
+}

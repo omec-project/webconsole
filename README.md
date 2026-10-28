@@ -5,6 +5,8 @@ SPDX-FileCopyrightText: 2024 Canonical Ltd.
 SPDX-License-Identifier: Apache-2.0
 -->
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/omec-project/webconsole/badge)](https://scorecard.dev/viewer/?uri=github.com/omec-project/webconsole)
+[![GitHub latest release (SemVer)](https://img.shields.io/github/v/release/omec-project/webconsole?sort=semver)](https://github.com/omec-project/webconsole/releases)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://spdx.org/licenses/Apache-2.0.html)
 
 # WebConsole
 
@@ -50,7 +52,7 @@ instructions, see the [MongoDB Replica Set Documentation](https://www.mongodb.co
 
 ## Webconsole Architecture diagram
 
-![Architecture](/docs/images/architecture.png)
+![Architecture](./docs/images/architecture.png)
 
 The webconsole has two services: **WebUI** and **NF Config**.
 
@@ -90,7 +92,7 @@ There are six endpoints exposed by this service.
 | IMSI QoS             | PCF                 | GET         | `/nfconfig/qos/{dnn}/{imsi}`   | None  | [List of ImsiQoS](https://github.com/omec-project/openapi/blob/main/nfConfigApi/model_imsi_qos.go)            |
 
 To make modifications to the NF Config API, please refer to the
-[NF config API documentation](https://github.com/omec-project/openapi/blob/main/nfConfigApi/README.md)
+[NF config API](https://github.com/omec-project/openapi/blob/main/nfConfigApi/webconsole-api.yaml)
 in the [openapi](https://github.com/omec-project/openapi) repository.
 
 ## Upcoming Features

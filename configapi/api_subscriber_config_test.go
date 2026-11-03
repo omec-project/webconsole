@@ -319,9 +319,7 @@ func TestGetSubscriberByID(t *testing.T) {
 			expectedHTTPStatus: http.StatusOK,
 			expectedFullResponse: map[string]any{
 				"AccessAndMobilitySubscriptionData": map[string]any{
-					"activeTime":          nil,
-					"ecRestrictionDataWb": nil,
-					"gpsis":               []any{sampleMsisdn},
+					"gpsis": []any{sampleMsisdn},
 					"nssai": map[string]any{
 						"defaultSingleNssais": []any{
 							map[string]any{"sd": "010203", sstKey: 1},
@@ -330,14 +328,10 @@ func TestGetSubscriberByID(t *testing.T) {
 							map[string]any{"sd": "010203", sstKey: 1},
 						},
 					},
-					"odbPacketServices": nil,
-					"rfspIndex":         nil,
-					"subsRegTimer":      nil,
 					"subscribedUeAmbr": map[string]any{
 						downlinkKey: ambr1000Kbps,
 						uplinkKey:   ambr1000Kbps,
 					},
-					"traceData": nil,
 				},
 				"AmPolicyData": map[string]any{
 					"subscCats": []any{subscCatAether},
@@ -359,8 +353,6 @@ func TestGetSubscriberByID(t *testing.T) {
 									"arp":            map[string]any{"preemptCap": "MAY_PREEMPT", "preemptVuln": "PREEMPTABLE", priorityLevelKey: 8},
 									priorityLevelKey: 8,
 								},
-								"dnAaaAddress":      nil,
-								"ecsAddrConfigInfo": nil,
 								"pduSessionTypes": map[string]any{
 									"allowedSessionTypes": []any{"IPV4"},
 									"defaultSessionType":  "IPV4",
@@ -375,12 +367,10 @@ func TestGetSubscriberByID(t *testing.T) {
 								},
 							},
 						},
-						"odbPacketServices": nil,
 						"singleNssai": map[string]any{
 							"sd":   "010203",
 							sstKey: 1,
 						},
-						"traceData": nil,
 					},
 				},
 				"SmPolicyData": map[string]any{

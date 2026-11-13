@@ -90,3 +90,26 @@ func isValidDeviceGroupBitrate(value int64, unit string) bool {
 	multiplier, _ := bitrateMultiplier(unit)
 	return value <= maxDeviceGroupBitrateBps/multiplier
 }
+
+// nonGbr5QiPriorityLevel holds the standardized Non-GBR 5QIs of TS 23.501 Table 5.7.4-1 and the
+// default priority level each one carries. The subscribed default 5QI shall be one of these
+// (TS 23.501 clause 5.7.2.7), so it is both the set a device group's QoS is validated against and
+// the order a default is chosen in: the 5QI number is no measure of priority (5QI 69 is priority 5,
+// 5QI 5 is priority 10), and a lower level is the more important flow.
+var nonGbr5QiPriorityLevel = map[int32]int32{
+	5:  10,
+	6:  60,
+	7:  70,
+	8:  80,
+	9:  90,
+	10: 90,
+	69: 5,
+	70: 55,
+	79: 65,
+	80: 68,
+}
+
+func isNonGbr5Qi(qci int32) bool {
+	_, ok := nonGbr5QiPriorityLevel[qci]
+	return ok
+}

@@ -98,7 +98,7 @@ func deviceGroupPostHelper(requestDeviceGroup configmodels.DeviceGroups, groupNa
 		logger.ConfigLog.Infof("DNS Secondary : %v", ipdomain.DnsSecondary)
 		logger.ConfigLog.Infof("IP MTU : %v", ipdomain.Mtu)
 		if ipdomain.UeDnnQos != nil {
-			if err := validateUeDnnQosBitrates(ipdomain.UeDnnQos, groupName, ipdomain.Dnn); err != nil {
+			if err := validateUeDnnQos(ipdomain.UeDnnQos, groupName, ipdomain.Dnn); err != nil {
 				return http.StatusBadRequest, err
 			}
 			ipdomain.UeDnnQos.DnnMbrDownlink = convertToBps(ipdomain.UeDnnQos.DnnMbrDownlink, ipdomain.UeDnnQos.BitrateUnit)
@@ -177,7 +177,7 @@ func updateDG(devGroup *configmodels.DeviceGroups, prevDevGroup *configmodels.De
 // device group is refused rather than accepted with a rate the operator never asked for. Before
 // this check the negative rates were clamped to math.MaxInt64, which turned the smallest rate an
 // operator can express into the largest one the element can carry.
-func validateUeDnnQosBitrates(qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, groupName, dnn string) error {
+func validateUeDnnQos(qos *configmodels.DeviceGroupsIpDomainExpandedUeDnnQos, groupName, dnn string) error {
 	rates := []struct {
 		name  string
 		value int64
@@ -189,6 +189,12 @@ func validateUeDnnQosBitrates(qos *configmodels.DeviceGroupsIpDomainExpandedUeDn
 		if !isValidDeviceGroupBitrate(rate.value, qos.BitrateUnit) {
 			return fmt.Errorf("invalid %s %d %q for DNN %s in device group %s", rate.name, rate.value, qos.BitrateUnit, dnn, groupName)
 		}
+	}
+	// The QoS of a device group becomes the subscribed default QoS of its subscribers, whose 5QI
+	// shall be a standardized Non-GBR one (TS 23.501 clause 5.7.2.7). A group posted without a
+	// traffic class is left to the existing handling of that case.
+	if qos.TrafficClass != nil && !isNonGbr5Qi(qos.TrafficClass.Qci) {
+		return fmt.Errorf("invalid traffic-class qci %d for DNN %s in device group %s: the subscribed default 5QI must be a standardized Non-GBR 5QI (5, 6, 7, 8, 9, 10, 69, 70, 79 or 80)", qos.TrafficClass.Qci, dnn, groupName)
 	}
 	return nil
 }

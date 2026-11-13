@@ -1131,7 +1131,7 @@ func addBitrateBps(a, b int64) int64 {
 }
 
 // ClampDeviceGroupBitrateBps bounds a device group rate to what ConvertToString can render, so a
-// legacy value read straight from storage -- not yet corrected by validateUeDnnQosBitrates because
+// legacy value read straight from storage -- not yet corrected by validateUeDnnQos because
 // it predates that check -- cannot be served as an unreadable or wrapped rate.
 func ClampDeviceGroupBitrateBps(val int64) int64 {
 	if val < 0 {
@@ -1141,6 +1141,28 @@ func ClampDeviceGroupBitrateBps(val int64) int64 {
 		return maxDeviceGroupBitrateBps
 	}
 	return val
+}
+
+// isPreferredDefaultTrafficClass reports whether candidate should replace current as the aggregate's
+// traffic class, which becomes the subscribed default 5QI.
+//
+// That 5QI shall be a Non-GBR one (TS 23.501 clause 5.7.2.7), so a Non-GBR class always beats any
+// other, and among Non-GBR classes the one with the lower default priority level of Table 5.7.4-1
+// wins -- not the lower 5QI number, which does not order them (5QI 69 is priority 5, 5QI 5 is 10).
+// Equal levels (5QI 9 and 10) fall to the lower number so that the choice does not depend on the
+// order the IP domains were listed in. A group stored before the 5QI was validated may hold only
+// classes that are not Non-GBR; the lower number then wins, as it always did, rather than failing.
+func isPreferredDefaultTrafficClass(candidate, current *configmodels.TrafficClassInfo) bool {
+	candidateLevel, candidateNonGbr := nonGbr5QiPriorityLevel[candidate.Qci]
+	currentLevel, currentNonGbr := nonGbr5QiPriorityLevel[current.Qci]
+	switch {
+	case candidateNonGbr != currentNonGbr:
+		return candidateNonGbr
+	case candidateNonGbr && candidateLevel != currentLevel:
+		return candidateLevel < currentLevel
+	default:
+		return candidate.Qci < current.Qci
+	}
 }
 
 func aggregateQoS(qosList []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos) configmodels.DeviceGroupsIpDomainExpandedUeDnnQos {
@@ -1176,12 +1198,11 @@ func aggregateQoS(qosList []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos) c
 			aggregated.BitrateUnit = qos.BitrateUnit
 		}
 
-		// Use the first non-nil traffic class (prefer higher priority)
+		// Use the traffic class of the most important Non-GBR flow
 		if qos.TrafficClass != nil {
 			if aggregated.TrafficClass == nil {
 				aggregated.TrafficClass = qos.TrafficClass
-			} else if qos.TrafficClass.Qci < aggregated.TrafficClass.Qci {
-				// Lower QCI value = higher priority, use higher priority class
+			} else if isPreferredDefaultTrafficClass(qos.TrafficClass, aggregated.TrafficClass) {
 				aggregated.TrafficClass = qos.TrafficClass
 				logger.ConfigLog.Infof("using higher priority QoS class (QCI %d)", qos.TrafficClass.Qci)
 			}

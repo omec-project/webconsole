@@ -8,6 +8,7 @@ package webui_context
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -46,7 +47,7 @@ func (context *WEBUIContext) UpdateNfProfiles() {
 	context.NFProfiles = nfProfiles
 
 	for _, nfProfile := range context.NFProfiles {
-		if nfProfile.NfServices == nil || context.NfProfileAlreadyExists(nfProfile) {
+		if !nfProfile.HasNfServices() && !nfProfile.HasNfServiceList() || context.NfProfileAlreadyExists(nfProfile) {
 			continue
 		}
 
@@ -77,7 +78,7 @@ func (context *WEBUIContext) NfProfileAlreadyExists(nfProfile models.NFProfile) 
 }
 
 func getNfOamUri(nfProfile models.NFProfile, serviceName models.ServiceName) (nfOamUri string) {
-	for _, service := range nfProfile.NfServices {
+	for _, service := range nfProfileServices(nfProfile) {
 		if service.ServiceName == serviceName && service.NfServiceStatus == models.NFSERVICESTATUS_REGISTERED {
 			if nfProfile.GetFqdn() != "" {
 				nfOamUri = nfProfile.GetFqdn()
@@ -99,6 +100,23 @@ func getNfOamUri(nfProfile models.NFProfile, serviceName models.ServiceName) (nf
 		}
 	}
 	return
+}
+
+// nfProfileServices returns the profile's services, merging the deprecated NfServices
+// array with its Rel-16 replacement NfServiceList. NfServiceList entries are ordered by
+// key so the selected OAM URI is deterministic.
+func nfProfileServices(nfProfile models.NFProfile) []models.NFService {
+	services := append([]models.NFService{}, nfProfile.GetNfServices()...)
+	nfServiceList := nfProfile.GetNfServiceList()
+	keys := make([]string, 0, len(nfServiceList))
+	for key := range nfServiceList {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		services = append(services, nfServiceList[key])
+	}
+	return services
 }
 
 func (context *WEBUIContext) GetOamUris(targetNfType models.NFType) (uris []string) {

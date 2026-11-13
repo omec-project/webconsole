@@ -666,6 +666,44 @@ func TestDeviceGroupPostRefusesRatesThatCannotBeServed(t *testing.T) {
 	}
 }
 
+// The QoS of a device group becomes its subscribers' subscribed default QoS, whose 5QI shall be a
+// standardized Non-GBR one (TS 23.501 clause 5.7.2.7).
+func TestDeviceGroupPostRefusesA5QiThatCannotBeTheDefault(t *testing.T) {
+	testCases := []struct {
+		name         string
+		qci          int32
+		expectedCode int
+	}{
+		{"a Non-GBR 5QI", 9, http.StatusOK},
+		{"a Non-GBR 5QI above 64", 69, http.StatusOK},
+		{"a GBR 5QI", 2, http.StatusBadRequest},
+		{"a delay-critical GBR 5QI", 82, http.StatusBadRequest},
+		{"an unassigned 5QI", 11, http.StatusBadRequest},
+		{"zero", 0, http.StatusBadRequest},
+		{"negative", -9, http.StatusBadRequest},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalDBClient := dbadapter.CommonDBClient
+			defer func() { dbadapter.CommonDBClient = originalDBClient }()
+			dbMock := &DeviceGroupMockDBClient{}
+			dbadapter.CommonDBClient = dbMock
+
+			dg := deviceGroup(testGroupName)
+			dg.IpDomainsExpanded[0].UeDnnQos.TrafficClass.Qci = tc.qci
+			w := postDeviceGroup(t, dg)
+
+			if w.Code != tc.expectedCode {
+				t.Errorf("expected %d, got %d: %s", tc.expectedCode, w.Code, w.Body.String())
+			}
+			if tc.expectedCode != http.StatusOK && len(dbMock.postData) != 0 {
+				t.Errorf("the device group was stored although the request was refused: %+v", dbMock.postData)
+			}
+		})
+	}
+}
+
 // The stored rates are bps, so the stored unit has to be bps as well. Left as posted it makes the
 // document multiply its own rates every time an operator's tool reads it and writes it back.
 func TestDeviceGroupPostStoresRatesInBpsAndSaysSo(t *testing.T) {

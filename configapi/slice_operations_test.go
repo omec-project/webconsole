@@ -829,11 +829,44 @@ func TestAggregateQoS_SumsCorrectly(t *testing.T) {
 	}
 
 	if result.TrafficClass == nil || result.TrafficClass.Qci != 5 {
-		t.Fatalf("expected lowest QCI to win (5), got %v", result.TrafficClass)
+		t.Fatalf("expected the Non-GBR 5QI with the higher priority to win (5), got %v", result.TrafficClass)
 	}
 
 	if result.BitrateUnit != bitrateUnitMbps {
 		t.Fatalf("expected BitrateUnit Mbps, got %s", result.BitrateUnit)
+	}
+}
+
+// The aggregate's traffic class becomes the subscribed default 5QI, which shall be Non-GBR
+// (TS 23.501 clause 5.7.2.7) and is chosen by the priority level of Table 5.7.4-1, not by the 5QI
+// number.
+func TestAggregateQoS_DefaultTrafficClass(t *testing.T) {
+	testCases := []struct {
+		name     string
+		qcis     []int32
+		expected int32
+	}{
+		{"a GBR 5QI never beats a Non-GBR one", []int32{9, 2}, 9},
+		{"a GBR 5QI listed first is replaced", []int32{1, 8}, 8},
+		{"a delay-critical GBR 5QI never beats a Non-GBR one", []int32{82, 9}, 9},
+		{"priority level, not the 5QI number, orders them", []int32{5, 69}, 69},
+		{"the same level falls to the lower number", []int32{10, 9}, 9},
+		{"the same level is independent of the order", []int32{9, 10}, 9},
+		{"only GBR 5QIs keeps the lower number as before", []int32{4, 2}, 2},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var qosList []configmodels.DeviceGroupsIpDomainExpandedUeDnnQos
+			for _, qci := range tc.qcis {
+				qosList = append(qosList, configmodels.DeviceGroupsIpDomainExpandedUeDnnQos{
+					TrafficClass: &configmodels.TrafficClassInfo{Qci: qci},
+				})
+			}
+			result := aggregateQoS(qosList)
+			if result.TrafficClass == nil || result.TrafficClass.Qci != tc.expected {
+				t.Errorf("expected 5QI %d, got %+v", tc.expected, result.TrafficClass)
+			}
+		})
 	}
 }
 

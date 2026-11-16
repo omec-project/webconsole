@@ -1,74 +1,37 @@
+// Copyright (C) 2026 Intel Corporation
+// SPDX-FileCopyrightText: 2024 Canonical Ltd
 // SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
 // SPDX-FileCopyrightText: 2019 free5GC.org
-// SPDX-FileCopyrightText: 2024 Canonical Ltd
-//
 // SPDX-License-Identifier: Apache-2.0
-//
 
 package logger
 
 import (
+	utilLogger "github.com/omec-project/util/logger"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+var component = utilLogger.NewComponent("WebUI")
+
 var (
-	log         *zap.Logger
-	AppLog      *zap.SugaredLogger
-	InitLog     *zap.SugaredLogger
-	WebUILog    *zap.SugaredLogger
-	ContextLog  *zap.SugaredLogger
-	GinLog      *zap.SugaredLogger
-	ConfigLog   *zap.SugaredLogger
-	DbLog       *zap.SugaredLogger
-	AuthLog     *zap.SugaredLogger
-	NfConfigLog *zap.SugaredLogger
-	atomicLevel zap.AtomicLevel
+	AppLog      = component.Category("App")
+	InitLog     = component.Category("Init")
+	WebUILog    = component.Category("WebUI")
+	ContextLog  = component.Category("Context")
+	GinLog      = component.Category("GIN")
+	ConfigLog   = component.Category("CONFIG")
+	DbLog       = component.Category("DB")
+	AuthLog     = component.Category("Auth")
+	NfConfigLog = component.Category("NFConfig")
 )
 
-func init() {
-	atomicLevel = zap.NewAtomicLevelAt(zap.InfoLevel)
-	config := zap.Config{
-		Level:            atomicLevel,
-		Development:      false,
-		Encoding:         "console",
-		EncoderConfig:    zap.NewProductionEncoderConfig(),
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
-
-	config.EncoderConfig.TimeKey = "timestamp"
-	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	config.EncoderConfig.LevelKey = "level"
-	config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	config.EncoderConfig.CallerKey = "caller"
-	config.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
-	config.EncoderConfig.MessageKey = "message"
-	config.EncoderConfig.StacktraceKey = ""
-
-	var err error
-	log, err = config.Build()
-	if err != nil {
-		panic(err)
-	}
-
-	AppLog = log.Sugar().With("component", "WebUI", "category", "App")
-	InitLog = log.Sugar().With("component", "WebUI", "category", "Init")
-	WebUILog = log.Sugar().With("component", "WebUI", "category", "WebUI")
-	ContextLog = log.Sugar().With("component", "WebUI", "category", "Context")
-	GinLog = log.Sugar().With("component", "WebUI", "category", "GIN")
-	ConfigLog = log.Sugar().With("component", "WebUI", "category", "CONFIG")
-	DbLog = log.Sugar().With("component", "WebUI", "category", "DB")
-	AuthLog = log.Sugar().With("component", "WebUI", "category", "Auth")
-	NfConfigLog = log.Sugar().With("component", "WebUI", "category", "NFConfig")
-}
-
 func GetLogger() *zap.Logger {
-	return log
+	return component.Zap()
 }
 
 // SetLogLevel: set the log level (panic|fatal|error|warn|info|debug)
 func SetLogLevel(level zapcore.Level) {
 	InitLog.Infoln("set log level:", level)
-	atomicLevel.SetLevel(level)
+	component.SetLevel(level)
 }

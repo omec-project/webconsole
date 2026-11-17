@@ -428,7 +428,9 @@ func TestNFConfig_Start_ServerError(t *testing.T) {
 		t.Error("expected error when starting server on same port, got nil")
 	}
 	cancel1()
-	<-errChan
+	if err := <-errChan; err != nil {
+		t.Errorf("got error = %v, want nil after context cancellation", err)
+	}
 }
 
 func TestNFConfig_Start_ContextCancellation(t *testing.T) {

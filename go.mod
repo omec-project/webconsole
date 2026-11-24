@@ -8,14 +8,14 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
-	github.com/omec-project/openapi/v2 v2.5.1
-	github.com/omec-project/util v1.10.2
+	github.com/omec-project/openapi/v2 v2.8.0
+	github.com/omec-project/util v1.10.3
 	github.com/prometheus/client_golang v1.25.0
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.1
 	github.com/swaggo/swag v1.16.6
 	github.com/urfave/cli/v3 v3.14.0
-	go.mongodb.org/mongo-driver/v2 v2.10.0
+	go.mongodb.org/mongo-driver/v2 v2.10.1
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v4 v4.0.0
 	golang.org/x/crypto v0.59.0
@@ -48,7 +48,7 @@ require (
 	github.com/goccy/go-json v0.12.0 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.20.4 // indirect
+	github.com/klauspost/compress v1.20.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.2 // indirect
 	github.com/leodido/go-urn v1.5.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
@@ -65,7 +65,7 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.2 // indirect
 	github.com/xdg-go/scram v1.4.0 // indirect
-	github.com/xdg-go/stringprep v1.0.4 // indirect
+	github.com/xdg-go/stringprep v1.0.5 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
